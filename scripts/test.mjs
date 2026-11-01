@@ -394,6 +394,125 @@ await test("the solver reads a ladder and answers a wrong move with the refutati
   assert.equal(S.status(pz, cur), "won");
 });
 
+/** Correct first moves in diagram coordinates. */
+function localCorrect(pz) {
+  return S.solveFirstMoves(pz)
+    .correct.map((c) => `${c.x - pz.box.x0},${c.y - pz.box.y0}`)
+    .sort();
+}
+
+await test("the solver reads nets (geta) of four shapes, and loose nets fail when three liberties count as escaped", () => {
+  const nets = [
+    // Open board, the ladder is broken by the white stone: only the tight net works.
+    { at: [4, 4], diagram: [". . . . . . . . .", ". . . . . . . . .", ". . . X X . . . .", ". . X o . . . . .", ". . X . . . . . .", ". . . . . . . . .", ". . . . . . O . .", ". . . . . . . . .", ". . . . . . . . ."], net: "4,4", tight: true },
+    // Near the corner: White pushes out twice and is still caught.
+    { corner: "tl", diagram: [". . . . . . . .", "X . . . . . . .", ". . . . . . . .", "X o . . . . . .", ". X . X . . . .", ". . . . . . . ."], net: "2,2" },
+    // On the side, cut off between two black stones.
+    { at: [3, 0], diagram: [". . . . . . . . .", ". . . . X . X . .", ". . . X o . . . .", ". . X . . . O . .", ". . . . . X . . .", ". . . . . . . . .", ". . . . . . . . ."], net: "5,3" },
+    // The classic diagonal net with a helper stone in the ladder's path.
+    { at: [3, 0], diagram: [". . . . . . . .", ". . X . X . . .", ". X o . . . . .", ". X . . . . . .", ". . . . O . . .", ". . . . . . . .", ". . . . . . . ."], net: "3,3" },
+  ];
+  for (const n of nets) {
+    const pz = S.createPuzzle({ goal: "capture", at: n.at, corner: n.corner, diagram: n.diagram });
+    const v = S.validate(pz);
+    assert.deepEqual(v.reasons, []);
+    assert.deepEqual(localCorrect(pz), [n.net]);
+    // A net, not an atari: the first move does not touch the stones.
+    const k0 = S.indexOf(pz, pz.keys[0].x, pz.keys[0].y);
+    assert.equal(libertiesAt(pz, S.play(pz, S.initialState(pz), S.indexOf(pz, v.line[0].x, v.line[0].y)), k0), libertiesAt(pz, S.initialState(pz), k0));
+    // A loose net lets the stones reach three liberties and still catches them.
+    let st = S.initialState(pz);
+    let pushedTo3 = false;
+    for (const m of v.line) {
+      st = S.play(pz, st, S.indexOf(pz, m.x, m.y));
+      const k = S.indexOf(pz, pz.keys[0].x, pz.keys[0].y);
+      if (m.c === pz.keyColor && st.board[k] === pz.keyColor && libertiesAt(pz, st, k) >= 3) pushedTo3 = true;
+    }
+    assert.equal(S.status(pz, st), "won");
+    if (n.tight) continue;
+    assert.equal(pushedTo3, true, "the net lets the stones reach three liberties");
+    // With the old rule (three liberties = escaped) a loose net cannot be expressed.
+    const old = S.createPuzzle({ goal: "capture", at: n.at, corner: n.corner, diagram: n.diagram, escape: 3 });
+    assert.ok(!localCorrect(old).includes(n.net));
+  }
+});
+
+function libertiesAt(pz, st, i) {
+  const seen = new Set([i]);
+  const stack = [i];
+  const libs = new Set();
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % pz.size;
+    const y = (p / pz.size) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= pz.size || ny >= pz.size) continue;
+      const q = ny * pz.size + nx;
+      if (seen.has(q)) continue;
+      if (st.board[q] === 0) libs.add(q);
+      else if (st.board[q] === st.board[i]) {
+        seen.add(q);
+        stack.push(q);
+      }
+    }
+  }
+  return libs.size;
+}
+
+await test("the solver plays a snapback when an ordinary atari lets the stones connect out", () => {
+  const pz = S.createPuzzle({ goal: "capture", at: [4, 0], diagram: [". X o . O O . .", ". X o . X O O .", ". . X X X . . .", ". . . . . . . .", ". . . . . . . ."] });
+  const v = S.validate(pz);
+  assert.deepEqual(v.reasons, []);
+  assert.deepEqual(localCorrect(pz), ["3,0"]);
+  // Throw in, White captures, Black takes back three stones.
+  assert.deepEqual(
+    v.line.map((m) => `${m.x - pz.box.x0},${m.y - pz.box.y0}`),
+    ["3,0", "3,1", "3,0"],
+  );
+  // The ordinary atari is refuted: White connects to its strong stones.
+  const st = S.play(pz, S.initialState(pz), S.indexOf(pz, 7, 1));
+  assert.equal(S.reply(pz, st).refutes, true);
+});
+
+await test("the solver tells a ko from an unconditional result and survives repeated ko captures", () => {
+  // Bent four in the corner: the best Black can do is a ko.
+  const diagram = [", , , X X X", ", X X X o O", ", X O O O .", ", X O . . ."];
+  const plain = S.createPuzzle({ goal: "kill", corner: "br", diagram });
+  assert.equal(S.outcome(plain, S.initialState(plain)), "ko");
+  assert.ok(S.validate(plain).reasons.some((r) => r.includes("already lost")));
+  const ko = S.createPuzzle({ goal: "kill", corner: "br", diagram, ko: "ok" });
+  const v = S.validate(ko);
+  assert.deepEqual(v.reasons, []);
+  assert.equal(v.result, "ko");
+  // Play the ko out the way the app does: the opponent keeps retaking where
+  // the rules allow, and every call returns.
+  let st = S.initialState(ko);
+  st = S.play(ko, st, S.indexOf(ko, v.first.correct[0].x, v.first.correct[0].y));
+  for (let n = 0; n < 12; n++) {
+    const r = S.reply(ko, st);
+    if (!r || r.pass) break;
+    st = S.play(ko, st, S.indexOf(ko, r.x, r.y));
+    if (S.status(ko, st) !== "open") break;
+    const moves = S.winningMoves(ko, st);
+    if (!moves.length) break;
+    st = S.play(ko, st, S.indexOf(ko, moves[0].x, moves[0].y));
+  }
+  // A ko the problem does not accept is refuted, not looped on.
+  const corner = S.createPuzzle({ goal: "kill", corner: "br", diagram: [", , , X X X", ", X X X o O", ", X O O O .", ", X O . . ."] });
+  assert.equal(S.status(corner, S.initialState(corner)), "lost");
+});
+
+await test("the solver's validate() rejects a start that is already decided", () => {
+  // Already captured in all but name: two liberties and no way out.
+  const dead = S.createPuzzle({ goal: "capture", corner: "tl", diagram: ["o . X .", ". X . .", "X . . .", ". . . ."] });
+  assert.ok(S.validate(dead).reasons.some((r) => r.startsWith("starting position is already")));
+  // Already alive: two real eyes.
+  const alive = S.createPuzzle({ goal: "kill", diagram: [". o . O X ,", "O O O O X ,", "X X X X X ,", ", , , , , ,"] });
+  assert.ok(S.validate(alive).reasons.some((r) => r.startsWith("starting position is already")));
+});
+
 await test("Benson's algorithm recognises two real eyes and rejects a false eye", () => {
   const alive = S.createPuzzle({ goal: "live", diagram: [". o . O X ,", "O O O O X ,", "X X X X X ,", ", , , , , ,"] });
   const st = S.initialState(alive);
