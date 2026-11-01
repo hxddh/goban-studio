@@ -95,6 +95,36 @@ jobs:
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
           test -f dist/GobanStudio/resources/frontend/dist/licenses/Goban-Studio-MIT.txt
           ls -R dist/GobanStudio | head -40
+      - name: capture packaged app
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $exe = (Get-ChildItem -Recurse -Filter goban-studio.exe dist/GobanStudio | Select-Object -First 1).FullName
+          $env:GOBAN_SELFTEST_OUT = Join-Path $env:TEMP "goban-window-report.json"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 12
+          Write-Host "report exists: $(Test-Path $env:GOBAN_SELFTEST_OUT)"
+          try {
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save("$PWD\windows-app.png", [System.Drawing.Imaging.ImageFormat]::Png)
+            Write-Host "screen captured"
+          } catch {
+            Write-Host "screen capture unavailable: $($_.Exception.Message)"
+          }
+          if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (Test-Path $env:GOBAN_SELFTEST_OUT) { Get-Content $env:GOBAN_SELFTEST_OUT }
+      - name: upload diagnostic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GobanStudio-Windows-diagnostic
+          path: windows-app.png
+          if-no-files-found: ignore
       - name: self-test the packaged app
         timeout-minutes: 4
         run: |
