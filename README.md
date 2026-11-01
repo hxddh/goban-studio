@@ -19,11 +19,30 @@ existing Gomoku app. It deliberately uses a different bundle ID
 | macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
 
-`SHA256SUMS` is attached to every GitHub release. The v2.0.0 notes are in
-[`.github/release-notes/v2.0.0.md`](.github/release-notes/v2.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v3.0.0 notes are in
+[`.github/release-notes/v3.0.0.md`](.github/release-notes/v3.0.0.md).
 
-## Three places, one board
+## v3 at a glance
 
+- **Today** — one starting screen: continue, today's five (with your own
+  mistakes), the next lesson, a suggested game, your level over time and
+  what to work on.
+- **Playing** — KataGo on its own thread (the window never waits),
+  incremental positions, a human pace, resignation at stronger levels, an
+  offer to count, clocks, teaching mode, two-click placement, a three-point
+  summary and a rating after each game.
+- **Review** — free variations with live analysis, explained mistakes with
+  "practise this", a hover chart.
+- **Craft** — generated kaya/katsura/paper/slate boards, shell and slate
+  stones, modelled sounds, one icon family, a motion system, a native macOS
+  menu bar alongside the system Edit and Window menus.
+- **Quality** — real-browser interface checks with budgets and visual
+  comparison in CI; a four-language glossary; a usability protocol (not yet
+  run with people).
+
+## Places, one board
+
+- **Today** — see "v3 at a glance".
 - **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
   dan), or two players on one board. Handicap is suggested from your level.
   The panel shows only the players, whose turn it is, **Pass** (with a
@@ -104,6 +123,8 @@ shell serves.
 ```bash
 npm test
 npm run release-check
+npm run ui-test        # real Chromium: flows, budgets, four languages, visuals
+npm run ui-update      # rewrite tests/visual baselines after an intended change
 ```
 
 The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
@@ -150,7 +171,7 @@ native gates, and only then creates the tag and GitHub Release. Release
 notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v2.0.0
+gh workflow run release.yml -f tag=v3.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
@@ -169,7 +190,13 @@ src/web/js/board.js           canvas renderer: zoom windows, overlays, keyboard 
 src/web/js/engine.js          one engine interface: strength ladder, hints, review, dead stones
 src/web/js/katago.js          native bridge client and KataGo report parser
 src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engine
-src/web/js/solver.js          life-and-death / capturing solver for practice
+src/web/js/solver.js          life-and-death / capturing solver (nets, snapbacks, ko)
+src/web/js/materials.js       board textures and stone sprites (src/web/assets)
+src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
+src/web/js/app/insight.js     mistake sources, themes, atari, complexity
+src/web/js/app/rating.js      rating on the EGF kyu/dan scale
+scripts/make-assets.mjs       regenerates every texture, stone, sound and icon
+scripts/patch-sdk.mjs         keeps the system Edit/Window menus beside app menus
 src/web/js/rules.js           game tree, legality, Japanese scoring, SGF export
 src/web/js/sgf.js             dependency-free FF[4] reader
 src/web/js/content/           course, problems (+ measured grades), openings, classics

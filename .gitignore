@@ -16,3 +16,5 @@ src/web/js/bundle.js
 engine/*/katago
 engine/*/katago.exe
 engine/*/*.dll
+.claude/worktrees/
+tests/visual/diff/

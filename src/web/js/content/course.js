@@ -362,7 +362,7 @@ export const COURSE = [
               "귀의 백 세 점은 한 덩어리입니다. 마지막 활로를 찾으세요.",
               "隅の白三子は一団です。最後の呼吸点を探しましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: ["o o o X", "X X . X", ". . X ."] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: ["o o o X", "X X . X", ". . X ."] },
             success: L("整串一起被提掉。", "The whole group comes off together.", "덩어리 전체가 함께 들어냅니다.", "一団がまとめて盤から消えます。"),
           },
           {
@@ -438,7 +438,7 @@ export const COURSE = [
               "귀의 점이 백의 마지막 활로입니다. 그곳에 두면 따내므로 둘 수 있습니다.",
               "隅の点が白の最後の呼吸点です。そこに打てば取れるので、打てます。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". o X .", "o o X .", "X X . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". o X .", "o o X .", "X X . ."] },
             success: L("能提子的一手永远不是禁着。", "A move that captures is never suicide.", "따내는 수는 착수 금지가 아닙니다.", "石を取る手は着手禁止になりません。"),
           },
           {
@@ -449,7 +449,7 @@ export const COURSE = [
               "백 세 점이 빈 점 하나를 둘러싸고 있고, 그 점이 세 점 모두의 마지막 활로입니다. 따내세요.",
               "白三子が空点を囲み、その点が三子すべての最後の呼吸点です。取りましょう。",
             ),
-            problem: { goal: "capture", at: [6, 0], diagram: [". X o . o X .", ". X X o X X .", ". . . X . . ."] },
+            problem: { goal: "capture", escape: 3, at: [6, 0], diagram: [". X o . o X .", ". X X o X X .", ". . . X . . ."] },
             success: L("看起来像禁着，其实一手提掉三颗子。", "It looked forbidden, but it captured three stones.", "착수 금지처럼 보였지만 세 점을 따냈습니다.", "着手禁止に見えて、実は三子を取る手でした。"),
           },
         ],
@@ -589,7 +589,7 @@ export const COURSE = [
               "백돌은 활로가 둘입니다. 중앙 쪽에서 단수쳐서 변으로 몰아내세요.",
               "白石の呼吸点は二つ。中央側からアタリにして、辺の方へ逃げさせましょう。",
             ),
-            problem: { goal: "capture", at: [3, 0], diagram: [". . . . .", ". X o X .", ". . . . .", ". . . . ."] },
+            problem: { goal: "capture", escape: 3, at: [3, 0], diagram: [". . . . .", ". X o X .", ". . . . .", ". . . . ."] },
             success: L("往边上逃没有用，边线就是墙。", "Running to the edge does not help: the edge is a wall.", "변으로 도망쳐도 소용없습니다. 변은 벽입니다.", "辺へ逃げても無駄です。盤端は壁です。"),
           },
           {
@@ -600,7 +600,7 @@ export const COURSE = [
               "이번에는 오른쪽에 흑돌 벽이 있습니다. 백이 그 벽 쪽으로 달아나도록 단수치세요.",
               "今度は右に黒石の壁があります。白がその壁にぶつかるようにアタリをかけましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". . . . . .", ". . X . X .", ". X o . X .", ". . . . X .", ". . . . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". . . . . .", ". . X . X .", ". X o . X .", ". . . . X .", ". . . . . ."] },
             success: L("自己的子也像墙一样挡住了对方。", "Your own stones block the escape just like the edge.", "내 돌도 변처럼 길을 막아 줍니다.", "自分の石も盤端と同じように逃げ道をふさぎます。"),
           },
           {
@@ -611,7 +611,7 @@ export const COURSE = [
               "귀 근처 백돌은 변에서 한 줄 떨어져 있습니다. 단수 방향을 잘 골라 잡으세요.",
               "隅の近くの白石は辺から一路です。正しい方向からアタリにして取りましょう。",
             ),
-            problem: { goal: "capture", corner: "tr", diagram: [". . . . . .", ". . . o X .", ". . . X . .", ". . . . . .", ". . . . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tr", diagram: [". . . . . .", ". . . o X .", ". . . X . .", ". . . . . .", ". . . . . ."] },
             success: L("挡住通往中间的路，白子只能往边上爬。", "Block the way to the centre and White can only crawl along the edge.", "중앙으로 가는 길을 막으면 백은 변으로 기어갈 수밖에 없습니다.", "中央への道をふさげば、白は辺をはうしかありません。"),
           },
         ],
@@ -643,7 +643,7 @@ export const COURSE = [
               "シチョウで白石を取りましょう。最初のアタリで白を隅の方へ逃がします。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "tl",
               diagram: [". . . . . . .", ". . . . . . .", ". . . . X . .", ". . X o . . .", ". . . X . . .", ". . . . . O .", ". . . . . . ."],
             },
@@ -658,7 +658,7 @@ export const COURSE = [
               "別の隅でもう一度シチョウ。反対側からアタリにすると、白は味方の方へ逃げます。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "br",
               diagram: [". . . . . . .", ". O . . . . .", ". . . X . . .", ". . . o X . .", ". . X . . . .", ". . . . . . .", ". . . . . . ."],
             },
@@ -673,7 +673,7 @@ export const COURSE = [
               "二子でもシチョウにかかります。上へ逃げるようにアタリをかけ、追い続けましょう。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "tl",
               diagram: [". . . . . . .", ". . . . . . .", ". . . . . . .", ". . X o . . .", ". . X o X . .", ". . . X . . .", ". . . . . . ."],
             },
@@ -709,7 +709,7 @@ export const COURSE = [
               "右下の白石がシチョウを助けます。ゲタで中の白石を取りましょう。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "tl",
               diagram: [". . . . . . . .", ". . . . . . . .", ". . . X X . . .", ". . X o . . . .", ". . X . . . . .", ". . . . . . . .", ". . . . . . O .", ". . . . . . . ."],
             },
@@ -724,7 +724,7 @@ export const COURSE = [
               "同じ形が別の隅に。やはりシチョウは不成立なので、ゲタを使います。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "br",
               diagram: [". . . . . . . .", ". O . . . . . .", ". . . . . . . .", ". . . . . X . .", ". . . . o X . .", ". . . X X . . .", ". . . . . . . .", ". . . . . . . ."],
             },
@@ -739,7 +739,7 @@ export const COURSE = [
               "今度は右上の隅。白石の逃げ道を見てから、かぶせましょう。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               corner: "tr",
               diagram: [". . . . . . . .", ". . . . . . . .", ". . . X X . . .", ". . . . o X . .", ". . . . . X . .", ". . . . . . . .", ". O . . . . . .", ". . . . . . . ."],
             },
@@ -772,9 +772,9 @@ export const COURSE = [
               "左上两颗白子只有两口气，但直接打吃会让它们连到右边。扑进去，再提回来。",
               "The two white stones at the upper left have two liberties, but a plain atari lets them connect to the right. Throw a stone in, then take back.",
               "왼쪽 위 백 두 점은 활로가 둘이지만, 그냥 단수치면 오른쪽과 이어집니다. 먹여친 뒤 되따내세요.",
-              "左上の白二子は呼吸点が二つですが、普通にアタリにすると右とつながります。ホウリコんでから取り返しましょう。",
+              "左上の白二子は呼吸点が二つですが、普通にアタリにすると右とつながります。ホウリコミを打ってから取り返しましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". . O . . .", "o o X O . .", "X X X O . .", ". . X . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". . O . . .", "o o X O . .", "X X X O . .", ". . X . . ."] },
             success: L(
               "白提一子后只剩一口气，你马上提回两颗。",
               "After White takes one stone it has a single liberty, and you take two right back.",
@@ -790,7 +790,7 @@ export const COURSE = [
               "오른쪽 위 귀도 같은 원리입니다. 돌을 내줄 점을 찾으세요.",
               "右上の隅も同じ考え方です。石を差し出す点を探しましょう。",
             ),
-            problem: { goal: "capture", corner: "tr", diagram: [". X o .", ". X o .", "X X X O", ". O O .", ". . . .", ". . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tr", diagram: [". X o .", ". X o .", "X X X O", ". O O .", ". . . .", ". . . ."] },
             success: L("舍一颗，得两颗。", "Give one, take two.", "한 점을 주고 두 점을 얻습니다.", "一子を捨てて二子を得ます。"),
           },
           {
@@ -801,7 +801,7 @@ export const COURSE = [
               "왼쪽 아래: 먼저 먹여치고, 그다음 환격입니다.",
               "左下：まずホウリコミ、それからウッテガエシです。",
             ),
-            problem: { goal: "capture", corner: "bl", diagram: [". . X . . .", "X X X O . .", "o o X O . .", ". . O . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "bl", diagram: [". . X . . .", "X X X O . .", "o o X O . .", ". . O . . ."] },
             success: L("看到对方只有两口气、又连不出去时，想一想倒扑。", "When stones have two liberties and nowhere to connect, think of the snapback.", "활로가 둘이고 이을 데가 없는 돌을 보면 환격을 떠올리세요.", "呼吸点が二つでつながる先のない石には、ウッテガエシを考えましょう。"),
           },
         ],
@@ -827,7 +827,7 @@ export const COURSE = [
               "백 두 점은 각각 활로가 둘이고, 하나를 함께 씁니다. 두 점을 동시에 단수치는 점을 찾으세요.",
               "白二子はそれぞれ呼吸点が二つで、一つを共有しています。両方をアタリにする点を探しましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". . X . . ,", ". X o . . ,", ". o . . . ,", ". X . . . ,", ", , , , , ,"] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". . X . . ,", ". X o . . ,", ". o . . . ,", ". X . . . ,", ", , , , , ,"] },
             success: L("白棋救一块，你吃另一块。", "White saves one; you capture the other.", "백이 하나를 살리면 다른 하나를 잡습니다.", "白が片方を助ければ、もう片方を取れます。"),
           },
           {
@@ -839,7 +839,7 @@ export const COURSE = [
               "広い所でも同じです。白二子の間に打ちましょう。",
             ),
             problem: {
-              goal: "capture",
+              goal: "capture", escape: 3,
               at: [2, 2],
               diagram: [", , , , , , ,", ", . X . . . ,", ", X o . o X ,", ", . . . X . ,", ", . . . . . ,", ", , , , , , ,"],
             },
@@ -853,7 +853,7 @@ export const COURSE = [
               "오른쪽 아래 귀에도 같은 기회가 있습니다. 양단수를 찾으세요.",
               "右下の隅にも同じチャンスがあります。両アタリを見つけましょう。",
             ),
-            problem: { goal: "capture", corner: "br", diagram: [", , , , , ,", ", . . . X .", ", . . . o .", ", . . o X .", ", . . X . ."] },
+            problem: { goal: "capture", escape: 3, corner: "br", diagram: [", , , , , ,", ", . . . X .", ", . . . o .", ", . . o X .", ", . . X . ."] },
             success: L("先找有两口气、又挨在一起的子。", "Look for stones with two liberties that sit close together.", "활로가 둘이고 가까이 붙은 돌을 먼저 찾으세요.", "呼吸点が二つで近くにある石を探すのがコツです。"),
           },
         ],
@@ -892,7 +892,7 @@ export const COURSE = [
               "흑돌이 단수입니다. 중앙 쪽으로 뻗어 살리세요.",
               "黒石がアタリです。中央へ伸びて助けましょう。",
             ),
-            problem: { goal: "save", at: [3, 0], diagram: [". . O . .", ". O x O .", ". . . . .", ". . . . ."] },
+            problem: { goal: "save", escape: 3, at: [3, 0], diagram: [". . O . .", ". O x O .", ". . . . .", ". . . . ."] },
             success: L("长出后有三口气，安全了。", "After extending you have three liberties: safe for now.", "뻗고 나니 활로가 셋, 일단 안전합니다.", "伸びて呼吸点が三つ。ひとまず安全です。"),
           },
           {
@@ -903,7 +903,7 @@ export const COURSE = [
               "귀 근처 흑돌이 세 방향에서 둘러싸였습니다. 유일한 출구를 찾으세요.",
               "隅の近くの黒石が三方から囲まれています。ただ一つの出口を探しましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . . .", ". . O . . .", ". O x . . .", ". . O . . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . . .", ". . O . . .", ". O x . . .", ". . O . . .", ". . . . . ."] },
             success: L("出口通向中间，那里气最多。", "The exit leads to the centre, where liberties are plentiful.", "출구가 중앙으로 열려 있어 활로가 많습니다.", "出口は中央へ。そこは呼吸点が豊富です。"),
           },
           {
@@ -914,7 +914,7 @@ export const COURSE = [
               "흑 두 점이 함께 단수입니다. 뻗어서 활로를 충분히 만드세요.",
               "黒二子がまとめてアタリです。伸びて呼吸点を十分にしましょう。",
             ),
-            problem: { goal: "save", at: [2, 2], diagram: [". . . . . . .", ". . O O . . .", ". O x x . . .", ". . O O . . .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, at: [2, 2], diagram: [". . . . . . .", ". . O O . . .", ". O x x . . .", ". . O O . . .", ". . . . . . ."] },
             success: L("一串子共用的气，长一手就多了。", "One extension adds liberties to the whole group.", "한 번 뻗으면 덩어리 전체의 활로가 늘어납니다.", "一つ伸びれば、一団全体の呼吸点が増えます。"),
           },
         ],
@@ -931,7 +931,7 @@ export const COURSE = [
               "단수당한 돌이 옆의 자기 돌과 이어지면 그 활로를 함께 씁니다. 연결하세요.",
               "アタリの石は近くの味方とつながれば、その呼吸点を共有できます。つなぎましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . . . .", ". . O O . . .", ". O x . X . .", ". . O X . . .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . . . .", ". . O O . . .", ". O x . X . .", ". . O X . . .", ". . . . . . ."] },
             success: L("连在一起，气就多了。", "Joined up, the group has plenty of liberties.", "이어지니 활로가 넉넉합니다.", "つながって呼吸点がたっぷりになりました。"),
           },
           {
@@ -942,7 +942,7 @@ export const COURSE = [
               "이 흑돌은 세 방향이 백돌입니다. 위쪽 흑 진영과 이으세요.",
               "この黒石は三方を白に囲まれています。上の味方とつながりましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . . .", ". X X . . .", ". . O x O .", ". . . O . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . . .", ". X X . . .", ". . O x O .", ". . . O . .", ". . . . . ."] },
             success: L("有自己人在旁边，比单独逃跑更安全。", "With friends nearby, connecting beats running alone.", "가까이 자기 돌이 있으면 혼자 달아나는 것보다 잇는 편이 안전합니다.", "味方が近くにいれば、一人で逃げるよりつながる方が安全です。"),
           },
           {
@@ -953,7 +953,7 @@ export const COURSE = [
               "오른쪽 아래 귀에도 단수당한 흑돌이 있습니다. 연결하세요.",
               "右下の隅にもアタリの黒石があります。つなげて助けましょう。",
             ),
-            problem: { goal: "save", corner: "br", diagram: [". . . . . . .", ". . . X O . .", ". . X . x O .", ". . . O O . .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "br", diagram: [". . . . . . .", ". . . X O . .", ". . X . x O .", ". . . O O . .", ". . . . . . ."] },
             success: L("先看看能不能连回家，再考虑逃跑。", "Before running, check whether you can connect home.", "달아나기 전에 이을 수 있는지 먼저 보세요.", "逃げる前に、つながれるかをまず見ましょう。"),
           },
           {
@@ -964,7 +964,7 @@ export const COURSE = [
               "오른쪽 위 흑돌이 단수인데 바로 옆에 자기 돌이 있습니다. 이으세요.",
               "右上の黒石がアタリで、すぐそばに味方がいます。つなぎましょう。",
             ),
-            problem: { goal: "save", corner: "tr", diagram: [". . . . . .", ". . . X X .", ". O x O . .", ". . O . . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tr", diagram: [". . . . . .", ". . . X X .", ". O x O . .", ". . O . . .", ". . . . . ."] },
             success: L("连回去，一颗弱子就变成了强棋的一部分。", "Connected, a weak stone becomes part of a strong group.", "이으니 약한 돌이 강한 덩어리의 일부가 되었습니다.", "つながって、弱い石が強い一団の一部になりました。"),
           },
         ],
@@ -990,7 +990,7 @@ export const COURSE = [
               "흑돌이 단수이고, 왼쪽으로 뻗어도 다시 단수가 됩니다. 오른쪽 백돌은 활로가 하나뿐입니다. 따내세요.",
               "黒石がアタリで、左へ伸びてもまたアタリです。右の白石は呼吸点が一つ。取りましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . . .", ". O O . X .", ". . x O X .", ". O O X . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . . .", ". O O . X .", ". . x O X .", ". O O X . .", ". . . . . ."] },
             success: L("提掉切断的子，你的子就连回去了。", "Capturing the cutting stone links your stones up again.", "끊은 돌을 따내니 흑돌이 다시 이어졌습니다.", "切った石を取れば、黒石はまたつながります。"),
           },
           {
@@ -1001,7 +1001,7 @@ export const COURSE = [
               "왼쪽 아래 귀도 같은 상황입니다. 활로가 하나뿐인 백돌을 먼저 찾으세요.",
               "左下の隅も同じ状況です。呼吸点一つの白石をまず探しましょう。",
             ),
-            problem: { goal: "save", corner: "bl", diagram: [". . . . . .", ". O O X . .", ". . x O X .", ". O O . X .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "bl", diagram: [". . . . . .", ". O O X . .", ". . x O X .", ". O O . X .", ". . . . . ."] },
             success: L("反吃是最好的防守。", "Capturing back is the best defence.", "되잡는 것이 최선의 수비입니다.", "取り返すのが最善の守りです。"),
           },
           {
@@ -1012,7 +1012,7 @@ export const COURSE = [
               "오른쪽 위 흑돌도 단수입니다. 스스로 사는 되잡기를 찾으세요.",
               "右上の黒石もアタリです。助かるための取りを見つけましょう。",
             ),
-            problem: { goal: "save", corner: "tr", diagram: [". . . . . .", ". X . O O .", ". X O x . .", ". . X O O .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tr", diagram: [". . . . . .", ". X . O O .", ". X O x . .", ". . X O O .", ". . . . . ."] },
             success: L("对方也有弱点，被打吃时别慌。", "Your opponent has weaknesses too; do not panic in atari.", "상대에게도 약점이 있습니다. 단수에도 당황하지 마세요.", "相手にも弱点があります。アタリでも慌てずに。"),
           },
         ],
@@ -1027,7 +1027,7 @@ export const COURSE = [
               "被征子追的时候，先看征子的路线上有没有你的子。如果有，逃到那里就能连上，征子就失败了。这颗子叫“引征”。",
               "When you are chased in a ladder, look along its path. If one of your stones waits there, you reach it and the ladder fails. That stone is a ladder breaker.",
               "축으로 쫓길 때는 축의 길목을 살펴보세요. 그곳에 내 돌이 있으면 그 돌과 이어져 축이 깨집니다. 그런 돌을 축머리라고 합니다.",
-              "シチョウで追われたら、その道筋を見ます。そこに自分の石があれば、つながってシチョウは失敗します。その石をシチョウアタリの石と言います。",
+              "シチョウで追われたら、その道筋を見ます。そこに自分の石があれば、つながってシチョウは失敗します。その石をシチョウアタリと言います。",
             ),
             board: {
               size: 19,
@@ -1044,7 +1044,7 @@ export const COURSE = [
               "흑돌이 단수입니다. 왼쪽 위에 흑돌이 기다리고 있습니다. 뻗어서 그쪽으로 달아나세요.",
               "黒石がアタリです。左上に黒石が待っています。伸びてそちらへ逃げましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . . . .", ". X . . . . .", ". . . . O . .", ". . O x O . .", ". . . O . . .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . . . .", ". X . . . . .", ". . . . O . .", ". . O x O . .", ". . . O . . .", ". . . . . . ."] },
             success: L("征子的路上有你的子，白棋追不上。", "Your stone stands in the ladder's path, so White cannot catch you.", "축 길목에 흑돌이 있어 백이 잡을 수 없습니다.", "シチョウの道に黒石があるので、白は取れません。"),
           },
           {
@@ -1055,7 +1055,7 @@ export const COURSE = [
               "오른쪽 위 귀도 같습니다. 축머리 흑돌이 귀 쪽에 있습니다. 달아나세요.",
               "右上の隅も同じ。シチョウアタリの黒石が隅の方にあります。逃げましょう。",
             ),
-            problem: { goal: "save", corner: "tr", diagram: [". . . . . . .", ". . . . . X .", ". . O . . . .", ". . O x O . .", ". . . O . . .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tr", diagram: [". . . . . . .", ". . . . . X .", ". . O . . . .", ". . O x O . .", ". . . O . . .", ". . . . . . ."] },
             success: L("逃之前先确认征子的路线。", "Read the ladder's path before you run.", "달아나기 전에 축의 길을 확인하세요.", "逃げる前にシチョウの道筋を確かめましょう。"),
           },
           {
@@ -1066,7 +1066,7 @@ export const COURSE = [
               "오른쪽 아래: 축머리가 아래쪽에 있습니다. 올바른 방향으로 뻗으세요.",
               "右下：シチョウアタリの石は下の方です。正しい方向へ伸びましょう。",
             ),
-            problem: { goal: "save", corner: "br", diagram: [". . . . . . .", ". . . O . . .", ". . O x O . .", ". . O . . . .", ". . . . . X .", ". . . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "br", diagram: [". . . . . . .", ". . . O . . .", ". . O x O . .", ". . O . . . .", ". . . . . X .", ". . . . . . ."] },
             success: L("方向对了，征子就不成立。", "Run the right way and the ladder breaks.", "방향이 맞으면 축은 성립하지 않습니다.", "方向が正しければ、シチョウは成立しません。"),
           },
         ],
@@ -1076,7 +1076,7 @@ export const COURSE = [
   /* ================================================================ UNIT 4 */
   {
     id: "connect",
-    title: L("连接与切断", "Connecting and cutting", "연결과 끊기", "継ぎと切り"),
+    title: L("连接与切断", "Connecting and cutting", "연결과 끊기", "つなぎと切り"),
     summary: L(
       "实连、虎口、找切断点，以及切断后吃子。",
       "Solid and hanging connections, finding cutting points, and cutting to capture.",
@@ -1128,7 +1128,7 @@ export const COURSE = [
               "오른쪽 흑돌은 왼쪽 흑 덩어리와 한 점으로만 이어져 있습니다. 백이 끊으면 위험합니다. 끊는 점을 지키세요.",
               "右の黒石は左の黒と一点だけでつながっています。白に切られると危険です。切りを守りましょう。",
             ),
-            problem: { goal: "save", corner: "tl", diagram: [". . . . O .", ". . . x O .", ". X X O O .", ". . . O . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tl", diagram: [". . . . O .", ". . . x O .", ". X X O O .", ". . . O . .", ". . . . . ."] },
             success: L("断点补好了。下一课会看到，虎口也行。", "The cut is protected. As the next lesson shows, a hanging connection works too.", "끊는 점을 지켰습니다. 다음 강에서 보듯 호구로 이어도 됩니다.", "切りを守りました。次の課で見るように、カケツギでも大丈夫です。"),
           },
           {
@@ -1139,7 +1139,7 @@ export const COURSE = [
               "오른쪽 위 귀에도 같은 끊는 점이 있습니다. 흑돌을 이어 두세요.",
               "右上の隅にも同じ切りの点があります。黒石をつないでおきましょう。",
             ),
-            problem: { goal: "save", corner: "tr", diagram: [". O . . . .", ". O x . . .", ". O O X X .", ". . O . . .", ". . . . . ."] },
+            problem: { goal: "save", escape: 3, corner: "tr", diagram: [". O . . . .", ". O x . . .", ". O O X X .", ". . O . . .", ". . . . . ."] },
             success: L("连在一起的棋子才有力量。", "Connected stones are strong stones.", "이어진 돌이 강한 돌입니다.", "つながった石こそ強い石です。"),
           },
         ],
@@ -1202,7 +1202,7 @@ export const COURSE = [
               "왼쪽 아래 흑돌에 끊는 점이 있습니다. 꽉 잇기도 호구도 좋습니다. 하나를 골라 지키세요.",
               "左下の黒石に切りの点があります。カタツギでもカケツギでもよいので、守りましょう。",
             ),
-            problem: { goal: "save", corner: "bl", diagram: [". . . . . .", ". . . O . .", ". X X O O .", ". . . x O .", ". . . . O ."] },
+            problem: { goal: "save", escape: 3, corner: "bl", diagram: [". . . . . .", ". . . O . .", ". X X O O .", ". . . x O .", ". . . . O ."] },
             success: L("实连坚固，虎口灵活，都能连上。", "Solid is sturdy, hanging is nimble; both connect.", "꽉 잇기는 튼튼하고 호구는 가볍습니다. 둘 다 연결입니다.", "カタツギは堅く、カケツギは軽い。どちらも継ぎです。"),
           },
         ],
@@ -1257,7 +1257,7 @@ export const COURSE = [
               "왼쪽 백돌은 오른쪽 백돌과 한 점으로만 이어져 있습니다. 끊고 잡으세요.",
               "左の白石は右の白石と一点だけでつながっています。切って取りましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". . . . . . .", ". . X X . . .", ". X o . O . .", ". X . X . . .", ". . . . . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". . . . . . .", ". . X X . . .", ". X o . O . .", ". X . X . . .", ". . . . . . ."] },
             success: L("被切断的子往往活不了。", "A stone that is cut off often cannot survive.", "끊긴 돌은 살기 어려운 경우가 많습니다.", "切り離された石は生き延びにくいものです。"),
           },
           {
@@ -1268,7 +1268,7 @@ export const COURSE = [
               "오른쪽 위에도 한 점으로만 이어진 백돌이 있습니다. 끊고 잡으세요.",
               "右上にも一点だけでつながる白石があります。切って取りましょう。",
             ),
-            problem: { goal: "capture", corner: "tr", diagram: [". . . . . . .", ". . . X X . .", ". . O . o X .", ". . . X . X .", ". . . . . . ."] },
+            problem: { goal: "capture", escape: 3, corner: "tr", diagram: [". . . . . . .", ". . . X X . .", ". . O . o X .", ". . . X . X .", ". . . . . . ."] },
             success: L("断点就是对方的弱点。", "A cutting point is your opponent's weakness.", "끊는 점은 상대의 약점입니다.", "切りの点は相手の弱点です。"),
           },
         ],
@@ -1285,7 +1285,7 @@ export const COURSE = [
               "2선의 백돌은 오른쪽 백돌과 한 점으로 이어져 있습니다. 끊으면서 단수쳐 변으로 모세요.",
               "二線の白石は右の白石と一点でつながっています。切ってアタリにし、辺へ追いましょう。",
             ),
-            problem: { goal: "capture", at: [2, 0], diagram: [". . . . . . .", ". . X o . . .", ". . . X O O .", ". . . . . . .", ". . . . . . ."] },
+            problem: { goal: "capture", escape: 3, at: [2, 0], diagram: [". . . . . . .", ". . X o . . .", ". . . X O O .", ". . . . . . .", ". . . . . . ."] },
             success: L("切断加打吃，白子被赶到边上吃掉了。", "Cut, atari, and the stone dies on the edge.", "끊고 단수치니 백돌이 변에서 잡혔습니다.", "切ってアタリ、白石は辺で取られました。"),
           },
           {
@@ -1296,7 +1296,7 @@ export const COURSE = [
               "왼쪽 변에도 같은 기회가 있습니다. 끊고 계속 단수치세요.",
               "左辺にも同じチャンスがあります。切ってアタリを続けましょう。",
             ),
-            problem: { goal: "capture", at: [0, 2], diagram: [". . . . .", ". . . . .", ". X . . .", ". o X . .", ". . O . .", ". . O . .", ". . . . ."] },
+            problem: { goal: "capture", escape: 3, at: [0, 2], diagram: [". . . . .", ". . . . .", ". X . . .", ". o X . .", ". . O . .", ". . O . .", ". . . . ."] },
             success: L("边上的子被切断后最容易被吃。", "Stones near the edge are the easiest to capture once cut.", "변 근처 돌은 끊기면 가장 잡히기 쉽습니다.", "辺の近くの石は、切られると最も取られやすいのです。"),
           },
           {
@@ -1307,7 +1307,7 @@ export const COURSE = [
               "아래 변: 끊는 점을 찾아 끊고 백돌을 잡으세요.",
               "下辺：切りの点を見つけ、切って白石を取りましょう。",
             ),
-            problem: { goal: "capture", at: [6, 14], diagram: [". . . . . . .", ". . . . . . .", ". . . X O O .", ". . X o . . .", ". . . . . . ."] },
+            problem: { goal: "capture", escape: 3, at: [6, 14], diagram: [". . . . . . .", ". . . . . . .", ". . . X O O .", ". . X o . . .", ". . . . . . ."] },
             success: L("看到断点，就要想一想能不能切。", "Whenever you see a cutting point, ask whether you can cut.", "끊는 점이 보이면 끊을 수 있는지 생각하세요.", "切りの点が見えたら、切れるかを考えましょう。"),
           },
         ],
@@ -1520,7 +1520,7 @@ export const COURSE = [
             text: L(
               "角上的黑棋眼位不小，但还没有两只眼。找到能分出两只眼的一手。",
               "Black's corner group has a fair amount of space but not yet two eyes. Find the move that divides it into two.",
-              "귀의 흑은 공간이 꽤 있지만 아직 두 눈이 없습니다. 두 눈으로 나누는 한 수를 찾으세요.",
+              "귀의 흑은 궁도가 꽤 넓지만 아직 두 눈이 없습니다. 두 눈으로 나누는 한 수를 찾으세요.",
               "隅の黒は広さはありますが、まだ二眼ではありません。二つに分ける一手を探しましょう。",
             ),
             problem: { goal: "live", corner: "tl", diagram: [". . . X O ,", ". . . X O ,", "X X X x O ,", "O O O O O ,"] },
@@ -1530,23 +1530,23 @@ export const COURSE = [
             kind: "problem",
             text: L(
               "这个眼位是“丁”字形的四个点。中间那一点最关键。",
-              "This eye space is four points in a T shape. The middle point is the key.",
-              "이 공간은 T자 모양의 네 점입니다. 가운데 점이 핵심입니다.",
+              "This eye space is four points in a T shape: a pyramid four. The middle point is the key.",
+              "이 궁도는 T자 모양의 네 점, 삿갓 사궁입니다. 가운데 점이 급소입니다.",
               "この眼形はT字形の四目です。真ん中の点が急所です。",
             ),
             problem: { goal: "live", corner: "tl", diagram: [". . . X O ,", "X . X X O ,", "X x X O O ,", "O O O O , ,"] },
-            success: L("丁四的中心是要点：自己下就活，被点就死。", "The centre of the T is vital: take it and live; lose it and die.", "T자 넷의 가운데가 급소입니다. 차지하면 살고, 빼앗기면 죽습니다.", "丁四の中心が急所。打てば生き、打たれれば死にです。"),
+            success: L("丁四的中心是要点：自己下就活，被点就死。", "The centre of a pyramid four is vital: take it and live; lose it and die.", "삿갓 사궁의 가운데가 급소입니다. 차지하면 살고, 빼앗기면 죽습니다.", "丁四の中心が急所。打てば生き、打たれれば死にです。"),
           },
           {
             kind: "problem",
             text: L(
               "五个空点挤成一团，叫“刀把五”。找到分出两只眼的要点。",
-              "Five empty points in a bulky clump. Find the vital point that makes two eyes.",
-              "빈 점 다섯이 뭉쳐 있는 모양입니다. 두 눈을 만드는 급소를 찾으세요.",
-              "五つの空点がかたまった形です。二眼を作る急所を探しましょう。",
+              "Five empty points in a clump make a bulky five. Find the vital point that makes two eyes.",
+              "빈 점 다섯이 뭉친 모양을 뭉친 오궁이라고 합니다. 두 눈을 만드는 급소를 찾으세요.",
+              "五つの空点がかたまった形を刀五と言います。二眼を作る急所を探しましょう。",
             ),
             problem: { goal: "live", corner: "tl", diagram: [". . . X O ,", ". . X X O ,", "X X x O O ,", "O O O O , ,"] },
-            success: L("刀把五的要点在最多空点相邻的位置。", "The vital point of the bulky five touches the most empty points.", "뭉친 다섯의 급소는 빈 점과 가장 많이 맞닿은 곳입니다.", "かたまった五目の急所は、最も多くの空点に接する点です。"),
+            success: L("刀把五的要点在最多空点相邻的位置。", "The vital point of the bulky five touches the most empty points.", "뭉친 오궁의 급소는 빈 점과 가장 많이 맞닿은 곳입니다.", "刀五の急所は、最も多くの空点に接する点です。"),
           },
           {
             kind: "problem",
@@ -1596,20 +1596,20 @@ export const COURSE = [
               "左の一線がまだ開いていて、白がはい込もうとしています。先に止めれば二眼の広さが残ります。",
             ),
             problem: { goal: "live", at: [4, 0], diagram: [", . . . . . O ,", ", O X x X X O ,", ", O O O O O O ,"] },
-            success: L("挡住入口，眼位就保住了。", "Block the entrance and your eye space stays yours.", "입구를 막으니 공간이 지켜졌습니다.", "入口を止めて、眼形を守りました。"),
+            success: L("挡住入口，眼位就保住了。", "Block the entrance and your eye space stays yours.", "입구를 막으니 궁도가 지켜졌습니다.", "入口を止めて、眼形を守りました。"),
           },
         ],
       },
       {
         id: "life-space",
-        title: L("眼位的大小", "Eye space", "눈 공간", "眼形の広さ"),
+        title: L("眼位的大小", "Eye space", "궁도의 넓이", "眼形の広さ"),
         steps: [
           {
             kind: "read",
             text: L(
               "眼位越大越容易活，太小就做不出两只眼。对方会从外面压缩你的眼位，所以有时要先把眼位扩大或守住。",
               "The more room a group has, the easier it lives; too little and two eyes will not fit. The opponent squeezes your space from outside, so sometimes you must widen or protect it first.",
-              "공간이 넓을수록 살기 쉽고, 너무 좁으면 두 눈이 들어가지 않습니다. 상대가 바깥에서 공간을 줄여 오므로 먼저 넓히거나 지켜야 할 때가 있습니다.",
+              "궁도가 넓을수록 살기 쉽고, 너무 좁으면 두 눈이 들어가지 않습니다. 상대가 바깥에서 궁도를 줄여 오므로 먼저 넓히거나 지켜야 할 때가 있습니다.",
               "眼形は広いほど生きやすく、狭すぎると二眼が入りません。相手は外から眼形を狭めてくるので、先に広げたり守ったりする必要があります。",
             ),
           },
@@ -1618,11 +1618,11 @@ export const COURSE = [
             text: L(
               "白棋想从右边缩小黑棋的眼位。先在角上下一手，确保做出两只眼。",
               "White wants to shrink Black's space from the right. Play the key point in the corner so two eyes are guaranteed.",
-              "백이 오른쪽에서 흑의 공간을 줄이려 합니다. 귀의 요점에 먼저 두어 두 눈을 확보하세요.",
+              "백이 오른쪽에서 흑의 궁도를 줄이려 합니다. 귀의 급소에 먼저 두어 두 눈을 확보하세요.",
               "白は右から黒の眼形を狭めようとしています。隅の要所に先に打って、二眼を確保しましょう。",
             ),
             problem: { goal: "live", corner: "tl", diagram: [". . . . O ,", ". X X x O ,", "X X O O O ,", "O O O , , ,"] },
-            success: L("先占好角上的要点，白棋再缩小也来不及了。", "With the corner point taken, White's squeeze comes too late.", "귀의 요점을 먼저 차지하니 백이 줄여도 늦습니다.", "隅の要所を先に打てば、白が狭めても間に合いません。"),
+            success: L("先占好角上的要点，白棋再缩小也来不及了。", "With the corner point taken, White's squeeze comes too late.", "귀의 급소를 먼저 차지하니 백이 줄여도 늦습니다.", "隅の要所を先に打てば、白が狭めても間に合いません。"),
           },
           {
             kind: "problem",
@@ -1640,11 +1640,11 @@ export const COURSE = [
             text: L(
               "左下角再来一次。白棋正要从右边缩小眼位。",
               "Once more, in the lower left. White is about to squeeze from the right.",
-              "왼쪽 아래에서 한 번 더. 백이 오른쪽에서 공간을 줄이려 합니다.",
+              "왼쪽 아래에서 한 번 더. 백이 오른쪽에서 궁도를 줄이려 합니다.",
               "左下でもう一度。白が右から狭めようとしています。",
             ),
             problem: { goal: "live", corner: "bl", diagram: ["O O O , , ,", "X X O O O ,", ". X X x O ,", ". . . . O ,"] },
-            success: L("眼位的要点往往在角上。", "The key point of eye space is often in the corner itself.", "공간의 급소는 귀 자체에 있는 경우가 많습니다.", "眼形の急所は、隅そのものにあることが多いのです。"),
+            success: L("眼位的要点往往在角上。", "The key point of eye space is often in the corner itself.", "궁도의 급소는 귀 자체에 있는 경우가 많습니다.", "眼形の急所は、隅そのものにあることが多いのです。"),
           },
         ],
       },
@@ -1656,9 +1656,9 @@ export const COURSE = [
     title: L("杀棋", "Killing", "잡기", "殺し"),
     summary: L(
       "点眼：抢占直三、曲三、丁四、刀把五的要点，以及从外面缩小眼位。",
-      "Take the vital point of straight three, bent three, the T-four and bulky five, and shrink eye space from outside.",
-      "직삼, 곡삼, T자 넷, 뭉친 다섯의 급소에 치중하고, 바깥에서 공간을 줄이기.",
-      "直三、曲がり三、丁四、かたまった五目の急所に置き、外から眼形を狭める。",
+      "Take the vital point of straight three, bent three, the pyramid four and bulky five, and shrink eye space from outside.",
+      "직삼, 곡삼, 삿갓 사궁, 뭉친 오궁의 급소에 치중하기, 바깥에서 궁도를 줄이기.",
+      "直三、曲がり三、丁四、刀五の急所に置き、外から眼形を狭める。",
     ),
     lessons: [
       {
@@ -1767,14 +1767,14 @@ export const COURSE = [
       },
       {
         id: "kill-four-five",
-        title: L("丁四与刀把五", "The T-four and bulky five", "T자 넷과 뭉친 다섯", "丁四とかたまった五目"),
+        title: L("丁四与刀把五", "The pyramid four and bulky five", "삿갓 사궁과 뭉친 오궁", "丁四と刀五"),
         steps: [
           {
             kind: "read",
             text: L(
               "有些四个点、五个点的眼位也能被点死：要点总是和最多空点相邻的那个点。被点之后，白棋怎么下都只能做出一只眼。",
               "Some four- and five-point eye spaces can be killed too. The vital point is always the one that touches the most empty points; once it is taken, White can only make one eye.",
-              "네 점, 다섯 점짜리 공간도 치중으로 잡을 수 있습니다. 급소는 언제나 빈 점과 가장 많이 맞닿은 점입니다. 그곳을 빼앗기면 백은 눈을 하나밖에 만들지 못합니다.",
+              "네 점, 다섯 점짜리 궁도도 치중으로 잡을 수 있습니다. 급소는 언제나 빈 점과 가장 많이 맞닿은 점입니다. 그곳을 빼앗기면 백은 눈을 하나밖에 만들지 못합니다.",
               "四目や五目の眼形でも、置いて殺せるものがあります。急所はいつも最も多くの空点に接する点で、そこを打たれると白は一眼しか作れません。",
             ),
           },
@@ -1782,30 +1782,30 @@ export const COURSE = [
             kind: "problem",
             text: L(
               "白棋的眼位是丁四。点在中心。",
-              "White's eye space is a T-shaped four. Play its centre.",
-              "백의 공간은 T자 넷입니다. 가운데에 치중하세요.",
+              "White's eye space is a pyramid four. Play its centre.",
+              "백의 궁도는 삿갓 사궁입니다. 가운데에 치중하세요.",
               "白の眼形は丁四です。中心に置きましょう。",
             ),
             problem: { goal: "kill", corner: "tl", diagram: [". . . O X ,", "O . O O X ,", "O o O X X ,", "X X X X , ,"] },
-            success: L("丁四被点中心，就是死形。", "A T-four with its centre taken is dead.", "가운데에 치중당한 T자 넷은 죽은 모양입니다.", "中心に置かれた丁四は死に形です。"),
+            success: L("丁四被点中心，就是死形。", "A pyramid four with its centre taken is dead.", "가운데에 치중당한 삿갓 사궁은 죽은 모양입니다.", "中心に置かれた丁四は死に形です。"),
           },
           {
             kind: "problem",
             text: L(
               "白棋的眼位是刀把五。找到要点。",
               "White's eye space is a bulky five. Find the vital point.",
-              "백의 공간은 뭉친 다섯입니다. 급소를 찾으세요.",
-              "白の眼形はかたまった五目です。急所を探しましょう。",
+              "백의 궁도는 뭉친 오궁입니다. 급소를 찾으세요.",
+              "白の眼形は刀五です。急所を探しましょう。",
             ),
             problem: { goal: "kill", corner: "tl", diagram: [". . . O X ,", ". . O O X ,", "O O o X X ,", "X X X X , ,"] },
-            success: L("点中刀把五的要点，白棋就活不了。", "Take the bulky five's vital point and White cannot live.", "뭉친 다섯의 급소를 차지하면 백은 살 수 없습니다.", "かたまった五目の急所を打てば、白は生きられません。"),
+            success: L("点中刀把五的要点，白棋就活不了。", "Take the bulky five's vital point and White cannot live.", "뭉친 오궁의 급소를 차지하면 백은 살 수 없습니다.", "刀五の急所を打てば、白は生きられません。"),
           },
           {
             kind: "problem",
             text: L(
               "右下角的丁四。点眼。",
-              "A T-four in the lower right. Kill it.",
-              "오른쪽 아래 귀의 T자 넷입니다. 잡으세요.",
+              "A pyramid four in the lower right. Kill it.",
+              "오른쪽 아래 귀의 삿갓 사궁입니다. 잡으세요.",
               "右下の隅の丁四です。殺しましょう。",
             ),
             problem: { goal: "kill", corner: "br", diagram: [", , X X X X", ", X X O o O", ", X O O . O", ", X O . . ."] },
@@ -1815,14 +1815,14 @@ export const COURSE = [
       },
       {
         id: "kill-reduce",
-        title: L("缩小眼位与点", "Reduce and place", "공간 줄이기와 치중", "眼形を狭める・置く"),
+        title: L("缩小眼位与点", "Reduce and place", "궁도 줄이기와 치중", "眼形を狭める・置く"),
         steps: [
           {
             kind: "read",
             text: L(
               "眼位还没定型时，可以从一路下手：有时在一路扳缩小眼位，有时直接点进里面的要点，让白棋来不及做两只眼。",
               "When the eye space is not settled yet, work on the first line: sometimes shrink it with a hane from the end, sometimes place a stone right on the vital point inside so White cannot fit two eyes.",
-              "공간이 아직 정해지지 않았으면 1선에서 공략합니다. 끝에서 젖혀 공간을 줄이기도 하고, 안쪽 급소에 바로 치중해 두 눈을 못 만들게 하기도 합니다.",
+              "궁도가 아직 정해지지 않았으면 1선에서 공략합니다. 끝에서 젖혀 궁도를 줄이기도 하고, 안쪽 급소에 바로 치중해 두 눈을 못 만들게 하기도 합니다.",
               "眼形がまだ決まっていない時は一線で攻めます。端からハネて狭めたり、中の急所に直接置いたりして、二眼を作らせません。",
             ),
           },
@@ -1831,11 +1831,11 @@ export const COURSE = [
             text: L(
               "二路上的白棋还有空间。从一路下手，不让它做出两只眼。",
               "The white stones on the second line still have room. Work from the first line and deny them two eyes.",
-              "2선의 백은 아직 공간이 있습니다. 1선에서 공략해 두 눈을 못 만들게 하세요.",
+              "2선의 백은 아직 궁도가 넓습니다. 1선에서 공략해 두 눈을 못 만들게 하세요.",
               "二線の白にはまだ広さがあります。一線から攻めて二眼を作らせないようにしましょう。",
             ),
-            problem: { goal: "kill", corner: "tl", diagram: [". . . . . . X ,", "O O O O o . X ,", "X X X X X X X ,"] },
-            success: L("眼位一小，白棋就只剩一只眼。", "Once the space is small enough, White has only one eye.", "공간이 작아지니 백은 눈이 하나뿐입니다.", "眼形が狭くなり、白は一眼だけです。"),
+            problem: { goal: "kill", corner: "tl", diagram: [". . . . . X ,", "O O O O o X ,", "X X X X X X ,"] },
+            success: L("眼位一小，白棋就只剩一只眼。", "Once the space is small enough, White has only one eye.", "궁도가 좁아지니 백은 눈이 하나뿐입니다.", "眼形が狭くなり、白は一眼だけです。"),
           },
           {
             kind: "problem",
@@ -1845,7 +1845,7 @@ export const COURSE = [
               "이 백은 조금 더 깁니다. 1선의 급소는 어디일까요?",
               "この白はもう少し長い形です。一線の急所はどこでしょう。",
             ),
-            problem: { goal: "kill", corner: "tl", diagram: [". . . . . . . X ,", "O O O O o . . X ,", "X X X X X X X X ,"] },
+            problem: { goal: "kill", corner: "tl", diagram: [". . . . . . X X ,", "O O O O o X . X ,", "X X X X X X X X ,"] },
             success: L("点在二一路，白棋两边顾不过来。", "A stone placed on the first line next to the corner leaves White unable to cover both sides.", "귀 옆 1선에 치중하니 백은 양쪽을 다 지키지 못합니다.", "隅の隣の一線に置かれ、白は両側を守りきれません。"),
           },
           {
@@ -1856,7 +1856,7 @@ export const COURSE = [
               "오른쪽 위 귀의 같은 모양입니다. 백을 잡으세요.",
               "右上の隅の同じ形です。白を殺しましょう。",
             ),
-            problem: { goal: "kill", corner: "tr", diagram: [", X . . . . . . .", ", X . . o O O O O", ", X X X X X X X X"] },
+            problem: { goal: "kill", corner: "tr", diagram: [", X X . . . . . .", ", X . X o O O O O", ", X X X X X X X X"] },
             success: L("杀棋的第一步：想一想白棋的眼会做在哪里。", "Killing starts with asking where White wants to make its eyes.", "잡기의 첫걸음은 백이 어디에 눈을 만들지 생각하는 것입니다.", "殺しの第一歩は、白がどこに眼を作りたいかを考えることです。"),
           },
           {
@@ -1868,7 +1868,7 @@ export const COURSE = [
               "白は隅に空点が六つありますが、外の呼吸点がありません。中に置きましょう。",
             ),
             problem: { goal: "kill", corner: "tl", diagram: [". . . O X ,", ". . . O X ,", "O O o O X ,", "X X X X X ,"] },
-            success: L("外面没有气的棋，眼位再大也可能被点死。", "With no outside liberties, even a roomy group can be killed by a placement.", "바깥 활로가 없으면 넓은 공간도 치중으로 잡힐 수 있습니다.", "外の呼吸点がなければ、広い眼形でも置きで殺せることがあります。"),
+            success: L("外面没有气的棋，眼位再大也可能被点死。", "With no outside liberties, even a roomy group can be killed by a placement.", "바깥 활로가 없으면 넓은 궁도도 치중으로 잡힐 수 있습니다.", "外の呼吸点がなければ、広い眼形でも置きで殺せることがあります。"),
           },
         ],
       },
@@ -1881,8 +1881,8 @@ export const COURSE = [
     summary: L(
       "两块都没有活的棋互相包围时，数清气，先紧外气，小心公气。",
       "When two groups without life surround each other: count liberties, fill outside liberties first, and beware of shared ones.",
-      "살지 못한 두 덩어리가 서로 에워쌀 때: 활로를 세고, 바깥 공배부터 메우고, 함께 쓰는 공배를 조심하기.",
-      "生きていない石同士が囲み合う時：呼吸点を数え、外ダメから詰め、共通のダメに注意する。",
+      "살지 못한 두 덩어리가 서로 에워쌀 때: 활로를 세고, 바깥 공배부터 메우고, 공동 공배를 조심하기.",
+      "生きていない石同士が囲み合う時：呼吸点を数え、外ダメから詰め、内ダメに注意する。",
     ),
     lessons: [
       {
@@ -1906,7 +1906,7 @@ export const COURSE = [
               "흑백 모두 활로가 둘이고 흑 차례입니다. 백의 활로를 메워 수상전에서 이기세요.",
               "黒白とも呼吸点は二つ、黒番です。白の呼吸点を詰めて攻め合いに勝ちましょう。",
             ),
-            problem: { goal: "capture", corner: "tl", diagram: [". o X . O ,", ". o X . O ,", "X o X O O ,", "X X O O , ,", ", , , , , ,"] },
+            problem: { goal: "capture", escape: 3, corner: "tl", diagram: [". o X . O ,", ". o X . O ,", "X o X O O ,", "X X O O , ,", ", , , , , ,"] },
             success: L("同样的气，先下的赢。", "Equal liberties: the first to move wins.", "활로가 같으면 먼저 두는 쪽이 이깁니다.", "同数なら先手の勝ちです。"),
           },
           {
@@ -1917,7 +1917,7 @@ export const COURSE = [
               "왼쪽 아래 귀의 수상전입니다. 세어 보고 메우세요.",
               "左下の隅の攻め合いです。数えてから詰めましょう。",
             ),
-            problem: { goal: "capture", corner: "bl", diagram: [", , , , , ,", "X X O O , ,", "X o X O O ,", ". o X . O ,", ". o X . O ,"] },
+            problem: { goal: "capture", escape: 3, corner: "bl", diagram: [", , , , , ,", "X X O O , ,", "X o X O O ,", ". o X . O ,", ". o X . O ,"] },
             success: L("紧对方的气，不要去补自己的气。", "Fill the opponent's liberties; adding to your own here is too slow.", "상대 활로를 메우세요. 여기서 내 활로를 늘리는 것은 늦습니다.", "相手の呼吸点を詰めましょう。ここで自分の呼吸点を増やすのは遅すぎます。"),
           },
           {
@@ -1942,8 +1942,8 @@ export const COURSE = [
             text: L(
               "两块棋之间共有的气叫“公气”，只属于一方的气叫“外气”。紧公气会同时减少自己的气，所以要先紧外气。",
               "A liberty both groups share is a shared liberty; one that belongs only to the opponent is an outside liberty. Filling a shared liberty costs you one too, so fill the outside ones first.",
-              "두 덩어리가 함께 쓰는 공배는 메우면 내 활로도 줄어듭니다. 상대만의 바깥 공배부터 메우세요.",
-              "両方が共有するダメを詰めると自分の呼吸点も減ります。相手だけの外ダメから詰めましょう。",
+              "두 덩어리가 함께 쓰는 활로를 공동 공배, 한쪽에만 있는 활로를 바깥 공배라고 합니다. 공동 공배를 메우면 내 활로도 줄어들므로 바깥 공배부터 메우세요.",
+              "両方が共有するダメを内ダメ、片方だけのダメを外ダメと言います。内ダメを詰めると自分の呼吸点も減るので、外ダメから詰めましょう。",
             ),
             board: {
               size: 19,
@@ -1961,22 +1961,22 @@ export const COURSE = [
             text: L(
               "中间那口气是公气。先紧白棋的外气，赢下对杀。",
               "The liberty between the groups is shared. Fill White's outside liberties first and win the race.",
-              "두 덩어리 사이의 공배는 함께 쓰는 공배입니다. 백의 바깥 공배부터 메워 이기세요.",
-              "間のダメは共通のダメです。白の外ダメから詰めて、攻め合いに勝ちましょう。",
+              "두 덩어리 사이의 공배는 공동 공배입니다. 백의 바깥 공배부터 메워 이기세요.",
+              "間のダメは内ダメです。白の外ダメから詰めて、攻め合いに勝ちましょう。",
             ),
             problem: { goal: "capture", corner: "tl", escape: 4, diagram: [". o . X . O ,", ". o X X . O ,", "X o X O O O ,", "X X O O , , ,"] },
-            success: L("外气紧完，最后再紧公气提子。", "Outside liberties first; the shared one last, when it captures.", "바깥 공배를 다 메운 뒤 마지막에 함께 쓰는 공배로 따냅니다.", "外ダメを詰め終えてから、最後に共通のダメで取ります。"),
+            success: L("外气紧完，最后再紧公气提子。", "Outside liberties first; the shared one last, when it captures.", "바깥 공배를 다 메운 뒤 마지막에 공동 공배로 따냅니다.", "外ダメを詰め終えてから、最後に内ダメで取ります。"),
           },
           {
             kind: "problem",
             text: L(
               "右上角是同样的对杀。不要先紧公气。",
               "The same race in the upper right. Do not start with the shared liberty.",
-              "오른쪽 위 귀의 같은 수상전입니다. 함께 쓰는 공배부터 메우지 마세요.",
-              "右上の隅の同じ攻め合いです。共通のダメから詰めてはいけません。",
+              "오른쪽 위 귀의 같은 수상전입니다. 공동 공배부터 메우지 마세요.",
+              "右上の隅の同じ攻め合いです。内ダメから詰めてはいけません。",
             ),
             problem: { goal: "capture", corner: "tr", escape: 4, diagram: [", O . X . o .", ", O . X X o .", ", O O O X o X", ", , , O O X X"] },
-            success: L("先紧公气的话，自己也少一口气，就输了。", "Fill the shared liberty first and you lose a liberty too, and the race.", "함께 쓰는 공배를 먼저 메우면 내 활로도 줄어 집니다.", "共通のダメから詰めると自分の呼吸点も減り、負けてしまいます。"),
+            success: L("先紧公气的话，自己也少一口气，就输了。", "Fill the shared liberty first and you lose a liberty too, and the race.", "공동 공배를 먼저 메우면 내 활로도 줄어서 지고 맙니다.", "内ダメから詰めると自分の呼吸点も減り、負けてしまいます。"),
           },
           {
             kind: "problem",
@@ -1987,7 +1987,7 @@ export const COURSE = [
               "左下の隅でもう一度。外ダメはどこでしょう。",
             ),
             problem: { goal: "capture", corner: "bl", escape: 4, diagram: ["X X O O , , ,", "X o X O O O ,", ". o X X . O ,", ". o . X . O ,"] },
-            success: L("先外后内，是对杀的基本功。", "Outside first, shared last: the basic rule of races.", "바깥부터, 함께 쓰는 공배는 마지막. 수상전의 기본입니다.", "外から先、共通は最後。攻め合いの基本です。"),
+            success: L("先外后内，是对杀的基本功。", "Outside first, shared last: the basic rule of races.", "바깥 공배가 먼저, 공동 공배는 마지막. 수상전의 기본입니다.", "外ダメが先、内ダメは最後。攻め合いの基本です。"),
           },
         ],
       },
@@ -2000,8 +2000,8 @@ export const COURSE = [
             text: L(
               "对杀前先问三个问题：双方各有几口气？哪些是公气？谁先下？算清楚再动手。",
               "Before a race, ask three questions: how many liberties does each side have, which are shared, and whose move is it? Count first, then play.",
-              "수상전 전에 세 가지를 물어보세요. 각자 활로가 몇 개인가, 함께 쓰는 공배는 어느 것인가, 누구 차례인가. 세어 본 뒤에 두세요.",
-              "攻め合いの前に三つ確かめます。お互いの呼吸点はいくつか、共通のダメはどれか、どちらの番か。数えてから打ちましょう。",
+              "수상전 전에 세 가지를 물어보세요. 각자 활로가 몇 개인가, 공동 공배는 어느 것인가, 누구 차례인가. 세어 본 뒤에 두세요.",
+              "攻め合いの前に三つ確かめます。お互いの呼吸点はいくつか、内ダメはどれか、どちらの番か。数えてから打ちましょう。",
             ),
           },
           {
@@ -2051,7 +2051,7 @@ export const COURSE = [
               "오른쪽 아래: 서로 활로가 둘, 흑 차례입니다.",
               "右下：お互い呼吸点二つ、黒番です。",
             ),
-            problem: { goal: "capture", corner: "br", diagram: [", , , , , ,", ", , O O X X", ", O O X o X", ", O . X o .", ", O . X o ."] },
+            problem: { goal: "capture", escape: 3, corner: "br", diagram: [", , , , , ,", ", , O O X X", ", O O X o X", ", O . X o .", ", O . X o ."] },
             success: L("气数相同时，先手就是胜负手。", "With equal liberties, having the move decides it.", "활로가 같으면 차례가 승부를 가릅니다.", "同数なら、手番が勝負を分けます。"),
           },
           {
@@ -2059,11 +2059,11 @@ export const COURSE = [
             text: L(
               "右下角：有一口公气。从哪里开始紧？",
               "Lower right: there is one shared liberty. Where do you start?",
-              "오른쪽 아래: 함께 쓰는 공배가 하나 있습니다. 어디부터 메울까요?",
-              "右下：共通のダメが一つあります。どこから詰めますか。",
+              "오른쪽 아래: 공동 공배가 하나 있습니다. 어디부터 메울까요?",
+              "右下：内ダメが一つあります。どこから詰めますか。",
             ),
             problem: { goal: "capture", corner: "br", escape: 4, diagram: [", , , O O X X", ", O O O X o X", ", O . X X o .", ", O . X . o ."] },
-            success: L("外气先紧，公气留到最后。", "Outside liberties first, the shared one last.", "바깥 공배 먼저, 함께 쓰는 공배는 마지막.", "外ダメが先、共通のダメは最後です。"),
+            success: L("外气先紧，公气留到最后。", "Outside liberties first, the shared one last.", "바깥 공배 먼저, 공동 공배는 마지막.", "外ダメが先、内ダメは最後です。"),
           },
           {
             kind: "problem",

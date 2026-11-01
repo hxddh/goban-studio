@@ -5,8 +5,14 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { BoardView } from "../board.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
+import { ICONS } from "./icons.js";
 
 const PATHS = {
+  today: '<rect x="3" y="4" width="14" height="13" rx="2.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/><circle cx="10" cy="12.5" r="1.6"/>',
+  forward: '<path d="M8.5 4.5L14 10l-5.5 5.5"/>',
+  branch: '<circle cx="6" cy="4.5" r="1.6"/><circle cx="6" cy="15.5" r="1.6"/><circle cx="14" cy="8" r="1.6"/><path d="M6 6.1v7.8M14 9.6c0 3-8 2-8 4.3"/>',
+  sparkle: '<path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/>',
+  clock: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>',
   play: '<rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M7.7 3v14M12.3 3v14M3 7.7h14M3 12.3h14"/>',
   practice: '<path d="M3.5 5.2c2.2-1 4.4-1 6.5.4 2.1-1.4 4.3-1.4 6.5-.4v10c-2.2-1-4.4-1-6.5.4-2.1-1.4-4.3-1.4-6.5-.4z"/><path d="M10 5.6v10"/>',
   library: '<rect x="3.5" y="3" width="4" height="14" rx="1"/><rect x="8.5" y="3" width="4" height="14" rx="1"/><path d="M14 4.2l3.2.8-2.6 12-3.1-.8"/>',
@@ -43,7 +49,7 @@ const PATHS = {
 
 export function Icon({ name, size = 18 }) {
   return (
-    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: PATHS[name] || PATHS.more }} />
+    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICONS[name] || PATHS[name] || ICONS.more || PATHS.more }} />
   );
 }
 
@@ -196,7 +202,8 @@ export function Board({ model, onPlay, onHover, label }) {
     return () => view.current?.destroy();
   }, []);
   useEffect(() => {
-    view.current?.setModel(model);
+    view.current?.setModel({ ...model, flatStones: !!state.settings?.flatStones });
+    window.__board = view.current;
   });
   const onKey = (e) => {
     const bv = view.current;

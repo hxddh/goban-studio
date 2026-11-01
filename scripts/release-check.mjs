@@ -1,8 +1,8 @@
 /**
  * Release gate for the content and packaging promises.
  *
- * v2 counts what is real: a course of at least 8 units / 36 lessons / 150
- * steps, at least 150 solver-verified problems with measured grades, 40 pro
+ * Counts what is real: a course of at least 8 units / 36 lessons / 150
+ * steps, at least 250 solver-verified problems with themes with measured grades, 40 pro
  * openings with unique titles and lines, 20 classics, four languages
  * everywhere, Japanese rules, licences and one version string.
  */
@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { COURSE } from "../src/web/js/content/course.js";
-import { PROBLEMS } from "../src/web/js/content/problems.js";
+import { PROBLEMS, THEMES } from "../src/web/js/content/problems.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { APP_VERSION } from "../src/web/js/version.js";
@@ -30,10 +30,18 @@ assert.ok(steps.length >= 150, "at least 150 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);
 for (const lesson of lessons) assertLocalized(lesson, ["title"], lesson.id);
 
-assert.ok(PROBLEMS.length >= 150, "at least 150 problems");
+assert.ok(PROBLEMS.length >= 250, "at least 250 problems");
 for (const p of PROBLEMS) assertLocalized(p, ["title", "hint"], p.id);
 const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
 for (const p of PROBLEMS) assert.ok(grades[p.id]?.grade >= 1 && grades[p.id].grade <= 5, `${p.id} has a measured grade`);
+for (const p of PROBLEMS) assert.ok(THEMES.some((th) => th.id === p.theme), `${p.id} has a theme`);
+for (const th of THEMES) assertLocalized(th, ["name"], "theme " + th.id);
+for (const f of ["assets/surfaces/kaya.webp", "assets/surfaces/katsura.webp", "assets/surfaces/paper.webp", "assets/surfaces/slate.webp", "assets/brand.svg", "assets/sounds/place-wood-0.wav", "js/selftest.js"]) {
+  assert.ok(fs.existsSync(path.join(root, "src/web", f)), f);
+}
+assert.ok(fs.existsSync(path.join(root, "scripts/patch-sdk.mjs")), "SDK menu patch present");
+assert.ok(fs.existsSync(path.join(root, "docs/glossary.md")), "glossary present");
+assert.ok(fs.existsSync(path.join(root, "docs/usability.md")), "usability protocol present");
 const histogram = [1, 2, 3, 4, 5].map((g) => PROBLEMS.filter((p) => grades[p.id].grade === g).length);
 
 assert.equal(OPENINGS.length, 40, "40 openings");
@@ -78,5 +86,5 @@ assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html
 assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");
 
 console.log(
-  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems (grades ${histogram.join("/")}) · 40 openings · 20 classics · 4 languages · Japanese rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
+  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 40 openings · 20 classics · 4 languages · Japanese rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
 );

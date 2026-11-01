@@ -8,7 +8,7 @@ import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
-import { rankLabel } from "./play.jsx";
+import { rankLabel, ratingLabel } from "./play.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 
 export function Sheets() {
@@ -23,7 +23,9 @@ function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelled
   const ref = useRef(null);
   useEffect(() => {
     const prev = document.activeElement;
-    const first = ref.current?.querySelector("[data-autofocus]") || ref.current?.querySelector("button.primary") || ref.current?.querySelector("input, button");
+    // Focus the intended control, or the sheet itself (no stray focus ring
+    // on the close button when nothing is primary).
+    const first = ref.current?.querySelector("[data-autofocus]") || ref.current?.querySelector("button.primary") || ref.current;
     first?.focus({ preventScroll: true });
     return () => prev?.focus?.({ preventScroll: true });
   }, []);
@@ -43,7 +45,7 @@ function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelled
   };
   return (
     <div class="scrim" onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div class={`sheet ${wide ? "wide" : ""} ${cls}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy || "sheet-title"} ref={ref} onKeyDown={onKey}>
+      <div class={`sheet ${wide ? "wide" : ""} ${cls}`} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={labelledBy || "sheet-title"} ref={ref} onKeyDown={onKey}>
         {title && (
           <header class="sheet-head">
             <h2 id="sheet-title">{title}</h2>
@@ -65,21 +67,23 @@ const PRESETS = [
   { size: 19, key: "full" },
 ];
 
-function NewGameSheet() {
+function NewGameSheet({ prefill }) {
   const s = state.settings;
-  const [size, setSize] = useState(state.game?.game.size || 19);
+  const rec = C.recommendedGame();
+  const [size, setSize] = useState(prefill?.size || state.game?.game.size || rec.size);
+  const [tc, setTc] = useState(s.timeControl || "none");
   const [opponent, setOpponent] = useState("ai");
   const [color, setColor] = useState(BLACK);
-  const [strengthIdx, setStrengthIdx] = useState(Math.max(0, STRENGTHS.findIndex((x) => x.id === s.strength)));
+  const [strengthIdx, setStrengthIdx] = useState(Math.max(0, STRENGTHS.findIndex((x) => x.id === (prefill?.strength || (s.autoStrength ? rec.strength : s.strength)))));
   const strength = STRENGTHS[strengthIdx].id;
-  const suggested = opponent === "ai" ? suggestHandicap(s.playerRank, strength, size) : 0;
+  const suggested = opponent === "ai" ? suggestHandicap(rec.rank, strength, size) : 0;
   const [advanced, setAdvanced] = useState(false);
   const [handicap, setHandicap] = useState(null);
   const [komi, setKomi] = useState(null);
   const h = handicap ?? (color === BLACK ? suggested : 0);
   const k = komi ?? (h > 0 ? 0.5 : 6.5);
   const start = () =>
-    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k });
+    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, timeControl: tc });
   return (
     <Modal
       title={t("common.newGame")}
@@ -161,7 +165,21 @@ function NewGameSheet() {
             </div>
           </>
         )}
+        <div class="row">
+          <span>{t("newGame.time")}</span>
+          <Segmented
+            label={t("newGame.time")}
+            value={tc}
+            onChange={setTc}
+            options={[
+              { value: "none", label: t("time.none") },
+              { value: "move30", label: t("time.move30") },
+              { value: "byoyomi", label: t("time.byoyomi") },
+            ]}
+          />
+        </div>
         {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
+        {opponent === "ai" && s.autoStrength && STRENGTHS[strengthIdx].id === rec.strength && <p class="fine">{t("newGame.fromRating")}</p>}
         {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
 
         <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
@@ -248,7 +266,7 @@ function SettingsSheet() {
         <div class="row">
           <span>{t("settings.board")}</span>
           <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
-            {["wood", "paper", "slate"].map((m) => (
+            {["kaya", "katsura", "paper", "slate"].map((m) => (
               <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
                 <i />
                 <span>{t("settings.material." + m)}</span>
@@ -256,15 +274,31 @@ function SettingsSheet() {
             ))}
           </div>
         </div>
+        <Switch label={t("settings.flatStones")} checked={!!s.flatStones} onChange={(v) => set("flatStones", v)} />
         <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
         <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
         <Switch label={t("settings.sound")} checked={s.sound} onChange={(v) => set("sound", v)} />
       </section>
       <section class="settings-group">
+        <h3>{t("settings.playing")}</h3>
+        <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
+        <p class="fine">{t("settings.teachingHelp")}</p>
+        <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
+        <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
+        <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
+        <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
+      </section>
+      <section class="settings-group">
         <h3>{t("settings.you")}</h3>
+        {state.progress.rating && (
+          <div class="row">
+            <span>{t("settings.estimated")}</span>
+            <strong>{ratingLabel(state.progress.rating.r)}</strong>
+          </div>
+        )}
         <div class="row">
           <span>{t("settings.yourRank")}</span>
-          <select value={s.playerRank ?? ""} onChange={(e) => set("playerRank", e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} aria-label={t("settings.yourRank")}>
+          <select value={s.playerRank ?? ""} onChange={(e) => C.setPlayerRank(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} aria-label={t("settings.yourRank")}>
             <option value="">{t("settings.rankUnknown")}</option>
             {rankOptions.map((r) => (
               <option value={r}>{rankText(r)}</option>
@@ -384,7 +418,8 @@ function ShortcutsSheet() {
     [`${SHIFT}${MOD}H`, t("common.hint")],
     [`${MOD}.`, t("play.focus")],
     [`${MOD},`, t("nav.settings")],
-    [`${MOD}1 / 2 / 3`, `${t("nav.play")} / ${t("nav.practice")} / ${t("nav.library")}`],
+    [`${MOD}1 / 2 / 3 / 4`, `${t("nav.today")} / ${t("nav.play")} / ${t("nav.practice")} / ${t("nav.library")}`],
+    [`${MOD}[  ${MOD}]`, t("shortcuts.history")],
     ["← →", t("shortcuts.browse")],
     ["Enter", t("shortcuts.continue")],
     ["Tab · ↑↓←→ · Space", t("shortcuts.board")],

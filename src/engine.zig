@@ -1,12 +1,21 @@
 //! KataGo sidecar for every board size.
 //!
 //! The web layer owns the game; this module owns one persistent KataGo GTP
-//! process. The page sends a short, validated GTP script describing the
-//! position (clear_board / boardsize / komi / play ...), and gets either one
-//! move back (`move`) or a full search report (`analyze`: win rate, score
-//! lead, candidate moves and ownership) that drives the opponent, hints,
-//! review and dead-stone marking. A missing or unusable engine is not fatal:
-//! the bridge returns an error and the page falls back to its local opponent.
+//! process. Two ways in:
+//!
+//!   * `Engine.move` / `Engine.analyze` (v2, synchronous): the page sends a
+//!     short, validated GTP script describing the position and the caller
+//!     blocks until KataGo answers. Kept for compatibility.
+//!   * `Worker` (v3, asynchronous): a dedicated thread owns the GTP
+//!     conversation. The UI thread hands it a structured position
+//!     (`Request`), the worker brings KataGo's board there incrementally
+//!     (undo/play from the last position it sent), searches with
+//!     `kata-search_analyze_cancellable`, and queues partial reports and the
+//!     final result for the UI thread to collect after a platform wake.
+//!     Nothing here touches the webview or the runtime.
+//!
+//! A missing or unusable engine is not fatal: the bridge returns an error
+//! and the page falls back to its local opponent.
 const std = @import("std");
 
 const bin_name = if (@import("builtin").os.tag == .windows) "katago.exe" else "katago";
@@ -19,13 +28,19 @@ pub const Engine = struct {
     stdout: ?std.Io.File = null,
     reader: std.Io.File.Reader = undefined,
     reader_ready: bool = false,
-    read_buf: [64 * 1024]u8 = undefined,
+    /// Bumped every time a new KataGo process starts: a position cached for
+    /// an older process is meaningless.
+    generation: u32 = 0,
+    /// Serialises writes to KataGo's stdin between the worker thread and a
+    /// cancel coming from the UI thread (see `Worker.lock`).
+    write_lock: ?*std.Io.Mutex = null,
+    read_buf: [256 * 1024]u8 = undefined,
     exe_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     bin_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     model_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     config_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     version_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
-    info_buf: [96 * 1024]u8 = undefined,
+    info_buf: [256 * 1024]u8 = undefined,
     info_len: usize = 0,
     play_buf: [16]u8 = undefined,
     play_len: usize = 0,
@@ -36,13 +51,25 @@ pub const Engine = struct {
     }
 
     pub fn deinit(self: *@This(), io: std.Io) void {
+        // `stdin` is also read by the UI thread (cancel newline) under
+        // `write_lock`; retract it before the process goes away.
+        self.setStdin(null);
         if (self.child) |*child| {
             child.kill(io);
             self.child = null;
         }
-        self.stdin = null;
         self.stdout = null;
         self.reader_ready = false;
+    }
+
+    fn setStdin(self: *@This(), file: ?std.Io.File) void {
+        if (self.write_lock) |lock| {
+            lock.lockUncancelable(self.io);
+            defer lock.unlock(self.io);
+            self.stdin = file;
+        } else {
+            self.stdin = file;
+        }
     }
 
     const Paths = struct {
@@ -185,15 +212,36 @@ pub const Engine = struct {
         const stdin = child.stdin orelse return error.EngineProtocol;
         const stdout = child.stdout orelse return error.EngineProtocol;
         self.child = child;
-        self.stdin = stdin;
+        self.setStdin(stdin);
         self.stdout = stdout;
         self.reader = std.Io.File.Reader.init(stdout, self.io, &self.read_buf);
         self.reader_ready = true;
+        self.generation +%= 1;
+    }
+
+    /// Write without taking `write_lock`; the caller holds it.
+    fn writeUnlocked(self: *@This(), text: []const u8) !void {
+        const file = self.stdin orelse return error.EngineMissing;
+        try file.writeStreamingAll(self.io, text);
     }
 
     fn writeAll(self: *@This(), text: []const u8) !void {
-        const file = self.stdin orelse return error.EngineMissing;
-        try file.writeStreamingAll(self.io, text);
+        if (self.write_lock) |lock| {
+            lock.lockUncancelable(self.io);
+            defer lock.unlock(self.io);
+            return self.writeUnlocked(text);
+        }
+        return self.writeUnlocked(text);
+    }
+
+    /// One command line in one write, so a concurrent cancel newline can
+    /// only land between lines, never inside one.
+    fn writeLine(self: *@This(), text: []const u8) !void {
+        var buf: [256]u8 = undefined;
+        if (text.len + 1 > buf.len) return error.InvalidRequest;
+        @memcpy(buf[0..text.len], text);
+        buf[text.len] = '\n';
+        return self.writeAll(buf[0 .. text.len + 1]);
     }
 
     fn readReply(self: *@This()) ![]const u8 {
@@ -213,14 +261,14 @@ pub const Engine = struct {
     }
 
     fn command(self: *@This(), text: []const u8) ![]const u8 {
-        try self.writeAll(text);
-        try self.writeAll("\n");
+        try self.writeLine(text);
         return self.readReply();
     }
 
     pub fn validateLine(line: []const u8) bool {
         const allowed = [_][]const u8{
             "clear_board",
+            "undo",
             "boardsize ",
             "komi ",
             "play ",
@@ -278,14 +326,12 @@ pub const Engine = struct {
         try self.runScript(script);
         var cmd_buf: [80]u8 = undefined;
         const search = std.fmt.bufPrint(&cmd_buf, "kata-search_analyze {s} ownership true", .{color}) catch return error.InvalidRequest;
-        try self.writeAll(search);
-        try self.writeAll("\n");
-        self.readAnalysis() catch |err| switch (err) {
+        try self.writeLine(search);
+        self.readAnalysis(null) catch |err| switch (err) {
             error.EngineRejected => {
                 const fallback = std.fmt.bufPrint(&cmd_buf, "kata-genmove_analyze {s} interval 1 ownership true", .{color}) catch return error.InvalidRequest;
-                try self.writeAll(fallback);
-                try self.writeAll("\n");
-                try self.readAnalysis();
+                try self.writeLine(fallback);
+                try self.readAnalysis(null);
             },
             else => return err,
         };
@@ -307,8 +353,14 @@ pub const Engine = struct {
         }
     }
 
+    /// Receives every `info` line as it arrives (streaming).
+    pub const InfoSink = struct {
+        context: *anyopaque,
+        on_info: *const fn (context: *anyopaque, line: []const u8) void,
+    };
+
     /// A GTP response is "=" followed by lines and closed by an empty line.
-    fn readAnalysis(self: *@This()) !void {
+    fn readAnalysis(self: *@This(), sink: ?InfoSink) !void {
         if (!self.reader_ready) return error.EngineMissing;
         self.info_len = 0;
         self.play_len = 0;
@@ -334,15 +386,573 @@ pub const Engine = struct {
                 return;
             }
             self.keepLine(line);
+            if (sink) |s| {
+                if (std.mem.startsWith(u8, line, "info ")) s.on_info(s.context, line);
+            }
         }
         return error.EngineProtocol;
     }
 };
 
+// ---------------------------------------------------------------- async
+
+pub const max_setup = 19 * 19;
+pub const max_moves = 1200;
+const columns = "ABCDEFGHJKLMNOPQRST";
+
+/// One GTP stone or pass: `color` is 'B' or 'W', `vertex` is "D4", "Q16"
+/// or "pass" (upper case, validated against the board size).
+pub const Move = struct {
+    color: u8 = 'B',
+    len: u8 = 0,
+    vertex: [4]u8 = undefined,
+
+    pub fn text(self: *const Move) []const u8 {
+        return self.vertex[0..self.len];
+    }
+
+    pub fn eql(a: Move, b: Move) bool {
+        return a.color == b.color and std.mem.eql(u8, a.vertex[0..a.len], b.vertex[0..b.len]);
+    }
+};
+
+/// Parse "B D4 W Q16 B pass" into `out`. Every vertex must be on a
+/// `size`×`size` board; anything else is an invalid request, so nothing
+/// but `play <color> <vertex>` can ever reach KataGo from these lists.
+pub fn parseMoves(list: []const u8, size: u8, allow_pass: bool, out: []Move) error{InvalidRequest}!usize {
+    var it = std.mem.tokenizeAny(u8, list, " \t\r\n");
+    var n: usize = 0;
+    while (it.next()) |color_token| {
+        const vertex_token = it.next() orelse return error.InvalidRequest;
+        if (n >= out.len) return error.InvalidRequest;
+        if (color_token.len != 1) return error.InvalidRequest;
+        const color = std.ascii.toUpper(color_token[0]);
+        if (color != 'B' and color != 'W') return error.InvalidRequest;
+        var move = Move{ .color = color };
+        if (std.ascii.eqlIgnoreCase(vertex_token, "pass")) {
+            if (!allow_pass) return error.InvalidRequest;
+            @memcpy(move.vertex[0..4], "pass");
+            move.len = 4;
+        } else {
+            if (vertex_token.len < 2 or vertex_token.len > 3) return error.InvalidRequest;
+            const letter = std.ascii.toUpper(vertex_token[0]);
+            const col = std.mem.indexOfScalar(u8, columns, letter) orelse return error.InvalidRequest;
+            if (col >= size) return error.InvalidRequest;
+            const row = std.fmt.parseInt(u8, vertex_token[1..], 10) catch return error.InvalidRequest;
+            if (row < 1 or row > size) return error.InvalidRequest;
+            move.vertex[0] = letter;
+            @memcpy(move.vertex[1..vertex_token.len], vertex_token[1..]);
+            move.len = @intCast(vertex_token.len);
+        }
+        out[n] = move;
+        n += 1;
+    }
+    return n;
+}
+
+pub const Position = struct {
+    size: u8 = 19,
+    komi: f64 = 6.5,
+    setup: [max_setup]Move = undefined,
+    setup_len: usize = 0,
+    moves: [max_moves]Move = undefined,
+    moves_len: usize = 0,
+
+    /// Same board, komi and root stones: only the move list may differ.
+    pub fn sameBase(a: *const Position, b: *const Position) bool {
+        if (a.size != b.size or a.komi != b.komi or a.setup_len != b.setup_len) return false;
+        for (a.setup[0..a.setup_len], b.setup[0..b.setup_len]) |x, y| {
+            if (!x.eql(y)) return false;
+        }
+        return true;
+    }
+
+    /// Length of the shared opening of the two move lists.
+    pub fn commonPrefix(a: *const Position, b: *const Position) usize {
+        const n = @min(a.moves_len, b.moves_len);
+        var i: usize = 0;
+        while (i < n and a.moves[i].eql(b.moves[i])) : (i += 1) {}
+        return i;
+    }
+};
+
+pub const Request = struct {
+    seq: u64 = 0,
+    position: Position = .{},
+    color: u8 = 'B',
+    visits: u32 = 64,
+    max_time: f64 = 6.0,
+    stream: bool = false,
+};
+
+/// How the worker brought KataGo to the requested position.
+pub const SyncStats = struct {
+    reset: bool = false,
+    undo: u32 = 0,
+    play: u32 = 0,
+};
+
+pub const Outcome = enum { ok, cancelled, failed };
+
+pub const Result = struct {
+    seq: u64 = 0,
+    outcome: Outcome = .failed,
+    play_buf: [16]u8 = undefined,
+    play_len: usize = 0,
+    /// Final `info` line, owned by `result_allocator`; the collector frees it.
+    info: ?[]u8 = null,
+    sync: SyncStats = .{},
+    error_name: []const u8 = "",
+
+    pub fn play(self: *const Result) []const u8 {
+        return self.play_buf[0..self.play_len];
+    }
+};
+
+pub const StreamInfo = struct {
+    seq: u64,
+    /// Owned by `result_allocator`; the collector frees it.
+    info: []u8,
+};
+
+/// Thread-safe allocator for everything that crosses threads.
+pub const result_allocator = std.heap.page_allocator;
+
+/// Minimum spacing of partial reports handed to the UI thread. KataGo is
+/// asked for one every 200 ms (`interval 20`); this guards the UI against
+/// bursts if reports queue up in the pipe.
+const stream_min_gap_ms: i64 = 180;
+
+/// A cross-thread nudge for the UI loop (PlatformServices.wake_fn).
+pub const WakeFn = *const fn (context: ?*anyopaque) anyerror!void;
+
+pub const CancelResult = enum { not_found, removed_pending, signalled_running };
+
+/// The KataGo worker. Lives on the heap for the whole session.
+///
+/// Threads:
+///   * UI thread: `submit`, `cancel`, `takeResults`, `takeStream`,
+///     `lockExclusive`/`unlockExclusive` (legacy sync bridge calls),
+///     `shutdown`.
+///   * worker thread: `run` — the only code that talks to KataGo while an
+///     async request is in flight.
+///
+/// `lock` guards the request/result state AND every write to KataGo's
+/// stdin, so "is this search cancelled?" + "send the search command" on
+/// the worker and "mark cancelled" + "send the cancel newline" on the UI
+/// thread are each atomic: a cancel can never slip in between the check
+/// and the search and be lost. `engine_lock` is held by whoever drives a
+/// GTP exchange (the worker for a job, the UI thread for a legacy sync
+/// call). The worker never waits for the UI thread while holding either
+/// lock, and reaches it only through `wake_fn` (documented thread-safe).
+pub const Worker = struct {
+    engine: Engine = .{},
+    io: std.Io = undefined,
+
+    lock: std.Io.Mutex = .init,
+    cond: std.Io.Condition = .init,
+    engine_lock: std.Io.Mutex = .init,
+
+    // --- guarded by `lock`
+    started: bool = false,
+    quit: bool = false,
+    has_pending: bool = false,
+    pending: Request = .{},
+    running_seq: u64 = 0,
+    cancel_seq: u64 = 0,
+    results: [16]Result = undefined,
+    results_len: usize = 0,
+    stream: ?StreamInfo = null,
+
+    // --- set on the UI thread before the worker starts
+    wake_context: ?*anyopaque = null,
+    wake_fn: ?WakeFn = null,
+
+    // --- owned by whoever holds `engine_lock`
+    current: Request = .{},
+    sent: Position = .{},
+    sent_valid: bool = false,
+    sent_generation: u32 = 0,
+    params_valid: bool = false,
+    sent_visits: u32 = 0,
+    sent_max_time: f64 = 0,
+    last_stream_ms: i64 = 0,
+
+    pub fn init(self: *Worker, io: std.Io, env_map: *std.process.Environ.Map) void {
+        self.* = .{};
+        self.io = io;
+        self.engine.init(io, env_map);
+        self.engine.write_lock = &self.lock;
+    }
+
+    pub fn setWake(self: *Worker, context: ?*anyopaque, wake_fn: ?WakeFn) void {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        self.wake_context = context;
+        self.wake_fn = wake_fn;
+    }
+
+    fn notify(self: *Worker) void {
+        if (self.wake_fn) |f| f(self.wake_context) catch {};
+    }
+
+    /// Start the thread on first use. Caller holds `lock`.
+    fn ensureStarted(self: *Worker) !void {
+        if (self.started) return;
+        const thread = try std.Thread.spawn(.{ .stack_size = 1024 * 1024 }, run, .{self});
+        thread.detach();
+        self.started = true;
+    }
+
+    /// Ask KataGo to stop the running search. Caller holds `lock`. A bare
+    /// newline interrupts `kata-search_analyze_cancellable` and is ignored
+    /// by KataGo's command loop at any other moment.
+    fn signalCancelLocked(self: *Worker, seq: u64) void {
+        self.cancel_seq = seq;
+        self.engine.writeUnlocked("\n") catch {};
+    }
+
+    pub const Submitted = struct {
+        /// A queued request that never started; reply "cancelled" for it.
+        dropped_seq: u64 = 0,
+        /// The running request that was told to stop; its result arrives
+        /// as cancelled (or, if it finished in the same instant, ok).
+        superseded_seq: u64 = 0,
+    };
+
+    /// Queue `req` (copied), superseding whatever is queued or running.
+    /// UI thread.
+    pub fn submit(self: *Worker, req: *const Request) !Submitted {
+        var out = Submitted{};
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        try self.ensureStarted();
+        if (self.has_pending) out.dropped_seq = self.pending.seq;
+        if (self.running_seq != 0 and self.cancel_seq != self.running_seq) {
+            out.superseded_seq = self.running_seq;
+            self.signalCancelLocked(self.running_seq);
+        }
+        self.pending = req.*;
+        self.has_pending = true;
+        self.cond.signal(self.io);
+        return out;
+    }
+
+    /// Cancel one request. UI thread.
+    pub fn cancel(self: *Worker, seq: u64) CancelResult {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        if (self.has_pending and self.pending.seq == seq) {
+            self.has_pending = false;
+            return .removed_pending;
+        }
+        if (self.running_seq == seq) {
+            if (self.cancel_seq != seq) self.signalCancelLocked(seq);
+            return .signalled_running;
+        }
+        return .not_found;
+    }
+
+    /// Hand finished results to the UI thread. UI thread.
+    pub fn takeResults(self: *Worker, out: []Result) usize {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        const n = @min(out.len, self.results_len);
+        @memcpy(out[0..n], self.results[0..n]);
+        const rest = self.results_len - n;
+        var i: usize = 0;
+        while (i < rest) : (i += 1) self.results[i] = self.results[n + i];
+        self.results_len = rest;
+        return n;
+    }
+
+    /// The latest partial report, if any. UI thread.
+    pub fn takeStream(self: *Worker) ?StreamInfo {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        const value = self.stream;
+        self.stream = null;
+        return value;
+    }
+
+    /// Exclusive use of the engine for a legacy synchronous bridge call.
+    /// The caller cancels async work first, so this waits only for KataGo
+    /// to stop. UI thread.
+    pub fn lockExclusive(self: *Worker) void {
+        self.engine_lock.lockUncancelable(self.io);
+    }
+
+    /// The synchronous call rewrote KataGo's board and parameters.
+    pub fn unlockExclusive(self: *Worker) void {
+        self.sent_valid = false;
+        self.params_valid = false;
+        self.engine_lock.unlock(self.io);
+    }
+
+    /// App exit. Stops the worker without waiting for it; KataGo is told to
+    /// quit (and exits with our stdin pipe in any case).
+    pub fn shutdown(self: *Worker) void {
+        self.lock.lockUncancelable(self.io);
+        const started = self.started;
+        self.quit = true;
+        self.has_pending = false;
+        if (started) self.engine.writeUnlocked("\nquit\n") catch {};
+        self.cond.signal(self.io);
+        self.lock.unlock(self.io);
+        if (!started) {
+            self.engine.deinit(self.io);
+        } else if (self.engine_lock.tryLock()) {
+            // Worker idle: reap the process ourselves.
+            self.engine.deinit(self.io);
+            self.engine_lock.unlock(self.io);
+        }
+    }
+
+    // ------------------------------------------------------ worker thread
+
+    fn run(self: *Worker) void {
+        while (true) {
+            self.lock.lockUncancelable(self.io);
+            while (!self.has_pending and !self.quit) self.cond.waitUncancelable(self.io, &self.lock);
+            if (self.quit) {
+                self.lock.unlock(self.io);
+                return;
+            }
+            // `current` is only touched by this thread (and read in
+            // `onInfo`, also this thread), so it can be filled here.
+            self.current = self.pending;
+            self.has_pending = false;
+            self.running_seq = self.current.seq;
+            self.lock.unlock(self.io);
+
+            // Lock order is engine_lock → lock everywhere (GTP writes take
+            // `lock` while the driver holds `engine_lock`), so never take
+            // engine_lock while holding `lock`.
+            var result = Result{ .seq = self.current.seq };
+            self.engine_lock.lockUncancelable(self.io);
+            self.process(&self.current, &result);
+            self.engine_lock.unlock(self.io);
+
+            self.publish(result);
+            self.notify();
+        }
+    }
+
+    fn publish(self: *Worker, result: Result) void {
+        while (true) {
+            self.lock.lockUncancelable(self.io);
+            if (self.running_seq == result.seq) self.running_seq = 0;
+            if (self.results_len < self.results.len) {
+                self.results[self.results_len] = result;
+                self.results_len += 1;
+                self.lock.unlock(self.io);
+                return;
+            }
+            if (self.quit) {
+                self.lock.unlock(self.io);
+                if (result.info) |info| result_allocator.free(info);
+                return;
+            }
+            self.lock.unlock(self.io);
+            // The UI thread has not collected for a while; let it catch up.
+            self.notify();
+            std.Io.sleep(self.io, .fromMilliseconds(20), .awake) catch {};
+        }
+    }
+
+    fn isCancelled(self: *Worker, seq: u64) bool {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        return self.cancel_seq == seq or self.quit;
+    }
+
+    fn process(self: *Worker, req: *const Request, result: *Result) void {
+        self.processInner(req, result) catch |err| {
+            result.error_name = @errorName(err);
+            if (result.info) |info| result_allocator.free(info);
+            result.info = null;
+            if (err == error.Cancelled) {
+                result.outcome = .cancelled;
+                return;
+            }
+            result.outcome = .failed;
+            // Unknown GTP state: start from a fresh process next time.
+            self.engine.deinit(self.io);
+            self.sent_valid = false;
+            self.params_valid = false;
+        };
+    }
+
+    fn processInner(self: *Worker, req: *const Request, result: *Result) !void {
+        if (self.isCancelled(req.seq)) return error.Cancelled;
+        try self.engine.start();
+        result.sync = try self.syncPosition(&req.position);
+        try self.syncParams(req.visits, req.max_time);
+
+        var cmd_buf: [96]u8 = undefined;
+        const color: []const u8 = if (req.color == 'W') "W" else "B";
+        const interval: []const u8 = if (req.stream) " interval 20" else "";
+        const search = std.fmt.bufPrint(&cmd_buf, "kata-search_analyze_cancellable {s}{s} ownership true\n", .{ color, interval }) catch return error.InvalidRequest;
+        try self.launch(req.seq, search);
+
+        self.last_stream_ms = 0;
+        const sink: ?Engine.InfoSink = if (req.stream) .{ .context = self, .on_info = onInfo } else null;
+        self.engine.readAnalysis(sink) catch |err| switch (err) {
+            // An engine without the cancellable flavour: same search, not
+            // interruptible (a cancel then waits for maxTime at worst).
+            error.EngineRejected => {
+                const fallback = std.fmt.bufPrint(&cmd_buf, "kata-search_analyze {s}{s} ownership true\n", .{ color, interval }) catch return error.InvalidRequest;
+                try self.launch(req.seq, fallback);
+                try self.engine.readAnalysis(sink);
+            },
+            else => return err,
+        };
+        const play = self.engine.play_buf[0..self.engine.play_len];
+        if (std.mem.eql(u8, play, "cancelled") or self.isCancelled(req.seq)) return error.Cancelled;
+        result.play_len = @min(play.len, result.play_buf.len);
+        @memcpy(result.play_buf[0..result.play_len], play[0..result.play_len]);
+        if (self.engine.info_len > 0) {
+            result.info = try result_allocator.dupe(u8, self.engine.info_buf[0..self.engine.info_len]);
+        }
+        result.outcome = .ok;
+    }
+
+    /// Send the search command unless the request was cancelled meanwhile.
+    fn launch(self: *Worker, seq: u64, command_line: []const u8) !void {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        if (self.cancel_seq == seq or self.quit) return error.Cancelled;
+        try self.engine.writeUnlocked(command_line);
+    }
+
+    fn onInfo(context: *anyopaque, line: []const u8) void {
+        const self: *Worker = @ptrCast(@alignCast(context));
+        const now = std.Io.Timestamp.now(self.io, .awake).toMilliseconds();
+        if (self.last_stream_ms != 0 and now - self.last_stream_ms < stream_min_gap_ms) return;
+        const copy = result_allocator.dupe(u8, line) catch return;
+        self.lock.lockUncancelable(self.io);
+        if (self.cancel_seq == self.current.seq) {
+            self.lock.unlock(self.io);
+            result_allocator.free(copy);
+            return;
+        }
+        if (self.stream) |old| result_allocator.free(old.info);
+        self.stream = .{ .seq = self.current.seq, .info = copy };
+        self.lock.unlock(self.io);
+        self.last_stream_ms = now;
+        self.notify();
+    }
+
+    fn playMove(self: *Worker, move: *const Move) !void {
+        var buf: [32]u8 = undefined;
+        const line = std.fmt.bufPrint(&buf, "play {c} {s}", .{ move.color, move.text() }) catch return error.InvalidRequest;
+        _ = try self.engine.command(line);
+    }
+
+    /// Bring KataGo's board to `target`, reusing what it already has:
+    /// `undo` back to the common prefix of the move lists, then `play`
+    /// forward. A different size, komi or set of root stones (or a fresh
+    /// process) starts over from `clear_board`.
+    fn syncPosition(self: *Worker, target: *const Position) !SyncStats {
+        var stats = SyncStats{};
+        const reusable = self.sent_valid and self.sent_generation == self.engine.generation and self.sent.sameBase(target);
+        // Until the end of this function KataGo's board is in flux.
+        self.sent_valid = false;
+        var incremental = false;
+        if (reusable) {
+            const keep = self.sent.commonPrefix(target);
+            const undo_count = self.sent.moves_len - keep;
+            incremental = true;
+            var i: usize = 0;
+            while (i < undo_count) : (i += 1) {
+                _ = self.engine.command("undo") catch |err| switch (err) {
+                    error.EngineRejected => {
+                        incremental = false;
+                        break;
+                    },
+                    else => return err,
+                };
+                stats.undo += 1;
+            }
+            if (incremental) {
+                for (target.moves[keep..target.moves_len]) |*move| {
+                    try self.playMove(move);
+                    stats.play += 1;
+                }
+            }
+        }
+        if (!incremental) {
+            stats = .{ .reset = true };
+            var buf: [64]u8 = undefined;
+            _ = try self.engine.command(std.fmt.bufPrint(&buf, "boardsize {d}", .{target.size}) catch return error.InvalidRequest);
+            _ = try self.engine.command("clear_board");
+            _ = try self.engine.command(std.fmt.bufPrint(&buf, "komi {d}", .{target.komi}) catch return error.InvalidRequest);
+            _ = try self.engine.command("kata-set-rules japanese");
+            // GTP `play` need not alternate, so root stones are simply
+            // placed one by one before the game's own moves.
+            for (target.setup[0..target.setup_len]) |*move| try self.playMove(move);
+            for (target.moves[0..target.moves_len]) |*move| {
+                try self.playMove(move);
+                stats.play += 1;
+            }
+        }
+        self.sent = target.*;
+        self.sent_generation = self.engine.generation;
+        self.sent_valid = true;
+        return stats;
+    }
+
+    fn syncParams(self: *Worker, visits: u32, max_time: f64) !void {
+        const fresh = self.params_valid and self.sent_generation == self.engine.generation;
+        var buf: [64]u8 = undefined;
+        if (!fresh or self.sent_visits != visits) {
+            _ = try self.engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxVisits {d}", .{visits}) catch return error.InvalidRequest);
+            self.sent_visits = visits;
+        }
+        if (!fresh or self.sent_max_time != max_time) {
+            _ = try self.engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxTime {d}", .{max_time}) catch return error.InvalidRequest);
+            self.sent_max_time = max_time;
+        }
+        self.params_valid = true;
+    }
+};
+
+test "async positions parse and validate" {
+    var moves: [8]Move = undefined;
+    const n = try parseMoves("B D4 w q16 B pass", 19, true, &moves);
+    try std.testing.expectEqual(@as(usize, 3), n);
+    try std.testing.expectEqualStrings("Q16", moves[1].text());
+    try std.testing.expectEqual(@as(u8, 'W'), moves[1].color);
+    try std.testing.expectEqualStrings("pass", moves[2].text());
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B I4", 19, true, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B K10", 9, true, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B D20", 19, true, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B pass", 19, false, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B D4 W", 19, true, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("X D4", 19, true, &moves));
+    try std.testing.expectError(error.InvalidRequest, parseMoves("B D4;quit", 19, true, &moves));
+}
+
+test "incremental sync reuses the common prefix" {
+    const a = try std.testing.allocator.create(Position);
+    defer std.testing.allocator.destroy(a);
+    const b = try std.testing.allocator.create(Position);
+    defer std.testing.allocator.destroy(b);
+    a.* = .{};
+    b.* = .{};
+    a.moves_len = try parseMoves("B D4 W Q16 B C3", 19, true, &a.moves);
+    b.moves_len = try parseMoves("B D4 W Q16 B D16 W pass", 19, true, &b.moves);
+    try std.testing.expect(a.sameBase(b));
+    try std.testing.expectEqual(@as(usize, 2), a.commonPrefix(b));
+    b.komi = 0.5;
+    try std.testing.expect(!a.sameBase(b));
+}
+
 test "engine script vocabulary is narrow" {
     try std.testing.expect(Engine.validateLine("clear_board"));
     try std.testing.expect(Engine.validateLine("boardsize 19"));
     try std.testing.expect(Engine.validateLine("kata-set-param maxVisits 200"));
+    try std.testing.expect(Engine.validateLine("undo"));
     try std.testing.expect(!Engine.validateLine("genmove B"));
     try std.testing.expect(!Engine.validateLine("kata-genmove_analyze B"));
     try std.testing.expect(!Engine.validateLine("quit"));

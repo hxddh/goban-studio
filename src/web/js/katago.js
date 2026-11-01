@@ -2,10 +2,21 @@
  * KataGo, reached through the native host.
  *
  * The packaged macOS and Windows app ships a KataGo GTP binary, a small
- * network and a config; the native bridge keeps one engine process alive for
- * the session. One request shape serves everything: the page sends the
- * position as a validated GTP script and gets KataGo's final search report
- * back (win rate, score lead, candidate moves with visits, ownership).
+ * network and a config; the native host keeps one engine process alive for
+ * the session. The page asks for a search of a position and gets KataGo's
+ * search report back (win rate, score lead, candidate moves with visits,
+ * ownership).
+ *
+ * Two transports, chosen by `status()`:
+ *
+ *   async (v3 hosts)  `studio.katagoAnalyzeAsync` — a worker thread in the
+ *                     host runs the search; the UI never blocks. The host
+ *                     keeps KataGo's board between requests and only sends
+ *                     the moves that changed. Partial reports stream in as
+ *                     `katago:info` window events, a request can be
+ *                     cancelled, and a new request supersedes the previous.
+ *   sync  (v2 hosts)  `studio.katagoAnalyze` — the whole position as a GTP
+ *                     script; blocks the host's UI thread while searching.
  *
  * All numbers are reported from Black's point of view
  * (reportAnalysisWinratesAs = BLACK in gtp.cfg).
@@ -16,17 +27,21 @@
 import { hasNative, nativeInvoke } from "./host.js";
 import { BLACK, LETTERS, coordLabel } from "./rules.js";
 
+const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
+
 let probe = null;
 
+/** { available, engine, version, async, stream, ... } — cached per session. */
 export async function status() {
-  if (!hasNative()) return { available: false, engine: "Local", version: "" };
+  if (!hasNative()) return OFFLINE;
   if (probe) return probe;
   probe = (async () => {
     try {
       const value = await nativeInvoke("studio.katagoStatus");
-      return value && typeof value === "object" ? value : { available: false, engine: "Local", version: "" };
+      if (!value || typeof value !== "object") return OFFLINE;
+      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream };
     } catch (_) {
-      return { available: false, engine: "Local", version: "" };
+      return OFFLINE;
     }
   })();
   return probe;
@@ -41,33 +56,65 @@ function b64(text) {
   return btoa(bin);
 }
 
-/** Stones on the root board (handicap and SGF setup) plus the moves to `node`. */
-function positionScript(game, node, visits) {
+function maxTimeFor(visits) {
+  return visits > 600 ? 12 : visits > 150 ? 6 : 3;
+}
+
+/** Root stones (handicap and SGF setup) as GTP plays: ["B D4", "W Q16", ...]. */
+function setupStones(game) {
   const size = game.size;
+  const root = game.root.board.signMap;
+  const out = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const v = root[y][x];
+      if (v) out.push(`${v === BLACK ? "B" : "W"} ${coordLabel(x, y, size)}`);
+    }
+  }
+  return out;
+}
+
+/** The moves from the root to `node`: ["B D4", "W pass", ...]. */
+function lineMoves(game, node) {
+  const line = [];
+  for (let n = node; n && n.parent; n = n.parent) if (n.move) line.push(n.move);
+  line.reverse();
+  return line.map((move) => `${move.color === BLACK ? "B" : "W"} ${move.pass ? "pass" : coordLabel(move.x, move.y, game.size)}`);
+}
+
+/**
+ * The structured position for `studio.katagoAnalyzeAsync` (without `id`
+ * and `stream`). Exported for the self-test.
+ */
+export function positionPayload(game, node = game.current, visits = 64) {
+  const v = Math.max(1, Math.round(visits));
+  return {
+    size: game.size,
+    komi: game.komi,
+    setup: setupStones(game).join(" "),
+    moves: lineMoves(game, node).join(" "),
+    color: node.turn === BLACK ? "B" : "W",
+    visits: v,
+    maxTime: maxTimeFor(v),
+  };
+}
+
+/** v2 request: the whole position as a GTP script. */
+function positionScript(game, node, visits) {
+  const v = Math.max(1, Math.round(visits));
   const commands = [
     "clear_board",
-    `boardsize ${size}`,
+    `boardsize ${game.size}`,
     `komi ${game.komi}`,
     "kata-set-rules japanese",
-    `kata-set-param maxVisits ${Math.max(1, Math.round(visits))}`,
-    `kata-set-param maxTime ${visits > 600 ? 12 : visits > 150 ? 6 : 3}`,
+    `kata-set-param maxVisits ${v}`,
+    `kata-set-param maxTime ${maxTimeFor(v)}`,
   ];
   // GTP `play` does not have to alternate, so setup stones are simply
   // placed one by one before the game's own moves. Under Japanese rules this
   // changes nothing about the position KataGo searches.
-  const root = game.root.board.signMap;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const v = root[y][x];
-      if (v) commands.push(`play ${v === BLACK ? "B" : "W"} ${coordLabel(x, y, size)}`);
-    }
-  }
-  const line = [];
-  for (let n = node; n && n.parent; n = n.parent) if (n.move) line.push(n.move);
-  line.reverse();
-  for (const move of line) {
-    commands.push(`play ${move.color === BLACK ? "B" : "W"} ${move.pass ? "pass" : coordLabel(move.x, move.y, size)}`);
-  }
+  for (const stone of setupStones(game)) commands.push(`play ${stone}`);
+  for (const move of lineMoves(game, node)) commands.push(`play ${move}`);
   return commands.join("\n");
 }
 
@@ -124,36 +171,126 @@ export function parseInfo(info, size) {
   return out;
 }
 
-/**
- * Search the position at `node` (default: the current node) with `visits`.
- * Returns null when KataGo is not available or the request fails.
- */
-export async function analyze(game, { node = game.current, visits = 64 } = {}) {
-  if (!hasNative()) return null;
-  const st = await status();
-  if (!st?.available) return null;
-  const script = positionScript(game, node, visits);
+/** The analysis object every caller gets (final or partial), or null. */
+function toAnalysis(info, playText, size) {
+  const parsed = parseInfo(String(info || ""), size);
+  const play = parseVertex(String(playText || ""), size);
+  const top = parsed.moves[0];
+  if (!top && !play) return null;
+  return {
+    moves: parsed.moves,
+    ownership: parsed.ownership,
+    winrate: top ? top.winrate : null,
+    scoreLead: top ? top.scoreLead : null,
+    play: play || (top ? (top.pass ? { pass: true } : { x: top.x, y: top.y }) : null),
+    visits: parsed.moves.reduce((s, m) => s + (m.visits || 0), 0),
+  };
+}
+
+/* ---------------------------------------------------------------- async */
+
+/** Requests in flight: id → { size, onInfo, finish }. */
+const live = new Map();
+let nextId = 0;
+let listening = false;
+
+function listen() {
+  if (listening) return;
+  const zero = globalThis.zero;
+  if (!zero || typeof zero.on !== "function") return;
+  try {
+    zero.on("katago:info", (detail) => {
+      const entry = detail && live.get(detail.id);
+      if (!entry || typeof entry.onInfo !== "function") return;
+      const partial = toAnalysis(detail.info, "", entry.size);
+      if (!partial) return;
+      try {
+        entry.onInfo(partial);
+      } catch (error) {
+        console.warn("KataGo onInfo handler failed", error);
+      }
+    });
+    listening = true;
+  } catch (_) {}
+}
+
+function analyzeAsync(game, node, visits, onInfo, signal) {
+  const id = `k${++nextId}`;
+  const stream = typeof onInfo === "function";
+  const payload = { id, ...positionPayload(game, node, visits), stream };
+  if (stream) listen();
+  return new Promise((resolve) => {
+    const entry = { size: game.size, onInfo: stream ? onInfo : null, finish: null };
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      live.delete(id);
+      if (signal) signal.removeEventListener("abort", onAbort);
+      resolve(value);
+    };
+    // Resolve at once; the host answers the cancelled request on its own.
+    const onAbort = () => {
+      nativeInvoke("studio.katagoCancel", { id }).catch(() => {});
+      finish(null);
+    };
+    entry.finish = finish;
+    live.set(id, entry);
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
+    nativeInvoke("studio.katagoAnalyzeAsync", payload).then(
+      (reply) => {
+        if (!reply || typeof reply !== "object" || reply.ok !== true) return finish(null);
+        const result = toAnalysis(reply.info, reply.play, game.size);
+        if (result && reply.sync && typeof reply.sync === "object") result.sync = reply.sync;
+        finish(result);
+      },
+      (error) => {
+        console.warn("KataGo request failed; using the offline engine.", error);
+        finish(null);
+      },
+    );
+  });
+}
+
+async function analyzeSync(game, node, visits) {
   try {
     const reply = await nativeInvoke("studio.katagoAnalyze", {
-      b64: b64(script),
+      b64: b64(positionScript(game, node, visits)),
       color: node.turn === BLACK ? "B" : "W",
     });
     if (!reply || typeof reply !== "object") return null;
-    const parsed = parseInfo(String(reply.info || ""), game.size);
-    const play = parseVertex(String(reply.play || ""), game.size);
-    const top = parsed.moves[0];
-    if (!top && !play) return null;
-    return {
-      moves: parsed.moves,
-      ownership: parsed.ownership,
-      winrate: top ? top.winrate : null,
-      scoreLead: top ? top.scoreLead : null,
-      play: play || (top ? (top.pass ? { pass: true } : { x: top.x, y: top.y }) : null),
-      visits: parsed.moves.reduce((s, m) => s + (m.visits || 0), 0),
-    };
+    return toAnalysis(reply.info, reply.play, game.size);
   } catch (error) {
     // A cold start or a killed sidecar can fail once; callers fall back.
     console.warn("KataGo request failed; using the offline engine.", error);
     return null;
   }
+}
+
+/**
+ * Search the position at `node` (default: the current node) with `visits`.
+ *
+ *   onInfo(partial)  called with partial results (same shape) while the
+ *                    search runs, about five times a second (async hosts)
+ *   signal           AbortSignal: abort cancels the search; resolves null
+ *
+ * Resolves { moves, ownership, winrate, scoreLead, play, visits } or null
+ * when KataGo is not available, the request fails, or it was cancelled or
+ * superseded by a newer request.
+ */
+export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null } = {}) {
+  if (!hasNative() || signal?.aborted) return null;
+  const st = await status();
+  if (!st?.available || signal?.aborted) return null;
+  if (st.async) return analyzeAsync(game, node, visits, onInfo, signal);
+  const result = await analyzeSync(game, node, visits);
+  return signal?.aborted ? null : result;
+}
+
+/** Cancel whatever is in flight; pending analyze() calls resolve null. */
+export function cancel() {
+  if (!live.size) return;
+  const entries = [...live.values()];
+  if (hasNative()) nativeInvoke("studio.katagoCancel", {}).catch(() => {});
+  for (const entry of entries) entry.finish?.(null);
 }

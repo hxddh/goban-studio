@@ -139,6 +139,56 @@ export async function takeOpenFiles() {
   }
 }
 
+/**
+ * Install the app's menus in the native menu bar (macOS; Windows keeps no
+ * menu bar and resolves false). `spec` is
+ *
+ *   [{ title, items: [{ label, command, key?, shift?, alt?, enabled?,
+ *                       checked?, separator? }] }]
+ *
+ * with localized labels; `key` is "n", ",", "arrowleft", … and ⌘ is
+ * implied. The system App/File/Edit and View/Window menus stay around them.
+ * Call again to update labels, checks or enabled states.
+ */
+export async function setNativeMenus(spec) {
+  if (!hasNative() || !Array.isArray(spec)) return false;
+  const menus = spec.map((menu) => ({
+    title: String(menu?.title || ""),
+    items: (menu?.items || []).map((item) =>
+      item?.separator
+        ? { separator: true }
+        : {
+            label: String(item?.label || ""),
+            command: String(item?.command || ""),
+            key: item?.key ? String(item.key).toLowerCase() : "",
+            shift: !!item?.shift,
+            alt: !!item?.alt,
+            enabled: item?.enabled !== false,
+            checked: !!item?.checked,
+          },
+    ),
+  }));
+  try {
+    const reply = await invoke("studio.setMenus", { menus });
+    return !!(reply && reply.applied);
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Call `handler(commandId)` for each native menu pick. Returns an unsubscribe. */
+export function onMenuCommand(handler) {
+  if (!hasNative() || typeof global.zero.on !== "function") return () => {};
+  try {
+    return global.zero.on("menu:command", (detail) => {
+      const command = detail && typeof detail === "object" ? detail.command : detail;
+      if (typeof command === "string" && command) handler(command);
+    });
+  } catch (_) {
+    return () => {};
+  }
+}
+
 /** Release-build self-test configuration (empty in normal launches). */
 export async function selftestConfig() {
   if (!hasNative()) return { enabled: false };

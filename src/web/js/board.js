@@ -14,8 +14,11 @@
  * playable without a pointer.
  */
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
+import { THEME_COLORS, loadMaterials, stoneVariant, surfaceFor } from "./materials.js";
 
 export const MATERIALS = {
+  kaya: null,
+  katsura: null,
   wood: {
     surface: ["#e9cd9d", "#dfba84", "#d2a970"],
     grain: "rgba(120, 78, 35, 0.045)",
@@ -85,6 +88,7 @@ export class BoardView {
       hoverValid: true,
       interactive: true,
       cursor: null,
+      ghost: null,
     };
     this.geom = null;
     this.dpr = 1;
@@ -102,7 +106,21 @@ export class BoardView {
       }
     });
     canvas.addEventListener("pointerdown", (e) => this.onPointerDown(e));
+    this.mats = null;
+    loadMaterials().then((m) => {
+      this.mats = m;
+      this.grainCache = null;
+      this.draw();
+    });
     this.resize();
+  }
+
+  /** Colours for the current surface: tuned per texture when available. */
+  theme() {
+    const name = this.model.material === "wood" ? "kaya" : this.model.material;
+    const base = MATERIALS[name] || MATERIALS[name === "kaya" || name === "katsura" ? "wood" : "paper"] || MATERIALS.wood;
+    const tuned = THEME_COLORS[name];
+    return tuned ? { ...base, ...tuned, line: tuned.line, edge: tuned.edge, star: tuned.star, text: tuned.text, shadow: tuned.shadow } : base;
   }
 
   destroy() {
@@ -111,6 +129,7 @@ export class BoardView {
   }
 
   setModel(patch) {
+    const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
     Object.assign(this.model, patch);
@@ -131,11 +150,21 @@ export class BoardView {
           if (!was && is) added++;
         }
       }
-      // Animate a single new stone (a move), not a whole new position.
-      if (added === 1 && last && !last.pass && board[last.y]?.[last.x]) this.placing = { x: last.x, y: last.y, start: now };
+      // Animate a single new stone (a move), not a whole new position, and
+      // never when the system asks for reduced motion.
+      const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) {
+        this.fading = [];
+        this.placing = null;
+      } else if (added === 1 && last && !last.pass && board[last.y]?.[last.x]) this.placing = { x: last.x, y: last.y, start: now };
       else this.placing = null;
       if (added > 1) this.fading = [];
       if (this.placing || this.fading.length) this.animate();
+    }
+    // Counting: territory fades in instead of popping.
+    if (!hadTerritory && this.model.territory && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+      this.territoryStart = performance.now();
+      this.animate();
     }
     this.draw();
   }
@@ -146,8 +175,9 @@ export class BoardView {
       const now = performance.now();
       if (this.placing && now - this.placing.start > PLACE_MS) this.placing = null;
       this.fading = this.fading.filter((f) => now - f.start < FADE_MS);
+      const territoryRunning = this.territoryStart && now - this.territoryStart < 450;
       this.draw();
-      if (this.placing || this.fading.length) this.raf = requestAnimationFrame(tick);
+      if (this.placing || this.fading.length || territoryRunning) this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
   }
@@ -246,13 +276,22 @@ export class BoardView {
   }
 
   grain(theme, w, h) {
-    const key = `${this.model.material}:${w}x${h}:${this.dpr}`;
+    const surface = this.mats ? surfaceFor(this.mats, this.model.material) : null;
+    const key = `${this.model.material}:${w}x${h}:${this.dpr}:${surface ? "tex" : "proc"}`;
     if (this.grainCache?.key === key) return this.grainCache.canvas;
     const c = document.createElement("canvas");
     c.width = Math.round(w * this.dpr);
     c.height = Math.round(h * this.dpr);
     const g = c.getContext("2d");
     g.scale(this.dpr, this.dpr);
+    if (surface) {
+      // The texture covers the board (cropped to a square from its centre).
+      g.imageSmoothingQuality = "high";
+      const side = Math.min(surface.naturalWidth || surface.width, surface.naturalHeight || surface.height);
+      g.drawImage(surface, 0, 0, side, side, 0, 0, w, h);
+      this.grainCache = { key, canvas: c };
+      return c;
+    }
     const bg = g.createLinearGradient(0, 0, w * 0.35, h);
     bg.addColorStop(0, theme.surface[0]);
     bg.addColorStop(0.55, theme.surface[1]);
@@ -283,7 +322,7 @@ export class BoardView {
     const g = this.geometry();
     this.geom = g;
     const m = this.model;
-    const theme = MATERIALS[m.material] || MATERIALS.wood;
+    const theme = this.theme();
     const { size } = m;
     const { cell, ox, oy, w, h, win } = g;
     const px = (x) => ox + x * cell;
@@ -405,6 +444,8 @@ export class BoardView {
 
     // Territory during scoring.
     if (m.territory) {
+      ctx.save();
+      ctx.globalAlpha = this.territoryStart ? Math.min(1, (now - this.territoryStart) / 450) : 1;
       for (let y = win.y0; y <= win.y1; y++) {
         for (let x = win.x0; x <= win.x1; x++) {
           const v = m.territory[y]?.[x] || 0;
@@ -418,6 +459,7 @@ export class BoardView {
           ctx.strokeRect(px(x) - r, py(y) - r, r * 2, r * 2);
         }
       }
+      ctx.restore();
     }
 
     // Variation (review lines, answers): numbered translucent stones.
@@ -443,6 +485,16 @@ export class BoardView {
     for (const mark of m.marks || []) {
       if (!inWin(mark.x, mark.y)) continue;
       this.mark(ctx, mark, theme);
+    }
+
+    // Two-click placement: the pending stone, with a ring.
+    if (m.ghost && inWin(m.ghost.x, m.ghost.y)) {
+      this.stone(ctx, m.ghost.x, m.ghost.y, m.ghost.color, theme, { alpha: 0.6, shadow: false, jitter: false });
+      ctx.strokeStyle = "rgba(196, 112, 50, 0.95)";
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(px(m.ghost.x), py(m.ghost.y), cell * 0.56, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // Hover preview.
@@ -493,6 +545,13 @@ export class BoardView {
       ctx.arc(cx + r * 0.12, cy + r * 0.2, r * 1.12, 0, Math.PI * 2);
       ctx.fill();
     }
+    const sprite = this.sprite(x, y, color);
+    if (sprite) {
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+      return;
+    }
     const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
     if (color === BLACK) {
       grad.addColorStop(0, "#5d5d59");
@@ -513,6 +572,16 @@ export class BoardView {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /** Pre-rendered stone: shell/slate variants, or flat high-contrast discs. */
+  sprite(x, y, color) {
+    const m = this.mats;
+    if (!m) return null;
+    if (this.model.flatStones) return color === BLACK ? m.flatBlack : m.flatWhite;
+    const list = color === BLACK ? m.black : m.white;
+    if (!list || !list.length) return null;
+    return list[stoneVariant(x, y, color, list.length)] || list[0];
   }
 
   label(ctx, x, y, text, color, fs) {
@@ -538,6 +607,28 @@ export class BoardView {
     ctx.fillStyle = tone;
     ctx.lineWidth = Math.max(1.4, g.cell * 0.07);
     ctx.beginPath();
+    if (mark.type === "candidate") {
+      // Engine candidates: a soft disc, darker for the best, with a number.
+      const colors = ["rgba(38,120,92,0.88)", "rgba(52,108,150,0.82)", "rgba(80,96,140,0.75)", "rgba(110,100,120,0.68)", "rgba(120,110,100,0.6)"];
+      ctx.fillStyle = colors[Math.min(colors.length - 1, mark.rank || 0)];
+      ctx.beginPath();
+      ctx.arc(cx, cy, g.cell * 0.44, 0, Math.PI * 2);
+      ctx.fill();
+      if (mark.label) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px "Inter Var", -apple-system, system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(mark.label, cx, cy + 0.5);
+      }
+      return;
+    }
+    if (mark.type === "area") {
+      ctx.fillStyle = mark.tone === "good" ? "rgba(63,138,90,0.28)" : "rgba(192,69,47,0.26)";
+      const h = g.cell * 0.5;
+      ctx.fillRect(cx - h, cy - h, h * 2, h * 2);
+      return;
+    }
     if (mark.type === "circle") {
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();
@@ -562,7 +653,7 @@ export class BoardView {
     } else if (mark.type === "label") {
       if (!stoneColor) {
         // Clear the grid under a letter so it reads.
-        ctx.fillStyle = (MATERIALS[this.model.material] || MATERIALS.wood).surface[1];
+        ctx.fillStyle = (MATERIALS[this.model.material] || MATERIALS.wood || {}).surface?.[1] || "#e0c08a";
         ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
         ctx.fillStyle = tone;
       }
