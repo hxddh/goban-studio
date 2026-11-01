@@ -539,10 +539,12 @@ export function reply(pz, st) {
   const moves = candidates(pz, st, keyIdx);
   let best = null;
   let bestCost = -1;
-  for (const m of moves) {
+  for (const [k, m] of moves.entries()) {
     const r = userWins(pz, m.next);
     if (!r.win) return { ...pointOf(pz, m.i), refutes: true };
-    if (r.nodes > bestCost) {
+    // Most stubborn among the natural defences (the best few by shape), so
+    // a lost defender still plays a move a person would play.
+    if (k < 4 && r.nodes > bestCost) {
       bestCost = r.nodes;
       best = m.i;
     }
