@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <!-- WebView2 executes its `window.zero` bridge through
+       AddScriptToExecuteOnDocumentCreated, which is subject to the page CSP;
+       macOS user scripts are not. Without 'unsafe-inline' the page renders,
+       but hasNative() is false and no native command reaches the host. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <title>Goban Studio</title>
   <link rel="icon" href="icon.png" type="image/png" />
   <link rel="stylesheet" href="styles.css" />
