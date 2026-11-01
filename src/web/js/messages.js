@@ -423,7 +423,7 @@ export const MESSAGES = {
   "mistakes.revealed": m("绿色圆圈是 KataGo 认可的下法，红叉是实战。", "Green circles are what KataGo approves; the red cross is the game move.", "초록 원은 KataGo가 인정한 수, 빨간 X는 실전 수입니다.", "緑の丸はKataGoが認める手、赤い×は実戦の手です。"),
 
   "practice.retryNow": m("回到你下错的地方了，再试一次。", "Back to where it went wrong — try again.", "틀린 곳으로 돌아왔습니다. 다시 해 보세요.", "間違えた所に戻りました。もう一度。"),
-  "practice.onlyKo": m("这样只能打劫，还有不用打劫的下法。", "That only gets a ko — there is a way without one.", "그러면 패가 됩니다. 패 없이 되는 수가 있습니다.", "それではコウになります。コウにならない手があります。"),
+  "practice.onlyKo": m("这样只能打劫，还有不用打劫的下法。", "That only gets a ko — there is a way without one.", "그러면 패가 됩니다. 패 없이 해결하는 수가 있습니다.", "それではコウになります。コウにならない手があります。"),
   "practice.themes": m("题型", "Themes", "유형", "テーマ"),
 
   "settings.playing": m("对局", "Playing", "대국", "対局"),
