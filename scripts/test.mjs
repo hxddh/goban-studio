@@ -496,6 +496,80 @@ await test("the native bridge sends setup stones, handicap and moves to KataGo f
   }
 });
 
+await test("async KataGo hosts get a structured position, stream partial reports and cancel", async () => {
+  const sent = [];
+  const listeners = new Map();
+  const replies = new Map();
+  const info9 = (visits) => `info move C3 visits ${visits} winrate 0.6 scoreLead 3 order 0 pv C3 G7 ownership ` + Array(81).fill("0.1").join(" ");
+  globalThis.zero = {
+    on: (name, fn) => {
+      listeners.set(name, fn);
+      return () => listeners.delete(name);
+    },
+    invoke: async (command, payload) => {
+      sent.push({ command, payload });
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test", async: true, stream: true };
+      if (command === "studio.katagoCancel") {
+        replies.get(payload.id)?.({ ok: false, id: payload.id, cancelled: true });
+        return { ok: true, cancelled: 1 };
+      }
+      if (command === "studio.katagoAnalyzeAsync") return new Promise((resolve) => replies.set(payload.id, resolve));
+      throw new Error("unexpected command " + command);
+    },
+  };
+  try {
+    const K = await import("../src/web/js/katago.js?bridge-async");
+    assert.equal((await K.status()).async, true);
+    const game = new Game({ size: 9, komi: 0.5, handicap: 2 });
+    game.play(4, 4);
+    game.pass();
+    const partials = [];
+    const pending = K.analyze(game, { visits: 20, onInfo: (p) => partials.push(p) });
+    await new Promise((r) => setTimeout(r, 0));
+    const req = sent.find((s) => s.command === "studio.katagoAnalyzeAsync").payload;
+    assert.equal(req.size, 9);
+    assert.equal(req.komi, 0.5);
+    assert.equal(req.setup, "B G7 B C3");
+    assert.equal(req.moves, "W E5 B pass");
+    assert.equal(req.color, "W");
+    assert.equal(req.visits, 20);
+    assert.equal(req.stream, true);
+    listeners.get("katago:info")({ id: req.id, info: info9(4) });
+    listeners.get("katago:info")({ id: "someone-else", info: info9(5) });
+    assert.equal(partials.length, 1);
+    assert.equal(partials[0].visits, 4);
+    assert.deepEqual(partials[0].play, { x: 2, y: 6 });
+    replies.get(req.id)({ ok: true, id: req.id, play: "C3", info: info9(20), sync: { reset: false, undo: 0, play: 1 } });
+    const a = await pending;
+    assert.equal(a.visits, 20);
+    assert.equal(a.ownership.length, 81);
+    assert.deepEqual(a.sync, { reset: false, undo: 0, play: 1 });
+
+    // Abort: cancel goes to the host and the call resolves null.
+    const controller = new AbortController();
+    const aborted = K.analyze(game, { visits: 20, signal: controller.signal });
+    await new Promise((r) => setTimeout(r, 0));
+    controller.abort();
+    assert.equal(await aborted, null);
+    const cancelReq = sent.filter((s) => s.command === "studio.katagoCancel").at(-1).payload;
+    assert.equal(cancelReq.id, sent.filter((s) => s.command === "studio.katagoAnalyzeAsync").at(-1).payload.id);
+
+    // cancel(): everything in flight resolves null; a superseded reply is null.
+    const third = K.analyze(game, { visits: 20 });
+    await new Promise((r) => setTimeout(r, 0));
+    K.cancel();
+    assert.equal(await third, null);
+    assert.deepEqual(sent.at(-1), { command: "studio.katagoCancel", payload: {} });
+    const fourth = K.analyze(game, { visits: 20 });
+    await new Promise((r) => setTimeout(r, 0));
+    const id4 = sent.filter((s) => s.command === "studio.katagoAnalyzeAsync").at(-1).payload.id;
+    replies.get(id4)({ ok: false, id: id4, cancelled: true });
+    assert.equal(await fourth, null);
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
 await test("v1 data migrates to v2 without losing games or settings", () => {
   for (const k of [...Object.values(KEYS), ...Object.values(V1_KEYS)]) removeKey(k);
   const g = newGame(9);

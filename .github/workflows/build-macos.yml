@@ -79,6 +79,12 @@ jobs:
           npm install -g "@native-sdk/cli@${SDK_VERSION}"
           echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
           native --version
+      - name: patch Native SDK (keep system menus around app menus)
+        run: |
+          # Idempotent; fails the build if the SDK source no longer has the
+          # anchors the patch expects. See the script header.
+          node scripts/patch-sdk.mjs "$SDK_PATH"
+          node scripts/patch-sdk.mjs --check "$SDK_PATH"
       - name: build frontend
         run: |
           npm run build

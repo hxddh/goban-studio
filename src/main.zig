@@ -12,8 +12,54 @@ const max_open_paths = 16;
 const OpenCallback = *const fn (context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void;
 extern fn goban_install_open_handler(context: ?*anyopaque, callback: OpenCallback) void;
 
-// Empty custom menus → host default bar (View → Full Screen, Window → Zoom).
-// Game actions: chrome / sidebar / in-page shortcuts.
+// Startup menus are empty → host default bar. The page installs its own,
+// localized menus with `studio.setMenus` (macOS); with the SDK patch from
+// scripts/patch-sdk.mjs they sit between the system App/File/Edit menus and
+// the system View/Window menus.
+
+/// Timer that collects KataGo worker output while async requests are open,
+/// in case a platform wake is coalesced away. Below the SDK's reserved ids.
+const katago_timer_id: u64 = 0x6b61_7461_676f;
+const katago_timer_interval_ns: u64 = 50 * std.time.ns_per_ms;
+const max_jobs = 8;
+
+/// An async analysis the page is waiting for. UI thread only.
+const Job = struct {
+    active: bool = false,
+    seq: u64 = 0,
+    responder: native_sdk.bridge.AsyncResponder = undefined,
+    bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
+    bridge_id_len: usize = 0,
+    /// The page's own request id, echoed in replies and stream events.
+    id: [64]u8 = undefined,
+    id_len: usize = 0,
+    window_id: u64 = 1,
+    stream: bool = false,
+    /// The page cancelled or superseded it: reply `cancelled` whatever
+    /// KataGo says (it may have finished in the same instant).
+    cancelled: bool = false,
+
+    fn idText(self: *const Job) []const u8 {
+        return self.id[0..self.id_len];
+    }
+};
+
+/// Labels and commands of the page's menus, copied into app-owned memory
+/// before they are handed to the platform.
+const MenuStore = struct {
+    menus: [native_sdk.platform.max_menus]native_sdk.Menu = undefined,
+    items: [native_sdk.platform.max_menu_items]native_sdk.MenuItem = undefined,
+    text: [32 * 1024]u8 = undefined,
+    text_len: usize = 0,
+
+    fn keep(self: *MenuStore, value: []const u8) ?[]const u8 {
+        if (self.text_len + value.len > self.text.len) return null;
+        const out = self.text[self.text_len..][0..value.len];
+        @memcpy(out, value);
+        self.text_len += value.len;
+        return out;
+    }
+};
 
 const App = struct {
     env_map: *std.process.Environ.Map,
@@ -27,13 +73,28 @@ const App = struct {
     frontend_dist_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     /// 第一个事件(lifecycle.start)到来时记下;窗口拖动 / 标题栏几何要用它的平台服务。
     runtime: ?*native_sdk.Runtime = null,
-    engine: engine_mod.Engine = .{},
+    /// KataGo: the worker thread owns the GTP process for async requests;
+    /// legacy sync calls borrow it with `lockExclusive`. Heap-allocated
+    /// (large buffers) in `main`.
+    katago: *engine_mod.Worker = undefined,
+    /// Scratch for parsing one async request (it is copied into the
+    /// worker's queue), so the bridge handler does not hold it on the stack.
+    request_scratch: *engine_mod.Request = undefined,
+    katago_available: bool = false,
+    katago_version_buf: [128]u8 = undefined,
+    katago_version: []const u8 = "",
+    jobs: [max_jobs]Job = [_]Job{.{}} ** max_jobs,
+    next_seq: u64 = 0,
+    wake_installed: bool = false,
+    timer_running: bool = false,
+    menu_store: MenuStore = .{},
     /// Paths handed to us by LaunchServices / argv. They are read by the page
     /// once it is ready; keeping the queue here also covers an event that
     /// arrives before the webview has subscribed.
     open_paths: std.ArrayList([]u8) = .empty,
-    handlers: [9]native_sdk.BridgeHandler = undefined,
-    policies: [9]native_sdk.BridgeCommandPolicy = undefined,
+    handlers: [11]native_sdk.BridgeHandler = undefined,
+    async_handlers: [1]native_sdk.bridge.AsyncHandler = undefined,
+    policies: [12]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -159,8 +220,26 @@ const App = struct {
             .context = self,
             .invoke_fn = katagoAnalyze,
         };
+        self.handlers[9] = .{
+            .name = "studio.katagoCancel",
+            .context = self,
+            .invoke_fn = katagoCancel,
+        };
+        self.handlers[10] = .{
+            .name = "studio.setMenus",
+            .context = self,
+            .invoke_fn = setMenus,
+        };
+        self.async_handlers[0] = .{
+            .name = "studio.katagoAnalyzeAsync",
+            .context = self,
+            .invoke_fn = katagoAnalyzeAsync,
+        };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
+        }
+        for (self.async_handlers, 0..) |handler, i| {
+            self.policies[self.handlers.len + i] = .{ .name = handler.name, .origins = &allowed_origins };
         }
         return .{
             .policy = .{
@@ -168,6 +247,7 @@ const App = struct {
                 .commands = self.policies[0..],
             },
             .registry = .{ .handlers = self.handlers[0..] },
+            .async_registry = .{ .handlers = self.async_handlers[0..] },
         };
     }
 };
@@ -277,18 +357,37 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
     self.runtime = runtime;
     forwardOpenFiles(runtime, event);
     switch (event) {
-        .command => |cmd| {
-            var buf: [256]u8 = undefined;
-            const detail = std.fmt.bufPrint(
-                &buf,
-                "{{\"id\":\"{s}\",\"command\":\"{s}\",\"key\":\"\",\"windowId\":{d},\"modifiers\":{{\"primary\":false,\"command\":false,\"control\":false,\"option\":false,\"shift\":false}}}}",
-                .{ cmd.name, cmd.name, if (cmd.window_id == 0) @as(u64, 1) else cmd.window_id },
-            ) catch return;
-            const wid: native_sdk.WindowId = if (cmd.window_id == 0) 1 else cmd.window_id;
-            runtime.emitWindowEvent(wid, "shortcut", detail) catch {};
-        },
+        .command => |cmd| forwardCommand(runtime, cmd.name, cmd.window_id),
+        // A KataGo worker result or partial report is waiting (the worker
+        // nudged the loop through PlatformServices.wake), or the fallback
+        // collection timer fired.
+        .effects_wake => drainKatago(self),
+        .timer => |timer| if (timer.id == katago_timer_id) drainKatago(self),
         else => {},
     }
+}
+
+/// Native menu picks reach the page as `menu:command` ({command, windowId});
+/// the v2 `shortcut` event is kept for older listeners.
+fn forwardCommand(runtime: *native_sdk.Runtime, name: []const u8, window_id: u64) void {
+    const wid: native_sdk.WindowId = if (window_id == 0) 1 else window_id;
+    var buf: [512]u8 = undefined;
+    var n: usize = 0;
+    if (!jsonAppend(&buf, &n, "{\"command\":")) return;
+    if (!jsonAppendString(&buf, &n, name)) return;
+    const tail = std.fmt.bufPrint(buf[n..], ",\"windowId\":{d}}}", .{wid}) catch return;
+    n += tail.len;
+    runtime.emitWindowEvent(wid, "menu:command", buf[0..n]) catch {};
+
+    var legacy: [640]u8 = undefined;
+    var m: usize = 0;
+    if (!jsonAppend(&legacy, &m, "{\"id\":")) return;
+    if (!jsonAppendString(&legacy, &m, name)) return;
+    if (!jsonAppend(&legacy, &m, ",\"command\":")) return;
+    if (!jsonAppendString(&legacy, &m, name)) return;
+    const rest = std.fmt.bufPrint(legacy[m..], ",\"key\":\"\",\"windowId\":{d},\"modifiers\":{{\"primary\":false,\"command\":false,\"control\":false,\"option\":false,\"shift\":false}}}}", .{wid}) catch return;
+    m += rest.len;
+    runtime.emitWindowEvent(wid, "shortcut", legacy[0..m]) catch {};
 }
 
 fn jsonStringField(payload: []const u8, key: []const u8) ?[]const u8 {
@@ -412,10 +511,10 @@ fn windowChrome(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
 }
 
 
-/// One move from the bundled KataGo 19x19 engine. The page sends a base64
-/// GTP setup script (newline-separated, limited to the setup vocabulary in
-/// engine.zig) and the side to move. The child process is persistent, so
-/// model load is paid once per app session.
+/// One move from the bundled KataGo engine (v2, synchronous). The page
+/// sends a base64 GTP setup script (newline-separated, limited to the setup
+/// vocabulary in engine.zig) and the side to move. Any async search is
+/// cancelled first; the call then borrows the worker's KataGo process.
 fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
     const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
@@ -429,17 +528,20 @@ fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, out
     if (script_len > script_buf.len) return error.InvalidRequest;
     dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
 
-    const move = self.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
+    cancelJobs(self, null);
+    self.katago.lockExclusive();
+    defer self.katago.unlockExclusive();
+    const move = self.katago.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
     return std.fmt.bufPrint(output, "{{\"ok\":true,\"move\":\"{s}\"}}", .{move}) catch error.HandlerFailed;
 }
 
-/// A full KataGo search report for the position: the page uses it for the
-/// opponent at every strength, hints, the review curve and dead stones.
-/// Same request shape as katagoMove; the reply carries KataGo's final
-/// `info` line and its chosen move, unparsed.
+/// A full KataGo search report for the position (v2, synchronous: blocks
+/// the UI thread for the whole search; the page uses the async command
+/// when the host has it). Same request shape as katagoMove; the reply
+/// carries KataGo's final `info` line and its chosen move, unparsed.
 fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
     const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
@@ -453,7 +555,10 @@ fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     if (script_len > script_buf.len) return error.InvalidRequest;
     dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
 
-    const result = self.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
+    cancelJobs(self, null);
+    self.katago.lockExclusive();
+    defer self.katago.unlockExclusive();
+    const result = self.katago.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
@@ -466,17 +571,363 @@ fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     return output[0..n];
 }
 
+/// Engine presence and version are resolved once in `main`, before the
+/// worker thread exists: resolving touches the engine's path buffers,
+/// which the worker uses while it starts KataGo.
 fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
-    var version_buf: [128]u8 = undefined;
-    const version = self.engine.versionText(&version_buf);
-    const ready = self.engine.available();
-    return std.fmt.bufPrint(
-        output,
-        "{{\"available\":{s},\"engine\":\"KataGo\",\"analyze\":true,\"version\":\"{s}\"}}",
-        .{ if (ready) "true" else "false", version },
-    ) catch error.HandlerFailed;
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"version\":")) return error.HandlerFailed;
+    if (!jsonAppendString(output, &n, self.katago_version)) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    return output[0..n];
+}
+
+// ------------------------------------------------------------ async KataGo
+//
+// Threading: bridge handlers, `drainKatago` and every runtime/webview call
+// run on the UI thread. The worker thread (engine.zig) only talks to KataGo
+// and to its own locked queues, then nudges the UI loop with the platform's
+// thread-safe `wake`; the `.effects_wake` event (plus a 50 ms fallback
+// timer while requests are open) runs `drainKatago` here, which emits the
+// partial reports and completes the stored AsyncResponders.
+
+const AnalyzePayload = struct {
+    id: []const u8 = "",
+    size: u32 = 19,
+    komi: f64 = 6.5,
+    setup: []const u8 = "",
+    moves: []const u8 = "",
+    color: []const u8 = "B",
+    visits: u32 = 64,
+    maxTime: f64 = 6.0,
+    stream: bool = false,
+};
+
+fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request, job: *Job) !void {
+    const parsed = std.json.parseFromSlice(AnalyzePayload, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const p = parsed.value;
+    if (p.id.len > job.id.len) return error.InvalidRequest;
+    @memcpy(job.id[0..p.id.len], p.id);
+    job.id_len = p.id.len;
+    job.stream = p.stream;
+    if (p.size < 2 or p.size > 19) return error.InvalidRequest;
+    if (!std.math.isFinite(p.komi) or @abs(p.komi) > 150) return error.InvalidRequest;
+    // GTP komi is a multiple of 0.5.
+    if (@floor(p.komi * 2) != p.komi * 2) return error.InvalidRequest;
+    if (p.color.len != 1 or (p.color[0] != 'B' and p.color[0] != 'W')) return error.InvalidRequest;
+    if (p.visits < 1 or p.visits > 100_000) return error.InvalidRequest;
+    if (!std.math.isFinite(p.maxTime) or p.maxTime <= 0 or p.maxTime > 120) return error.InvalidRequest;
+    const size: u8 = @intCast(p.size);
+    req.position.size = size;
+    req.position.komi = p.komi;
+    req.position.setup_len = try engine_mod.parseMoves(p.setup, size, false, &req.position.setup);
+    req.position.moves_len = try engine_mod.parseMoves(p.moves, size, true, &req.position.moves);
+    req.color = p.color[0];
+    req.visits = p.visits;
+    req.max_time = p.maxTime;
+    req.stream = p.stream;
+}
+
+fn findJob(self: *App, seq: u64) ?*Job {
+    if (seq == 0) return null;
+    for (&self.jobs) |*job| {
+        if (job.active and job.seq == seq) return job;
+    }
+    return null;
+}
+
+fn anyJobActive(self: *App) bool {
+    for (self.jobs) |job| {
+        if (job.active) return true;
+    }
+    return false;
+}
+
+fn installWake(self: *App) void {
+    if (self.wake_installed) return;
+    const runtime = self.runtime orelse return;
+    const services = runtime.options.platform.services;
+    self.katago.setWake(services.context, services.wake_fn);
+    self.wake_installed = true;
+}
+
+fn startDrainTimer(self: *App) void {
+    if (self.timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.startTimer(katago_timer_id, katago_timer_interval_ns, true) catch return;
+    self.timer_running = true;
+}
+
+fn stopDrainTimer(self: *App) void {
+    if (!self.timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.cancelTimer(katago_timer_id) catch {};
+    self.timer_running = false;
+}
+
+/// Complete a job's bridge call. Replies are always bridge successes; the
+/// page reads `ok` / `cancelled` / `error` from the object.
+fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, result: ?*const engine_mod.Result) void {
+    const info: []const u8 = if (result) |r| (r.info orelse "") else "";
+    const cap = info.len * 2 + 512;
+    const buf = engine_mod.result_allocator.alloc(u8, cap) catch {
+        job.responder.success(job.bridge_id[0..job.bridge_id_len], "{\"ok\":false,\"error\":\"OutOfMemory\"}") catch {};
+        job.active = false;
+        return;
+    };
+    defer engine_mod.result_allocator.free(buf);
+    var n: usize = 0;
+    var ok = true;
+    switch (outcome) {
+        .ok => {
+            const r = result.?;
+            ok = jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and
+                jsonAppendString(buf, &n, job.idText()) and
+                jsonAppend(buf, &n, ",\"play\":") and
+                jsonAppendString(buf, &n, r.play()) and
+                jsonAppend(buf, &n, ",\"info\":") and
+                jsonAppendString(buf, &n, info);
+            if (ok) {
+                const tail = std.fmt.bufPrint(buf[n..], ",\"sync\":{{\"reset\":{s},\"undo\":{d},\"play\":{d}}}}}", .{
+                    if (r.sync.reset) "true" else "false",
+                    r.sync.undo,
+                    r.sync.play,
+                }) catch "";
+                n += tail.len;
+                ok = tail.len > 0;
+            }
+        },
+        .cancelled => {
+            ok = jsonAppend(buf, &n, "{\"ok\":false,\"id\":") and
+                jsonAppendString(buf, &n, job.idText()) and
+                jsonAppend(buf, &n, ",\"cancelled\":true}");
+        },
+        .failed => {
+            ok = jsonAppend(buf, &n, "{\"ok\":false,\"id\":") and
+                jsonAppendString(buf, &n, job.idText()) and
+                jsonAppend(buf, &n, ",\"error\":") and
+                jsonAppendString(buf, &n, if (error_name.len > 0) error_name else "HandlerFailed") and
+                jsonAppend(buf, &n, "}");
+        },
+    }
+    const body = if (ok) buf[0..n] else "{\"ok\":false,\"error\":\"ResponseTooLarge\"}";
+    job.responder.success(job.bridge_id[0..job.bridge_id_len], body) catch {};
+    job.active = false;
+}
+
+/// Cancel the job with page id `id` (every open job when null). A queued
+/// request is answered at once; a running one when KataGo has stopped.
+/// Returns how many jobs were cancelled.
+fn cancelJobs(self: *App, id: ?[]const u8) usize {
+    var count: usize = 0;
+    for (&self.jobs) |*job| {
+        if (!job.active or job.cancelled) continue;
+        if (id) |wanted| {
+            if (!std.mem.eql(u8, job.idText(), wanted)) continue;
+        }
+        count += 1;
+        switch (self.katago.cancel(job.seq)) {
+            .removed_pending => respondJob(job, .cancelled, "", null),
+            // Running, or finished and waiting in the result queue: the
+            // drain answers it as cancelled.
+            .signalled_running, .not_found => job.cancelled = true,
+        }
+    }
+    return count;
+}
+
+/// `studio.katagoAnalyzeAsync`: queue a search and return immediately; the
+/// reply comes from `drainKatago` once the worker has a result.
+fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    var job = Job{ .active = true, .responder = responder, .window_id = invocation.source.window_id };
+    const rid = invocation.request.id;
+    const rid_len = @min(rid.len, job.bridge_id.len);
+    @memcpy(job.bridge_id[0..rid_len], rid[0..rid_len]);
+    job.bridge_id_len = rid_len;
+
+    const req = self.request_scratch;
+    req.seq = 0;
+    req.position.setup_len = 0;
+    req.position.moves_len = 0;
+    parseAnalyzeRequest(self, invocation.request.payload, req, &job) catch {
+        respondJob(&job, .failed, "InvalidRequest", null);
+        return;
+    };
+    if (!self.katago_available) {
+        respondJob(&job, .failed, "EngineMissing", null);
+        return;
+    }
+    var slot: ?*Job = null;
+    for (&self.jobs) |*candidate| {
+        if (!candidate.active) {
+            slot = candidate;
+            break;
+        }
+    }
+    const free_slot = slot orelse {
+        respondJob(&job, .failed, "Busy", null);
+        return;
+    };
+    self.next_seq += 1;
+    req.seq = self.next_seq;
+    job.seq = req.seq;
+    installWake(self);
+    const submitted = self.katago.submit(req) catch |err| {
+        respondJob(&job, .failed, @errorName(err), null);
+        return;
+    };
+    free_slot.* = job;
+    if (findJob(self, submitted.dropped_seq)) |dropped| respondJob(dropped, .cancelled, "", null);
+    if (findJob(self, submitted.superseded_seq)) |superseded| superseded.cancelled = true;
+    startDrainTimer(self);
+}
+
+/// `studio.katagoCancel` {id}: stop that request (every open one without
+/// an id). The cancelled request itself replies {ok:false, cancelled:true}.
+fn katagoCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    var id_buf: [64]u8 = undefined;
+    const id: ?[]const u8 = if (jsonStringField(invocation.request.payload, "id")) |raw| jsonUnescape(raw, &id_buf) else null;
+    // A queued request is answered right here; the running one as soon as
+    // KataGo stops (the worker wakes the loop).
+    const count = cancelJobs(self, if (id) |value| (if (value.len > 0) value else null) else null);
+    return std.fmt.bufPrint(output, "{{\"ok\":true,\"cancelled\":{d}}}", .{count}) catch error.HandlerFailed;
+}
+
+fn emitInfo(runtime: *native_sdk.Runtime, job: *const Job, info: []const u8) void {
+    const buf = engine_mod.result_allocator.alloc(u8, info.len * 2 + 192) catch return;
+    defer engine_mod.result_allocator.free(buf);
+    var n: usize = 0;
+    const ok = jsonAppend(buf, &n, "{\"id\":") and
+        jsonAppendString(buf, &n, job.idText()) and
+        jsonAppend(buf, &n, ",\"info\":") and
+        jsonAppendString(buf, &n, info) and
+        jsonAppend(buf, &n, "}");
+    if (!ok) return;
+    runtime.emitWindowEvent(job.window_id, "katago:info", buf[0..n]) catch {};
+}
+
+/// Collect what the worker produced: the latest partial report (as a
+/// `katago:info` window event) first, then finished results (as replies to
+/// the waiting `studio.katagoAnalyzeAsync` calls). UI thread.
+fn drainKatago(self: *App) void {
+    const runtime = self.runtime orelse return;
+    if (self.katago.takeStream()) |partial| {
+        defer engine_mod.result_allocator.free(partial.info);
+        if (findJob(self, partial.seq)) |job| {
+            if (!job.cancelled and job.stream) emitInfo(runtime, job, partial.info);
+        }
+    }
+    var results: [16]engine_mod.Result = undefined;
+    const n = self.katago.takeResults(&results);
+    for (results[0..n]) |*result| {
+        defer if (result.info) |info| engine_mod.result_allocator.free(info);
+        const job = findJob(self, result.seq) orelse continue;
+        const outcome: engine_mod.Outcome = if (job.cancelled) .cancelled else result.outcome;
+        respondJob(job, outcome, result.error_name, result);
+    }
+    if (!anyJobActive(self)) stopDrainTimer(self);
+}
+
+// ------------------------------------------------------------ native menus
+
+const MenuItemSpec = struct {
+    label: []const u8 = "",
+    command: []const u8 = "",
+    key: []const u8 = "",
+    shift: bool = false,
+    alt: bool = false,
+    enabled: bool = true,
+    checked: bool = false,
+    separator: bool = false,
+};
+
+const MenuSpec = struct {
+    title: []const u8 = "",
+    items: []const MenuItemSpec = &.{},
+};
+
+const MenusPayload = struct {
+    menus: []const MenuSpec = &.{},
+};
+
+fn validMenuCommand(command: []const u8) bool {
+    if (command.len == 0 or command.len > 128) return false;
+    if (std.mem.eql(u8, command, ".") or std.mem.eql(u8, command, "..")) return false;
+    for (command) |c| {
+        if (c < 0x20 or c == '/' or c == '\\') return false;
+    }
+    return true;
+}
+
+/// Build the platform menu list from the page's spec into `store`. Items
+/// that cannot be shown (empty label, bad command) are skipped and an
+/// unknown key drops only the shortcut, so one bad entry never costs the
+/// whole bar. ⌘ (primary) is implied for every key.
+fn buildMenus(store: *MenuStore, spec: []const MenuSpec) ![]const native_sdk.Menu {
+    store.text_len = 0;
+    var menu_count: usize = 0;
+    var item_count: usize = 0;
+    for (spec) |menu_spec| {
+        if (menu_count >= store.menus.len) break;
+        if (menu_spec.title.len == 0 or menu_spec.title.len > 64) continue;
+        const title = store.keep(menu_spec.title) orelse return error.InvalidRequest;
+        const first = item_count;
+        for (menu_spec.items) |item| {
+            if (item_count >= store.items.len) break;
+            if (item.separator) {
+                if (item_count == first) continue;
+                store.items[item_count] = .{ .separator = true };
+                item_count += 1;
+                continue;
+            }
+            if (item.label.len == 0 or item.label.len > 128 or !validMenuCommand(item.command)) continue;
+            var key_buf: [32]u8 = undefined;
+            var key: []const u8 = "";
+            if (item.key.len > 0 and item.key.len <= key_buf.len) {
+                const lowered = std.ascii.lowerString(&key_buf, item.key);
+                if (native_sdk.platform.isValidShortcutKey(lowered)) key = store.keep(lowered) orelse return error.InvalidRequest;
+            }
+            store.items[item_count] = .{
+                .label = store.keep(item.label) orelse return error.InvalidRequest,
+                .command = store.keep(item.command) orelse return error.InvalidRequest,
+                .key = key,
+                .modifiers = .{ .primary = key.len > 0, .shift = key.len > 0 and item.shift, .option = key.len > 0 and item.alt },
+                .enabled = item.enabled,
+                .checked = item.checked,
+            };
+            item_count += 1;
+        }
+        store.menus[menu_count] = .{ .title = title, .items = store.items[first..item_count] };
+        menu_count += 1;
+    }
+    const menus = store.menus[0..menu_count];
+    try native_sdk.platform.validateMenus(menus);
+    return menus;
+}
+
+/// `studio.setMenus` {menus:[{title, items:[{label, command, key?, shift?,
+/// alt?, enabled?, checked?, separator?}]}]}: install the page's localized
+/// menu bar (macOS). Picks come back as `menu:command` window events.
+/// Windows keeps no menu bar; the call succeeds with applied:false.
+fn setMenus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    if (comptime builtin.os.tag != .macos) {
+        return std.fmt.bufPrint(output, "{{\"ok\":true,\"applied\":false}}", .{}) catch error.HandlerFailed;
+    }
+    const runtime = self.runtime orelse return error.HandlerFailed;
+    const parsed = std.json.parseFromSlice(MenusPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const menus = try buildMenus(&self.menu_store, parsed.value.menus);
+    try runtime.options.platform.services.configureMenus(menus);
+    var items: usize = 0;
+    for (menus) |menu| items += menu.items.len;
+    return std.fmt.bufPrint(output, "{{\"ok\":true,\"applied\":true,\"menus\":{d},\"items\":{d}}}", .{ menus.len, items }) catch error.HandlerFailed;
 }
 
 /// The page polls this once after boot (and while running) instead of relying
@@ -528,8 +979,15 @@ fn installPlatformOpenHandler(self: *App) void {
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
     defer app_state.deinit();
-    app_state.engine.init(init.io, init.environ_map);
-    defer app_state.engine.deinit(init.io);
+    // Not freed at exit: the detached worker thread may still be unwinding.
+    const katago = try std.heap.page_allocator.create(engine_mod.Worker);
+    katago.init(init.io, init.environ_map);
+    defer katago.shutdown();
+    app_state.katago = katago;
+    app_state.request_scratch = try std.heap.page_allocator.create(engine_mod.Request);
+    app_state.request_scratch.* = .{};
+    app_state.katago_available = katago.engine.available();
+    app_state.katago_version = katago.engine.versionText(&app_state.katago_version_buf);
     app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);

@@ -262,7 +262,7 @@ export function start() {
       drainOpenFiles();
       if (++n >= 6) clearInterval(timer);
     }, 1500);
-    setTimeout(runSelfTest, 900);
+    setTimeout(() => import("../selftest.js").then((m) => m.runSelfTest({ state })), 900);
   }
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => {
