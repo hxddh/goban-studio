@@ -14,6 +14,7 @@ import * as Host from "../host.js";
 import { hasNative, normalizePaths, onDropFiles, onOpenFiles, selftestConfig, setupChrome, takeOpenFiles, writeTextFile } from "../host.js";
 import { state, update, useAppState, toast } from "./store.js";
 import * as C from "./controller.js";
+import * as S from "../solver.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
 import { TodayView } from "./today.jsx";
 import { PlayView } from "./play.jsx";
@@ -350,6 +351,9 @@ async function runSelfTest() {
 
 export function start() {
   C.boot();
+  // Handles for the interface tests (scripts/ui-test.mjs); harmless in use.
+  window.__state = state;
+  window.__solver = S;
   render(<App />, document.getElementById("root"));
   document.addEventListener("keydown", onKeyDown);
   // Mouse back/forward buttons move through history.

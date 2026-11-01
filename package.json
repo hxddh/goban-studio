@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Goban Studio — learn, play and review Go (围棋 · 바둑 · 囲碁) on macOS and Windows.",
+  "description": "Goban Studio \u2014 learn, play and review Go (\u56f4\u68cb \u00b7 \ubc14\ub451 \u00b7 \u56f2\u7881) on macOS and Windows.",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/bundle.mjs",
@@ -11,14 +11,19 @@
     "test": "node scripts/test.mjs && node scripts/test-app.mjs",
     "verify": "npm test && npm run build && npm run sync",
     "package:macos": "bash scripts/package.sh",
-    "release-check": "node scripts/release-check.mjs"
+    "release-check": "node scripts/release-check.mjs",
+    "ui-test": "node scripts/ui-test.mjs",
+    "ui-update": "node scripts/ui-test.mjs --update"
   },
   "dependencies": {
     "@sabaki/go-board": "1.4.3",
     "preact": "^10.29.8"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.63.0",
+    "pngjs": "^7.0.0"
   },
   "engines": {
     "node": ">=24"

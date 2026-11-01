@@ -406,6 +406,7 @@ export const MESSAGES = {
   "review.tryHint": m("在棋盘上落子即可试下变化。", "Play on the board to try a variation.", "판 위에 두면 변화를 시험할 수 있습니다.", "盤上に打つと変化を試せます。"),
   "review.liveToggle": m("实时分析", "Live analysis", "실시간 분석", "リアルタイム解析"),
   "review.liveSearching": m("计算中", "searching", "계산 중", "計算中"),
+  "review.candidatesLegend": m("棋盘上的数字：各候选点下一手后的胜率（%）。", "Numbers on the board: each candidate's win rate (%) for the side to move.", "판 위 숫자: 각 후보 수의 승률(%)입니다.", "盤上の数字：各候補手の勝率（%）です。"),
   "review.practiceThis": m("练这一手", "Practise this", "이 수 연습", "この手を練習"),
 
   "mistakes.title": m("我的错题", "My mistakes", "나의 실수", "自分の悪手"),

@@ -680,6 +680,7 @@ function LiveLine() {
         {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
         {live && !r.live.done ? ` · ${t("review.liveSearching")}` : ""}
       </span>
+      {live && !r.variation && !r.guess && <span class="fine">{t("review.candidatesLegend")}</span>}
     </div>
   );
 }

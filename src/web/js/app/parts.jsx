@@ -202,6 +202,7 @@ export function Board({ model, onPlay, onHover, label }) {
   }, []);
   useEffect(() => {
     view.current?.setModel(model);
+    window.__board = view.current;
   });
   const onKey = (e) => {
     const bv = view.current;

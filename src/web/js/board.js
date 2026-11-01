@@ -133,14 +133,19 @@ export class BoardView {
           if (!was && is) added++;
         }
       }
-      // Animate a single new stone (a move), not a whole new position.
-      if (added === 1 && last && !last.pass && board[last.y]?.[last.x]) this.placing = { x: last.x, y: last.y, start: now };
+      // Animate a single new stone (a move), not a whole new position, and
+      // never when the system asks for reduced motion.
+      const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) {
+        this.fading = [];
+        this.placing = null;
+      } else if (added === 1 && last && !last.pass && board[last.y]?.[last.x]) this.placing = { x: last.x, y: last.y, start: now };
       else this.placing = null;
       if (added > 1) this.fading = [];
       if (this.placing || this.fading.length) this.animate();
     }
     // Counting: territory fades in instead of popping.
-    if (!hadTerritory && this.model.territory) {
+    if (!hadTerritory && this.model.territory && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches)) {
       this.territoryStart = performance.now();
       this.animate();
     }

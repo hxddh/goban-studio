@@ -175,7 +175,7 @@ kbd {
 .board-frame {
   position: relative;
   width: min(100%, calc(100vh - var(--inset) - 48px));
-  max-width: 980px;
+  max-width: 1100px;
   aspect-ratio: 1;
   border-radius: 10px;
   overflow: hidden;
