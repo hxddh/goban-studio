@@ -3,7 +3,7 @@
     .name = "goban-studio",
     .display_name = "Goban Studio",
     .description = "Goban Studio — a beginner-first Go (围棋 · 바둑 · 囲碁) app for macOS & Windows.",
-    .version = "1.1.0",
+    .version = "1.1.1",
     .icons = .{"assets/icon.png"},
     .platforms = .{ "macos", "windows" },
     .permissions = .{},

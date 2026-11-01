@@ -1,7 +1,7 @@
 # KataGo sidecar
 
 `katago` (or `katago.exe`) is built or downloaded into `engine/<platform>/`.
-The engine is KataGo v1.16.0, MIT licensed by David J Wu and contributors:
+The engine is KataGo v1.18.1, MIT licensed by David J Wu and contributors:
 <https://github.com/lightvector/KataGo>.
 
 `model.txt.gz` is the public b6c96 network (KataGo model version 8). It is

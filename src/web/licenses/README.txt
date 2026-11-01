@@ -6,8 +6,8 @@ Goban-Studio-MIT.txt. The application also redistributes the following
 components; their licence texts sit beside this file.
 
   @sabaki/go-board 1.4.3 — MIT — sabaki-go-board-MIT.txt
-  Moka 9×9 network and player — MIT — Moka-MIT.txt
-  KataGo 1.16.0 and the b6c96 network — MIT — KataGo-MIT.txt
+  Moka v2.1 9×9 network and player — MIT — Moka-MIT.txt
+  KataGo 1.18.1 and the b6c96 network — MIT — KataGo-MIT.txt
   Inter typeface — SIL Open Font License 1.1 — Inter-OFL.txt
 
 The SGF opening positions are from the public-domain Go game collection at

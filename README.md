@@ -18,8 +18,8 @@ existing Gomoku app. It deliberately uses a different bundle ID
 | macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
 
-`SHA256SUMS` is attached to every GitHub release. The full v1.1.0 notes are in
-[`.github/release-notes/v1.1.0.md`](.github/release-notes/v1.1.0.md).
+`SHA256SUMS` is attached to every GitHub release. The full v1.1.1 notes are in
+[`.github/release-notes/v1.1.1.md`](.github/release-notes/v1.1.1.md).
 
 ## What is here
 
@@ -27,9 +27,9 @@ existing Gomoku app. It deliberately uses a different bundle ID
   and positional superko are checked locally. Play 9/13/19 boards under
   Japanese rules, with komi, up to nine handicap stones, and a human or
   computer opponent at five levels. On 19×19 the packaged app starts the
-  bundled KataGo sidecar; 9×9 uses the bundled Moka INT8 network; 13×13 keeps
-  the local heuristic opponent. Both sidebars retract independently during
-  play, and the layout choice is remembered.
+  bundled KataGo sidecar; 9×9 uses the bundled Moka v2.1 INT8 network; 13×13
+  keeps the local heuristic opponent. Both sidebars retract independently
+  during play, and the layout choice is remembered.
 - **Scoring** — two passes enter scoring. Tap dead stones, see territory and
   prisoners, confirm the result, or resume play. A one-colour region counts
   only when it is separated from at least one side of the board, so an open
@@ -51,7 +51,8 @@ existing Gomoku app. It deliberately uses a different bundle ID
 
 ## Run the web app
 
-Requires Node.js 20 or newer.
+Requires Node.js 24 or newer. The desktop build uses the latest Node 26 LTS
+in CI.
 
 ```bash
 npm ci
@@ -85,7 +86,7 @@ queue and the KataGo sidecar; `src/macos_open.m` receives the macOS Apple
 Event that a double-clicked `.sgf` produces; `src/runner.zig` is the platform
 runner; the app itself lives in `src/web`.
 
-On a machine with Zig 0.16 and the Native SDK:
+On a machine with Node.js 24+, Zig 0.16.0 and Native SDK 0.11.0:
 
 ```bash
 npm run build
@@ -114,13 +115,15 @@ the tag and GitHub Release. Release notes live in
 `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v1.1.0
+gh workflow run release.yml -f tag=v1.1.1
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
-publishing. The macOS job builds KataGo from the v1.16.0 source with the Eigen
+publishing. The macOS job builds KataGo from the v1.18.1 source with the Eigen
 backend; the Windows job downloads the matching official Eigen build and ships
-its DLLs. The Windows zip is produced by `scripts/make-zip.py` (forward slashes
+its DLLs. v1.18.1 is the latest KataGo release with official Eigen CPU
+binaries; v1.18.2 only changes the CUDA Turing attention path. The Windows zip
+is produced by `scripts/make-zip.py` (forward slashes
 and Unix mode bits), and `SHA256SUMS` is uploaded with all three assets.
 
 ## Architecture

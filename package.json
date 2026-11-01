@@ -1,6 +1,6 @@
 {
   "name": "goban-studio",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "description": "Goban Studio — a beginner-first Go (围棋 · 바둑 · 囲碁) app for macOS and Windows.",
@@ -20,6 +20,6 @@
     "esbuild": "0.28.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   }
 }

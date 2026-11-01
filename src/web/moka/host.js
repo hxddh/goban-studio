@@ -1,7 +1,8 @@
 /**
  * Moka 9×9 neural opponent, loaded as an ES module beside the classic app
- * bundle. The model is a 105k-parameter INT8 policy/value network distilled
- * from KataGo b6c96 (MIT, see LICENSE and THIRD_PARTY_NOTICES.md). It is used
+ * bundle. The model is Moka v2.1, a 244,529-parameter INT8 policy/value
+ * network distilled from KataGo b18 (MIT, see LICENSE and
+ * THIRD_PARTY_NOTICES.md). It is used
  * only on 9×9; 13×13 and 19×19 stay on the local heuristic engine.
  *
  * The worker keeps inference off the UI thread. If a WebView cannot start a

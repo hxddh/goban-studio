@@ -30,10 +30,10 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
@@ -47,7 +47,7 @@ jobs:
         run: npm test
       - name: build KataGo Eigen sidecar
         run: |
-          git clone --depth 1 --branch v1.16.0 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
+          git clone --depth 1 --branch v1.18.1 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build" \
             -G Ninja -DUSE_BACKEND=EIGEN -DUSE_AVX2=OFF -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
             -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
@@ -124,7 +124,7 @@ jobs:
           cp packaging/README-macOS.txt dist/dmg/README-macOS.txt
           hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
           ls -lh dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: GobanStudio-macOS-arm64
           path: |
