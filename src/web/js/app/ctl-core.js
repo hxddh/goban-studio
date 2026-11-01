@@ -29,7 +29,7 @@ export function setSetting(key, value) {
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
   if (key === "appearance") applyAppearance();
-  if (key === "board") Audio.setMaterial?.(value === "slate" ? "slate" : value === "paper" ? "paper" : "wood");
+  if (key === "board") Audio.setMaterial?.(value);
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval") syncMenus();
 }
 

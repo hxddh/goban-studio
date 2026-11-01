@@ -42,7 +42,7 @@ export function boot() {
   }
   setLang(settings.lang);
   Audio.setSound(settings.sound);
-  Audio.setMaterial?.(settings.board === "slate" ? "slate" : settings.board === "paper" ? "paper" : "wood");
+  Audio.setMaterial?.(settings.board);
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();

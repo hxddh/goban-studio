@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { BoardView } from "../board.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
+import { ICONS } from "./icons.js";
 
 const PATHS = {
   today: '<rect x="3" y="4" width="14" height="13" rx="2.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/><circle cx="10" cy="12.5" r="1.6"/>',
@@ -48,7 +49,7 @@ const PATHS = {
 
 export function Icon({ name, size = 18 }) {
   return (
-    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: PATHS[name] || PATHS.more }} />
+    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICONS[name] || PATHS[name] || ICONS.more || PATHS.more }} />
   );
 }
 
@@ -201,7 +202,7 @@ export function Board({ model, onPlay, onHover, label }) {
     return () => view.current?.destroy();
   }, []);
   useEffect(() => {
-    view.current?.setModel(model);
+    view.current?.setModel({ ...model, flatStones: !!state.settings?.flatStones });
     window.__board = view.current;
   });
   const onKey = (e) => {

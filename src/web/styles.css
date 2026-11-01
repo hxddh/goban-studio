@@ -553,9 +553,10 @@ input[type="range"] { accent-color: var(--accent); }
 .swatches { display: flex; gap: 8px; }
 .swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-1); color: var(--text-2); }
 .swatch i { width: 44px; height: 28px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
-.swatch.wood i { background: linear-gradient(135deg, #e9cd9d, #d2a970); }
-.swatch.paper i { background: linear-gradient(135deg, #faf6ec, #ece2cb); }
-.swatch.slate i { background: linear-gradient(135deg, #2f3c35, #1f2924); }
+.swatch.kaya i { background: #e2b46f url(assets/surfaces/kaya.webp) center / cover; }
+.swatch.katsura i { background: #ecd9b0 url(assets/surfaces/katsura.webp) center / cover; }
+.swatch.paper i { background: #f5eddb url(assets/surfaces/paper.webp) center / cover; }
+.swatch.slate i { background: #2c3a34 url(assets/surfaces/slate.webp) center / cover; }
 .swatch.on i { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .swatch.on { color: var(--text); }
 .about { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }

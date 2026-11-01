@@ -266,7 +266,7 @@ function SettingsSheet() {
         <div class="row">
           <span>{t("settings.board")}</span>
           <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
-            {["wood", "paper", "slate"].map((m) => (
+            {["kaya", "katsura", "paper", "slate"].map((m) => (
               <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
                 <i />
                 <span>{t("settings.material." + m)}</span>
@@ -274,6 +274,7 @@ function SettingsSheet() {
             ))}
           </div>
         </div>
+        <Switch label={t("settings.flatStones")} checked={!!s.flatStones} onChange={(v) => set("flatStones", v)} />
         <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
         <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
         <Switch label={t("settings.sound")} checked={s.sound} onChange={(v) => set("sound", v)} />

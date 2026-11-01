@@ -29,7 +29,7 @@ export const V1_KEYS = {
 export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
-  board: "wood", // wood | paper | slate
+  board: "kaya", // kaya | katsura | paper | slate
   coords: false,
   sound: true,
   numbers: false,
@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS = {
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the rating when suggesting an opponent
+  flatStones: false, // high-contrast flat stones (accessibility)
 };
 
 const memory = new Map();
@@ -157,7 +158,8 @@ export function loadSettings() {
   const s = readJSON(KEYS.settings, {});
   const out = { ...DEFAULT_SETTINGS, ...s };
   if (!["auto", "light", "dark"].includes(out.appearance)) out.appearance = "auto";
-  if (!["wood", "paper", "slate"].includes(out.board)) out.board = "wood";
+  if (out.board === "wood") out.board = "kaya";
+  if (!["kaya", "katsura", "paper", "slate"].includes(out.board)) out.board = "kaya";
   return out;
 }
 

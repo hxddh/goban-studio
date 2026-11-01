@@ -33,10 +33,7 @@ function Rail() {
   return (
     <nav class="rail" aria-label={t("nav.main")}>
       <div class="rail-top" data-drag>
-        <span class="mark" aria-hidden="true">
-          <i />
-          <i />
-        </span>
+        <img class="mark" src="assets/brand.svg" alt="" aria-hidden="true" width="28" height="28" />
       </div>
       <div class="history-btns">
         <IconButton icon="back" label={`${t("nav.back")} (${MOD}[)`} onClick={C.back} disabled={!C.canGoBack()} />
