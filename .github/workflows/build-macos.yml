@@ -12,9 +12,9 @@ on:
         required: false
         default: "0.11.0"
       runner:
-        description: "macOS runner image (macos-14 is in scheduled brownouts before its retirement)"
+        description: "macOS runner image (macos-14 is retired; macos-15 is the default)"
         required: false
-        default: "macos-14"
+        default: "macos-15"
   workflow_call:
     inputs:
       release_tag:
@@ -28,14 +28,14 @@ on:
       runner:
         type: string
         required: false
-        default: "macos-14"
+        default: "macos-15"
 
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: ${{ inputs.runner || 'macos-14' }}
+    runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v7

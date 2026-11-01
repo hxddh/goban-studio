@@ -58,6 +58,20 @@ export function suggestHandicap(playerRank, strengthId, size) {
   return Math.min(size === 9 ? 5 : 9, stones);
 }
 
+/**
+ * One search at a time. The sidecar supersedes a running search with a new
+ * one; queueing here keeps the whole-game review, live analysis, pondering
+ * and the opponent from cancelling each other. A caller that no longer
+ * wants its result aborts its own signal.
+ */
+let chain = Promise.resolve();
+function queued(fn) {
+  const run = chain.then(fn, fn);
+  chain = run.catch(() => {});
+  return run;
+}
+const analyzeQ = (game, opts) => queued(() => (opts?.signal?.aborted ? null : KataGo.analyze(game, opts)));
+
 let cached = null;
 export async function info() {
   if (cached) return cached;
@@ -125,7 +139,7 @@ function legal(game, move) {
  */
 export async function decide(game, strengthId, { signal } = {}) {
   const strength = strengthById(strengthId);
-  const analysis = await KataGo.analyze(game, { visits: strength.visits, signal });
+  const analysis = await analyzeQ(game, { visits: strength.visits, signal });
   if (signal?.aborted) return { move: null, analysis: null };
   if (analysis) {
     let move = pickCandidate(analysis, game.turn, strength);
@@ -138,12 +152,12 @@ export async function decide(game, strengthId, { signal } = {}) {
 
 /** A quick look at the position (for teaching mode and the eval bar). */
 export async function evaluate(game, { node = game.current, visits = 48, signal } = {}) {
-  return KataGo.analyze(game, { node, visits, signal });
+  return analyzeQ(game, { node, visits, signal });
 }
 
 /** Live analysis for review, with partial results while it searches. */
 export async function live(game, node, { visits = 240, onInfo, signal } = {}) {
-  return KataGo.analyze(game, { node, visits, onInfo, signal });
+  return analyzeQ(game, { node, visits, onInfo, signal });
 }
 
 export function cancel() {
@@ -152,7 +166,7 @@ export function cancel() {
 
 export async function chooseMove(game, strengthId) {
   const strength = strengthById(strengthId);
-  const analysis = await KataGo.analyze(game, { visits: strength.visits });
+  const analysis = await analyzeQ(game, { visits: strength.visits });
   if (analysis) {
     // Never resign, never pass early while the board is open: KataGo's own
     // choice is a pass only when the game is really over.
@@ -165,7 +179,7 @@ export async function chooseMove(game, strengthId) {
 
 /** The engine's suggestion for the side to move, with a short line. */
 export async function hint(game) {
-  const analysis = await KataGo.analyze(game, { visits: 200 });
+  const analysis = await analyzeQ(game, { visits: 200 });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
     return { ...toMove(top), pv: top.pv || [], source: "katago" };
@@ -179,7 +193,7 @@ export async function hint(game) {
  * best move with its line. `visits` trades accuracy for speed.
  */
 export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
-  const a = await KataGo.analyze(game, { node, visits, signal });
+  const a = await analyzeQ(game, { node, visits, signal });
   if (a && a.moves.length) {
     const top = a.moves[0];
     return {
@@ -207,7 +221,7 @@ export function estimateNode(game, node) {
  * [] when the engine is unavailable; the player marks stones by hand then.
  */
 export async function deadStones(game) {
-  const a = await KataGo.analyze(game, { visits: 160 });
+  const a = await analyzeQ(game, { visits: 160 });
   if (!a?.ownership) return { stones: [], source: "manual" };
   const size = game.size;
   const signMap = game.board.signMap;

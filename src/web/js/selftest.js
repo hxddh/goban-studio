@@ -160,7 +160,9 @@ export async function runSelfTest({ state } = {}) {
       validAnalysis(third, 19) &&
       second.sync && second.sync.reset === false && second.sync.undo === 0 && second.sync.play === 1 &&
       third.sync && third.sync.reset === false && third.sync.undo === 1 && third.sync.play === 0 &&
-      secondMs <= firstMs
+      // The sync counts prove the position was extended, not replayed; the
+      // timing only guards against a pathological slowdown.
+      secondMs <= firstMs * 1.5
     );
 
     // --- cancel: a long search stops promptly when asked

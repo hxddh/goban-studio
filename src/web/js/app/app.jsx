@@ -5,13 +5,9 @@
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
-import { Game } from "../rules.js";
-import * as Engine from "../engine.js";
-import * as KataGo from "../katago.js";
 import { t } from "../i18n.js";
-import { APP_VERSION } from "../version.js";
 import * as Host from "../host.js";
-import { hasNative, normalizePaths, onDropFiles, onOpenFiles, selftestConfig, setupChrome, takeOpenFiles, writeTextFile } from "../host.js";
+import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeOpenFiles } from "../host.js";
 import { state, update, useAppState, toast } from "./store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
@@ -312,38 +308,6 @@ function importPaths(detail) {
   const sgf = paths.find((p) => /\.sgf$/i.test(p));
   if (sgf) C.importFromPath(sgf);
   else if (paths.length) toast(t("library.onlySgf"), "warn");
-}
-
-/**
- * A packaged build is launched by the release workflows with
- * GOBAN_SELFTEST_OUT set. The report is written from the real WebView: it
- * proves the page, the native bridge and KataGo's analysis all came up.
- */
-async function runSelfTest() {
-  if (!hasNative()) return;
-  const cfg = await selftestConfig();
-  if (!cfg?.enabled || !cfg.path) return;
-  const checks = { webview: true, bridge: typeof window.zero?.invoke === "function", ui: !!document.querySelector(".app") };
-  const report = { version: APP_VERSION, language: state.settings.lang, checks };
-  try {
-    const g19 = new Game({ size: 19, komi: 6.5 });
-    const a19 = await KataGo.analyze(g19, { visits: 16 });
-    checks.analyze19 = !!(a19 && Number.isFinite(a19.winrate) && a19.ownership?.length === 361 && a19.moves.length > 0);
-    report.winrate19 = a19?.winrate ?? null;
-    const g9 = new Game({ size: 9, komi: 6.5 });
-    g9.play(4, 4);
-    const a9 = await KataGo.analyze(g9, { visits: 16 });
-    checks.analyze9 = !!(a9 && Number.isFinite(a9.scoreLead) && a9.ownership?.length === 81);
-    const h = new Game({ size: 19, komi: 0.5, handicap: 4 });
-    const move = await Engine.chooseMove(h, "5k");
-    checks.handicapMove = !!(move && !move.pass && h.canPlay(move.x, move.y).ok);
-    report.engineMove = move && !move.pass ? `${move.x},${move.y}` : "";
-    report.boardSize = 19;
-  } catch (error) {
-    report.error = String(error?.message || error);
-  }
-  report.ok = Object.values(checks).every(Boolean) && ["analyze19", "analyze9", "handicapMove"].every((k) => checks[k]);
-  await writeTextFile(cfg.path, JSON.stringify(report, null, 2) + "\n");
 }
 
 export function start() {
