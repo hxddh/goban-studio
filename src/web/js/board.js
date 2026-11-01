@@ -143,7 +143,13 @@ export class BoardView {
     cancelAnimationFrame(this.raf);
   }
 
+  /** Board text follows the interface font (per language, docs/design.md §2). */
+  readFont() {
+    this.font = (typeof getComputedStyle === "function" && getComputedStyle(this.canvas).getPropertyValue("--font").trim()) || FONT;
+  }
+
   setModel(patch) {
+    this.readFont();
     const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
@@ -323,6 +329,7 @@ export class BoardView {
   }
 
   draw() {
+    if (!this.font) this.readFont();
     const ctx = this.ctx;
     const g = this.geometry();
     this.geom = g;
@@ -389,7 +396,7 @@ export class BoardView {
     if (m.showCoords) {
       ctx.fillStyle = theme.text;
       const fs = Math.max(10, Math.min(13, cell * 0.3));
-      ctx.font = `500 ${fs}px ${FONT}`;
+      ctx.font = `500 ${fs}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const gap = cell * 0.8;
@@ -608,7 +615,7 @@ export class BoardView {
     const g = this.geom;
     const j = this.jitter(x, y);
     ctx.fillStyle = color;
-    ctx.font = `600 ${Math.max(8, fs)}px ${FONT}`;
+    ctx.font = `600 ${Math.max(8, fs)}px ${this.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, g.ox + x * g.cell + j.dx, g.oy + y * g.cell + j.dy + 0.5);
@@ -636,7 +643,7 @@ export class BoardView {
       ctx.fill();
       if (mark.label) {
         ctx.fillStyle = "#fff";
-        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px ${FONT}`;
+        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px ${this.font}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(mark.label, cx, cy + 0.5);
@@ -677,7 +684,7 @@ export class BoardView {
         ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
         ctx.fillStyle = tone;
       }
-      ctx.font = `600 ${g.cell * 0.46}px ${FONT}`;
+      ctx.font = `600 ${g.cell * 0.46}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(mark.label || "", cx, cy + 0.5);
