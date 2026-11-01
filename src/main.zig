@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const runner = @import("runner");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
+const update_mod = @import("update.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -22,6 +23,10 @@ extern fn goban_install_open_handler(context: ?*anyopaque, callback: OpenCallbac
 const katago_timer_id: u64 = 0x6b61_7461_676f;
 const katago_timer_interval_ns: u64 = 50 * std.time.ns_per_ms;
 const max_jobs = 8;
+/// Timer that collects the update check's result (and enforces its
+/// deadline) while one is open; same role as the KataGo timer.
+const update_timer_id: u64 = 0x7570_6461_7465;
+const update_timer_interval_ns: u64 = 250 * std.time.ns_per_ms;
 
 /// An async analysis the page is waiting for. UI thread only.
 const Job = struct {
@@ -92,9 +97,21 @@ const App = struct {
     /// once it is ready; keeping the queue here also covers an event that
     /// arrives before the webview has subscribed.
     open_paths: std.ArrayList([]u8) = .empty,
-    handlers: [11]native_sdk.BridgeHandler = undefined,
-    async_handlers: [1]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [12]native_sdk.BridgeCommandPolicy = undefined,
+    /// Update check (the only network request; see update.zig). One open
+    /// `studio.checkUpdate` call at a time. UI thread only, except the
+    /// Checker's own locked slot.
+    updater: *update_mod.Checker = undefined,
+    update_wake_installed: bool = false,
+    update_active: bool = false,
+    update_gen: u64 = 0,
+    update_deadline_ms: i64 = 0,
+    update_timer_running: bool = false,
+    update_responder: native_sdk.bridge.AsyncResponder = undefined,
+    update_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
+    update_bridge_id_len: usize = 0,
+    handlers: [12]native_sdk.BridgeHandler = undefined,
+    async_handlers: [2]native_sdk.bridge.AsyncHandler = undefined,
+    policies: [14]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -230,10 +247,20 @@ const App = struct {
             .context = self,
             .invoke_fn = setMenus,
         };
+        self.handlers[11] = .{
+            .name = "studio.openReleasePage",
+            .context = self,
+            .invoke_fn = openReleasePage,
+        };
         self.async_handlers[0] = .{
             .name = "studio.katagoAnalyzeAsync",
             .context = self,
             .invoke_fn = katagoAnalyzeAsync,
+        };
+        self.async_handlers[1] = .{
+            .name = "studio.checkUpdate",
+            .context = self,
+            .invoke_fn = checkUpdate,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -361,8 +388,14 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
         // A KataGo worker result or partial report is waiting (the worker
         // nudged the loop through PlatformServices.wake), or the fallback
         // collection timer fired.
-        .effects_wake => drainKatago(self),
-        .timer => |timer| if (timer.id == katago_timer_id) drainKatago(self),
+        .effects_wake => {
+            drainKatago(self);
+            drainUpdate(self);
+        },
+        .timer => |timer| {
+            if (timer.id == katago_timer_id) drainKatago(self);
+            if (timer.id == update_timer_id) drainUpdate(self);
+        },
         else => {},
     }
 }
@@ -509,7 +542,6 @@ fn windowChrome(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
         chrome.buttons.height,
     });
 }
-
 
 /// One move from the bundled KataGo engine (v2, synchronous). The page
 /// sends a base64 GTP setup script (newline-separated, limited to the setup
@@ -834,6 +866,123 @@ fn drainKatago(self: *App) void {
     if (!anyJobActive(self)) stopDrainTimer(self);
 }
 
+// ------------------------------------------------------------ updates
+//
+// "Offline by design" with one user-controlled exception: the page may ask
+// for the latest release (a menu pick, or the opt-in weekly check). The
+// request runs on its own thread (update.zig); the reply comes back here
+// through the platform wake or the fallback timer, like KataGo's.
+
+fn installUpdateWake(self: *App) void {
+    if (self.update_wake_installed) return;
+    const runtime = self.runtime orelse return;
+    const services = runtime.options.platform.services;
+    self.updater.setWake(services.context, services.wake_fn);
+    self.update_wake_installed = true;
+}
+
+fn nowMs(self: *App) i64 {
+    return std.Io.Timestamp.now(self.io, .awake).toMilliseconds();
+}
+
+fn stopUpdateTimer(self: *App) void {
+    if (!self.update_timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.cancelTimer(update_timer_id) catch {};
+    self.update_timer_running = false;
+}
+
+/// `studio.checkUpdate` {}: GET the latest GitHub release of this app.
+/// Replies (always a bridge success) `{ok:true, latest, url, notes,
+/// publishedAt, prerelease}` or `{ok:false, error}` with error one of
+/// Busy, Timeout, Network, NoRelease, RateLimited, HttpStatus,
+/// BadResponse, ResponseTooLarge, OutOfMemory, Unavailable.
+fn checkUpdate(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    const rid = invocation.request.id;
+    if (self.update_active) {
+        responder.success(rid, "{\"ok\":false,\"error\":\"Busy\"}") catch {};
+        return;
+    }
+    installUpdateWake(self);
+    const gen = self.updater.start() catch |err| {
+        const reply = if (err == error.Busy) "{\"ok\":false,\"error\":\"Busy\"}" else "{\"ok\":false,\"error\":\"Unavailable\"}";
+        responder.success(rid, reply) catch {};
+        return;
+    };
+    const rid_len = @min(rid.len, self.update_bridge_id.len);
+    @memcpy(self.update_bridge_id[0..rid_len], rid[0..rid_len]);
+    self.update_bridge_id_len = rid_len;
+    self.update_responder = responder;
+    self.update_gen = gen;
+    self.update_deadline_ms = nowMs(self) + update_mod.timeout_ms;
+    self.update_active = true;
+    if (!self.update_timer_running) {
+        if (self.runtime) |runtime| {
+            if (runtime.options.platform.services.startTimer(update_timer_id, update_timer_interval_ns, true)) |_| {
+                self.update_timer_running = true;
+            } else |_| {}
+        }
+    }
+}
+
+/// Answer the open update check if its thread has finished or its time is
+/// up. UI thread.
+fn drainUpdate(self: *App) void {
+    if (!self.update_active) {
+        stopUpdateTimer(self);
+        return;
+    }
+    const buf = engine_mod.result_allocator.alloc(u8, update_mod.max_reply_bytes) catch return;
+    defer engine_mod.result_allocator.free(buf);
+    const id = self.update_bridge_id[0..self.update_bridge_id_len];
+    if (self.updater.take(self.update_gen, buf)) |reply| {
+        self.update_active = false;
+        self.update_responder.success(id, reply) catch {};
+    } else if (nowMs(self) >= self.update_deadline_ms) {
+        self.updater.abandon(self.update_gen);
+        self.update_active = false;
+        self.update_responder.success(id, "{\"ok\":false,\"error\":\"Timeout\"}") catch {};
+    }
+    if (!self.update_active) stopUpdateTimer(self);
+}
+
+/// `studio.openReleasePage`: open the app's fixed GitHub releases page in
+/// the system browser. The payload is ignored: the page can never choose
+/// the address. Replies `{ok}`.
+fn openReleasePage(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    const url = update_mod.releases_page_url;
+    var opened = false;
+    if (self.runtime) |runtime| {
+        if (runtime.options.platform.services.openExternalUrl(url)) |_| {
+            opened = true;
+        } else |_| {}
+    }
+    if (!opened) opened = spawnBrowser(self.io, url);
+    return std.fmt.bufPrint(output, "{{\"ok\":{s}}}", .{if (opened) "true" else "false"}) catch error.HandlerFailed;
+}
+
+/// Fallback when the platform's open-URL service is missing or fails:
+/// `open` (macOS), the URL protocol handler (Windows), `xdg-open`.
+fn spawnBrowser(io: std.Io, url: []const u8) bool {
+    const argv: []const []const u8 = switch (builtin.os.tag) {
+        .macos => &.{ "/usr/bin/open", url },
+        .windows => &.{ "rundll32.exe", "url.dll,FileProtocolHandler", url },
+        else => &.{ "xdg-open", url },
+    };
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .ignore,
+        .create_no_window = true,
+    }) catch return false;
+    _ = child.wait(io) catch {};
+    return true;
+}
+
 // ------------------------------------------------------------ native menus
 
 const MenuItemSpec = struct {
@@ -953,14 +1102,26 @@ fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
 /// A closed packaged app can be launched with GOBAN_SELFTEST_OUT set by the
 /// release job. The page writes a small report to that path after the real
 /// WebView, bridge and engine are up; the platform workflow waits for it.
+///
+/// GOBAN_TOUR_OUT (v4) asks for the screenshot tour instead: the page walks
+/// through its main screens (src/web/js/tour.js), writing its progress to
+/// that path and waiting for scripts/tour-app.mjs to capture each one.
 fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
     const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
-    if (path.len == 0) return std.fmt.bufPrint(output, "{{\"enabled\":false}}", .{}) catch error.HandlerFailed;
+    const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
-    if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
-    if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    if (path.len == 0) {
+        if (!jsonAppend(output, &n, "{\"enabled\":false")) return error.HandlerFailed;
+    } else {
+        if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    }
+    if (tour.len > 0) {
+        if (!jsonAppend(output, &n, ",\"tour\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, tour)) return error.HandlerFailed;
+    }
     if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
 }
@@ -988,6 +1149,10 @@ pub fn main(init: std.process.Init) !void {
     app_state.request_scratch.* = .{};
     app_state.katago_available = katago.engine.available();
     app_state.katago_version = katago.engine.versionText(&app_state.katago_version_buf);
+    // Not freed at exit either: a check thread may still be finishing.
+    const updater = try std.heap.page_allocator.create(update_mod.Checker);
+    updater.init(init.io);
+    app_state.updater = updater;
     app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);
@@ -1007,6 +1172,7 @@ pub fn main(init: std.process.Init) !void {
 
 test {
     std.testing.refAllDecls(engine_mod);
+    std.testing.refAllDecls(update_mod);
 }
 
 test "production source uses frontend assets" {

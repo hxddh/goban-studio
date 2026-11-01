@@ -1,0 +1,166 @@
+/**
+ * Update checks — the app's only network request, and only when asked.
+ *
+ * The page never talks to the network itself (CSP `connect-src 'self'`).
+ * The native host does one HTTPS GET of GitHub's "latest release" document
+ * for this repository (`studio.checkUpdate`) when
+ *
+ *   - the player picks "Check for updates…", or
+ *   - the player turned on "Check automatically once a week" (off by
+ *     default) and a week has passed since the last check.
+ *
+ * Nothing is sent but the request itself: no identifiers, no version. The
+ * browser preview has no host and reports `unavailable`.
+ *
+ * The version arithmetic and the weekly schedule are pure functions; the
+ * two entry points take their dependencies as arguments so the tests can
+ * drive them without a host.
+ */
+import { APP_VERSION } from "./version.js";
+import { readJSON, writeJSON } from "./persist.js";
+import * as Host from "./host.js";
+
+export const UPDATE_KEY = "goban-studio.update.v1";
+export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** The setting that turns the weekly check on (default false). */
+export const AUTO_SETTING = "autoUpdateCheck";
+
+/** "v4.1.0" / "4.1" / "4.1.0-beta.2" → { major, minor, patch, pre } or null. */
+export function parseVersion(text) {
+  const m = /^\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?\s*$/.exec(String(text ?? ""));
+  if (!m) return null;
+  return { major: Number(m[1]), minor: Number(m[2] ?? 0), patch: Number(m[3] ?? 0), pre: m[4] ? m[4].split(".") : [] };
+}
+
+function comparePre(a, b) {
+  // A release outranks any of its pre-releases (semver §11).
+  if (!a.length && !b.length) return 0;
+  if (!a.length) return 1;
+  if (!b.length) return -1;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] === undefined) return -1;
+    if (b[i] === undefined) return 1;
+    const na = /^\d+$/.test(a[i]);
+    const nb = /^\d+$/.test(b[i]);
+    if (na && nb) {
+      const d = Number(a[i]) - Number(b[i]);
+      if (d) return Math.sign(d);
+    } else if (na !== nb) {
+      return na ? -1 : 1;
+    } else if (a[i] !== b[i]) {
+      return a[i] < b[i] ? -1 : 1;
+    }
+  }
+  return 0;
+}
+
+/** -1, 0 or 1; null when either side is not a version. */
+export function compareVersions(a, b) {
+  const va = typeof a === "string" ? parseVersion(a) : a;
+  const vb = typeof b === "string" ? parseVersion(b) : b;
+  if (!va || !vb) return null;
+  for (const k of ["major", "minor", "patch"]) {
+    if (va[k] !== vb[k]) return va[k] > vb[k] ? 1 : -1;
+  }
+  return comparePre(va.pre, vb.pre);
+}
+
+/** Is `latest` a newer version than `current`? (false when unparseable) */
+export function isNewer(latest, current = APP_VERSION) {
+  return compareVersions(latest, current) === 1;
+}
+
+/** Is an automatic check due? Only when enabled, and a week after the last one. */
+export function isCheckDue({ enabled, lastCheck, now = Date.now(), interval = WEEK_MS }) {
+  if (!enabled) return false;
+  const last = Number(lastCheck);
+  if (!Number.isFinite(last) || last <= 0) return true;
+  // A clock moved backwards counts as "checked just now", not "never".
+  if (last > now) return false;
+  return now - last >= interval;
+}
+
+/** When the next automatic check falls due (ms), or null when it is off. */
+export function nextCheckAt({ enabled, lastCheck, now = Date.now(), interval = WEEK_MS }) {
+  if (!enabled) return null;
+  const last = Number(lastCheck);
+  if (!Number.isFinite(last) || last <= 0) return now;
+  return Math.max(now, last + interval);
+}
+
+/**
+ * Turn the host's reply into what the interface shows:
+ *
+ *   { status: "available", latest, current, url, notes, publishedAt }
+ *   { status: "current",   latest, current, url }
+ *   { status: "unavailable" }                    browser preview / old host
+ *   { status: "error", error }                   Network, Timeout, RateLimited…
+ */
+export function interpretReply(reply, current = APP_VERSION) {
+  if (!reply || typeof reply !== "object") return { status: "error", error: "BadResponse" };
+  if (reply.ok !== true) {
+    const error = String(reply.error || "Unknown");
+    return error === "unavailable" ? { status: "unavailable" } : { status: "error", error };
+  }
+  const latest = String(reply.latest || "");
+  if (!parseVersion(latest)) return { status: "error", error: "BadResponse" };
+  const base = { latest, current, url: String(reply.url || ""), publishedAt: String(reply.publishedAt || "") };
+  if (isNewer(latest, current)) return { status: "available", ...base, notes: String(reply.notes || "") };
+  return { status: "current", ...base };
+}
+
+export function loadUpdateState(read = readJSON) {
+  const v = read(UPDATE_KEY, {});
+  return { lastCheck: Number(v.lastCheck) || 0, lastResult: v.lastResult && typeof v.lastResult === "object" ? v.lastResult : null };
+}
+
+function remember(result, now, write) {
+  // Errors do not reset the week: a failed weekly check retries next launch.
+  if (result.status === "unavailable" || result.status === "error") return;
+  const { status, latest, url, publishedAt } = result;
+  write(UPDATE_KEY, { lastCheck: now, lastResult: { status, latest, url, publishedAt } });
+}
+
+/**
+ * Check now (the menu item). Resolves to an `interpretReply` result.
+ * `deps` is for the tests: { check, now, current, write }.
+ */
+export async function checkNow(deps = {}) {
+  const check = deps.check || Host.checkUpdate;
+  const now = deps.now ?? Date.now();
+  const current = deps.current || APP_VERSION;
+  let reply;
+  try {
+    reply = await check();
+  } catch (_) {
+    reply = { ok: false, error: "Network" };
+  }
+  const result = interpretReply(reply, current);
+  remember(result, now, deps.write || writeJSON);
+  return result;
+}
+
+/**
+ * The weekly check, run once after start-up. Does nothing — no request —
+ * unless `settings.autoUpdateCheck` is true and a week has passed. Resolves
+ * to the result, or null when no check was made.
+ * `deps`: { check, now, current, read, write, hasHost }.
+ */
+export async function autoCheckIfDue(settings, deps = {}) {
+  const hasHost = deps.hasHost ?? Host.hasNative();
+  if (!hasHost) return null;
+  const now = deps.now ?? Date.now();
+  const { lastCheck } = loadUpdateState(deps.read || readJSON);
+  if (!isCheckDue({ enabled: settings?.[AUTO_SETTING] === true, lastCheck, now })) return null;
+  return checkNow({ ...deps, now });
+}
+
+/** Can this build check at all? (false in the browser preview) */
+export function canCheckUpdates() {
+  return Host.canCheckUpdates();
+}
+
+/** Open the app's releases page in the system browser (fixed address). */
+export function openReleasePage() {
+  return Host.openReleasePage();
+}

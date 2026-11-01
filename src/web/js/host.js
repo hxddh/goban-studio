@@ -200,6 +200,59 @@ export async function selftestConfig() {
   }
 }
 
+/* ---------------------------------------------------------- v4 updates */
+
+/** How long the page waits for `studio.checkUpdate` (the host gives up at 15 s). */
+const UPDATE_TIMEOUT_MS = 20000;
+
+/** Can this build check for updates? (false in the browser preview) */
+export function canCheckUpdates() {
+  return hasNative();
+}
+
+/**
+ * Ask the host for the latest GitHub release — the app's only network
+ * request, made only when this is called. Resolves to
+ *
+ *   { ok: true, latest: "v4.1.0", url, notes, publishedAt, prerelease }
+ *   { ok: false, error }   error: "unavailable" (no host / old host),
+ *                          "Timeout", "Network", "RateLimited", "NoRelease",
+ *                          "Busy", "HttpStatus", "BadResponse", …
+ *
+ * Never rejects.
+ */
+export async function checkUpdate() {
+  if (!hasNative()) return { ok: false, error: "unavailable" };
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, error: "Timeout" }), UPDATE_TIMEOUT_MS);
+  });
+  try {
+    const reply = await Promise.race([invoke("studio.checkUpdate", {}), timeout]);
+    return reply && typeof reply === "object" ? reply : { ok: false, error: "BadResponse" };
+  } catch (e) {
+    // An older host without the command answers with a bridge error.
+    return { ok: false, error: /unknown|not found|unsupported|no handler/i.test(String(e?.message || e)) ? "unavailable" : "Network" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Open the app's releases page in the system browser. The host opens one
+ * fixed address (github.com/hxddh/goban-studio/releases/latest); nothing
+ * the page passes can change it. Resolves true when it was handed to the OS.
+ */
+export async function openReleasePage() {
+  if (!hasNative()) return false;
+  try {
+    const reply = await invoke("studio.openReleasePage", {});
+    return !!(reply && reply.ok);
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function setupChrome() {
   const chrome = await windowChrome();
   const top = Math.max(0, Number(chrome.top) || 0);

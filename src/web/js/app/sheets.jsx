@@ -318,6 +318,9 @@ function SettingsSheet() {
           <span class="fine">{t("settings.offline")}</span>
           <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
         </p>
+        <UpdateRow />
+        <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />
+        <p class="fine">{t("update.autoHelp")}</p>
         <div class="actions">
           <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
             {t("shortcuts.title")}
@@ -328,6 +331,34 @@ function SettingsSheet() {
         </div>
       </section>
     </Modal>
+  );
+}
+
+/** "Check for updates…" with what the last check found. */
+function UpdateRow() {
+  const u = state.updateCheck;
+  const can = C.canCheckUpdates();
+  let text = "";
+  if (u?.status === "checking") text = t("update.checking");
+  else if (u?.status === "available") text = t("update.available", [u.latest]);
+  else if (u?.status === "current") text = t("update.current", [u.current]);
+  else if (u?.status === "error") text = t("update.error");
+  else if (!can) text = t("update.unavailable");
+  return (
+    <div class="row update-row">
+      <span class={u?.status === "available" ? "" : "muted"} aria-live="polite">
+        {text}
+      </span>
+      {u?.status === "available" ? (
+        <Button size="sm" icon="download" onClick={C.openReleasePage}>
+          {t("update.download")}
+        </Button>
+      ) : (
+        <Button size="sm" onClick={() => C.checkForUpdates()} disabled={!can || u?.status === "checking"}>
+          {t("update.check")}
+        </Button>
+      )}
+    </div>
   );
 }
 

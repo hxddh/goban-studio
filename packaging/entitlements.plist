@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for Goban Studio.app under the hardened runtime (Developer ID
+  builds; scripts/macos-sign.sh). Deliberately empty:
+
+  * WKWebView runs JavaScript (and its JIT) in Apple's own WebContent XPC
+    processes, not in this process, so com.apple.security.cs.allow-jit and
+    allow-unsigned-executable-memory are not needed. The Zig executable
+    generates no code at run time.
+  * The app is not sandboxed (no com.apple.security.app-sandbox), so it
+    needs no network-client entitlement for the opt-in update check and no
+    file entitlements for opening .sgf files.
+  * KataGo is a separate executable inside the bundle, signed on its own
+    with the hardened runtime and no entitlements. A non-sandboxed parent
+    needs no entitlement to start it; it loads only system libraries, so
+    library validation does not have to be disabled.
+
+  The packaged-app self-test runs on the signed app before notarization,
+  so a missing entitlement would fail the build, not a player's launch.
+-->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

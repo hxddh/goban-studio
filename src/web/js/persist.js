@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS = {
   flatStones: false, // high-contrast flat stones (accessibility)
   // v4
   boardSize: 19, // the size you last chose for a new game
-  autoUpdate: false, // check for a new version once a week (opt-in)
+  autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
   v4: true, // settings have been through the v4 migration
 };
 

@@ -648,3 +648,4 @@ button.group-row:hover { background: var(--fill); }
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
 :root[data-motion="reduced"] .place, :root[data-motion="reduced"] .enter-up, :root[data-motion="reduced"] .panel-state { animation: none; }
+.update-row > span { flex: 1; }

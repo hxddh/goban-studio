@@ -76,6 +76,7 @@ function App() {
 const COMMANDS = {
   "app.settings": () => C.openSheet("settings"),
   "help.shortcuts": () => C.openSheet("shortcuts"),
+  "help.checkUpdates": () => C.checkForUpdates(),
   "file.new": () => C.openNewGame(),
   "file.import": () => C.pickImport(),
   "file.export": () => (C.playReviewing() || state.review ? C.exportSGF(state.review.game, state.review.meta.name) : C.exportSGF()),
@@ -150,6 +151,8 @@ function menuSpec() {
       items: [
         { label: t("nav.settings"), command: "app.settings", key: "," },
         { label: t("shortcuts.title"), command: "help.shortcuts", key: "/" },
+        { separator: true },
+        { label: t("update.check"), command: "help.checkUpdates" },
       ],
     },
   ];
@@ -300,6 +303,8 @@ export function start() {
       if (++n >= 6) clearInterval(timer);
     }, 1500);
     setTimeout(() => import("../selftest.js").then((m) => m.runSelfTest({ state })), 900);
+    // v4 release checks: the screenshot tour, only when the host was launched with GOBAN_TOUR_OUT.
+    setTimeout(() => Host.selftestConfig().then((c) => c?.tour && import("../tour.js").then((m) => m.runTour(c))), 1200);
   }
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => {

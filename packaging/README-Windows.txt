@@ -9,6 +9,11 @@ This build is not Authenticode-signed. Windows SmartScreen may show
 "Windows protected your PC"; choose "More info" and then "Run anyway".
 The SHA256SUMS file in the GitHub release lets you verify the download.
 
+The app works offline and needs no account. It makes no network request
+unless you choose Check for updates, or turn on the weekly update check in
+Settings (off by default); either asks GitHub for the latest version and
+sends nothing about you or your games.
+
 SGF files
 ---------
 To open .sgf files by double-click, run this once from the app folder:

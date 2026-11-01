@@ -38,6 +38,12 @@ import {
   writeJSON,
 } from "../src/web/js/persist.js";
 import * as Lib from "../src/web/js/library.js";
+import * as U from "../src/web/js/update.js";
+import * as Host from "../src/web/js/host.js";
+import { APP_VERSION } from "../src/web/js/version.js";
+import * as Sign from "./signing-notes.mjs";
+import * as Shots from "./screenshots.mjs";
+import { PNG } from "pngjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -814,6 +820,198 @@ await test("static page inputs and build script are present", () => {
   // WebView2 injects window.zero as an inline script; without unsafe-inline
   // its CSP drops the bridge and the packaged page silently becomes static.
   assert.match(html, /script-src 'self' 'unsafe-inline'/);
+});
+
+/* ------------------------------------------------------------ v4 release */
+
+await test("v4: versions compare as semver (v-prefix, missing parts, pre-releases)", () => {
+  assert.deepEqual(U.parseVersion("v4.1.0"), { major: 4, minor: 1, patch: 0, pre: [] });
+  assert.deepEqual(U.parseVersion("4.1"), { major: 4, minor: 1, patch: 0, pre: [] });
+  assert.deepEqual(U.parseVersion("4.0.0-beta.2+build.7").pre, ["beta", "2"]);
+  for (const bad of ["", "latest", "v", "4.x", "release-4", null, undefined]) assert.equal(U.parseVersion(bad), null, String(bad));
+  assert.equal(U.compareVersions("v3.0.0", "3.0.0"), 0);
+  assert.equal(U.compareVersions("3.0.1", "3.0.0"), 1);
+  assert.equal(U.compareVersions("3.10.0", "3.9.9"), 1, "numeric, not lexical");
+  assert.equal(U.compareVersions("4.0.0-beta.1", "4.0.0"), -1, "a pre-release is older than its release");
+  assert.equal(U.compareVersions("4.0.0-beta.2", "4.0.0-beta.10"), -1);
+  assert.equal(U.compareVersions("4.0.0-alpha", "4.0.0-beta"), -1);
+  assert.equal(U.compareVersions("4.0.0-1", "4.0.0-alpha"), -1, "numeric identifiers sort first");
+  assert.equal(U.compareVersions("4.0.0-beta", "4.0.0-beta.1"), -1);
+  assert.equal(U.compareVersions("nonsense", "3.0.0"), null);
+  assert.equal(U.isNewer("v4.0.0", "3.0.0"), true);
+  assert.equal(U.isNewer("v3.0.0", "3.0.0"), false);
+  assert.equal(U.isNewer("v2.9.9", "3.0.0"), false);
+  assert.equal(U.isNewer("garbage", "3.0.0"), false);
+  assert.equal(U.isNewer(`v${APP_VERSION}`), false, "the running version is not an update");
+});
+
+await test("v4: the weekly check is off by default and runs at most once a week", () => {
+  assert.equal(DEFAULT_SETTINGS.autoUpdateCheck, false, "opt-in");
+  assert.equal(loadSettings().autoUpdateCheck, false);
+  const now = Date.UTC(2026, 10, 1);
+  assert.equal(U.isCheckDue({ enabled: false, lastCheck: 0, now }), false, "never when off");
+  assert.equal(U.isCheckDue({ enabled: true, lastCheck: 0, now }), true, "first check when on");
+  assert.equal(U.isCheckDue({ enabled: true, lastCheck: now - U.WEEK_MS + 60000, now }), false);
+  assert.equal(U.isCheckDue({ enabled: true, lastCheck: now - U.WEEK_MS, now }), true);
+  assert.equal(U.isCheckDue({ enabled: true, lastCheck: now + 3600000, now }), false, "a clock set back is not 'never checked'");
+  assert.equal(U.nextCheckAt({ enabled: false, lastCheck: 0, now }), null);
+  assert.equal(U.nextCheckAt({ enabled: true, lastCheck: now - 1000, now }), now - 1000 + U.WEEK_MS);
+  assert.equal(U.nextCheckAt({ enabled: true, lastCheck: 0, now }), now);
+});
+
+await test("v4: host replies become available / current / error / unavailable", () => {
+  const ok = { ok: true, latest: "v4.1.0", url: "https://github.com/hxddh/goban-studio/releases/tag/v4.1.0", notes: "New", publishedAt: "2026-11-01T00:00:00Z" };
+  assert.deepEqual(U.interpretReply(ok, "4.0.0"), { status: "available", latest: "v4.1.0", current: "4.0.0", url: ok.url, publishedAt: ok.publishedAt, notes: "New" });
+  assert.equal(U.interpretReply(ok, "4.1.0").status, "current");
+  assert.equal(U.interpretReply(ok, "5.0.0").status, "current", "an older release is not offered");
+  assert.deepEqual(U.interpretReply({ ok: false, error: "unavailable" }), { status: "unavailable" });
+  assert.deepEqual(U.interpretReply({ ok: false, error: "RateLimited" }), { status: "error", error: "RateLimited" });
+  assert.deepEqual(U.interpretReply({ ok: true, latest: "<b>" }), { status: "error", error: "BadResponse" });
+  assert.deepEqual(U.interpretReply(null), { status: "error", error: "BadResponse" });
+});
+
+await test("v4: without a native host there is no update request and the API says unavailable", async () => {
+  assert.equal(globalThis.zero, undefined);
+  assert.deepEqual(await Host.checkUpdate(), { ok: false, error: "unavailable" });
+  assert.equal(await Host.openReleasePage(), false);
+  assert.equal(Host.canCheckUpdates(), false);
+  assert.equal(U.canCheckUpdates(), false);
+  assert.deepEqual(await U.checkNow(), { status: "unavailable" });
+  assert.equal(await U.autoCheckIfDue({ autoUpdateCheck: true }), null, "the weekly check needs a host");
+});
+
+await test("v4: checkNow / autoCheckIfDue ask only when allowed and remember successful checks", async () => {
+  const store = new Map();
+  const read = (k, fallback) => (store.has(k) ? store.get(k) : fallback);
+  const write = (k, v) => store.set(k, v);
+  let calls = 0;
+  const check = async () => {
+    calls++;
+    return { ok: true, latest: "v9.0.0", url: "https://github.com/hxddh/goban-studio/releases/tag/v9.0.0", notes: "x" };
+  };
+  const now = Date.UTC(2026, 10, 1);
+  const deps = { check, read, write, hasHost: true, current: "4.0.0" };
+  assert.equal(await U.autoCheckIfDue({ autoUpdateCheck: false }, { ...deps, now }), null);
+  assert.equal(await U.autoCheckIfDue({}, { ...deps, now }), null, "missing setting means off");
+  assert.equal(calls, 0, "no request while the weekly check is off");
+  const first = await U.autoCheckIfDue({ autoUpdateCheck: true }, { ...deps, now });
+  assert.equal(first.status, "available");
+  assert.equal(calls, 1);
+  assert.equal(U.loadUpdateState(read).lastCheck, now);
+  assert.equal(await U.autoCheckIfDue({ autoUpdateCheck: true }, { ...deps, now: now + 86400000 }), null, "not again the next day");
+  assert.equal(calls, 1);
+  assert.equal((await U.autoCheckIfDue({ autoUpdateCheck: true }, { ...deps, now: now + U.WEEK_MS })).status, "available");
+  assert.equal(calls, 2);
+  // A failed check does not count as this week's check.
+  const failing = { ...deps, check: async () => ({ ok: false, error: "Network" }) };
+  const later = now + 3 * U.WEEK_MS;
+  assert.deepEqual(await U.checkNow({ ...failing, now: later }), { status: "error", error: "Network" });
+  assert.equal(U.loadUpdateState(read).lastCheck, now + U.WEEK_MS);
+  const throwing = { ...deps, check: async () => { throw new Error("bridge"); } };
+  assert.deepEqual(await U.checkNow({ ...throwing, now: later }), { status: "error", error: "Network" });
+});
+
+await test("v4: the native update commands are fixed to this repository", () => {
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8");
+  assert.match(main, /"studio\.checkUpdate"/);
+  assert.match(main, /"studio\.openReleasePage"/);
+  assert.match(zig, /releases_api_url = "https:\/\/api\.github\.com\/repos\/hxddh\/goban-studio\/releases\/latest"/);
+  assert.match(zig, /releases_page_url = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/latest"/);
+  // openReleasePage never reads the page's payload.
+  const open = main.slice(main.indexOf("fn openReleasePage("), main.indexOf("fn spawnBrowser("));
+  assert.match(open, /_ = invocation;/);
+  assert.doesNotMatch(open, /payload/);
+  // The page itself still cannot reach the network.
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  assert.match(html, /connect-src 'self'/);
+  const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
+  assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  assert.match(messages, /\/\/ v4 release\n/);
+  for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
+});
+
+await test("v4: release notes and package READMEs say how the build was really signed", () => {
+  const v3 = fs.readFileSync(path.join(root, ".github/release-notes/v3.0.0.md"), "utf8");
+  const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
+  const unsigned = Sign.normalizeStatus("windows", {});
+  const notarized = Sign.normalizeStatus("macos", { mode: "developer-id", notarized: true });
+  const signedWin = Sign.normalizeStatus("windows", { mode: "authenticode", timestamped: true });
+  const plain = Sign.applyToNotes(v3, adhoc, unsigned);
+  assert.match(plain, /Ad-hoc signed, \*\*not notarized\*\*/);
+  assert.match(plain, /\*\*Not Authenticode-signed\.\*\*/);
+  assert.equal(plain.split("| macOS (Apple Silicon)").length, 2, "one macOS row");
+  const signed = Sign.applyToNotes(v3, notarized, signedWin);
+  assert.match(signed, /notarized by Apple/);
+  assert.match(signed, /\*\*Authenticode-signed\.\*\*/);
+  assert.doesNotMatch(signed, /Ad-hoc|Not Authenticode/);
+  assert.ok(signed.includes("## Playing"), "the rest of the notes is kept");
+  // Markers win; a notes file without the section gets one.
+  const marked = Sign.applyToNotes("# T\n\n<!-- first-launch -->\nold\n<!-- /first-launch -->\n\nBody\n", notarized, unsigned);
+  assert.match(marked, /<!-- first-launch -->\n\| Platform/);
+  assert.doesNotMatch(marked, /\nold\n/);
+  assert.match(Sign.applyToNotes("# T\n\nBody\n", adhoc, unsigned), /^# T\n\n## Download and first launch\n\n\| Platform/);
+  // "notarized" without Developer ID cannot be claimed.
+  assert.equal(Sign.normalizeStatus("macos", { mode: "adhoc", notarized: true }).notarized, false);
+  for (const platform of ["macos", "windows"]) {
+    const file = path.join(root, `packaging/README-${platform === "macos" ? "macOS" : "Windows"}.txt`);
+    const text = fs.readFileSync(file, "utf8");
+    const off = Sign.normalizeStatus(platform, {});
+    assert.equal(Sign.applyToReadme(text, off), text.replace(/\r\n/g, "\n"), `${platform} unsigned README unchanged`);
+    const on = platform === "macos" ? notarized : signedWin;
+    const out = Sign.applyToReadme(text, on);
+    assert.notEqual(out, text);
+    assert.doesNotMatch(out, /ad-hoc signed|not Authenticode-signed/);
+    assert.match(out, /Check for updates/, "the README states the one network request");
+  }
+});
+
+await test("v4: screenshot checks catch blank and repeated screens", () => {
+  const make = (w, h, fn) => {
+    const png = new PNG({ width: w, height: h });
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const [r, g, b] = fn(x, y);
+        const i = (y * w + x) * 4;
+        png.data[i] = r;
+        png.data[i + 1] = g;
+        png.data[i + 2] = b;
+        png.data[i + 3] = 255;
+      }
+    return PNG.sync.read(PNG.sync.write(png));
+  };
+  const black = make(200, 120, () => [0, 0, 0]);
+  const today = make(200, 120, (x, y) => [(x * 5) % 256, (y * 7) % 256, ((x + y) * 3) % 256]);
+  const game = make(200, 120, (x, y) => (x > 60 && x < 160 ? [220, 180, 110] : [(x * 11) % 256, (y * 3) % 256, 90]));
+  assert.equal(Shots.isBlank(Shots.imageStats(black)), true);
+  assert.equal(Shots.isBlank(Shots.imageStats(today)), false);
+  assert.equal(Shots.diffFraction(today, today), 0);
+  assert.ok(Shots.diffFraction(today, game) > 0.3);
+  assert.equal(Shots.diffFraction(today, make(100, 100, () => [1, 2, 3])), 1, "different sizes differ");
+  assert.equal(Shots.checkSequence([{ name: "today", png: today }, { name: "game", png: game }]).ok, true);
+  const repeated = Shots.checkSequence([{ name: "today", png: today }, { name: "game", png: today }]);
+  assert.equal(repeated.ok, false);
+  assert.match(repeated.failures[0], /game: same as the previous screen/);
+  assert.match(Shots.checkSequence([{ name: "blank", png: black }]).failures[0], /blank/);
+  assert.equal(Shots.checkSequence([]).ok, false);
+});
+
+await test("v4: the screenshot tour visits five screens and starts only with GOBAN_TOUR_OUT", () => {
+  const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8");
+  const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
+  const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(names, ["today", "game19", "review", "practice", "settings"]);
+  for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
+  const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
+  assert.match(app, /c\?\.tour && import\("\.\.\/tour\.js"\)/);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  assert.match(main, /GOBAN_TOUR_OUT/);
+  for (const wf of ["build-macos.yml", "build-windows.yml"]) {
+    const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8");
+    assert.match(y, /scripts\/tour-app\.mjs/, wf);
+    assert.match(y, wf.includes("macos") ? /native-screenshots-macos/ : /native-screenshots-windows/, wf);
+  }
 });
 
 if (failures) {
