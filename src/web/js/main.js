@@ -136,6 +136,7 @@ const state = {
   review: null,
   reviewOwnership: false,
   classic: null,
+  openedFromDocument: false,
   learn: {
     tab: "lessons",
     mode: null,
@@ -1408,6 +1409,11 @@ async function importSGFText(text, name = "goban-studio.sgf") {
   state.review = null;
   state.classic = null;
   state.thinking = false;
+  state.openedFromDocument = true;
+  if (state.settings.firstRun) {
+    state.settings.firstRun = false;
+    saveSettings(state.settings);
+  }
   persistCurrent();
   saveToLibrary();
   goView("play");
@@ -1656,7 +1662,7 @@ function enterReview() {
 }
 
 function onboarding() {
-  if (!state.settings.firstRun) return;
+  if (!state.settings.firstRun || state.openedFromDocument) return;
   const body = `<div class="onboarding">
     <p class="onboarding-lead">${esc(t("onboarding.subtitle"))}</p>
     <div class="lang-grid">${LANG_IDS.map((id) => `<button class="lang-btn" data-onboard-lang="${id}"><strong>${LANG_NAMES[id]}</strong><span>${id.toUpperCase()}</span></button>`).join("")}</div>
@@ -1790,12 +1796,13 @@ function init() {
   onDropFiles(importPaths);
   onOpenFiles(importPaths);
   if (hasNative()) {
-    drainOpenFiles();
+    drainOpenFiles().finally(() => setTimeout(onboarding, 80));
     setInterval(drainOpenFiles, 1500);
     window.addEventListener("focus", drainOpenFiles);
     setTimeout(runSelfTest, 900);
+  } else {
+    setTimeout(onboarding, 120);
   }
-  setTimeout(() => onboarding(), 120);
   setTimeout(() => {
     if (state.view === "play") maybeAiMove();
   }, 250);
