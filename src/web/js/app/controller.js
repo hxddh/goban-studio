@@ -253,7 +253,7 @@ export function finishOnboarding(choice, rank = null) {
     const first = allLessons()[0];
     if (first) openLesson(first.lesson.id, 0);
   } else if (choice === "rules") {
-    newGame({ size: 9, opponent: "ai", color: BLACK, strength });
+    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: Engine.suggestHandicap(next.playerRank, strength, 19) });
   } else {
     newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
   }

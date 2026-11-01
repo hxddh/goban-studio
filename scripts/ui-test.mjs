@@ -151,7 +151,7 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=0");
+  await page.click(".preset >> nth=2");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
   await page.focus("canvas.board");
@@ -177,7 +177,7 @@ await check("a board click paints within budget", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=2");
+  await page.click(".preset >> nth=0");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
   const p = await pointOf(page, 3, 3);
@@ -202,7 +202,7 @@ await check("review: a variation, back to the game, Esc closes the layer", async
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=0");
+  await page.click(".preset >> nth=2");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
   await clickPoint(page, 4, 4);
@@ -286,9 +286,13 @@ await check("all four languages render every place without overflow or missing s
       const bad = await page.evaluate(() => {
         const text = document.body.innerText;
         const raw = text.match(/\b[a-z]+\.[a-zA-Z]+(\.[a-zA-Z]+)?\b/g)?.filter((s) => /^(nav|play|review|practice|library|settings|today|teach|summary|common|score|error|goal|grade|topic|mistakes|explain|time|newGame|menu)\./.test(s));
-        const over = [...document.querySelectorAll(".btn, .rail-btn, .chip, .segmented button")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim());
-        return { raw: raw || [], over };
+        const over = [...document.querySelectorAll(".btn, .sb-item, .chip, .segmented button")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim());
+        // docs/design.md §1: one primary action per screen.
+        const visible = (el) => el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+        const primaries = [...document.querySelectorAll(".btn.primary")].filter(visible).length;
+        return { raw: raw || [], over, primaries };
       });
+      assert(bad.primaries <= 1, `${locale} place ${k}: ${bad.primaries} primary buttons`);
       assert(!bad.raw.length, `${locale}: raw keys ${bad.raw.join(", ")}`);
       assert(!bad.over.length, `${locale}: clipped ${bad.over.join(", ")}`);
     }
@@ -309,7 +313,7 @@ for (const vp of [
     await onboard(page, 1);
     // A fixed two-player position so the board is deterministic.
     await page.keyboard.press("Control+n");
-    await page.click(".preset >> nth=0");
+    await page.click(".preset >> nth=2");
     await page.click(".sheet .segmented button >> nth=1");
     await page.click(".sheet-foot .btn.primary");
     for (const [x, y] of [[2, 2], [6, 6], [6, 2], [2, 6], [4, 4]]) await clickPoint(page, x, y);

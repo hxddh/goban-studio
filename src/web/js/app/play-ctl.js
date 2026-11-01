@@ -61,7 +61,7 @@ export function restoreCurrent() {
       /* fall through */
     }
   }
-  state.game = freshGameState(new Game({ size: 9, komi: 6.5 }), { opponent: "ai", strength: state.settings.strength });
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, komi: 6.5 }), { opponent: "ai", strength: state.settings.strength });
 }
 
 export function persistCurrent() {
@@ -129,14 +129,18 @@ export function recommendedGame() {
   const r = p.rating?.r ?? rankToRating(s.playerRank ?? 30);
   const rank = ratingToRank(r);
   const strength = s.autoStrength ? strengthForRating(r) : s.strength;
-  const size = rank >= 20 ? 9 : rank >= 12 ? 13 : 19;
+  // The standard board, always; strength and handicap close the gap. A
+  // 9×9 game is offered beside it as the quick option.
+  const size = 19;
   const handicap = Engine.suggestHandicap(rank, strength, size);
   const weak = topWeaknesses(p.weakness, 1)[0] || null;
-  return { size, strength, handicap, rank, weak };
+  const quick = { size: 9, strength, handicap: Engine.suggestHandicap(rank, strength, 9) };
+  return { size, strength, handicap, rank, weak, quick };
 }
 
 export function newGame(opts = {}) {
-  const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : 19;
+  const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : state.settings.boardSize || 19;
+  if (opts.rememberSize && size !== state.settings.boardSize) setSetting("boardSize", size);
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
   const komi = opts.komi !== undefined && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : handicap > 0 ? 0.5 : 6.5;
   const game = new Game({ size, komi, handicap });

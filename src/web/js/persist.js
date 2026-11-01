@@ -29,8 +29,8 @@ export const V1_KEYS = {
 export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
-  board: "kaya", // kaya | katsura | paper | slate
-  coords: false,
+  board: "plain", // plain | wood | ink (v4)
+  coords: true,
   sound: true,
   numbers: false,
   strength: "25k",
@@ -46,7 +46,14 @@ export const DEFAULT_SETTINGS = {
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the rating when suggesting an opponent
   flatStones: false, // high-contrast flat stones (accessibility)
+  // v4
+  boardSize: 19, // the size you last chose for a new game
+  autoUpdate: false, // check for a new version once a week (opt-in)
+  v4: true, // settings have been through the v4 migration
 };
+
+/** v3 surfaces → v4 materials. */
+const BOARD_V4 = { kaya: "plain", wood: "plain", katsura: "wood", paper: "plain", slate: "ink" };
 
 const memory = new Map();
 
@@ -109,8 +116,8 @@ export function migrate() {
     if (typeof v1.numbers === "boolean") next.numbers = v1.numbers;
     if (v1.theme === "night") {
       next.appearance = "dark";
-      next.board = "slate";
-    } else if (v1.theme === "paper") next.board = "paper";
+      next.board = "ink";
+    } else if (v1.theme === "paper") next.board = "plain";
     if (LEVEL_TO_STRENGTH[v1.level]) next.strength = LEVEL_TO_STRENGTH[v1.level];
     // Someone who used v1 has seen the rules and the board.
     next.onboarded = v1.firstRun === false;
@@ -158,8 +165,15 @@ export function loadSettings() {
   const s = readJSON(KEYS.settings, {});
   const out = { ...DEFAULT_SETTINGS, ...s };
   if (!["auto", "light", "dark"].includes(out.appearance)) out.appearance = "auto";
-  if (out.board === "wood") out.board = "kaya";
-  if (!["kaya", "katsura", "paper", "slate"].includes(out.board)) out.board = "kaya";
+  // v4: three materials, and coordinates on for the standard board. A v3
+  // user who never touched them had the old defaults (kaya, no coordinates).
+  if (!s.v4) {
+    out.board = BOARD_V4[out.board] || "plain";
+    if (s.coords === false && (s.board === undefined || s.board === "kaya")) out.coords = true;
+    out.v4 = true;
+  }
+  if (!["plain", "wood", "ink"].includes(out.board)) out.board = "plain";
+  if (![9, 13, 19].includes(out.boardSize)) out.boardSize = 19;
   return out;
 }
 

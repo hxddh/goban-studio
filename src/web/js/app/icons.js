@@ -44,9 +44,9 @@ const bulbBody = `<path d="M7.4 13.25c0-1.8-2.65-2.85-2.65-5.75a5.25 5.25 0 0 1 
 export const ICONS = {
   // Places
   today: `<rect x="3" y="4.25" width="14" height="12.5" rx="2.5"/><path d="M3 8.25h14M7 2.75v3M13 2.75v3"/>${dot(10, 12.5, 1.5)}`,
-  play: `<circle cx="7.5" cy="7.5" r="4.4" fill="currentColor"/><circle cx="12.9" cy="12.9" r="3.85"/>`,
-  practice: `<path d="M3.5 16.5V6a2.5 2.5 0 0 1 2.5-2.5h10.5"/><path d="M3.5 10.5h13M10.5 3.5v13"/><circle cx="10.5" cy="10.5" r="3" fill="currentColor"/>`,
-  library: `<rect x="3" y="3.5" width="3.5" height="13" rx="1"/><rect x="8.25" y="3.5" width="3.5" height="13" rx="1"/><rect x="13" y="4.1" width="3.4" height="12.4" rx="1" transform="rotate(-10 14.7 10.3)"/>`,
+  play: `<rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M3 10h4.25M12.75 10H17M10 3v4.25M10 12.75V17"/><circle cx="10" cy="10" r="2.75" fill="currentColor"/>`,
+  practice: `<path d="M10 5.6C8.4 4.4 6.2 3.9 3.5 4.1v11.4c2.7-.2 4.9.3 6.5 1.5 1.6-1.2 3.8-1.7 6.5-1.5V4.1c-2.7-.2-4.9.3-6.5 1.5z"/><path d="M10 5.6V17"/>`,
+  library: `<rect x="3.25" y="3.5" width="3.5" height="13" rx="1"/><rect x="8.25" y="3.5" width="3.5" height="13" rx="1"/><path d="M13.4 4.6l3.1-.6 2.1 11.8-3.1.6z"/>`,
   gear: gear(),
   keyboard: `<rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M5.75 8.25h0M8.6 8.25h0M11.4 8.25h0M14.25 8.25h0M5.75 11.75h0M14.25 11.75h0M8.25 11.75h3.5"/>`,
 

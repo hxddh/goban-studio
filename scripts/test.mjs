@@ -310,7 +310,7 @@ await test("every key the interface uses is in the string table", () => {
     "goal.": ["capture", "save", "kill", "live", "place"],
     "grade.": ["1", "2", "3", "4", "5"],
     "library.kind.": ["all", "won", "lost", "imported"],
-    "settings.material.": ["wood", "paper", "slate"],
+    "settings.material.": ["plain", "wood", "ink"],
     "newGame.": ["quick", "medium", "full"],
   };
   for (const [prefix, list] of Object.entries(dynamic)) for (const v of list) used.add(prefix + v);
@@ -700,7 +700,7 @@ await test("v1 data migrates to v2 without losing games or settings", () => {
   const s = loadSettings();
   assert.equal(s.lang, "ja");
   assert.equal(s.appearance, "dark");
-  assert.equal(s.board, "slate");
+  assert.equal(s.board, "ink");
   assert.equal(s.strength, "10k");
   assert.equal(s.onboarded, true);
   const p = loadProgress();
@@ -773,7 +773,7 @@ await test("Moka 9x9 assets are present and attributed", () => {
 });
 
 await test("static page inputs and build script are present", () => {
-  for (const file of ["index.html", "styles.css", "fonts/inter-latin-wght-normal.woff2", "js/main.jsx", "js/app/app.jsx"]) {
+  for (const file of ["index.html", "styles.css", "js/main.jsx", "js/app/app.jsx"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
   }
   assert.ok(fs.existsSync(path.join(root, "scripts/bundle.mjs")));

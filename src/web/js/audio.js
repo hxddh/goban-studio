@@ -32,7 +32,7 @@ const FILES = {
 };
 
 /** Surfaces that take the softer placement set. */
-const SOFT = new Set(["paper", "slate"]);
+const SOFT = new Set(["paper", "slate", "ink"]);
 
 const buffers = {};
 const last = {};

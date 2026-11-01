@@ -138,9 +138,9 @@ export const MESSAGES = {
   "area.bottom-right": m("右下角", "in the bottom-right corner", "우하귀", "右下隅"),
 
   "newGame.board": m("棋盘", "Board", "바둑판", "碁盤"),
-  "newGame.quick": m("入门 · 约 10 分钟", "Learn · ~10 min", "입문 · 약 10분", "入門 · 約10分"),
-  "newGame.medium": m("进阶 · 约 25 分钟", "Step up · ~25 min", "중급 · 약 25분", "中級 · 約25分"),
-  "newGame.full": m("标准 · 约 1 小时", "Full game · ~1 hr", "정식 · 약 1시간", "本格 · 約1時間"),
+  "newGame.quick": m("快棋 · 约 10 分钟", "Quick · ~10 min", "속기 · 약 10분", "早碁 · 約10分"),
+  "newGame.medium": m("中盘 · 约 25 分钟", "Medium · ~25 min", "중간 · 약 25분", "中くらい · 約25分"),
+  "newGame.full": m("标准棋盘 · 约 1 小时", "Standard · ~1 hr", "표준 · 약 1시간", "標準 · 約1時間"),
   "newGame.opponent": m("对手", "Opponent", "상대", "相手"),
   "newGame.computer": m("电脑", "Computer", "컴퓨터", "コンピュータ"),
   "newGame.twoPlayers": m("两人对局", "Two players", "2인 대국", "二人で対局"),
@@ -259,12 +259,10 @@ export const MESSAGES = {
   "settings.light": m("浅色", "Light", "밝게", "ライト"),
   "settings.dark": m("深色", "Dark", "어둡게", "ダーク"),
   "settings.board": m("棋盘", "Board", "바둑판", "碁盤"),
-  "settings.material.kaya": m("榧木", "Kaya", "비자", "榧"),
-  "settings.material.katsura": m("桂木", "Katsura", "계수나무", "桂"),
+  "settings.material.plain": m("素", "Plain", "무지", "無地"),
+  "settings.material.wood": m("淡木", "Light wood", "옅은 나무", "淡い木目"),
+  "settings.material.ink": m("墨", "Ink", "먹", "墨"),
   "settings.flatStones": m("高对比度棋子", "High-contrast stones", "고대비 바둑돌", "高コントラストの石"),
-  "settings.material.wood": m("木", "Wood", "나무", "木"),
-  "settings.material.paper": m("纸", "Paper", "종이", "紙"),
-  "settings.material.slate": m("石板", "Slate", "석판", "石板"),
   "settings.coordinates": m("显示坐标", "Coordinates", "좌표 표시", "座標を表示"),
   "settings.moveNumbers": m("显示手数", "Move numbers", "수순 번호", "手数を表示"),
   "settings.sound": m("落子声音", "Stone sounds", "착수 소리", "石音"),
@@ -450,4 +448,7 @@ export const MESSAGES = {
   "theme.ko": m("劫", "Ko", "패", "コウ"),
   "theme.race-outside": m("对杀：外气", "Race: outside liberties", "수상전: 바깥 공배", "攻め合い：外ダメ"),
   "theme.race-shared": m("对杀：公气", "Race: shared liberties", "수상전: 공동 공배", "攻め合い：内ダメ"),
+
+  // v4 ui
+  "today.quick9": m("来盘 9 路快棋", "Or a quick 9×9", "9줄 속기 한 판", "9路で早碁を一局"),
 };

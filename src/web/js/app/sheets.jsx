@@ -61,16 +61,17 @@ function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelled
 
 /* --------------------------------------------------------------- new game */
 
+// The standard board first; the smaller ones are quicker games.
 const PRESETS = [
-  { size: 9, key: "quick" },
-  { size: 13, key: "medium" },
   { size: 19, key: "full" },
+  { size: 13, key: "medium" },
+  { size: 9, key: "quick" },
 ];
 
 function NewGameSheet({ prefill }) {
   const s = state.settings;
   const rec = C.recommendedGame();
-  const [size, setSize] = useState(prefill?.size || state.game?.game.size || rec.size);
+  const [size, setSize] = useState(prefill?.size || s.boardSize || rec.size);
   const [tc, setTc] = useState(s.timeControl || "none");
   const [opponent, setOpponent] = useState("ai");
   const [color, setColor] = useState(BLACK);
@@ -83,7 +84,7 @@ function NewGameSheet({ prefill }) {
   const h = handicap ?? (color === BLACK ? suggested : 0);
   const k = komi ?? (h > 0 ? 0.5 : 6.5);
   const start = () =>
-    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, timeControl: tc });
+    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, timeControl: tc, rememberSize: true });
   return (
     <Modal
       title={t("common.newGame")}
@@ -165,7 +166,16 @@ function NewGameSheet({ prefill }) {
             </div>
           </>
         )}
-        <div class="row">
+        {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
+        {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
+
+        <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
+          <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
+          <span class="fine">{t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}</span>
+        </button>
+        {advanced && (
+          <>
+            <div class="row">
           <span>{t("newGame.time")}</span>
           <Segmented
             label={t("newGame.time")}
@@ -178,16 +188,7 @@ function NewGameSheet({ prefill }) {
             ]}
           />
         </div>
-        {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
-        {opponent === "ai" && s.autoStrength && STRENGTHS[strengthIdx].id === rec.strength && <p class="fine">{t("newGame.fromRating")}</p>}
-        {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
 
-        <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
-          <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
-          <span class="fine">{t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}</span>
-        </button>
-        {advanced && (
-          <>
             <div class="row">
               <span>{t("common.handicap")}</span>
               <Stepper
@@ -266,7 +267,7 @@ function SettingsSheet() {
         <div class="row">
           <span>{t("settings.board")}</span>
           <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
-            {["kaya", "katsura", "paper", "slate"].map((m) => (
+            {["plain", "wood", "ink"].map((m) => (
               <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
                 <i />
                 <span>{t("settings.material." + m)}</span>
@@ -315,7 +316,7 @@ function SettingsSheet() {
             {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
           </span>
           <span class="fine">{t("settings.offline")}</span>
-          <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT) · Inter (OFL)</span>
+          <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
         </p>
         <div class="actions">
           <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
