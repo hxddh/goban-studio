@@ -42,9 +42,9 @@ existing Gomoku app. It deliberately uses a different bundle ID
   titles and eight-move lines, 20 classic games and 300 tsumego drills, all
   in the four launch languages, with hints, retry, answer and spaced review.
 - **Library** — SGF import/export, saved games, a 200-game cap, and automatic
-  saving of the current game. Double-clicking an `.sgf` opens it, and a record
-  that declares a non-Japanese ruleset is rejected with an explanation rather
-  than silently re-scored.
+  saving of the current game. Double-clicking an `.sgf` opens it on macOS and
+  Windows, and a record that declares a non-Japanese ruleset is rejected with
+  an explanation rather than silently re-scored.
 - **Settings** — language, wood/night/paper board themes, coordinates, move
   numbers, sound and default difficulty.
 - **Offline by design** — no account, no network request, no telemetry.
