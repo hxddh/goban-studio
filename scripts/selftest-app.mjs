@@ -67,7 +67,7 @@ const failed = Object.entries(checks).filter(([, value]) => value !== true).map(
 // plays in a handicap game. async/stream/incremental/cancel: the search
 // runs off the UI thread (no frame gap ≥ 250 ms), reports partial results,
 // re-syncs a one-move change with one `play`, and stops within 1 s.
-const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel"];
+const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
 const ok = report.ok === true && report.boardSize === 19 && required.every((k) => checks[k] === true) && failed.length === 0;
 console.log(JSON.stringify(report, null, 2));
 if (!ok) {

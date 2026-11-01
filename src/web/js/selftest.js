@@ -23,9 +23,9 @@ import { Game } from "./rules.js";
 import * as Engine from "./engine.js";
 import * as KataGo from "./katago.js";
 import { APP_VERSION } from "./version.js";
-import { hasNative, nativeInvoke, selftestConfig, writeTextFile } from "./host.js";
+import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, writeTextFile } from "./host.js";
 
-const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel"];
+const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
 const MAX_FRAME_GAP_MS = 250;
 const MAX_CANCEL_MS = 1000;
 
@@ -177,6 +177,17 @@ export async function runSelfTest({ state } = {}) {
     const after = await KataGo.analyze(g9, { visits: 16 });
     Object.assign(timings, { cancelMs: Math.round(cancelMs) });
     report.cancelReply = reply ? { ok: reply.ok, id: reply.id, cancelled: reply.cancelled ?? false } : null;
+    // --- menus: the localized menu bar installs on macOS (Windows has none).
+    try {
+      const { menuSpec } = await import("./app/app.jsx");
+      const applied = await setNativeMenus(menuSpec());
+      const mac = /Mac/.test(navigator.platform || navigator.userAgent || "");
+      report.menusApplied = applied;
+      checks.menus = mac ? applied === true : applied === false;
+    } catch (e) {
+      report.menusError = String(e?.message || e);
+      checks.menus = false;
+    }
     checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < MAX_CANCEL_MS && validAnalysis(after, 9));
   } catch (error) {
     report.error = String(error?.message || error);
