@@ -28,6 +28,14 @@ for (const f of fs.readdirSync(path.join(src, "fonts"))) {
 if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
 }
+// Generated textures, stone sprites, sounds and the brand mark
+// (scripts/make-assets.mjs). The preview page is a development aid only.
+if (fs.existsSync(path.join(src, "assets"))) {
+  fs.cpSync(path.join(src, "assets"), path.join(dist, "assets"), {
+    recursive: true,
+    filter: (from) => path.basename(from) !== "preview.html",
+  });
+}
 if (fs.existsSync(path.join(src, "moka"))) {
   fs.cpSync(path.join(src, "moka"), path.join(dist, "moka"), { recursive: true });
 }
