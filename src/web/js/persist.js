@@ -38,6 +38,13 @@ export const DEFAULT_SETTINGS = {
   experience: null, // "new" | "rules" | "player"
   onboarded: false,
   focus: false,
+  // v3
+  teaching: null, // null = decide from level (on for newer players)
+  confirmMove: false, // two-click placement
+  showEval: false, // win-rate bar while playing
+  timeControl: "none", // none | move30 | byoyomi
+  liveAnalysis: true, // candidate overlay in review
+  autoStrength: true, // follow the rating when suggesting an opponent
 };
 
 const memory = new Map();
@@ -159,7 +166,7 @@ export function saveSettings(settings) {
 }
 
 function emptyProgress() {
-  return { lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null } };
+  return { lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null }, rating: null, weakness: {}, mistakes: [] };
 }
 
 export function loadProgress() {
@@ -172,7 +179,35 @@ export function loadProgress() {
     classics: obj(p.classics),
     daily: p.daily && typeof p.daily === "object" ? p.daily : null,
     streak: p.streak && typeof p.streak === "object" ? p.streak : { count: 0, last: null },
+    rating: p.rating && typeof p.rating === "object" && Number.isFinite(p.rating.r) ? p.rating : null,
+    weakness: obj(p.weakness),
+    mistakes: Array.isArray(p.mistakes) ? p.mistakes.slice(0, 200) : [],
   };
+}
+
+/**
+ * A mistake from one of your games, kept as a drill: the position before the
+ * move (SGF + move index), what you played and what KataGo preferred. It
+ * comes back in Today's five on the same spaced-review ladder as problems.
+ */
+export function addMistake(progress, m) {
+  const id = m.id || `${m.gameKey}-${m.index}`;
+  if (progress.mistakes.some((x) => x.id === id)) return progress;
+  progress.mistakes.unshift({ ...m, id, added: Date.now(), streak: 0, due: Date.now(), attempts: 0 });
+  progress.mistakes = progress.mistakes.slice(0, 200);
+  saveProgress(progress);
+  return progress;
+}
+
+export function markMistake(progress, id, { solved }, now = Date.now()) {
+  const m = progress.mistakes.find((x) => x.id === id);
+  if (!m) return progress;
+  m.attempts = (m.attempts || 0) + 1;
+  m.streak = solved ? (m.streak || 0) + 1 : 0;
+  m.due = now + (solved ? LADDER[Math.min(LADDER.length - 1, m.streak - 1)] : 1) * DAY;
+  m.solved = m.solved || solved;
+  saveProgress(progress);
+  return progress;
 }
 
 export function saveProgress(progress) {

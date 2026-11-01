@@ -1,5 +1,7 @@
 /**
- * The shell: a slim rail with three places, and the place itself.
+ * The shell: a slim rail with four places (Today, Play, Practice, Library),
+ * back/forward history, the native menu bar, keyboard handling, and the
+ * place itself.
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
@@ -8,25 +10,19 @@ import * as Engine from "../engine.js";
 import * as KataGo from "../katago.js";
 import { t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
-import {
-  hasNative,
-  normalizePaths,
-  onDropFiles,
-  onOpenFiles,
-  selftestConfig,
-  setupChrome,
-  takeOpenFiles,
-  writeTextFile,
-} from "../host.js";
+import * as Host from "../host.js";
+import { hasNative, normalizePaths, onDropFiles, onOpenFiles, selftestConfig, setupChrome, takeOpenFiles, writeTextFile } from "../host.js";
 import { state, update, useAppState, toast } from "./store.js";
 import * as C from "./controller.js";
-import { Icon, MOD } from "./parts.jsx";
+import { Icon, IconButton, MOD } from "./parts.jsx";
+import { TodayView } from "./today.jsx";
 import { PlayView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryView } from "./library.jsx";
 import { Sheets } from "./sheets.jsx";
 
 const SPACES = [
+  { id: "today", icon: "today", key: "nav.today" },
   { id: "play", icon: "play", key: "nav.play" },
   { id: "practice", icon: "practice", key: "nav.practice" },
   { id: "library", icon: "library", key: "nav.library" },
@@ -40,6 +36,10 @@ function Rail() {
           <i />
           <i />
         </span>
+      </div>
+      <div class="history-btns">
+        <IconButton icon="back" label={`${t("nav.back")} (${MOD}[)`} onClick={C.back} disabled={!C.canGoBack()} />
+        <IconButton icon="forward" label={`${t("nav.forward")} (${MOD}])`} onClick={C.forward} disabled={!C.canGoForward()} />
       </div>
       <ul>
         {SPACES.map((sp, i) => (
@@ -86,13 +86,17 @@ function App() {
   });
   if (!s.ready) return null;
   const focus = s.settings.focus && s.space === "play" && !C.playReviewing();
+  const reviewKey = s.review ? "review-" + s.review.source : "";
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Rail />}
       <main class="main" id="main">
-        {s.space === "play" && <PlayView />}
-        {s.space === "practice" && <PracticeView />}
-        {s.space === "library" && <LibraryView />}
+        <div class="place" key={s.space + reviewKey + (s.space === "practice" ? s.practice.view : "")}>
+          {s.space === "today" && <TodayView />}
+          {s.space === "play" && <PlayView />}
+          {s.space === "practice" && <PracticeView />}
+          {s.space === "library" && <LibraryView />}
+        </div>
       </main>
       <Sheets />
       <Toasts />
@@ -114,6 +118,98 @@ function App() {
   );
 }
 
+/* ------------------------------------------------------------ commands */
+
+/** One table of commands for keyboard, native menus and the page. */
+const COMMANDS = {
+  "app.settings": () => C.openSheet("settings"),
+  "help.shortcuts": () => C.openSheet("shortcuts"),
+  "file.new": () => C.openNewGame(),
+  "file.import": () => C.pickImport(),
+  "file.export": () => (C.playReviewing() || state.review ? C.exportSGF(state.review.game, state.review.meta.name) : C.exportSGF()),
+  "game.pass": () => state.space === "play" && C.requestPass(),
+  "game.undo": () => (state.space === "practice" ? C.undoProblemMove() : state.space === "play" && !C.playReviewing() ? C.undo() : null),
+  "game.hint": () => (state.space === "play" ? C.askHint() : state.space === "practice" ? C.problemHint() : null),
+  "game.resign": () => state.space === "play" && C.requestResign(),
+  "game.review": () => C.reviewCurrentGame(),
+  "game.save": () => C.saveToLibrary(),
+  "view.focus": () => C.toggleFocus(),
+  "view.coords": () => C.setSetting("coords", !state.settings.coords),
+  "view.numbers": () => C.setSetting("numbers", !state.settings.numbers),
+  "view.eval": () => C.setSetting("showEval", !state.settings.showEval),
+  "view.live": () => C.toggleLive(),
+  "go.today": () => C.goSpace("today"),
+  "go.play": () => C.goSpace("play"),
+  "go.practice": () => C.goSpace("practice"),
+  "go.library": () => C.goSpace("library"),
+  "go.back": () => C.back(),
+  "go.forward": () => C.forward(),
+};
+
+function runCommand(id) {
+  const fn = COMMANDS[id];
+  if (fn) fn();
+}
+
+/** The native menu bar (macOS), in the interface language. */
+function menuSpec() {
+  const s = state.settings;
+  return [
+    {
+      title: t("menu.game"),
+      items: [
+        { label: t("common.newGame"), command: "file.new", key: "n" },
+        { label: t("library.import"), command: "file.import", key: "o" },
+        { label: t("common.exportSgf"), command: "file.export", key: "e", shift: true },
+        { separator: true },
+        { label: t("common.pass"), command: "game.pass", key: "p", shift: true },
+        { label: t("common.undo"), command: "game.undo" },
+        { label: t("common.hint"), command: "game.hint", key: "h", shift: true },
+        { label: t("play.reviewSoFar"), command: "game.review", key: "r", shift: true },
+        { label: t("play.save"), command: "game.save", key: "s" },
+        { separator: true },
+        { label: t("common.resign"), command: "game.resign" },
+      ],
+    },
+    {
+      title: t("menu.view"),
+      items: [
+        { label: t("play.focus"), command: "view.focus", key: ".", checked: !!s.focus },
+        { label: t("settings.coordinates"), command: "view.coords", checked: !!s.coords },
+        { label: t("settings.moveNumbers"), command: "view.numbers", checked: !!s.numbers },
+        { label: t("settings.showEval"), command: "view.eval", checked: !!s.showEval },
+        { label: t("settings.liveAnalysis"), command: "view.live", checked: !!s.liveAnalysis },
+      ],
+    },
+    {
+      title: t("menu.go"),
+      items: [
+        { label: t("nav.today"), command: "go.today", key: "1" },
+        { label: t("nav.play"), command: "go.play", key: "2" },
+        { label: t("nav.practice"), command: "go.practice", key: "3" },
+        { label: t("nav.library"), command: "go.library", key: "4" },
+        { separator: true },
+        { label: t("nav.back"), command: "go.back", key: "[" },
+        { label: t("nav.forward"), command: "go.forward", key: "]" },
+      ],
+    },
+    {
+      title: t("menu.help"),
+      items: [
+        { label: t("nav.settings"), command: "app.settings", key: "," },
+        { label: t("shortcuts.title"), command: "help.shortcuts", key: "/" },
+      ],
+    },
+  ];
+}
+
+function installMenus() {
+  if (typeof Host.setNativeMenus !== "function") return;
+  try {
+    Host.setNativeMenus(menuSpec());
+  } catch (_) {}
+}
+
 /* --------------------------------------------------------------- keyboard */
 
 function onKeyDown(e) {
@@ -123,53 +219,61 @@ function onKeyDown(e) {
   if (e.key === "Escape") {
     if (state.menu) return update({ menu: null });
     if (state.sheet) return C.closeSheet();
+    if (state.game?.ghost) return C.clearGhost();
     if (state.review?.variation) {
       state.review.variation = null;
       return update();
     }
+    if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
     if (state.settings.focus) return C.toggleFocus();
     return;
   }
   if (state.sheet?.kind === "onboarding") return;
   if (mod && !e.altKey) {
-    if (k === "n" && !e.shiftKey) {
+    const map = { n: "file.new", ",": "app.settings", "/": "help.shortcuts", "?": "help.shortcuts", o: "file.import", "[": "go.back", "]": "go.forward" };
+    if (!e.shiftKey && map[k]) {
       e.preventDefault();
-      return C.openSheet("newGame");
-    }
-    if (k === "," ) {
-      e.preventDefault();
-      return C.openSheet("settings");
-    }
-    if (k === "/" || k === "?") {
-      e.preventDefault();
-      return C.openSheet("shortcuts");
+      return runCommand(map[k]);
     }
     if (state.sheet) return;
-    if (k === "." ) {
+    if (k === ".") {
       e.preventDefault();
-      return C.toggleFocus();
+      return runCommand("view.focus");
     }
-    if (["1", "2", "3"].includes(k)) {
+    if (["1", "2", "3", "4"].includes(k)) {
       e.preventDefault();
       return C.goSpace(SPACES[Number(k) - 1].id);
     }
     if (typing) return;
     if (k === "z" && !e.shiftKey) {
       e.preventDefault();
-      if (state.space === "practice") return C.undoProblemMove();
-      if (state.space === "play" && !C.playReviewing()) return C.undo();
-      return;
+      return runCommand("game.undo");
     }
-    if (k === "p" && e.shiftKey && state.space === "play") {
+    if (k === "s" && !e.shiftKey) {
       e.preventDefault();
-      return C.requestPass();
+      return runCommand("game.save");
     }
-    if (k === "h" && e.shiftKey) {
+    if (e.shiftKey && k === "p") {
       e.preventDefault();
-      if (state.space === "play") return C.askHint();
-      if (state.space === "practice") return C.problemHint();
+      return runCommand("game.pass");
+    }
+    if (e.shiftKey && k === "h") {
+      e.preventDefault();
+      return runCommand("game.hint");
+    }
+    if (e.shiftKey && k === "r") {
+      e.preventDefault();
+      return runCommand("game.review");
+    }
+    if (e.shiftKey && k === "e") {
+      e.preventDefault();
+      return runCommand("file.export");
     }
     return;
+  }
+  if (e.altKey && !mod && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    e.preventDefault();
+    return runCommand(e.key === "ArrowLeft" ? "go.back" : "go.forward");
   }
   if (state.sheet || typing || e.altKey) return;
   const reviewing = state.review && (state.review.meta.space || "play") === state.space;
@@ -215,8 +319,7 @@ function importPaths(detail) {
 /**
  * A packaged build is launched by the release workflows with
  * GOBAN_SELFTEST_OUT set. The report is written from the real WebView: it
- * proves the page, the native bridge and KataGo's analysis all came up on
- * 9×9 and 19×19, not just that the executable linked.
+ * proves the page, the native bridge and KataGo's analysis all came up.
  */
 async function runSelfTest() {
   if (!hasNative()) return;
@@ -249,14 +352,21 @@ export function start() {
   C.boot();
   render(<App />, document.getElementById("root"));
   document.addEventListener("keydown", onKeyDown);
+  // Mouse back/forward buttons move through history.
+  window.addEventListener("mouseup", (e) => {
+    if (e.button === 3) C.back();
+    if (e.button === 4) C.forward();
+  });
   setTimeout(() => setupChrome().catch(() => {}), 0);
   onDropFiles(importPaths);
   onOpenFiles(importPaths);
+  C.onMenusChanged(installMenus);
+  if (typeof Host.onMenuCommand === "function") Host.onMenuCommand(runCommand);
+  setInterval(C.clockTick, 250);
   if (hasNative()) {
+    installMenus();
     drainOpenFiles();
     window.addEventListener("focus", drainOpenFiles);
-    // Some hosts queue a launch document without an event; check a few
-    // times after start, then rely on focus and the open:files event.
     let n = 0;
     const timer = setInterval(() => {
       drainOpenFiles();
@@ -274,3 +384,4 @@ export function start() {
   });
 }
 
+export { COMMANDS, menuSpec };

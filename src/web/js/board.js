@@ -85,6 +85,7 @@ export class BoardView {
       hoverValid: true,
       interactive: true,
       cursor: null,
+      ghost: null,
     };
     this.geom = null;
     this.dpr = 1;
@@ -111,6 +112,7 @@ export class BoardView {
   }
 
   setModel(patch) {
+    const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
     Object.assign(this.model, patch);
@@ -137,6 +139,11 @@ export class BoardView {
       if (added > 1) this.fading = [];
       if (this.placing || this.fading.length) this.animate();
     }
+    // Counting: territory fades in instead of popping.
+    if (!hadTerritory && this.model.territory) {
+      this.territoryStart = performance.now();
+      this.animate();
+    }
     this.draw();
   }
 
@@ -146,8 +153,9 @@ export class BoardView {
       const now = performance.now();
       if (this.placing && now - this.placing.start > PLACE_MS) this.placing = null;
       this.fading = this.fading.filter((f) => now - f.start < FADE_MS);
+      const territoryRunning = this.territoryStart && now - this.territoryStart < 450;
       this.draw();
-      if (this.placing || this.fading.length) this.raf = requestAnimationFrame(tick);
+      if (this.placing || this.fading.length || territoryRunning) this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
   }
@@ -405,6 +413,8 @@ export class BoardView {
 
     // Territory during scoring.
     if (m.territory) {
+      ctx.save();
+      ctx.globalAlpha = this.territoryStart ? Math.min(1, (now - this.territoryStart) / 450) : 1;
       for (let y = win.y0; y <= win.y1; y++) {
         for (let x = win.x0; x <= win.x1; x++) {
           const v = m.territory[y]?.[x] || 0;
@@ -418,6 +428,7 @@ export class BoardView {
           ctx.strokeRect(px(x) - r, py(y) - r, r * 2, r * 2);
         }
       }
+      ctx.restore();
     }
 
     // Variation (review lines, answers): numbered translucent stones.
@@ -443,6 +454,16 @@ export class BoardView {
     for (const mark of m.marks || []) {
       if (!inWin(mark.x, mark.y)) continue;
       this.mark(ctx, mark, theme);
+    }
+
+    // Two-click placement: the pending stone, with a ring.
+    if (m.ghost && inWin(m.ghost.x, m.ghost.y)) {
+      this.stone(ctx, m.ghost.x, m.ghost.y, m.ghost.color, theme, { alpha: 0.6, shadow: false, jitter: false });
+      ctx.strokeStyle = "rgba(196, 112, 50, 0.95)";
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      ctx.beginPath();
+      ctx.arc(px(m.ghost.x), py(m.ghost.y), cell * 0.56, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // Hover preview.
@@ -538,6 +559,28 @@ export class BoardView {
     ctx.fillStyle = tone;
     ctx.lineWidth = Math.max(1.4, g.cell * 0.07);
     ctx.beginPath();
+    if (mark.type === "candidate") {
+      // Engine candidates: a soft disc, darker for the best, with a number.
+      const colors = ["rgba(38,120,92,0.88)", "rgba(52,108,150,0.82)", "rgba(80,96,140,0.75)", "rgba(110,100,120,0.68)", "rgba(120,110,100,0.6)"];
+      ctx.fillStyle = colors[Math.min(colors.length - 1, mark.rank || 0)];
+      ctx.beginPath();
+      ctx.arc(cx, cy, g.cell * 0.44, 0, Math.PI * 2);
+      ctx.fill();
+      if (mark.label) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px "Inter Var", -apple-system, system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(mark.label, cx, cy + 0.5);
+      }
+      return;
+    }
+    if (mark.type === "area") {
+      ctx.fillStyle = mark.tone === "good" ? "rgba(63,138,90,0.28)" : "rgba(192,69,47,0.26)";
+      const h = g.cell * 0.5;
+      ctx.fillRect(cx - h, cy - h, h * 2, h * 2);
+      return;
+    }
     if (mark.type === "circle") {
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();

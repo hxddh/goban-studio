@@ -11,11 +11,13 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique"];
 
+
 export function PracticeView() {
   const v = state.practice.view;
   if (v === "lesson") return <LessonView />;
   if (v === "problem") return <ProblemView />;
   if (v === "topic") return <TopicPage />;
+  if (v === "mistake") return <MistakeView />;
   if (v === "dailyDone") return <DailyDone />;
   return <PracticeHome />;
 }
@@ -92,6 +94,8 @@ function PracticeHome() {
         </ol>
       </section>
 
+      <MistakesSection />
+
       <section class="section">
         <h2 class="section-title">{t("practice.problems")}</h2>
         <p class="muted section-sub">{t("practice.problemsCaption", [C.PROBLEMS.length])}</p>
@@ -121,9 +125,9 @@ function PracticeHome() {
 
 function DailyCard() {
   const p = state.progress;
-  const daily = p.daily?.date === todayKey() ? p.daily : null;
+  const daily = C.todaysDaily();
   const done = daily ? daily.done.length : 0;
-  const finished = daily && daily.index >= daily.ids.length;
+  const finished = daily && daily.index >= daily.items.length;
   const streak = p.streak?.count || 0;
   return (
     <section class="card hero daily">
@@ -131,9 +135,9 @@ function DailyCard() {
       <h2>{finished ? t("practice.dailyFinished") : t("practice.dailyTitle")}</h2>
       <div class="daily-dots" aria-label={t("practice.ofN", [daily ? daily.index : 0, 5])}>
         {Array.from({ length: 5 }, (_, i) => {
-          const id = daily?.ids[i];
-          const cls = id && daily.done.includes(id) ? "done" : daily && i < daily.index ? "missed" : daily && i === daily.index ? "on" : "";
-          return <i class={cls} />;
+          const it = daily?.items[i];
+          const cls = it && daily.done.includes(it.id) ? "done" : daily && i < daily.index ? "missed" : daily && i === daily.index ? "on" : "";
+          return <i class={`${cls} ${it?.kind === "m" ? "own" : ""}`} />;
         })}
       </div>
       <p class="fine">
@@ -146,20 +150,44 @@ function DailyCard() {
         )}
       </p>
       {!finished && (
-        <Button kind={daily ? "primary" : "primary"} onClick={C.startDaily}>
+        <Button kind="primary" onClick={C.startDaily}>
           {daily && daily.index > 0 ? t("practice.continue") : t("practice.start")}
         </Button>
       )}
-      {finished && <p class="muted">{t("practice.dailySolved", [done, daily.ids.length])}</p>}
+      {finished && <p class="muted">{t("practice.dailySolved", [done, daily.items.length])}</p>}
+    </section>
+  );
+}
+
+function MistakesSection() {
+  const list = state.progress.mistakes;
+  if (!list.length) return null;
+  return (
+    <section class="section">
+      <h2 class="section-title">{t("mistakes.title")}</h2>
+      <p class="muted section-sub">{t("mistakes.caption")}</p>
+      <div class="problem-grid">
+        {list.slice(0, 12).map((m) => (
+          <button type="button" class={`problem-card ${m.streak >= 2 ? "done" : ""}`} onClick={() => C.openMistakeDrill(m.id)}>
+            <Stone color={m.color} size={12} />
+            <span class="problem-title">{t("mistakes.item", [m.index, m.size])}</span>
+            {m.theme ? <span class="fine">{C.themeName(m.theme)}</span> : <span />}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
 
 function TopicPage() {
   const topic = state.practice.topic;
-  const list = C.problemsOfTopic(topic);
+  const theme = state.practice.theme;
+  const all = C.problemsOfTopic(topic);
+  const themes = [...new Set(all.map((x) => x.theme).filter(Boolean))];
+  const list = theme ? all.filter((x) => x.theme === theme) : all;
   const p = state.progress;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
+  const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
   return (
     <div class="page">
       <div class="drag" data-drag />
@@ -170,6 +198,18 @@ function TopicPage() {
         <h1>{t("topic." + topic)}</h1>
         <p class="muted">{t("topic." + topic + ".desc")}</p>
       </header>
+      {themes.length > 1 && (
+        <div class="chips theme-filter" role="radiogroup" aria-label={t("practice.themes")}>
+          <button type="button" role="radio" aria-checked={!theme} class={`chip ${!theme ? "on" : ""}`} onClick={() => setTheme(null)}>
+            {t("library.kind.all")}
+          </button>
+          {themes.map((th) => (
+            <button type="button" role="radio" aria-checked={theme === th} class={`chip ${theme === th ? "on" : ""}`} onClick={() => setTheme(th)}>
+              {C.themeName(th)}
+            </button>
+          ))}
+        </div>
+      )}
       {byGrade.map(({ g, items }) => (
         <section class="section">
           <h2 class="section-title">
@@ -178,7 +218,7 @@ function TopicPage() {
           <div class="problem-grid">
             {items.map((x) => {
               const pr = p.problems[x.id];
-              const n = list.indexOf(x) + 1;
+              const n = all.indexOf(x) + 1;
               return (
                 <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
                   <span class="problem-no">{n}</span>
@@ -192,6 +232,74 @@ function TopicPage() {
       ))}
     </div>
   );
+}
+
+function MistakeView() {
+  const D = state.practice.mistake;
+  const m = D.m;
+  const game = D.game;
+  const node = game.current;
+  const daily = state.practice.daily;
+  const marks = [];
+  if (D.status === "wrong" || D.status === "same") marks.push({ ...D.last, type: "cross", tone: "bad" });
+  if (D.status === "revealed" || D.status === "right") for (const a of m.accept || [m.best]) marks.push({ ...a, type: "circle", tone: "good" });
+  if (D.status === "revealed") marks.push({ ...m.played, type: "cross", tone: "bad" });
+  const board = node.board.signMap.map((r) => r.slice());
+  if (D.status === "right" && D.last) board[D.last.y][D.last.x] = m.color;
+  const model = {
+    size: game.size,
+    board,
+    lastMove: D.status === "right" ? D.last : node.move,
+    marks,
+    showCoords: state.settings.coords,
+    material: state.settings.board,
+    view: null,
+    hoverColor: m.color,
+    interactive: D.status !== "right" && D.status !== "revealed",
+  };
+  const msg =
+    D.status === "right" ? t("mistakes.right") : D.status === "same" ? t("mistakes.same") : D.status === "wrong" ? t("mistakes.wrong") : D.status === "revealed" ? t("mistakes.revealed") : t("mistakes.prompt", [formatLoss(m.loss)]);
+  return (
+    <div class="workspace">
+      <section class="stage" aria-label={t("mistakes.title")}>
+        <div class="drag" data-drag />
+        <Board model={model} onPlay={C.practicePlay} />
+      </section>
+      <aside class="panel">
+        <header class="panel-head" data-drag>
+          <button type="button" class="back" onClick={C.practiceHome}>
+            <Icon name="back" size={16} /> {t("nav.practice")}
+          </button>
+          {daily && <span class="fine">{t("practice.dailyOf", [daily.index + 1, daily.items.length])}</span>}
+        </header>
+        <div class="panel-title">
+          <span class="eyebrow">{t("mistakes.title")}</span>
+          <h1>{t("mistakes.item", [m.index, m.size])}</h1>
+          {m.theme && <span class="chip theme-chip">{C.themeName(m.theme)}</span>}
+        </div>
+        <p class="goal">
+          <Stone color={m.color} size={14} /> {t("mistakes.goal")}
+        </p>
+        <p class={`feedback ${D.status === "right" ? "good" : D.status === "wrong" || D.status === "same" ? "bad" : "info"}`}>{msg}</p>
+        <div class="actions wrap">
+          {(D.status === "right" || D.status === "revealed") && (
+            <Button kind="primary" onClick={C.nextAfterMistake}>
+              {daily ? t("practice.nextDaily") : t("common.continue")}
+            </Button>
+          )}
+          {D.status !== "right" && D.status !== "revealed" && (
+            <Button kind="ghost" onClick={C.revealMistake}>
+              {t("practice.showAnswer")}
+            </Button>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function formatLoss(v) {
+  return String(Math.round((v || 0) * 2) / 2);
 }
 
 function puzzleModel(P, extra = {}) {
@@ -231,6 +339,7 @@ function ProblemFeedback({ P, success }) {
   if (P.feedback === "solved") return <p class="feedback good">{success || t("practice.solved")}</p>;
   if (P.feedback === "wrong") return <p class="feedback bad">{t("practice.wrongExplained")}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
+  if (P.feedback === "retry") return <p class="feedback bad">{t("practice.retryNow")}</p>;
   if (P.busy) return <p class="feedback muted">{t("practice.answering")}</p>;
   return null;
 }
@@ -277,7 +386,7 @@ function ProblemView() {
   const P = pr.problem;
   const def = P.def;
   const daily = pr.daily;
-  const list = C.problemsOfTopic(def.topic);
+  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
   return (
@@ -293,7 +402,7 @@ function ProblemView() {
           </button>
           {daily && (
             <span class="fine">
-              {t("practice.dailyOf", [daily.index + 1, daily.ids.length])}
+              {t("practice.dailyOf", [daily.index + 1, daily.items.length])}
             </span>
           )}
         </header>
@@ -458,6 +567,7 @@ function LessonView() {
 
 function DailyDone() {
   const d = state.practice.daily || state.progress.daily;
+  const total = d?.items?.length || 5;
   const streak = state.progress.streak?.count || 0;
   return (
     <div class="page center-page">
@@ -465,7 +575,7 @@ function DailyDone() {
       <section class="card celebrate">
         <span class="eyebrow">{t("practice.daily")}</span>
         <h1>{t("practice.dailyFinished")}</h1>
-        <p class="muted">{t("practice.dailySolved", [d?.done?.length || 0, d?.ids?.length || 5])}</p>
+        <p class="muted">{t("practice.dailySolved", [d?.done?.length || 0, total])}</p>
         {streak > 0 && (
           <p class="fine">
             <Icon name="flame" size={13} /> {t("practice.streak", [streak])}

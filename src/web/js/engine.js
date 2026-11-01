@@ -14,7 +14,7 @@
  */
 import { BLACK, WHITE, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
-import { chooseMove as chooseLocal, evaluate } from "./ai.js";
+import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 
 /**
  * Strength ladder. Ranks are honest approximations for the bundled b6c96
@@ -30,7 +30,7 @@ export const STRENGTHS = [
   { id: "10k", rank: 10, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, local: 4 },
   { id: "5k", rank: 5, visits: 64, temp: 0.45, maxLoss: 3.5, slip: 0, local: 5 },
   { id: "1k", rank: 1, visits: 160, temp: 0.2, maxLoss: 1.5, slip: 0, local: 5 },
-  { id: "2d", rank: -2, visits: 500, temp: 0, maxLoss: 0, slip: 0, local: 5 },
+  { id: "2d", rank: -1, visits: 500, temp: 0, maxLoss: 0, slip: 0, local: 5 },
 ];
 
 export function strengthById(id) {
@@ -118,6 +118,38 @@ function legal(game, move) {
   return game.canPlay(move.x, move.y).ok;
 }
 
+/**
+ * The computer's move plus the search behind it, so the caller can judge
+ * the position (teaching warnings, resignation, "shall we count?") and pace
+ * its reply. `analysis` is null when KataGo is not available.
+ */
+export async function decide(game, strengthId, { signal } = {}) {
+  const strength = strengthById(strengthId);
+  const analysis = await KataGo.analyze(game, { visits: strength.visits, signal });
+  if (signal?.aborted) return { move: null, analysis: null };
+  if (analysis) {
+    let move = pickCandidate(analysis, game.turn, strength);
+    if (!legal(game, move)) move = analysis.play;
+    if (legal(game, move)) return { move, analysis };
+  }
+  const move = await chooseLocal(game, { level: strength.local, color: game.turn });
+  return { move, analysis: null };
+}
+
+/** A quick look at the position (for teaching mode and the eval bar). */
+export async function evaluate(game, { node = game.current, visits = 48, signal } = {}) {
+  return KataGo.analyze(game, { node, visits, signal });
+}
+
+/** Live analysis for review, with partial results while it searches. */
+export async function live(game, node, { visits = 240, onInfo, signal } = {}) {
+  return KataGo.analyze(game, { node, visits, onInfo, signal });
+}
+
+export function cancel() {
+  KataGo.cancel?.();
+}
+
 export async function chooseMove(game, strengthId) {
   const strength = strengthById(strengthId);
   const analysis = await KataGo.analyze(game, { visits: strength.visits });
@@ -146,8 +178,8 @@ export async function hint(game) {
  * Review data for one position: Black-POV win rate and score lead, and the
  * best move with its line. `visits` trades accuracy for speed.
  */
-export async function analyzeNode(game, node, visits = 48) {
-  const a = await KataGo.analyze(game, { node, visits });
+export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
+  const a = await KataGo.analyze(game, { node, visits, signal });
   if (a && a.moves.length) {
     const top = a.moves[0];
     return {
@@ -156,6 +188,7 @@ export async function analyzeNode(game, node, visits = 48) {
       scoreLead: top.scoreLead,
       best: toMove(top),
       pv: top.pv || [],
+      moves: a.moves,
       ownership: a.ownership,
     };
   }
@@ -164,7 +197,7 @@ export async function analyzeNode(game, node, visits = 48) {
 
 /** Offline stand-in for analyzeNode: a heuristic score estimate. */
 export function estimateNode(game, node) {
-  const lead = evaluate(node.board, BLACK, game.size) - game.komi;
+  const lead = evaluateLocal(node.board, BLACK, game.size) - game.komi;
   return { source: "estimate", winrate: 1 / (1 + Math.exp(-lead / 8)), scoreLead: lead, best: null, pv: [], ownership: null };
 }
 
