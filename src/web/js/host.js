@@ -155,13 +155,12 @@ export async function setupChrome() {
   const top = Math.max(0, Number(chrome.top) || 0);
   document.documentElement.style.setProperty("--titlebar-inset", top + "px");
   if (top > 0) document.documentElement.dataset.nativeChrome = "inset";
-  const bar = document.querySelector(".topbar");
-  if (bar) {
-    bar.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0) return;
-      // Only the empty part of the bar drags; buttons keep their click.
-      if (e.target.closest("button, a, input, select, textarea")) return;
-      windowDrag();
-    });
-  }
+  // Any element marked data-drag moves the window (hidden title bar); its
+  // buttons keep their clicks.
+  document.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    if (!e.target.closest?.("[data-drag]")) return;
+    if (e.target.closest("button, a, input, select, textarea, canvas")) return;
+    windowDrag();
+  });
 }

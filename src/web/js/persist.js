@@ -1,13 +1,25 @@
 /**
  * The one door to stored state.
  *
- * Settings, learning progress and the current game are small JSON values.
- * The library is its own key because it is the largest and because a quota
- * failure there must not take the settings down with it. Every read is
- * guarded: a corrupt value falls back to a fresh default instead of breaking
- * the first frame.
+ * Settings, learning progress and the game on the board are small JSON
+ * values. The library is its own key because it is the largest and because
+ * a quota failure there must not take the settings down with it. Every read
+ * is guarded: a corrupt value falls back to a fresh default instead of
+ * breaking the first frame.
+ *
+ * v2 keys replace the v1 keys. `migrate()` runs once at start: it carries
+ * settings, opening/classic progress, the streak, the current game and the
+ * library forward, and leaves the v1 keys untouched so a downgrade still
+ * finds them.
  */
 export const KEYS = {
+  settings: "goban-studio.settings.v2",
+  progress: "goban-studio.progress.v2",
+  current: "goban-studio.current.v2",
+  library: "goban-studio.library.v2",
+};
+
+export const V1_KEYS = {
   settings: "goban-studio.settings.v1",
   progress: "goban-studio.progress.v1",
   current: "goban-studio.current.v1",
@@ -16,14 +28,16 @@ export const KEYS = {
 
 export const DEFAULT_SETTINGS = {
   lang: null,
-  theme: "wood",
-  coords: true,
+  appearance: "auto", // auto | light | dark
+  board: "wood", // wood | paper | slate
+  coords: false,
   sound: true,
   numbers: false,
-  playRailCollapsed: false,
-  playSideCollapsed: false,
-  level: 2,
-  firstRun: true,
+  strength: "25k",
+  playerRank: null, // self-assessed kyu (30…1) or dan as negative; null = new player
+  experience: null, // "new" | "rules" | "player"
+  onboarded: false,
+  focus: false,
 };
 
 const memory = new Map();
@@ -61,22 +75,101 @@ export function writeJSON(key, value) {
   }
 }
 
+export function removeKey(key) {
+  try {
+    storage().removeItem(key);
+  } catch (_) {}
+}
+
+const LEVEL_TO_STRENGTH = { 1: "25k", 2: "20k", 3: "15k", 4: "10k", 5: "5k" };
+
+/** Carry v1 data forward once. Safe to call on every start. */
+export function migrate() {
+  const has = (k) => {
+    try {
+      return storage().getItem(k) != null;
+    } catch (_) {
+      return false;
+    }
+  };
+  if (!has(KEYS.settings) && has(V1_KEYS.settings)) {
+    const v1 = readJSON(V1_KEYS.settings, {});
+    const next = { ...DEFAULT_SETTINGS };
+    if (v1.lang) next.lang = v1.lang;
+    if (typeof v1.coords === "boolean") next.coords = v1.coords;
+    if (typeof v1.sound === "boolean") next.sound = v1.sound;
+    if (typeof v1.numbers === "boolean") next.numbers = v1.numbers;
+    if (v1.theme === "night") {
+      next.appearance = "dark";
+      next.board = "slate";
+    } else if (v1.theme === "paper") next.board = "paper";
+    if (LEVEL_TO_STRENGTH[v1.level]) next.strength = LEVEL_TO_STRENGTH[v1.level];
+    // Someone who used v1 has seen the rules and the board.
+    next.onboarded = v1.firstRun === false;
+    if (next.onboarded) next.experience = "rules";
+    writeJSON(KEYS.settings, next);
+  }
+  if (!has(KEYS.progress) && has(V1_KEYS.progress)) {
+    const v1 = readJSON(V1_KEYS.progress, {});
+    // v1 lessons and drills no longer exist; openings, classics and the
+    // streak do.
+    writeJSON(KEYS.progress, {
+      ...emptyProgress(),
+      openings: v1.openings && typeof v1.openings === "object" ? v1.openings : {},
+      classics: v1.classics && typeof v1.classics === "object" ? v1.classics : {},
+      streak: v1.streak && typeof v1.streak === "object" ? v1.streak : { count: 0, last: null },
+    });
+  }
+  if (!has(KEYS.current) && has(V1_KEYS.current)) {
+    const v1 = readJSON(V1_KEYS.current, null);
+    if (v1 && v1.sgf) {
+      writeJSON(KEYS.current, {
+        sgf: v1.sgf,
+        humanColor: v1.humanColor,
+        opponent: v1.opponent,
+        strength: LEVEL_TO_STRENGTH[v1.level] || DEFAULT_SETTINGS.strength,
+        name: v1.name || "",
+        savedAt: v1.savedAt || Date.now(),
+      });
+    }
+  }
+  if (!has(KEYS.library) && has(V1_KEYS.library)) {
+    const v1 = readJSON(V1_KEYS.library, { games: [] });
+    const games = (Array.isArray(v1.games) ? v1.games : [])
+      .filter((g) => g && typeof g.sgf === "string")
+      .map((g) => ({
+        ...g,
+        strength: LEVEL_TO_STRENGTH[g.level] || null,
+        source: "game",
+      }));
+    writeJSON(KEYS.library, { v: 2, games });
+  }
+}
+
 export function loadSettings() {
   const s = readJSON(KEYS.settings, {});
-  return { ...DEFAULT_SETTINGS, ...s };
+  const out = { ...DEFAULT_SETTINGS, ...s };
+  if (!["auto", "light", "dark"].includes(out.appearance)) out.appearance = "auto";
+  if (!["wood", "paper", "slate"].includes(out.board)) out.board = "wood";
+  return out;
 }
 
 export function saveSettings(settings) {
   return writeJSON(KEYS.settings, settings);
 }
 
+function emptyProgress() {
+  return { lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null } };
+}
+
 export function loadProgress() {
   const p = readJSON(KEYS.progress, {});
+  const obj = (v) => (v && typeof v === "object" ? v : {});
   return {
-    lessons: p.lessons && typeof p.lessons === "object" ? p.lessons : {},
-    openings: p.openings && typeof p.openings === "object" ? p.openings : {},
-    classics: p.classics && typeof p.classics === "object" ? p.classics : {},
-    puzzles: p.puzzles && typeof p.puzzles === "object" ? p.puzzles : {},
+    lessons: obj(p.lessons),
+    problems: obj(p.problems),
+    openings: obj(p.openings),
+    classics: obj(p.classics),
     daily: p.daily && typeof p.daily === "object" ? p.daily : null,
     streak: p.streak && typeof p.streak === "object" ? p.streak : { count: 0, last: null },
   };
@@ -86,17 +179,15 @@ export function saveProgress(progress) {
   return writeJSON(KEYS.progress, progress);
 }
 
-export function markLesson(progress, id) {
-  progress.lessons[id] = { done: true, at: Date.now() };
+/** A lesson finished, or its furthest step reached. */
+export function markLesson(progress, id, { step = null, done = false } = {}) {
+  const prev = progress.lessons[id] || { done: false, step: 0 };
+  const next = { ...prev, at: Date.now() };
+  if (step != null) next.step = Math.max(prev.step || 0, step);
+  if (done) next.done = true;
+  progress.lessons[id] = next;
   saveProgress(progress);
   return progress;
-}
-
-const LADDER = [1, 3, 7, 21];
-const DAY = 86400000;
-export function todayKey(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
 export function markOpening(progress, id) {
@@ -111,53 +202,79 @@ export function markClassic(progress, id) {
   return progress;
 }
 
-export function markPuzzle(progress, id, correct) {
-  const prev = progress.puzzles[id] || { solved: false, attempts: 0, streak: 0, due: 0, last: 0 };
-  const next = { ...prev, attempts: prev.attempts + 1, last: Date.now() };
-  if (correct) {
-    next.solved = true;
+/** Spaced review: 1, 3, 7, 21 days after consecutive clean solves. */
+export const LADDER = [1, 3, 7, 21];
+export const DAY = 86400000;
+
+export function todayKey(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+/**
+ * Record one attempt. `clean` is a first-try solve without hint or answer;
+ * anything else resets the ladder so the problem comes back tomorrow.
+ */
+export function markProblem(progress, id, { solved, clean = solved }, now = Date.now()) {
+  const prev = progress.problems[id] || { solved: false, attempts: 0, streak: 0, due: 0, last: 0 };
+  const next = { ...prev, attempts: prev.attempts + 1, last: now };
+  if (solved) next.solved = true;
+  if (solved && clean) {
     next.streak = (prev.streak || 0) + 1;
-    const rung = Math.min(LADDER.length - 1, Math.max(0, next.streak - 1));
-    next.due = Date.now() + LADDER[rung] * DAY;
+    const rung = Math.min(LADDER.length - 1, next.streak - 1);
+    next.due = now + LADDER[rung] * DAY;
   } else {
     next.streak = 0;
-    next.due = Date.now();
+    next.due = now + DAY;
   }
-  progress.puzzles[id] = next;
+  progress.problems[id] = next;
   saveProgress(progress);
   return progress;
 }
 
-export function duePuzzles(progress, all, limit = 5, now = Date.now()) {
-  const due = all.filter((p) => {
-    const e = progress.puzzles[p.id];
-    return e && !e.solved ? true : e && e.due && e.due <= now;
-  });
-  const rest = all.filter((p) => !due.includes(p));
-  const out = [];
-  for (const p of due) {
-    if (out.length >= limit) break;
-    out.push(p);
-  }
-  let seed = Number(todayKey().replace(/-/g, "")) || 1;
+/**
+ * Today's five: problems due for review first, then new problems at the
+ * learner's level (the lowest grade with unsolved problems, and one above).
+ * Stable for a given day.
+ */
+export function dailySet(progress, problems, grades, limit = 5, now = Date.now()) {
+  const due = problems
+    .filter((p) => {
+      const e = progress.problems[p.id];
+      return e && e.due && e.due <= now;
+    })
+    .sort((a, b) => progress.problems[a.id].due - progress.problems[b.id].due);
+  const out = due.slice(0, limit);
+  const unseen = problems.filter((p) => !progress.problems[p.id]);
+  const gradeOf = (p) => grades[p.id]?.grade || 1;
+  const level = unseen.length ? Math.min(...unseen.map(gradeOf)) : 1;
+  let seed = Number(todayKey(new Date(now)).replace(/-/g, "")) || 1;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0x100000000;
   };
-  const shuffled = rest.slice().sort(() => rand() - 0.5);
-  for (const p of shuffled) {
+  const pool = unseen.filter((p) => gradeOf(p) <= level + 1).sort((a, b) => gradeOf(a) - gradeOf(b) || rand() - 0.5);
+  for (const p of pool) {
     if (out.length >= limit) break;
-    out.push(p);
+    if (!out.includes(p)) out.push(p);
+  }
+  for (const p of problems) {
+    if (out.length >= limit) break;
+    if (!out.includes(p)) out.push(p);
   }
   return out;
 }
 
-export function touchStreak(progress) {
-  const today = todayKey();
+export function touchStreak(progress, now = Date.now()) {
+  const today = todayKey(new Date(now));
   if (progress.streak.last === today) return progress;
-  const yesterday = todayKey(new Date(Date.now() - DAY));
+  const yesterday = todayKey(new Date(now - DAY));
   progress.streak.count = progress.streak.last === yesterday ? (progress.streak.count || 0) + 1 : 1;
   progress.streak.last = today;
   saveProgress(progress);
   return progress;
+}
+
+export function clearAll() {
+  for (const k of [...Object.values(KEYS), ...Object.values(V1_KEYS)]) removeKey(k);
 }
