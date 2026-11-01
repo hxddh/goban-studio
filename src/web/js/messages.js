@@ -121,6 +121,7 @@ export const MESSAGES = {
   "review.previous": m("上一手", "Previous", "이전 수", "前の手"),
   "review.next": m("下一手", "Next", "다음 수", "次の手"),
 
+  "learn.basics": m("入门", "Basics", "기초", "基本"),
   "learn.lessons": m("课程", "Lessons", "강좌", "レッスン"),
   "learn.tsumego": m("死活题", "Puzzles", "사활 문제", "詰碁"),
   "learn.daily": m("每日", "Daily", "매일", "毎日"),

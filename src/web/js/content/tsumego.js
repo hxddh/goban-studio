@@ -1,11 +1,16 @@
 /**
  * Tsumego drills: positions with one correct first move.
  *
- * These are drills, not a claim that every position has a unique solution.
- * The app checks the scripted line; the hint names the idea. The set is
- * intentionally small enough to hand-check, and the schema is the same one a
- * larger curated book can use later.
+ * The base positions and their scripted lines are hand-checked. The expanded
+ * drills are deterministic board symmetries/translations of those shapes,
+ * replayed through the rules before they are shown; they are practice
+ * variants, not independently authored professional problems.
+ *
+ * The app checks the scripted line; the hint names the idea. A larger,
+ * native-reviewed problem book can use the same schema.
  */
+import { Game } from "../rules.js";
+
 const L = (zh, en, ko, ja) => ({ zh, en, ko, ja });
 const s = (x, y, c) => ({ x, y, c });
 
@@ -44,7 +49,7 @@ function make(id, kind, n, setup, toMove, line, level = 1) {
   };
 }
 
-export const TSUMEGO = [
+const BASE_TSUMEGO = [
   make("cap-1", "capture", 1, [s(0, 0, -1), s(1, 0, 1)], 1, [{ c: 1, x: 0, y: 1 }], 1),
   make("cap-2", "capture", 2, [s(4, 0, -1), s(3, 0, 1), s(5, 0, 1)], 1, [{ c: 1, x: 4, y: 1 }], 1),
   make("cap-3", "capture", 3, [s(4, 4, -1), s(3, 4, 1), s(5, 4, 1), s(4, 3, 1)], 1, [{ c: 1, x: 4, y: 5 }], 1),
@@ -71,6 +76,107 @@ export const TSUMEGO = [
   make("cut-2", "cut", 2, [s(4, 3, -1), s(4, 5, -1)], 1, [{ c: 1, x: 4, y: 4 }], 1),
   make("cut-3", "cut", 3, [s(2, 2, -1), s(4, 2, -1)], 1, [{ c: 1, x: 3, y: 2 }], 1),
 ];
+
+/**
+ * Expand the hand-checked base shapes into a larger drill set.
+ *
+ * The transforms are board symmetries and small translations. They keep the
+ * tactical idea (capture, atari, extend, connect, cut) while giving the
+ * learner fresh coordinates. Every candidate is replayed through the real
+ * rules before it enters the list, and a position is only used once.
+ */
+function expandTsumego(base, target) {
+  const setupKey = (setup) =>
+    setup
+      .map((stone) => `${stone.x},${stone.y},${stone.c}`)
+      .sort()
+      .join("|");
+  const seen = new Set(base.map((puzzle) => setupKey(puzzle.setup) + ":" + puzzle.toMove));
+  const counters = new Map();
+  for (const puzzle of base) counters.set(puzzle.kind, (counters.get(puzzle.kind) || 0) + 1);
+  const groups = new Map();
+
+  const transforms = [
+    (x, y) => [x, y],
+    (x, y) => [8 - x, y],
+    (x, y) => [x, 8 - y],
+    (x, y) => [8 - x, 8 - y],
+    (x, y) => [y, x],
+    (x, y) => [8 - y, x],
+    (x, y) => [y, 8 - x],
+    (x, y) => [8 - y, 8 - x],
+  ];
+
+  for (const puzzle of base) {
+    const candidates = [];
+    for (const transform of transforms) {
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dy = -3; dy <= 3; dy++) {
+          const point = (stone) => {
+            const [x, y] = transform(stone.x, stone.y);
+            return { x: x + dx, y: y + dy };
+          };
+          const setup = puzzle.setup.map((stone) => ({ ...point(stone), c: stone.c }));
+          if (setup.some((stone) => stone.x < 0 || stone.y < 0 || stone.x >= 9 || stone.y >= 9)) continue;
+          const line = puzzle.line.map((move) => ({ ...point(move), c: move.c }));
+          if (line.some((move) => move.x < 0 || move.y < 0 || move.x >= 9 || move.y >= 9)) continue;
+          const key = setupKey(setup) + ":" + puzzle.toMove;
+          if (seen.has(key)) continue;
+          const game = new Game({ size: 9, komi: 6.5 });
+          game.setup(setup, puzzle.toMove);
+          let legal = true;
+          for (const move of line) {
+            const result = game.play(move.x, move.y, { color: move.c });
+            if (!result.ok) {
+              legal = false;
+              break;
+            }
+          }
+          if (!legal) continue;
+          seen.add(key);
+          candidates.push({ puzzle, setup, line, key });
+        }
+      }
+    }
+    groups.set(puzzle.kind, groups.get(puzzle.kind) || []);
+    groups.get(puzzle.kind).push(...candidates);
+  }
+
+  const kinds = [...groups.keys()];
+  const output = [];
+  let cursor = 0;
+  while (output.length < target && kinds.length) {
+    let madeProgress = false;
+    for (const kind of kinds) {
+      if (output.length >= target) break;
+      const list = groups.get(kind);
+      const next = list[cursor];
+      if (!next) continue;
+      madeProgress = true;
+      const n = (counters.get(kind) || 0) + 1;
+      counters.set(kind, n);
+      output.push(
+        make(
+          `${kind}-${n}`,
+          kind,
+          n,
+          next.setup,
+          next.puzzle.toMove,
+          next.line,
+          // Spread the generated variants across the three difficulty bands
+          // instead of inheriting the base shape's level (which would leave
+          // almost everything in "easy").
+          1 + ((output.length + next.puzzle.level) % 3),
+        ),
+      );
+    }
+    if (!madeProgress) break;
+    cursor++;
+  }
+  return output;
+}
+
+export const TSUMEGO = [...BASE_TSUMEGO, ...expandTsumego(BASE_TSUMEGO, 275)];
 
 export function tsumegoById(id) {
   return TSUMEGO.find((p) => p.id === id) || null;

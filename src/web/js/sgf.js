@@ -202,7 +202,7 @@ export function loadSGF(text) {
   const data = root.data || {};
   const size = parseSize(first(data, "SZ"));
   const komiRaw = first(data, "KM");
-  const komi = komiRaw === "" ? (size === 9 ? 6.5 : 7.5) : Number(komiRaw);
+  const komi = komiRaw === "" ? (size === 19 ? 7.5 : 6.5) : Number(komiRaw);
   const ru = first(data, "RU").toLowerCase();
   const rules = ru.includes("japan") ? "japanese" : "chinese";
   const ab = expandPoints(data.AB, size);
@@ -217,7 +217,7 @@ export function loadSGF(text) {
   const game = new Game({
     size,
     rules,
-    komi: Number.isFinite(komi) ? komi : size === 9 ? 6.5 : 7.5,
+    komi: Number.isFinite(komi) ? komi : size === 19 ? 7.5 : 6.5,
     handicap,
     date,
     playerBlack: first(data, "PB") || "Black",

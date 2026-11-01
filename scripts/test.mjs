@@ -14,6 +14,7 @@ import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap } fro
 import { loadSGF } from "../src/web/js/sgf.js";
 import { chooseMove } from "../src/web/js/ai.js";
 import { analyze } from "../src/web/js/review.js";
+import { BASICS } from "../src/web/js/content/basics.js";
 import { LESSONS } from "../src/web/js/content/lessons.js";
 import { TSUMEGO } from "../src/web/js/content/tsumego.js";
 import { MESSAGES } from "../src/web/js/messages.js";
@@ -44,7 +45,7 @@ function setup(stones, turn = BLACK, size = 9) {
   return game;
 }
 
-function newGame(size = 9, options = {}) {
+function newGame(size = 19, options = {}) {
   return new Game({ size, ...options });
 }
 
@@ -56,8 +57,15 @@ await test("coordinates skip I and count rows from the bottom", () => {
   assert.equal(formatPoints(7), "7");
 });
 
-await test("a stone alternates turns and cannot be overwritten", () => {
+await test("a fresh game uses the standard 19x19 board", () => {
   const g = newGame();
+  assert.equal(g.size, 19);
+  assert.equal(g.komi, 7.5);
+  assert.equal(g.mainLine().length, 1);
+});
+
+await test("a stone alternates turns and cannot be overwritten", () => {
+  const g = newGame(9);
   assert.deepEqual(g.play(4, 4), { ok: true, node: g.current, captures: { black: 0, white: 0 } });
   assert.equal(g.turn, WHITE);
   assert.equal(g.moveNumber, 1);
@@ -246,13 +254,23 @@ await test("every UI key exists in all four launch languages", () => {
   assert.equal(t("nav.library"), "棋谱");
 });
 
+await test("the rules primer is complete in all four languages", () => {
+  assert.equal(BASICS.length, 8);
+  for (const card of BASICS) {
+    for (const lang of LANG_IDS) {
+      assert.ok(card.title[lang]?.trim(), `${card.id} title ${lang}`);
+      assert.ok(card.text[lang]?.trim(), `${card.id} text ${lang}`);
+    }
+  }
+});
+
 await test("all lesson and puzzle positions and lines are legal", () => {
   const items = [
     ...LESSONS.map((item) => ({ ...item, kind: "lesson" })),
     ...TSUMEGO.map((item) => ({ ...item, kind: "puzzle" })),
   ];
-  assert.equal(LESSONS.length, 12);
-  assert.equal(TSUMEGO.length, 25);
+  assert.equal(LESSONS.length, 20);
+  assert.equal(TSUMEGO.length, 300);
   for (const item of items) {
     assert.equal(item.size, 9, `${item.id} size`);
     assert.ok(item.line.length > 0, `${item.id} line`);
@@ -334,6 +352,15 @@ await test("due puzzles are stable and progress respects the review ladder", () 
   assert.equal(progress.puzzles["cap-1"].streak, 0);
   touchStreak(progress);
   assert.equal(progress.streak.count, 1);
+});
+
+await test("Moka 9x9 assets are present and attributed", () => {
+  for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
+    assert.ok(fs.existsSync(path.join(root, "src/web/moka", file)), `moka/${file}`);
+  }
+  const model = JSON.parse(fs.readFileSync(path.join(root, "src/web/moka/go-model.json"), "utf8"));
+  assert.equal(model.architecture.boardSize, 9);
+  assert.equal(fs.statSync(path.join(root, "src/web/moka/go-model.bin")).size, model.weightsBytes);
 });
 
 await test("static page inputs and build script are present", () => {

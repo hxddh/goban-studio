@@ -6,8 +6,9 @@ README.
 
 ## Automated
 
-`npm test` — 19 checks:
+`npm test` — 22 checks:
 
+- default 19×19 board and 7.5 komi
 - coordinates and point formatting
 - undo discards a leaf instead of leaving a hidden branch
 - alternating turns, occupied/outside rejection
@@ -21,7 +22,9 @@ README.
 - SGF import with pass, setup, comments and `YYYY-MM-DD` dates
 - invalid SGF rejection
 - every UI string present in zh/en/ko/ja
-- every lesson and tsumego setup and solution legal
+- the eight basics cards present in all four languages
+- Moka 9×9 assets present, model size matches its manifest, attribution files shipped
+- 20 lessons and 300 drill setups/solutions legal
 - opponent legality on 9×9 and 19×19
 - review point count
 - library save/open/delete
@@ -36,8 +39,11 @@ Static asset checks are intentionally limited to source inputs; the bundle and
   language updates the dialog, rail and page; Start persists `firstRun: false`
 - Chinese, English, Korean and Japanese settings pages; four-language font
   stacks and Korean `keep-all` do not overflow the cards
-- 9×9 and 19×19 play; human-vs-human and human-vs-computer; computer replies
-  after the human move and after undo
+- fresh app opens a standard 19×19 / 7.5-komi board; 9×9 and 19×19 play;
+  human-vs-human and human-vs-computer; computer replies after the human move
+  and after undo
+- Moka 9×9 model initializes in the browser, answers a human move with a
+  legal policy move; 13×13/19×19 fall back to the heuristic
 - capture lesson `capture-corner`: setup stones render, the correct move
   captures the white stone, `1/1` and “lesson complete” appear, Next works
 - tsumego `cap-1`: setup renders, correct move is accepted, progress is
@@ -83,6 +89,9 @@ Static asset checks are intentionally limited to source inputs; the bundle and
 - `native build -Dplatform=null` — ReleaseFast executable links and builds.
 - Native file open/save dialogs are wired through the Native SDK web API,
   with a browser file-input/download fallback.
+- OS open-with events are forwarded by `src/main.zig` to the page as
+  `open:files`; drag/drop uses `drop:files`. The native event delivery itself
+  has not been exercised on a real macOS/Windows session.
 
 ## Not verified in this environment
 

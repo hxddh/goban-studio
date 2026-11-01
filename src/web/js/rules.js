@@ -154,7 +154,7 @@ export class Game {
   constructor({
     size = 19,
     rules = "chinese",
-    komi = size === 19 ? 7.5 : size === 13 ? 7.5 : 6.5,
+    komi = size === 19 ? 7.5 : 6.5,
     handicap = 0,
     date = new Date(),
     playerBlack = "Black",

@@ -192,8 +192,21 @@ function playout(board, color, size, maxMoves) {
 /**
  * Pick a move. Never mutates the game; returns {x,y} or {pass:true}.
  */
+async function chooseMoka(game, level) {
+  if (game.size !== 9) return null;
+  const host = typeof globalThis !== "undefined" ? globalThis.GobanMoka : null;
+  if (!host || typeof host.chooseMove !== "function") return null;
+  try {
+    return await host.chooseMove(game, { level });
+  } catch (_) {
+    return null;
+  }
+}
+
 export async function chooseMove(game, { level = 3, color = game.turn } = {}) {
   const size = game.size;
+  const neural = await chooseMoka(game, level);
+  if (neural) return neural;
   const board = game.board.clone();
   const lastMove = game.lastMove;
   const cfg = LEVELS.find((l) => l.id === level) || LEVELS[2];

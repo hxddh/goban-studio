@@ -69,9 +69,110 @@ const App = struct {
     }
 };
 
+/// OS "open with" / document-open events. The page subscribes to the
+/// window event "open:files" and imports the first .sgf path. The event may
+/// arrive before the page has subscribed; that is a platform limitation, not
+/// a reason to keep a second copy of the file in native state.
+const OPEN_FILE_VARIANTS = [_][]const u8{ "open_files", "open_file", "open_urls", "open_documents" };
+
+fn forwardOpenFiles(runtime: *native_sdk.Runtime, event: native_sdk.Event) void {
+    inline for (OPEN_FILE_VARIANTS) |variant| {
+        if (comptime @hasField(native_sdk.Event, variant)) {
+            if (event == @field(std.meta.Tag(native_sdk.Event), variant)) {
+                emitOpenFiles(runtime, @field(event, variant));
+            }
+        }
+    }
+}
+
+fn openFilePathOf(item: anytype) ?[]const u8 {
+    const T = @TypeOf(item);
+    if (comptime @typeInfo(T) == .pointer) {
+        const value: []const u8 = item;
+        return value;
+    }
+    if (comptime @typeInfo(T) == .@"struct" and @hasField(T, "path")) {
+        const value: []const u8 = item.path;
+        return value;
+    }
+    return null;
+}
+
+fn emitOpenFiles(runtime: *native_sdk.Runtime, payload: anytype) void {
+    const P = @TypeOf(payload);
+    var detail_buf: [8192]u8 = undefined;
+    var n: usize = 0;
+    if (!jsonAppend(&detail_buf, &n, "{\"paths\":[")) return;
+    var count: usize = 0;
+    if (comptime @typeInfo(P) == .pointer) {
+        for (payload) |item| {
+            if (openFilePathOf(item)) |path| {
+                if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+            }
+        }
+    } else if (comptime @typeInfo(P) == .@"struct") {
+        if (comptime @hasField(P, "paths")) {
+            for (payload.paths) |item| {
+                if (openFilePathOf(item)) |path| {
+                    if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                }
+            }
+        } else if (comptime @hasField(P, "files")) {
+            for (payload.files) |item| {
+                if (openFilePathOf(item)) |path| {
+                    if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                }
+            }
+        } else if (comptime @hasField(P, "path")) {
+            if (openFilePathOf(payload.path)) |path| {
+                if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+            }
+        } else return;
+    } else return;
+    if (count == 0) return;
+    if (!jsonAppend(&detail_buf, &n, "]}")) return;
+    runtime.emitWindowEvent(1, "open:files", detail_buf[0..n]) catch {};
+}
+
+fn appendOpenPath(buf: []u8, n: *usize, count: *usize, path: []const u8) bool {
+    if (path.len == 0 or path.len > 4096) return true;
+    if (count.* > 0 and !jsonAppend(buf, n, ",")) return false;
+    if (!jsonAppendString(buf, n, path)) return false;
+    count.* += 1;
+    return true;
+}
+
+fn jsonAppend(buf: []u8, n: *usize, text: []const u8) bool {
+    if (n.* + text.len > buf.len) return false;
+    @memcpy(buf[n.*..][0..text.len], text);
+    n.* += text.len;
+    return true;
+}
+
+fn jsonAppendString(buf: []u8, n: *usize, text: []const u8) bool {
+    if (!jsonAppend(buf, n, "\"")) return false;
+    for (text) |c| {
+        switch (c) {
+            '"' => if (!jsonAppend(buf, n, "\\\"")) return false,
+            '\\' => if (!jsonAppend(buf, n, "\\\\")) return false,
+            '\n' => if (!jsonAppend(buf, n, "\\n")) return false,
+            '\r' => if (!jsonAppend(buf, n, "\\r")) return false,
+            '\t' => if (!jsonAppend(buf, n, "\\t")) return false,
+            else => {
+                if (c < 0x20) return false;
+                if (n.* + 1 > buf.len) return false;
+                buf[n.*] = c;
+                n.* += 1;
+            },
+        }
+    }
+    return jsonAppend(buf, n, "\"");
+}
+
 fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.Event) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     self.runtime = runtime;
+    forwardOpenFiles(runtime, event);
     switch (event) {
         .command => |cmd| {
             var buf: [256]u8 = undefined;

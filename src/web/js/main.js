@@ -11,6 +11,7 @@ import { BoardView } from "./board.js";
 import { chooseMove, hintMove, LEVELS } from "./ai.js";
 import { analyze, ownership } from "./review.js";
 import { apply, detectLang, LANG_IDS, LANG_NAMES, setLang, t } from "./i18n.js";
+import { BASICS } from "./content/basics.js";
 import { LESSONS } from "./content/lessons.js";
 import { TSUMEGO } from "./content/tsumego.js";
 import {
@@ -365,9 +366,9 @@ function resumePlay() {
 }
 
 function newGame(opts = {}) {
-  const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : 9;
+  const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : 19;
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
-  const komi = opts.komi !== undefined ? Number(opts.komi) : handicap > 0 ? 0.5 : size === 9 ? 6.5 : 7.5;
+  const komi = opts.komi !== undefined ? Number(opts.komi) : handicap > 0 ? 0.5 : size === 19 ? 7.5 : 6.5;
   state.game = new Game({
     size,
     rules: opts.rules === "japanese" ? "japanese" : "chinese",
@@ -392,7 +393,7 @@ function newGame(opts = {}) {
 }
 
 function newGameDialog() {
-  const s = state.game?.size || 9;
+  const s = state.game?.size || 19;
   const levelOptions = LEVELS.map((l) => `<option value="${l.id}" ${l.id === state.level ? "selected" : ""}>${esc(t(l.key))} · ${l.id}</option>`).join("");
   const body = `
     <div class="form-grid">
@@ -412,7 +413,7 @@ function newGameDialog() {
       <label class="field"><span>${esc(t("play.ruleset"))}</span>
         <select id="ng-rules"><option value="chinese">${esc(t("common.chinese"))}</option><option value="japanese">${esc(t("common.japanese"))}</option></select>
       </label>
-      <label class="field"><span>${esc(t("common.komi"))}</span><input id="ng-komi" type="number" step="0.5" min="0" max="15" value="${s === 9 ? 6.5 : 7.5}" /></label>
+      <label class="field"><span>${esc(t("common.komi"))}</span><input id="ng-komi" type="number" step="0.5" min="0" max="15" value="${s === 19 ? 7.5 : 6.5}" /></label>
       <label class="field"><span>${esc(t("common.handicap"))}</span>
         <select id="ng-handicap">${[0, 2, 3, 4, 5].map((n) => `<option value="${n}">${n || t("common.none")}</option>`).join("")}</select>
       </label>
@@ -446,7 +447,7 @@ function newGameDialog() {
   const handicapSelect = $("#ng-handicap");
   sizeSelect?.addEventListener("change", () => {
     if (!komiInput) return;
-    komiInput.value = Number(sizeSelect.value) === 9 ? "6.5" : "7.5";
+    komiInput.value = Number(sizeSelect.value) === 19 ? "7.5" : "6.5";
   });
   handicapSelect?.addEventListener("change", () => {
     if (!komiInput) return;
@@ -879,15 +880,27 @@ function learnSide() {
   const l = state.learn;
   if (l.mode === "lesson" && l.lesson) return lessonPlayerSide();
   if (l.mode === "puzzle" && l.puzzle) return puzzlePlayerSide();
-  const tabs = ["lessons", "tsumego", "daily"];
+  const doneLessons = LESSONS.filter((lesson) => state.progress.lessons[lesson.id]?.done).length;
+  const solvedPuzzles = TSUMEGO.filter((puzzle) => state.progress.puzzles[puzzle.id]?.solved).length;
+  const streak = state.progress.streak?.count || 0;
+  const stats = `<div class="learn-stats">
+    <span><strong>${doneLessons}</strong> / ${LESSONS.length} ${esc(t("learn.lessons"))}</span>
+    <span><strong>${solvedPuzzles}</strong> / ${TSUMEGO.length} ${esc(t("learn.tsumego"))}</span>
+    <span>${esc(t("learn.streak", [streak]))}</span>
+  </div>`;
+  const tabs = ["basics", "lessons", "tsumego", "daily"];
   const tabHtml = tabs
     .map(
       (id) =>
-        `<button class="seg ${l.tab === id ? "on" : ""}" data-tab="${id}">${esc(t(id === "lessons" ? "learn.lessons" : id === "tsumego" ? "learn.tsumego" : "learn.daily"))}</button>`,
+        `<button class="seg ${l.tab === id ? "on" : ""}" data-tab="${id}">${esc(t(id === "basics" ? "learn.basics" : id === "lessons" ? "learn.lessons" : id === "tsumego" ? "learn.tsumego" : "learn.daily"))}</button>`,
     )
     .join("");
   let body = "";
-  if (l.tab === "lessons") {
+  if (l.tab === "basics") {
+    body = `<div class="basics-list">${BASICS.map(
+      (card, i) => `<article class="basics-card"><div class="card-head"><h3>${esc(tx(card.title))}</h3><span class="basic-no">${String(i + 1).padStart(2, "0")}</span></div><p>${esc(tx(card.text))}</p></article>`,
+    ).join("")}</div>`;
+  } else if (l.tab === "lessons") {
     body = `<div class="lesson-grid">${LESSONS.map((lesson, i) => {
       const done = state.progress.lessons[lesson.id]?.done;
       return `<button class="lesson-card ${done ? "done" : ""}" data-lesson="${lesson.id}">
@@ -924,7 +937,7 @@ function learnSide() {
       }
     </section>`;
   }
-  return `<div class="seg-row">${tabHtml}</div>${body}`;
+  return `${stats}<div class="seg-row">${tabHtml}</div>${body}`;
 }
 
 function lessonPlayerSide() {
@@ -1021,7 +1034,7 @@ function renderSettingsPage() {
         <p class="muted small">${esc(t("settings.offline"))}</p>
       </section>
       <section class="settings-card"><h3>${esc(t("settings.data"))}</h3><button class="btn danger" data-action="clear-data">${esc(t("settings.clearData"))}</button></section>
-      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} 1.0.0 · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Inter (OFL)</p></section>
+      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} 1.0.0 · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Moka (MIT) · Inter (OFL)</p></section>
     </div>`;
 }
 
@@ -1530,7 +1543,7 @@ function bootGame() {
       /* fall through to a fresh game */
     }
   }
-  state.game = new Game({ size: 9, komi: 6.5 });
+  state.game = new Game({ size: 19, komi: 7.5 });
   state.humanColor = BLACK;
   state.opponent = "ai";
   state.level = state.settings.level || 2;

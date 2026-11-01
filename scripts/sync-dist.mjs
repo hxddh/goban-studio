@@ -28,6 +28,9 @@ for (const f of fs.readdirSync(path.join(src, "fonts"))) {
 if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
 }
+if (fs.existsSync(path.join(src, "moka"))) {
+  fs.cpSync(path.join(src, "moka"), path.join(dist, "moka"), { recursive: true });
+}
 
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
 const version = (appZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1] || "0.0.0";
