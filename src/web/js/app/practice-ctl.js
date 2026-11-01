@@ -310,7 +310,7 @@ function respond(P) {
           Audio.stone(false);
         }
       }
-      lost(P);
+      lost(P, { ko: !!r.ko });
     }, 320);
     return;
   }
@@ -347,9 +347,9 @@ function respond(P) {
  * position goes back to the learner's last decision so they can try again
  * without reaching for a button.
  */
-function lost(P) {
+function lost(P, { ko = false } = {}) {
   P.status = "lost";
-  P.feedback = "wrong";
+  P.feedback = ko ? "ko" : "wrong";
   P.busy = false;
   Audio.wrong?.();
   recordAttempt(P, false);

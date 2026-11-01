@@ -337,6 +337,7 @@ function puzzleModel(P, extra = {}) {
 function ProblemFeedback({ P, success }) {
   if (P.answer) return <p class="feedback info">{t("practice.answerShown")}</p>;
   if (P.feedback === "solved") return <p class="feedback good">{success || t("practice.solved")}</p>;
+  if (P.feedback === "ko") return <p class="feedback bad">{t("practice.onlyKo")}</p>;
   if (P.feedback === "wrong") return <p class="feedback bad">{t("practice.wrongExplained")}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
   if (P.feedback === "retry") return <p class="feedback bad">{t("practice.retryNow")}</p>;
