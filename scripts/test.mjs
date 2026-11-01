@@ -447,11 +447,14 @@ await test("KataGo reports parse into candidates, lines and ownership", () => {
 await test("the strength ladder keeps strong levels exact and weak levels inside their loss window", () => {
   const analysis = { moves: parseInfo(SAMPLE_INFO, 19).moves, play: { x: 3, y: 15 } };
   assert.deepEqual(pickCandidate(analysis, BLACK, strengthById("2d"), () => 0.99), { x: 3, y: 15 });
-  // 10k allows up to 6 points: D4 and Q16, never K10 (8.9 points worse).
+  // 10k allows up to 6 points: D4 and Q16, never K10 (8.9 points worse)
+  // unless its 2% deliberate slip fires (the first draw below 0.02).
   for (let i = 0; i < 50; i++) {
-    const m = pickCandidate(analysis, BLACK, strengthById("10k"), () => i / 50);
+    const m = pickCandidate(analysis, BLACK, strengthById("10k"), () => 0.05 + (i / 50) * 0.94);
     assert.ok(!(m.x === 9 && m.y === 9), "10k must not take a 9-point loss");
   }
+  const slipped = pickCandidate(analysis, BLACK, strengthById("10k"), () => 0.01);
+  assert.deepEqual(slipped, { x: 9, y: 9 }, "the deliberate slip picks outside the window");
   // White's point of view flips the score lead: K10 is White's best here.
   assert.deepEqual(pickCandidate(analysis, WHITE, { ...strengthById("2d"), temp: 0 }), { x: 3, y: 15 });
   assert.equal(new Set(STRENGTHS.map((s) => s.id)).size, STRENGTHS.length);
