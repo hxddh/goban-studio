@@ -140,6 +140,28 @@ function PracticeHome() {
             })}
           </div>
         </section>
+
+        {C.SHAPES.length > 0 && (
+          <section class="section">
+            <h2 class="section-title">{t("practice.shapes")}</h2>
+            <div class="chips shape-chips">
+              {C.SHAPES.map((sh) => {
+                const id = typeof sh === "string" ? sh : sh.id;
+                const list = C.problemsOfShape(id);
+                if (!list.length) return null;
+                const solved = list.filter((x) => p.problems[x.id]?.solved).length;
+                return (
+                  <button type="button" class={`chip ${solved === list.length ? "done" : ""}`} onClick={() => C.openShape(id)}>
+                    {C.shapeName(id)}
+                    <span class="chip-count">
+                      {solved}/{list.length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </>
   );
@@ -170,7 +192,8 @@ function MistakesSection() {
 function TopicPage() {
   const topic = state.practice.topic;
   const theme = state.practice.theme;
-  const all = C.problemsOfTopic(topic);
+  const shape = state.practice.shape;
+  const all = shape ? C.problemsOfShape(shape) : C.problemsOfTopic(topic);
   const themes = [...new Set(all.map((x) => x.theme).filter(Boolean))];
   const list = theme ? all.filter((x) => x.theme === theme) : all;
   const p = state.progress;
@@ -178,11 +201,11 @@ function TopicPage() {
   const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("topic." + topic)} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
     <div class="page">
       <header class="page-head">
-        <h1>{t("topic." + topic)}</h1>
-        <p class="muted">{t("topic." + topic + ".desc")}</p>
+        <h1>{shape ? C.shapeName(shape) : t("topic." + topic)}</h1>
+        <p class="muted">{shape ? t("practice.shapes") : t("topic." + topic + ".desc")}</p>
       </header>
       {themes.length > 1 && (
         <div class="chips theme-filter" role="radiogroup" aria-label={t("practice.themes")}>
@@ -319,9 +342,8 @@ function puzzleModel(P, extra = {}) {
 
 function ProblemFeedback({ P, success }) {
   if (P.answer) return <p class="feedback info">{t("practice.answerShown")}</p>;
-  if (P.feedback === "solved") return <p class="feedback good">{success || t("practice.solved")}</p>;
-  if (P.feedback === "ko") return <p class="feedback bad">{t("practice.onlyKo")}</p>;
-  if (P.feedback === "wrong") return <p class="feedback bad">{t("practice.wrongExplained")}</p>;
+  if (P.feedback === "solved") return <p class="feedback good">{P.result === "seki" ? t(C.feedbackKey(P)) : success || t("practice.solved")}</p>;
+  if (P.feedback === "ko" || P.feedback === "wrong") return <p class="feedback bad">{t(C.feedbackKey(P))}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
   if (P.feedback === "retry") return <p class="feedback bad">{t("practice.retryNow")}</p>;
   if (P.busy) return <p class="feedback muted">{t("practice.answering")}</p>;

@@ -313,7 +313,7 @@ await test("every key the interface uses is in the string table", () => {
   const dynamic = {
     "area.": ["top", "bottom", "left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"],
     "error.": ["illegal", "occupied", "outside", "turn", "ko", "suicide", "superko"],
-    "goal.": ["capture", "save", "kill", "live", "place"],
+    "goal.": ["capture", "save", "kill", "live", "seki", "place"],
     "grade.": ["1", "2", "3", "4", "5"],
     "library.kind.": ["all", "won", "lost", "imported"],
     "settings.material.": ["plain", "wood", "ink"],
@@ -526,6 +526,124 @@ await test("Benson's algorithm recognises two real eyes and rejects a false eye"
   const single = S.createPuzzle({ goal: "live", diagram: [". . . o X ,", "O O O O X ,", "X X X X X ,", ", , , , , ,"] });
   const st2 = S.initialState(single);
   assert.equal(S.bensonAlive(single, st2.board, WHITE, [S.indexOf(single, 3, 0)]), false);
+});
+
+/** Seki positions: Black's key group (x) against White stones inside it, a solid white wall outside. */
+const SEKI = {
+  // No eyes, two shared liberties: whoever fills one is captured.
+  pure: [". O O O . x O ,", "X X X X X X O ,", "O O O O O O O ,", ", , , , , , , ,"],
+  // One eye each and one shared liberty.
+  eyeEye: [". x O . O O . X O ,", "X X O O O O X X O ,", "O X X X X X X O O ,", "O O O O O O O O O ,", ", , , , , , , , , ,"],
+  // Look-alike: Black's second space is not shared with White, so Black takes it and has two eyes.
+  eyeAndSpace: [". x O . O O . . X O ,", "X X O O O O X X X O ,", "O X X X X X X O O O ,", "O O O O O O O O O O ,", ", , , , , , , , , , ,"],
+  // Look-alike: one shared liberty and no eye; White captures first.
+  short: ["X O O O . x O ,", "X X X X X X O ,", "O O O O O O O ,", ", , , , , , , ,"],
+  // Look-alike: the "seki" leans on a point nobody may play (outside the region).
+  fiat: [", O O O . x O ,", "X X X X X X O ,", "O O O O O O O ,", ", , , , , , , ,"],
+};
+
+await test("the solver recognises seki and tells it from life, death and look-alikes", () => {
+  const info = (diagram) => {
+    const pz = S.createPuzzle({ goal: "seki", diagram });
+    return S.sekiInfo(pz, S.initialState(pz));
+  };
+  const pure = info(SEKI.pure);
+  assert.equal(pure.result, "seki");
+  assert.deepEqual(pure.shared, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+  const eyeEye = info(SEKI.eyeEye);
+  assert.equal(eyeEye.result, "seki");
+  assert.deepEqual(eyeEye.shared, [{ x: 6, y: 0 }]);
+  assert.equal(info(SEKI.eyeAndSpace).result, "alive");
+  assert.equal(info(SEKI.short).result, "dead");
+  assert.equal(info(SEKI.fiat).result, "unknown");
+  // Neither side can fill a shared liberty of the pure seki: Black's fill is
+  // self-atari and White captures; White's fill lets Black capture.
+  const pz = S.createPuzzle({ goal: "seki", diagram: SEKI.pure });
+  const st = S.initialState(pz);
+  const blackFills = S.play(pz, st, S.indexOf(pz, 0, 0));
+  assert.equal(S.attackerWins(pz, blackFills, 100000, pz.attacker).win, true);
+  const whiteFills = S.play(pz, { ...st, toMove: WHITE }, S.indexOf(pz, 0, 0));
+  assert.equal(S.attackerWins(pz, whiteFills, 100000, pz.attacker).win, false);
+  // A kill problem that only reaches seki is a failure (Japanese rules): the
+  // attacker cannot capture, and the position is not already "won" for it.
+  const kill = S.createPuzzle({ goal: "kill", diagram: SEKI.pure.map((r) => r.replace(/[XOxo]/g, (c) => ({ X: "O", O: "X", x: "o", o: "x" })[c])) });
+  assert.equal(S.attackerWins(kill, S.initialState(kill), 100000).win, false);
+});
+
+await test('goal "seki": the learner must survive, cannot live independently, and the answer ends in seki', () => {
+  const problem = { goal: "seki", diagram: [". . . . . x O ,", ". . O O O X O ,", "X X X X X X O ,", "O O O O O O O ,", ", , , , , , , ,"] };
+  const pz = S.createPuzzle(problem);
+  assert.equal(pz.sekiGoal, true);
+  assert.equal(pz.userColor, BLACK);
+  const v = S.validate(pz);
+  assert.deepEqual(v.reasons, []);
+  assert.equal(v.result, "seki");
+  assert.deepEqual(localCorrect(pz), ["1,1"]);
+  let st = S.initialState(pz);
+  for (const m of v.line) st = S.play(pz, st, S.indexOf(pz, m.x, m.y));
+  assert.equal(S.status(pz, st), "won");
+  assert.equal(S.sekiInfo(pz, st).result, "seki");
+  // The same idea with a group that can make two eyes is not a seki problem.
+  const twoEyes = S.createPuzzle({ goal: "seki", diagram: [". . O X ,", ". o O X ,", "O O O X ,", "X X X X ,", ", , , , ,"].map((r) => r.replace(/[XOxo]/g, (c) => ({ X: "O", O: "X", x: "o", o: "x" })[c])) });
+  assert.ok(S.validate(twoEyes).reasons.some((r) => r.includes("can live independently")));
+  // goal "live" still accepts seki as survival.
+  const live = S.createPuzzle({ ...problem, goal: "live" });
+  assert.deepEqual(S.validate(live).reasons, []);
+});
+
+/** Capturing races on the top edge: White (o) in columns 3-4, Black in column 5, walls outside. */
+const RACE = {
+  threeThree: [", X . O o X . O ,", ", X . O O X . O ,", ", X . O O X . O ,", ", X X X X O O O ,", ", , , , , , , , ,"],
+  threeTwo: [", X . O o X . O ,", ", X . O O X . O ,", ", X . O O X X O ,", ", X X X X O O O ,", ", , , , , , , , ,"],
+  twoThree: [", X . O o X . O ,", ", X . O O X . O ,", ", X X O O X . O ,", ", X X X X O O O ,", ", , , , , , , , ,"],
+  // One outside liberty each and two shared: neither can approach (seki).
+  shared: [", X . O o . X . O ,", ", X . O O . X . O ,", ", X X O O O X X O ,", ", , X X X X O O O ,", ", , , , , , , , , ,"],
+  // Black has an eye, White has none: the shared liberties are Black's.
+  eyeNoEye: [", X X . O o . X . X O ,", ", X X . O O . X X X O ,", ", X X X O O O X X X O ,", ", , X X X X X O O O O ,", ", , , , , , , , , , , ,"],
+  // Black's big eye (square four) against White's one-point eye.
+  bigSmall: [", X X . O . O . X . . X O ,", ", X X . O o O . X . . X O ,", ", X X X X O O O X X X X O ,", ", , , X X X X X O O O O O ,", ", , , , , , , , , , , , , ,"],
+  // The same race with a one-point eye for Black: equal eyes, and White has more liberties.
+  smallSmall: [", X X . O . O . X X . X O ,", ", X X . O o O . X X X X O ,", ", X X X X O O O X X X X O ,", ", , , X X X X X O O O O O ,", ", , , , , , , , , , , , , ,"],
+};
+const raceAt = (diagram, goal) => S.createPuzzle({ goal, diagram, at: [3, 0] });
+/** Does Black capture White when Black moves first / when White moves first? */
+function race(diagram) {
+  const kill = raceAt(diagram, "kill");
+  const live = raceAt(diagram, "live");
+  const a = S.attackerWins(kill, S.initialState(kill), 600000);
+  const b = S.attackerWins(live, S.initialState(live), 600000);
+  assert.ok(a.exact && b.exact, "race search exact");
+  return { blackFirst: a.win, whiteFirst: b.win, kill, live };
+}
+
+await test("capturing races: liberty counts, who moves first, shared liberties, eyes and big eyes", () => {
+  // 3 against 3, no shared liberty: whoever moves first wins, and only by filling an outside liberty.
+  const r33 = race(RACE.threeThree);
+  assert.deepEqual([r33.blackFirst, r33.whiteFirst], [true, false]);
+  assert.deepEqual(localCorrect(r33.kill), ["2,0", "2,1", "2,2"]);
+  assert.deepEqual(localCorrect(r33.live), ["6,0", "6,1", "6,2"]);
+  // 3 against 2: the side with fewer liberties loses even moving first.
+  const r32 = race(RACE.threeTwo);
+  assert.deepEqual([r32.blackFirst, r32.whiteFirst], [false, false]);
+  const r23 = race(RACE.twoThree);
+  assert.deepEqual([r23.blackFirst, r23.whiteFirst], [true, true]);
+  // Two shared liberties and one outside liberty each: neither side can
+  // capture, whoever moves first (seki); here Black's group is the key.
+  const sh = race(RACE.shared);
+  assert.equal(sh.blackFirst, false);
+  assert.equal(sh.whiteFirst, false);
+  const swapKey = RACE.shared.map((r) => r.replace("o", "O").replace(/^(, X \. O O \. )X/, "$1x"));
+  const blackKey = S.createPuzzle({ goal: "kill", diagram: swapKey, at: [3, 0], toMove: WHITE });
+  assert.equal(S.attackerWins(blackKey, S.initialState(blackKey), 600000).win, false, "White cannot capture Black either");
+  // Eye against no eye: Black wins even if White moves first.
+  const en = race(RACE.eyeNoEye);
+  assert.deepEqual([en.blackFirst, en.whiteFirst], [true, true]);
+  // Big eye against small eye wins even moving second; with equal one-point
+  // eyes the same liberties lose even moving first.
+  const bs = race(RACE.bigSmall);
+  assert.deepEqual([bs.blackFirst, bs.whiteFirst], [true, true]);
+  const ss = race(RACE.smallSmall);
+  assert.deepEqual([ss.blackFirst, ss.whiteFirst], [false, false]);
 });
 
 await test("every practice problem is verified and graded by the solver", () => {

@@ -35,11 +35,42 @@
  * proves that a `ko: "ok"` problem really is a ko: the learner can force a ko
  * but cannot win unconditionally.
  *
- * Termination for life and death (kill / live). The board outside the
+ * Termination for life and death (kill / live / seki). The board outside the
  * region is fixed; a group lives when Benson's algorithm finds it
  * unconditionally alive, dies when a key stone is captured, and two passes in
- * a row leave it alive (seki counts as life). The region is finite, the
- * superko rule forbids repeating a position, and the depth limit backs it up.
+ * a row leave it alive (seki counts as life, as under Japanese rules: a kill
+ * that only reaches seki is a failure). The region is finite, the superko
+ * rule forbids repeating a position, and the depth limit backs it up.
+ *
+ * Seki. A "strict" search changes one rule: two passes in a row are a win
+ * for the attacker, so the defender must reach Benson life (or, in a race on
+ * an open board, the escape count) by force. A group that survives the
+ * ordinary search but not the strict one lives only because neither side can
+ * make progress: that is seki, provided the stalemate is real. `sekiInfo()`
+ * calls a position seki when all of these hold:
+ *
+ *   1. the attacker, moving first, cannot capture a key stone (every ko is
+ *      counted against the defender);
+ *   2. the defender, moving first, cannot reach independent life (strict
+ *      search, every ko against the defender);
+ *   3. nothing the key stones can reach (over empty points, their own
+ *      stones and attacker chains that could be captured) breathes through
+ *      a point nobody may play (outside the region, or outside the diagram
+ *      for a problem without one): such stones can never be captured, so
+ *      the key stones might survive only by fiat. This is conservative: a
+ *      race between two groups that each lean on the other side's wall is
+ *      not called seki, since the defender's wall is in reach;
+ *   4. at least one key liberty is shared with an attacker chain whose own
+ *      liberties are all playable: the stones the defender lives alongside
+ *      are part of the fight, not the fixed wall outside it.
+ *
+ * Under 1 and 2, no shared liberty can be filled to advantage: filling it is
+ * self-atari, or lets the other side capture, or changes nothing. A problem
+ * with `goal: "seki"` is a "live" problem whose best result is seki:
+ * `validate()` proves the defender survives, cannot live independently from
+ * the start, and that the answer line ends in a position `sekiInfo()` calls
+ * seki. Every ko counts against the learner, so bent four in the corner
+ * (dead under Japanese rules) is never accepted as life or seki.
  *
  * Termination for capturing races on an open board (capture / save), with
  * E = `escape` (default 4): the key stones are captured when any of them is
@@ -79,6 +110,8 @@ export const BLACK = 1;
 export const WHITE = -1;
 
 const PASS = -1;
+/** Every problem goal; "seki" is a defence goal (see createPuzzle). */
+export const GOALS = ["capture", "save", "kill", "live", "seki"];
 const DEFAULT_ESCAPE = 4;
 const DEFAULT_PUSHES = 2;
 
@@ -121,10 +154,27 @@ export function parseDiagram(rows) {
  * problem = {
  *   diagram: [...rows], size = 19, corner = "tl" | "tr" | "bl" | "br",
  *   at: [x0, y0] (overrides corner), toMove = 1 | -1,
- *   goal: "capture" | "save" | "kill" | "live",
+ *   goal: "capture" | "save" | "kill" | "live" | "seki",
  *   ko: "ok" (a ko is an acceptable result for the learner),
- *   escape = 4 (liberties that count as escaped, capture/save only), maxDepth
+ *   escape = 4 (liberties that count as escaped, capture/save only), maxDepth,
+ *   replay = (goal === "seki") (captured points may be played again)
  * }
+ *
+ * `replay`: a problem's region is its '.' points. With `replay: true` the
+ * points of the diagram's stones join it once they are captured, as on a
+ * real board (throw back in, retake, fill an eye). Problems written before v4
+ * leave it off: their region is fixed, and some of their answers depend on a
+ * captured point staying out of play. Seki problems always have it, and the
+ * v4 classic-shape problems set it.
+ *
+ * Goals: "capture" / "save" are about the key stones on an open board,
+ * "kill" / "live" about a group inside a region. "seki" is a defence goal
+ * like "live" (the learner owns the key stones and moves first; a region is
+ * required) whose best result is seki: the key stones survive, but no
+ * defence gives them independent life. Survival is what the learner must
+ * achieve; validate() also proves that independent life is out of reach and
+ * that the answer ends in a real seki (see sekiInfo()). A "live" problem
+ * still accepts seki as survival, and a "kill" that only reaches seki fails.
  */
 export function createPuzzle(problem) {
   const size = problem.size || 19;
@@ -148,20 +198,21 @@ export function createPuzzle(problem) {
     if (!s || s.c !== keyColor) throw new Error("key stones must share one colour");
   }
   const goal = problem.goal;
-  if (!["capture", "save", "kill", "live"].includes(goal)) throw new Error(`unknown goal ${goal}`);
+  if (!GOALS.includes(goal)) throw new Error(`unknown goal ${goal}`);
   if (problem.ko !== undefined && problem.ko !== "ok") throw new Error(`unknown ko option ${problem.ko}`);
   const attackGoal = goal === "capture" || goal === "kill";
   const toMove = problem.toMove ?? (attackGoal ? -keyColor : keyColor);
   const userColor = toMove;
   if (attackGoal && userColor !== -keyColor) throw new Error("the attacker must move first in an attack problem");
   if (!attackGoal && userColor !== keyColor) throw new Error("the defender must move first in a defence problem");
-  const lifeGoal = goal === "kill" || goal === "live";
+  const lifeGoal = goal === "kill" || goal === "live" || goal === "seki";
+  const replay = problem.replay ?? goal === "seki";
   let region = null;
   if (lifeGoal || d.hasOutside) {
     region = d.region.map(shift);
     // Empty points inside the diagram are region unless marked ','.
   }
-  if (lifeGoal && (!region || !region.length)) throw new Error("kill/live problems need a region");
+  if (lifeGoal && (!region || !region.length)) throw new Error("kill/live/seki problems need a region");
   const view = viewFor(size, x0, y0, d.w, d.h);
   return {
     id: problem.id,
@@ -174,14 +225,39 @@ export function createPuzzle(problem) {
     toMove,
     goal,
     lifeGoal,
+    sekiGoal: goal === "seki",
+    replay,
     region,
     koOk: problem.ko === "ok",
     box: { x0, y0, x1: x0 + d.w - 1, y1: y0 + d.h - 1 },
     escape: problem.escape || DEFAULT_ESCAPE,
     pushes: problem.pushes ?? DEFAULT_PUSHES,
-    maxDepth: problem.maxDepth || (lifeGoal ? Math.min(40, (region?.length || 10) * 2 + 8) : (problem.escape || DEFAULT_ESCAPE) >= 4 ? 60 : 30),
+    maxDepth: problem.maxDepth || (lifeGoal ? lifeDepth(region?.length || 10, replay ? innerStones(problem.diagram) : 0, replay) : (problem.escape || DEFAULT_ESCAPE) >= 4 ? 60 : 30),
     view,
   };
+}
+
+/**
+ * Depth limit for life and death: twice the points in play plus a margin.
+ * With `replay` the stones that do not touch the outside (',') can be
+ * captured and their points played again, so they count as points in play.
+ */
+function lifeDepth(regionSize, inner, replay) {
+  return Math.min(replay ? 60 : 40, (regionSize + inner) * 2 + 8);
+}
+
+/** Stones in a diagram with no ',' next to them (the ones inside the fight). */
+function innerStones(rows) {
+  const grid = rows.map((r) => r.replace(/\s+/g, "").split(""));
+  let n = 0;
+  grid.forEach((row, y) =>
+    row.forEach((ch, x) => {
+      if (!"XOxo".includes(ch)) return;
+      const nb = [grid[y - 1]?.[x], grid[y + 1]?.[x], row[x - 1], row[x + 1]];
+      if (!nb.includes(",")) n++;
+    }),
+  );
+  return n;
 }
 
 function viewFor(size, x0, y0, w, h) {
@@ -465,18 +541,32 @@ function keyLiberties(pz, board, keyIdx) {
   return keyInfo(pz, board, keyIdx).minLibs;
 }
 
-/** +1: attacker has won, -1: defender has won, 0: undecided. */
-function terminal(pz, st, keyIdx, info = null) {
+/**
+ * +1: attacker has won, -1: defender has won, 0: undecided. In a strict
+ * search two passes are a win for the attacker: the defender must reach
+ * independent life (or escape) by force.
+ */
+function terminal(pz, st, keyIdx, info = null, strict = false) {
   for (const i of keyIdx) if (st.board[i] !== pz.keyColor) return 1;
-  if (st.passes >= 2) return -1;
+  if (st.passes >= 2 && !strict) return -1;
   if (pz.lifeGoal) {
     if (bensonAlive(pz, st.board, pz.keyColor, keyIdx)) return -1;
   } else if ((info || keyInfo(pz, st.board, keyIdx)).minLibs >= pz.escape) return -1;
+  if (st.passes >= 2) return 1;
   return 0;
 }
 
+/**
+ * The points either side may play: the region's empty points and, with
+ * `replay`, the points of the diagram's stones once those are captured (a
+ * captured point is part of the fight: it can be retaken, filled or made an
+ * eye). Without `replay` a captured point stays out of play; see createPuzzle.
+ */
 function regionSet(pz) {
-  if (!pz._region && pz.region) pz._region = pz.region.map((p) => p.y * pz.size + p.x);
+  if (!pz._region && pz.region) {
+    const pts = [...pz.region, ...(pz.replay ? pz.stones : [])].map((p) => p.y * pz.size + p.x);
+    pz._region = [...new Set(pts)];
+  }
   return pz._region;
 }
 
@@ -576,15 +666,18 @@ function quickScore(pz, st, i, info, attacking) {
 }
 
 class Search {
-  constructor(pz, master, budget = 150000) {
+  constructor(pz, master, budget = 150000, strict = false) {
     this.pz = pz;
     this.master = master;
+    this.strict = strict;
     this.keyIdx = keyIndices(pz);
-    // One table per ko master, shared by every search on this puzzle:
-    // positions repeat across first-move checks, replies and status checks.
+    // One table per ko master (and per strictness), shared by every search on
+    // this puzzle: positions repeat across first-move checks, replies and
+    // status checks.
     if (!pz._tt) pz._tt = {};
-    let tt = pz._tt[master];
-    if (!tt || tt.size > 1500000) tt = pz._tt[master] = new Map();
+    const slot = strict ? `${master}s` : master;
+    let tt = pz._tt[slot];
+    if (!tt || tt.size > 1500000) tt = pz._tt[slot] = new Map();
     this.tt = tt;
     this.path = new Map();
     this.nodes = 0;
@@ -606,7 +699,7 @@ class Search {
     const pz = this.pz;
     const info = keyInfo(pz, st.board, this.keyIdx);
     if (info.captured) return { win: true, exact: true };
-    const term = terminal(pz, st, this.keyIdx, info);
+    const term = terminal(pz, st, this.keyIdx, info, this.strict);
     if (term) return { win: term > 0, exact: true };
     const attacking = st.toMove === pz.attacker;
     if (!pz.lifeGoal && attacking && pz.escape >= 4 && info.minLibs === pz.escape - 1) {
@@ -662,10 +755,11 @@ class Search {
 
 /**
  * Does the attacker win from `st` (with st.toMove to play)? `master` is the
- * ko master; by default the side the learner is playing against.
+ * ko master; by default the side the learner is playing against. `strict`
+ * makes two passes a win for the attacker (see the header on seki).
  */
-export function attackerWins(pz, st, budget, master = -pz.userColor) {
-  const s = new Search(pz, master, budget);
+export function attackerWins(pz, st, budget, master = -pz.userColor, strict = false) {
+  const s = new Search(pz, master, budget, strict);
   // Iterative deepening: short wins (most of them) are found before the
   // search wanders down a long line; shallow results stay in the table.
   let r;
@@ -676,10 +770,13 @@ export function attackerWins(pz, st, budget, master = -pz.userColor) {
   return { win: r.win, exact: r.exact && !s.exhausted, nodes: s.nodes };
 }
 
-/** Learner's result; `koOk` true makes the learner ko master. */
-function userWins(pz, st, budget, koOk = pz.koOk) {
+/**
+ * Learner's result; `koOk` true makes the learner ko master, `strict` asks a
+ * defending learner for independent life (seki is not enough).
+ */
+function userWins(pz, st, budget, koOk = pz.koOk, strict = false) {
   const master = koOk ? pz.userColor : -pz.userColor;
-  const r = attackerWins(pz, st, budget, master);
+  const r = attackerWins(pz, st, budget, master, strict);
   const attackGoal = pz.userColor === pz.attacker;
   return { win: attackGoal ? r.win : !r.win, nodes: r.nodes, exact: r.exact };
 }
@@ -748,6 +845,12 @@ export function reply(pz, st) {
   if (pz.koOk) {
     const fight = moves.find((m) => !userWins(pz, m.next, undefined, false).win);
     if (fight) best = fight.i;
+  }
+  // In a seki problem the opponent keeps the learner from independent life,
+  // so the answer ends in the seki the problem is about.
+  if (pz.sekiGoal) {
+    const firm = moves.find((m) => !userWins(pz, m.next, undefined, pz.koOk, true).win);
+    if (firm) best = firm.i;
   }
   if (!userWins(pz, st).win) return { pass: true, refutes: true, ko: st.ko >= 0 };
   if (best === null) return { pass: true, refutes: false };
@@ -853,12 +956,14 @@ function everyChainBreathes(pz, board) {
 
 /**
  * Prove a puzzle is a fair problem. Returns { ok, reasons, result, first,
- * line }: `reasons` lists every defect found, `result` is "win" or "ko" (the
- * learner's best result from the start). A problem is fair when every chain
+ * line }: `reasons` lists every defect found, `result` is "win", "ko" or
+ * "seki" (the learner's best result from the start). A problem is fair when every chain
  * breathes, the start is not already decided, the first-move search is
  * exact with one to `maxCorrect` correct moves, a `ko: "ok"` problem really
- * is a ko (no unconditional answer exists, a ko does), and the solution line
- * is legal and ends in a won position.
+ * is a ko (no unconditional answer exists, a ko does), a `goal: "seki"`
+ * problem really is a seki (no independent life exists, and the answer ends
+ * in a position sekiInfo() calls seki), and the solution line is legal and
+ * ends in a won position.
  */
 export function validate(pz, { maxCorrect = 3, first = null, line = null } = {}) {
   const reasons = [];
@@ -871,6 +976,13 @@ export function validate(pz, { maxCorrect = 3, first = null, line = null } = {})
   if (first.correct.length < 1) reasons.push("no correct first move");
   if (first.correct.length > maxCorrect) reasons.push(`${first.correct.length} correct first moves (max ${maxCorrect})`);
   let result = pz.koOk ? "ko" : "win";
+  if (pz.sekiGoal) {
+    // The best result really is seki: no defence reaches independent life.
+    const indep = userWins(pz, st0, 600000, pz.koOk, true);
+    if (!indep.exact) reasons.push("the independent-life search is not exact");
+    if (indep.win) reasons.push('goal "seki" but the learner can live independently');
+    result = "seki";
+  }
   if (pz.koOk) {
     const uncond = userWins(pz, st0, 600000, false);
     if (!uncond.exact) reasons.push("the unconditional search is not exact");
@@ -895,6 +1007,10 @@ export function validate(pz, { maxCorrect = 3, first = null, line = null } = {})
     // The opponent had no move worth playing: the learner is on move again.
     if (st.toMove !== pz.userColor && !terminal(pz, st, keyIndices(pz))) st = play(pz, st, PASS);
     if (status(pz, st) !== "won") reasons.push("the solution line does not end in a win");
+    else if (pz.sekiGoal) {
+      const s = sekiInfo(pz, st);
+      if (s.result !== "seki") reasons.push(`the solution line ends in ${s.result}, not seki (${s.why})`);
+    }
   }
   return { ok: !reasons.length, reasons, result, first, line };
 }
@@ -909,6 +1025,95 @@ export function winningMoves(pz, st) {
     if (userWins(pz, m.next).win) out.push(pointOf(pz, m.i));
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ seki */
+
+function playable(pz, i) {
+  const region = regionSet(pz);
+  if (region) {
+    if (!pz._regionSet) pz._regionSet = new Set(region);
+    return pz._regionSet.has(i);
+  }
+  return inBox(pz, i);
+}
+
+/**
+ * How the key stones stand in a position, whoever is to move:
+ *
+ *   result  "dead"    the attacker, moving first, captures a key stone
+ *           "alive"   the defender, moving first, reaches independent life
+ *                     (Benson life, or the escape count off a region)
+ *           "seki"    neither, and the stalemate is real (rules 3 and 4 in
+ *                     the header): the groups share liberties nobody can
+ *                     fill to advantage
+ *           "unknown" neither, but the defender survives only through a
+ *                     liberty outside the problem area or next to the fixed
+ *                     wall alone, or a search ran out of budget
+ *   shared  for "seki", the shared liberties as {x, y}
+ *   why     a short reason when the result is not "seki"
+ *
+ * Every ko counts against the defender in both searches.
+ */
+export function sekiInfo(pz, st, budget = 300000) {
+  const c = context(pz.size);
+  const keyIdx = keyIndices(pz);
+  const board = st.board;
+  const info = keyInfo(pz, board, keyIdx);
+  if (info.captured) return { result: "dead", shared: [], why: "a key stone is captured" };
+  const att = { ...st, toMove: pz.attacker, ko: st.toMove === pz.attacker ? st.ko : -1, passes: 0 };
+  const r1 = attackerWins(pz, att, budget, pz.attacker);
+  if (r1.win) return { result: "dead", shared: [], why: "the attacker captures" };
+  if (!r1.exact) return { result: "unknown", shared: [], why: "the capture search is not exact" };
+  const def = { ...st, toMove: pz.keyColor, ko: st.toMove === pz.keyColor ? st.ko : -1, passes: 0 };
+  const r2 = attackerWins(pz, def, budget, pz.attacker, true);
+  if (!r2.exact) return { result: "unknown", shared: [], why: "the life search is not exact" };
+  if (!r2.win) return { result: "alive", shared: [], why: "independent life" };
+  // Rule 3: nothing the key stones can reach breathes through a point nobody
+  // may play. Spread from the key chains over empty points, defending
+  // stones and attacker chains that could be captured (all their liberties
+  // playable); a defending chain met on the way with an unplayable liberty
+  // can never be captured, so the key stones might live only by joining it.
+  {
+    const reach = new Uint8Array(board.length);
+    const stack = [...keyIdx];
+    for (const k of keyIdx) reach[k] = 1;
+    const libsPlayable = new Map();
+    const allPlayable = (i) => {
+      if (!libsPlayable.has(i)) {
+        const ch = chain(c, board, i);
+        const ok = ch.libs.every((x) => playable(pz, x));
+        for (const p of ch.stones) libsPlayable.set(p, ok);
+      }
+      return libsPlayable.get(i);
+    };
+    while (stack.length) {
+      const p = stack.pop();
+      if (board[p] === 0 ? !playable(pz, p) : !allPlayable(p)) {
+        if (board[p] !== pz.attacker) return { result: "unknown", shared: [], why: "the key stones reach a liberty outside the problem area" };
+        continue;
+      }
+      for (const q of c.nbr[p]) {
+        if (reach[q]) continue;
+        reach[q] = 1;
+        stack.push(q);
+      }
+    }
+  }
+  // Attacker chains next to a key liberty whose own liberties are all in play.
+  const shared = new Set();
+  const seen = new Set();
+  for (const l of info.libs) {
+    for (const q of c.nbr[l]) {
+      if (board[q] !== pz.attacker || seen.has(q)) continue;
+      const ec = chain(c, board, q);
+      for (const p of ec.stones) seen.add(p);
+      if (!ec.libs.every((x) => playable(pz, x))) continue;
+      for (const x of ec.libs) if (info.libs.has(x)) shared.add(x);
+    }
+  }
+  if (!shared.size) return { result: "unknown", shared: [], why: "no liberty is shared with stones inside the fight" };
+  return { result: "seki", shared: [...shared].sort((a, b) => a - b).map((i) => pointOf(pz, i)) };
 }
 
 /** Board as rows of signs, for the renderer. */

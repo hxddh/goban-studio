@@ -649,3 +649,6 @@ button.group-row:hover { background: var(--fill); }
 }
 :root[data-motion="reduced"] .place, :root[data-motion="reduced"] .enter-up, :root[data-motion="reduced"] .panel-state { animation: none; }
 .update-row > span { flex: 1; }
+.shape-chips .chip { height: 32px; padding: 0 12px; gap: 8px; font-size: 13px; }
+.chip-count { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 11px; }
+.chip.done .chip-count { color: var(--good); }

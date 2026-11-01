@@ -3000,5 +3000,552 @@
         "y": 0
       }
     ]
+  },
+  "seki-01": {
+    "grade": 5,
+    "score": 12.4,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 1,
+        "y": 1
+      }
+    ]
+  },
+  "seki-02": {
+    "grade": 5,
+    "score": 12.7,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      }
+    ]
+  },
+  "seki-03": {
+    "grade": 4,
+    "score": 10.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 18
+      }
+    ]
+  },
+  "seki-04": {
+    "grade": 4,
+    "score": 11.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
+        "y": 0
+      }
+    ]
+  },
+  "seki-05": {
+    "grade": 4,
+    "score": 10.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 10,
+        "y": 17
+      }
+    ]
+  },
+  "seki-06": {
+    "grade": 4,
+    "score": 10.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 8,
+        "y": 1
+      }
+    ]
+  },
+  "seki-07": {
+    "grade": 5,
+    "score": 11.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 10,
+        "y": 18
+      }
+    ]
+  },
+  "seki-08": {
+    "grade": 4,
+    "score": 10.5,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 15,
+        "y": 1
+      }
+    ]
+  },
+  "seki-09": {
+    "grade": 4,
+    "score": 10.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 1
+      }
+    ]
+  },
+  "seki-10": {
+    "grade": 4,
+    "score": 10.3,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 3,
+        "y": 17
+      }
+    ]
+  },
+  "seki-11": {
+    "grade": 4,
+    "score": 10.3,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
+        "y": 17
+      }
+    ]
+  },
+  "seki-12": {
+    "grade": 4,
+    "score": 9.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
+        "y": 1
+      }
+    ]
+  },
+  "seki-13": {
+    "grade": 4,
+    "score": 11.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 17
+      }
+    ]
+  },
+  "race-23": {
+    "grade": 3,
+    "score": 8.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 12,
+        "y": 0
+      }
+    ]
+  },
+  "race-24": {
+    "grade": 3,
+    "score": 9.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 0
+      },
+      {
+        "x": 12,
+        "y": 1
+      }
+    ]
+  },
+  "race-25": {
+    "grade": 4,
+    "score": 10.5,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 11,
+        "y": 0
+      },
+      {
+        "x": 11,
+        "y": 1
+      }
+    ]
+  },
+  "race-26": {
+    "grade": 3,
+    "score": 7.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 11,
+        "y": 0
+      },
+      {
+        "x": 11,
+        "y": 1
+      },
+      {
+        "x": 17,
+        "y": 0
+      }
+    ]
+  },
+  "race-27": {
+    "grade": 3,
+    "score": 9.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 18
+      }
+    ]
+  },
+  "race-28": {
+    "grade": 3,
+    "score": 9.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 16,
+        "y": 18
+      }
+    ]
+  },
+  "race-29": {
+    "grade": 2,
+    "score": 6.8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "race-30": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 17
+      }
+    ]
+  },
+  "race-31": {
+    "grade": 4,
+    "score": 9.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 1
+      },
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "race-32": {
+    "grade": 2,
+    "score": 7.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 12,
+        "y": 0
+      }
+    ]
+  },
+  "race-33": {
+    "grade": 2,
+    "score": 7.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "race-34": {
+    "grade": 3,
+    "score": 8.2,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      },
+      {
+        "x": 7,
+        "y": 1
+      },
+      {
+        "x": 7,
+        "y": 2
+      }
+    ]
+  },
+  "shape-straight-three-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 0
+      }
+    ]
+  },
+  "shape-straight-three-02": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "shape-straight-three-03": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "shape-bent-three-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 0
+      }
+    ]
+  },
+  "shape-bent-three-02": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 11,
+        "y": 0
+      }
+    ]
+  },
+  "shape-bent-three-03": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 1
+      }
+    ]
+  },
+  "shape-rabbity-six-03": {
+    "grade": 3,
+    "score": 8.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 2
+      }
+    ]
+  },
+  "shape-pyramid-four-01": {
+    "grade": 2,
+    "score": 6.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 0
+      }
+    ]
+  },
+  "shape-pyramid-four-02": {
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "shape-pyramid-four-03": {
+    "grade": 2,
+    "score": 6.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "shape-bulky-five-01": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "shape-bulky-five-02": {
+    "grade": 2,
+    "score": 6.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 9,
+        "y": 0
+      },
+      {
+        "x": 10,
+        "y": 1
+      },
+      {
+        "x": 10,
+        "y": 0
+      }
+    ]
+  },
+  "shape-bulky-five-03": {
+    "grade": 3,
+    "score": 8.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "shape-crossed-five-01": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "shape-crossed-five-02": {
+    "grade": 2,
+    "score": 7.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 2
+      }
+    ]
+  },
+  "shape-rabbity-six-01": {
+    "grade": 3,
+    "score": 9.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "shape-rabbity-six-02": {
+    "grade": 2,
+    "score": 6.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 1
+      },
+      {
+        "x": 11,
+        "y": 2
+      },
+      {
+        "x": 10,
+        "y": 2
+      }
+    ]
+  },
+  "shape-rectangular-six-01": {
+    "grade": 3,
+    "score": 8.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 1
+      }
+    ]
+  },
+  "shape-second-line-seven-01": {
+    "grade": 4,
+    "score": 9.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 0
+      },
+      {
+        "x": 8,
+        "y": 0
+      },
+      {
+        "x": 5,
+        "y": 0
+      }
+    ]
+  },
+  "shape-crossed-five-03": {
+    "grade": 2,
+    "score": 6.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 10,
+        "y": 3
+      }
+    ]
   }
 }

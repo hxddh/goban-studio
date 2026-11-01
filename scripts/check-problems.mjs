@@ -6,7 +6,11 @@
  * breathes, the start is not already decided, the first-move search is exact
  * with 1–3 correct first moves, a `ko: "ok"` problem really resolves to a ko
  * (and only ko problems have the "ko" theme), and the answer line is legal
- * and wins. The stored grade in problem-grades.json must match a fresh
+ * and wins. A `goal: "seki"` problem must be proved a seki (no independent
+ * life from the start, the answer ends in a position sekiInfo() calls seki)
+ * and carry the "seki" theme; every "seki" theme problem has that goal. A
+ * `shape` must name an entry of SHAPES (a classic textbook shape) with a
+ * four-language name. The stored grade in problem-grades.json must match a fresh
  * measurement. Across problems: no two share a position under the 8 board
  * symmetries (and colour swap); no theme makes up more than 40% of any grade;
  * the whole check stays within its time budget and no single problem is slow.
@@ -16,12 +20,12 @@
  */
 import fs from "node:fs";
 
-import { PROBLEMS, THEMES } from "../src/web/js/content/problems.js";
-import { createPuzzle, parseDiagram, validate } from "../src/web/js/solver.js";
+import { PROBLEMS, SHAPES, THEMES } from "../src/web/js/content/problems.js";
+import { GOALS as SOLVER_GOALS, createPuzzle, parseDiagram, validate } from "../src/web/js/solver.js";
 import { GRADES_FILE, gradeProblem } from "./grade-problems.mjs";
 
 const TOPICS = new Set(["capture", "escape", "connect", "life", "kill", "race", "technique"]);
-const GOALS = new Set(["capture", "save", "kill", "live"]);
+const GOALS = new Set(SOLVER_GOALS);
 const LANGS = ["zh", "en", "ko", "ja"];
 const MAX_CORRECT = 3;
 const TIME_BUDGET_MS = 90000;
@@ -90,6 +94,14 @@ for (const t of THEMES || []) {
   for (const lang of LANGS) if (typeof t.name?.[lang] !== "string" || !t.name[lang].trim()) fail("THEMES", `${t.id} name.${lang} is empty`);
 }
 
+const shapeIds = new Set();
+for (const sh of SHAPES || []) {
+  if (!/^[a-z]+(-[a-z]+)*$/.test(sh.id || "")) fail("SHAPES", `bad shape id ${sh.id}`);
+  if (shapeIds.has(sh.id)) fail("SHAPES", `duplicate shape ${sh.id}`);
+  shapeIds.add(sh.id);
+  for (const lang of LANGS) if (typeof sh.name?.[lang] !== "string" || !sh.name[lang].trim()) fail("SHAPES", `${sh.id} name.${lang} is empty`);
+}
+
 let stored = {};
 try {
   stored = JSON.parse(fs.readFileSync(GRADES_FILE, "utf8"));
@@ -111,6 +123,8 @@ for (const p of PROBLEMS) {
   if (!GOALS.has(p.goal)) fail(id, `unknown goal ${p.goal}`);
   if (!themeIds.has(p.theme)) fail(id, `theme ${p.theme} is not in THEMES`);
   if ((p.ko === "ok") !== (p.theme === "ko")) fail(id, 'theme "ko" and ko: "ok" go together (a ko problem is one whose best result is a ko)');
+  if ((p.goal === "seki") !== (p.theme === "seki")) fail(id, 'theme "seki" and goal: "seki" go together (a seki problem is one whose best result is seki)');
+  if (p.shape !== undefined && !shapeIds.has(p.shape)) fail(id, `shape ${p.shape} is not in SHAPES`);
   for (const field of ["title", "hint"]) {
     for (const lang of LANGS) {
       const text = p[field]?.[lang];
@@ -138,6 +152,7 @@ for (const p of PROBLEMS) {
   const v = validate(pz, { maxCorrect: MAX_CORRECT, first: { correct: d.correct, exact: d.exact }, line: d.line });
   for (const reason of v.reasons) fail(id, reason);
   if (p.ko === "ok" && v.result !== "ko") fail(id, "does not resolve to a ko");
+  if (p.goal === "seki" && v.result !== "seki") fail(id, "does not resolve to seki");
   const ms = performance.now() - started;
   timings.push({ id, ms });
   if (ms > MAX_PROBLEM_MS) fail(id, `took ${(ms / 1000).toFixed(2)}s (limit ${MAX_PROBLEM_MS / 1000}s)`);
@@ -190,9 +205,9 @@ if (failures.length) {
   process.exit(1);
 }
 
-const count = (key) => {
+const count = (key, keep = () => true) => {
   const out = {};
-  for (const p of PROBLEMS) out[p[key]] = (out[p[key]] || 0) + 1;
+  for (const p of PROBLEMS.filter(keep)) out[p[key]] = (out[p[key]] || 0) + 1;
   return Object.entries(out)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${k} ${v}`)
@@ -202,6 +217,7 @@ console.log(
   `problems ok: ${PROBLEMS.length} in ${(total / 1000).toFixed(1)}s\n` +
     `  topics: ${count("topic")}\n` +
     `  themes: ${count("theme")}\n` +
+    `  classic shapes: ${PROBLEMS.filter((p) => p.shape).length} (${count("shape", (p) => p.shape)})\n` +
     `  grades 1-5: ${hist.join(" / ")}\n` +
     `  slowest: ${slowest}`,
 );
