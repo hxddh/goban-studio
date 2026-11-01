@@ -528,7 +528,7 @@ fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, out
     if (script_len > script_buf.len) return error.InvalidRequest;
     dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
 
-    cancelJobs(self, null);
+    _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
     const move = self.katago.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
@@ -555,7 +555,7 @@ fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     if (script_len > script_buf.len) return error.InvalidRequest;
     dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
 
-    cancelJobs(self, null);
+    _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
     const result = self.katago.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
