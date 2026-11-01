@@ -25,30 +25,35 @@ what the signing steps actually did, not from a template. Until the
 certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
 are ad-hoc signed (macOS) and unsigned (Windows).
 
-`SHA256SUMS` is attached to every GitHub release. The v3.0.0 notes are in
-[`.github/release-notes/v3.0.0.md`](.github/release-notes/v3.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v4.0.0 notes are in
+[`.github/release-notes/v4.0.0.md`](.github/release-notes/v4.0.0.md).
 
-## v3 at a glance
+## v4 at a glance
 
-- **Today** — one starting screen: continue, today's five (with your own
-  mistakes), the next lesson, a suggested game, your level over time and
-  what to work on.
-- **Playing** — KataGo on its own thread (the window never waits),
-  incremental positions, a human pace, resignation at stronger levels, an
-  offer to count, clocks, teaching mode, two-click placement, a three-point
-  summary and a rating after each game.
-- **Review** — free variations with live analysis, explained mistakes with
-  "practise this", a hover chart.
-- **Craft** — generated kaya/katsura/paper/slate boards, shell and slate
-  stones, modelled sounds, one icon family, a motion system, a native macOS
-  menu bar alongside the system Edit and Window menus.
-- **Quality** — real-browser interface checks with budgets and visual
-  comparison in CI; a four-language glossary; a usability protocol (not yet
-  run with people).
+- **A calm board** — no texture by default (Plain; Light wood at a quarter of
+  the old grain; Ink for dark rooms), lines snapped to whole pixels, star
+  points and stones to a written spec, coordinates on.
+- **The standard board** — 19×19 is the default everywhere (first launch,
+  onboarding, the suggested game with a handicap, New game, which remembers
+  your choice); 13×13 and 9×9 are the quicker games.
+- **One design system** — [`docs/design.md`](docs/design.md): system fonts,
+  an 8 px grid, neutral colours with one accent, one primary action per
+  screen, a sidebar and a toolbar with back/forward; a tall hidden title bar
+  on macOS.
+- **Review that explains** — what each key mistake cost and where (group
+  died, race or ko lost, territory, tempo), and the better line or the
+  refutation as clickable, described steps.
+- **Content proved on a real board** — seki, capturing races and classic
+  shapes; every problem re-proved with captured points playable again
+  ([`docs/problems-audit.md`](docs/problems-audit.md)).
+- **Release** — conditional Developer ID signing and notarization (macOS) and
+  Authenticode (Windows), a user-initiated update check, and native
+  screenshots of the packaged apps in CI.
 
 ## Places, one board
 
-- **Today** — see "v3 at a glance".
+- **Today** — one starting screen: continue (or the suggested game), today's
+  five, the next lesson, what to work on, your level over time.
 - **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
   dan), or two players on one board. Handicap is suggested from your level.
   The panel shows only the players, whose turn it is, **Pass** (with a
@@ -74,9 +79,10 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   record that declares a non-Japanese ruleset is rejected with an
   explanation rather than silently re-scored.
 - **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
-  wood/paper/slate board, coordinates, move numbers, sound, your level.
+  Plain / Light wood / Ink board, coordinates, move numbers, sound, your
+  level, and update checks.
 - **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
-  ⌘1/2/3 places, ←/→ through a review, and the board itself is playable with
+  ⌘1/2/3/4 places, ←/→ through a review, and the board itself is playable with
   Tab, the arrow keys and Space (⌘/ lists them all; Ctrl on Windows).
 - **Offline by design** — no account, no telemetry, and no network request
   unless you ask for one: **Check for updates…** makes a single request to
@@ -155,8 +161,9 @@ shell serves.
 ```bash
 npm test
 npm run release-check
-npm run ui-test        # real Chromium: flows, budgets, four languages, visuals
+npm run ui-test        # real Chromium: flows, budgets, four languages, one primary per screen, visuals
 npm run ui-update      # rewrite tests/visual baselines after an intended change
+node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv for native-speaker review
 ```
 
 The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
@@ -203,7 +210,7 @@ native gates, and only then creates the tag and GitHub Release. Release
 notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v3.0.0
+gh workflow run release.yml -f tag=v4.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
@@ -228,13 +235,16 @@ src/web/styles.css            design tokens, light/dark, every component
 src/web/js/main.jsx           entry
 src/web/js/app/store.js       one state object, update(), toasts, announcements
 src/web/js/app/controller.js  everything the app does (play, review, practice, library)
-src/web/js/app/*.jsx          views: shell, play + review, practice, library, sheets
+src/web/js/app/chrome.jsx     sidebar and toolbar (docs/design.md)
+src/web/js/app/*.jsx          views: play + review, today, practice, library, sheets
+src/web/js/app/story.js       step-by-step mistake stories (rules-derived descriptions)
+src/web/js/app/explain.js     key mistakes and loss attribution
 src/web/js/board.js           canvas renderer: zoom windows, overlays, keyboard cursor
 src/web/js/engine.js          one engine interface: strength ladder, hints, review, dead stones
 src/web/js/katago.js          native bridge client and KataGo report parser
 src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engine
 src/web/js/solver.js          life-and-death / capturing solver (nets, snapbacks, ko)
-src/web/js/materials.js       board textures and stone sprites (src/web/assets)
+src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
 src/web/js/update.js          update check: version compare, opt-in weekly schedule
