@@ -476,7 +476,11 @@ await test("static page inputs and build script are present", () => {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
   }
   assert.ok(fs.existsSync(path.join(root, "scripts/bundle.mjs")));
-  assert.match(fs.readFileSync(path.join(root, "src/web/index.html"), "utf8"), /js\/bundle\.js/);
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  assert.match(html, /js\/bundle\.js/);
+  // WebView2 injects window.zero as an inline script; without unsafe-inline
+  // its CSP drops the bridge and the packaged page silently becomes static.
+  assert.match(html, /script-src 'self' 'unsafe-inline'/);
 });
 
 if (failures) {
