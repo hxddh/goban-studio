@@ -21,11 +21,13 @@ import { startRating } from "./rating.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { autoCheckForUpdates } from "./update-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
 export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
+export * from "./update-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -56,6 +58,8 @@ export function boot() {
     maybeComputerMove();
     ponder();
   });
+  // v4: the opt-in weekly update check (no request unless it is on and due).
+  if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
 }
 
 /* --------------------------------------------------------------- places */

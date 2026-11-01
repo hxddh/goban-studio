@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS = {
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the rating when suggesting an opponent
   flatStones: false, // high-contrast flat stones (accessibility)
+  // v4
+  autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
 };
 
 const memory = new Map();

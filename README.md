@@ -16,8 +16,14 @@ existing Gomoku app. It deliberately uses a different bundle ID
 
 | Platform | File | First launch |
 | --- | --- | --- |
-| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
-| Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
+| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | See the release notes. A build made with the project's Developer ID is signed and notarized and opens normally. A build made without it is ad-hoc signed and not notarized: right-click the app → Open once; if blocked, `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
+| Windows (x64) | `GobanStudio-Windows-x64.zip` | See the release notes. A build made without the code-signing certificate is not Authenticode-signed: if SmartScreen appears, More info → Run anyway. WebView2 is normally preinstalled. |
+
+Each release's notes (and the README inside the download) state how *that*
+build was signed: the release workflow writes the "First launch" text from
+what the signing steps actually did, not from a template. Until the
+certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
+are ad-hoc signed (macOS) and unsigned (Windows).
 
 `SHA256SUMS` is attached to every GitHub release. The v3.0.0 notes are in
 [`.github/release-notes/v3.0.0.md`](.github/release-notes/v3.0.0.md).
@@ -72,7 +78,12 @@ existing Gomoku app. It deliberately uses a different bundle ID
 - **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
   ⌘1/2/3 places, ←/→ through a review, and the board itself is playable with
   Tab, the arrow keys and Space (⌘/ lists them all; Ctrl on Windows).
-- **Offline by design** — no account, no network request, no telemetry.
+- **Offline by design** — no account, no telemetry, and no network request
+  unless you ask for one: **Check for updates…** makes a single request to
+  GitHub for the latest release, and the weekly automatic check is off
+  until you turn it on in Settings. Nothing about you or your games is
+  sent; everything else (KataGo, lessons, your library) stays on your
+  computer.
 
 ## Honest content
 
@@ -177,6 +188,17 @@ gh workflow run release.yml -f tag=v3.0.0
 Use `-f rehearse=true` to run every gate and both builds without tagging or
 publishing.
 
+Signing is conditional on repository secrets (see
+[`docs/signing.md`](docs/signing.md)): with them, the macOS app and its
+KataGo sidecar are signed with a Developer ID under the hardened runtime,
+notarized and stapled, and the Windows `goban-studio.exe` and `katago.exe`
+are Authenticode-signed and timestamped; without them the builds fall back
+to ad-hoc / unsigned and say so in the release notes. Both platform builds
+also run a native screenshot tour of the packaged app
+(`scripts/tour-app.mjs`: Today, a 19×19 game, its review, Practice,
+Settings) and upload the captures as `native-screenshots-macos` /
+`native-screenshots-windows`.
+
 ## Architecture
 
 ```
@@ -193,6 +215,9 @@ src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engi
 src/web/js/solver.js          life-and-death / capturing solver (nets, snapbacks, ko)
 src/web/js/materials.js       board textures and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
+src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
+src/web/js/update.js          update check: version compare, opt-in weekly schedule
+src/update.zig                the one network request: GitHub's latest-release API
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/make-assets.mjs       regenerates every texture, stone, sound and icon

@@ -275,7 +275,7 @@ export const MESSAGES = {
   "settings.about": m("关于", "About", "정보", "このアプリについて"),
   "settings.engineOn": m("引擎：{0}（所有棋盘）", "Engine: {0} (every board size)", "엔진: {0} (모든 판)", "エンジン：{0}（すべての碁盤）"),
   "settings.engineOff": m("引擎：离线简易引擎（浏览器预览）", "Engine: offline fallback (browser preview)", "엔진: 오프라인 대체 엔진(브라우저 미리보기)", "エンジン：オフライン簡易エンジン（ブラウザ版）"),
-  "settings.offline": m("完全离线：没有账号、没有网络请求、没有统计。", "Fully offline: no account, no network requests, no tracking.", "완전 오프라인: 계정, 네트워크 요청, 추적이 없습니다.", "完全オフライン：アカウント、通信、計測はありません。"),
+  "settings.offline": m("离线使用：没有账号、没有统计。唯一的联网请求是检查更新，且只在你要求时发生。", "Offline: no account, no tracking. The only network request is the update check, and only when you ask for it.", "오프라인: 계정도 추적도 없습니다. 유일한 네트워크 요청은 업데이트 확인이며, 요청할 때만 일어납니다.", "オフライン：アカウントも計測もありません。通信はアップデートの確認だけで、求めたときにのみ行われます。"),
   "settings.licenses": m("开源许可", "Licences", "라이선스", "ライセンス"),
   "settings.clearData": m("清除所有数据", "Erase all data", "모든 데이터 지우기", "すべてのデータを消去"),
   "settings.clearConfirm": m("清除所有数据？", "Erase all data?", "모든 데이터를 지울까요?", "すべてのデータを消去しますか？"),
@@ -450,4 +450,28 @@ export const MESSAGES = {
   "theme.ko": m("劫", "Ko", "패", "コウ"),
   "theme.race-outside": m("对杀：外气", "Race: outside liberties", "수상전: 바깥 공배", "攻め合い：外ダメ"),
   "theme.race-shared": m("对杀：公气", "Race: shared liberties", "수상전: 공동 공배", "攻め合い：内ダメ"),
+
+  // v4 release
+  "update.check": m("检查更新…", "Check for updates…", "업데이트 확인…", "アップデートを確認…"),
+  "update.auto": m("每周自动检查一次更新", "Check for updates automatically once a week", "매주 한 번 자동으로 업데이트 확인", "週に一度、自動でアップデートを確認"),
+  "update.autoHelp": m(
+    "默认关闭。开启后，Goban Studio 每周向 GitHub 查询一次最新版本，不发送任何关于你或你的棋局的信息。",
+    "Off by default. When on, Goban Studio asks GitHub for the latest version once a week. Nothing about you or your games is sent.",
+    "기본값은 꺼짐입니다. 켜면 Goban Studio가 일주일에 한 번 GitHub에 최신 버전을 묻습니다. 사용자나 기보에 관한 정보는 보내지 않습니다.",
+    "初期設定はオフです。オンにすると、Goban Studio が週に一度 GitHub に最新版を問い合わせます。あなたや棋譜についての情報は送りません。",
+  ),
+  "update.privacy": m(
+    "检查更新时只会访问 GitHub 一次；这是 Goban Studio 唯一的联网请求，且只在你要求时发生。",
+    "Checking contacts GitHub once. It is Goban Studio's only network request, and it happens only when you ask.",
+    "업데이트 확인은 GitHub에 한 번 접속합니다. Goban Studio의 유일한 네트워크 요청이며, 요청할 때만 일어납니다.",
+    "アップデートの確認では GitHub に一度だけ接続します。Goban Studio が行う唯一の通信で、あなたが求めたときだけ行われます。",
+  ),
+  "update.checking": m("正在检查更新…", "Checking for updates…", "업데이트 확인 중…", "アップデートを確認しています…"),
+  "update.available": m("Goban Studio {0} 已发布", "Goban Studio {0} is available", "Goban Studio {0}이(가) 나왔습니다", "Goban Studio {0} が公開されています"),
+  "update.current": m("已是最新版本（{0}）", "You have the latest version ({0})", "최신 버전입니다 ({0})", "最新版です（{0}）"),
+  "update.download": m("打开下载页面", "Open download page", "다운로드 페이지 열기", "ダウンロードページを開く"),
+  "update.notes": m("更新内容", "What's new", "새로운 점", "新機能"),
+  "update.lastChecked": m("上次检查：{0}", "Last checked {0}", "마지막 확인: {0}", "最終確認：{0}"),
+  "update.unavailable": m("只有桌面版应用可以检查更新", "Update checks are available in the desktop app only", "업데이트 확인은 데스크톱 앱에서만 할 수 있습니다", "アップデートの確認はデスクトップアプリでのみ行えます"),
+  "update.error": m("暂时无法检查更新，请稍后再试", "Couldn't check for updates. Try again later.", "지금은 업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.", "アップデートを確認できませんでした。あとでもう一度お試しください。"),
 };
