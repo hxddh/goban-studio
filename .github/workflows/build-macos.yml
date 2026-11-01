@@ -48,6 +48,11 @@ jobs:
       - name: build KataGo Eigen sidecar
         run: |
           git clone --depth 1 --branch v1.18.1 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
+          # KataGo 1.18.1 calls quick_exit, which the macOS 14 SDK's libc++
+          # does not declare. _Exit preserves immediate-exit fatal-error
+          # semantics without requiring a newer deployment target.
+          perl -0pi -e 's/quick_exit\(EXIT_FAILURE\)/_Exit(EXIT_FAILURE)/g' \
+            "$RUNNER_TEMP/KataGo/cpp/core/global.cpp"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build" \
             -G Ninja -DUSE_BACKEND=EIGEN -DUSE_AVX2=OFF -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
             -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
