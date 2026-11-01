@@ -102,6 +102,8 @@ jobs:
       - name: capture packaged app
         shell: pwsh
         continue-on-error: true
+        env:
+          WEBVIEW2_USER_DATA_FOLDER: ${{ runner.temp }}\goban-webview2-capture
         run: |
           $exe = (Get-ChildItem -Recurse -Filter goban-studio.exe dist/GobanStudio | Select-Object -First 1).FullName
           $env:GOBAN_SELFTEST_OUT = Join-Path $env:TEMP "goban-window-report.json"
@@ -131,10 +133,22 @@ jobs:
           if-no-files-found: ignore
       - name: self-test the packaged app
         timeout-minutes: 4
+        env:
+          WEBVIEW2_USER_DATA_FOLDER: ${{ runner.temp }}\goban-webview2-selftest
         run: |
           exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
           test -n "$exe"
           node scripts/selftest-app.mjs "$exe"
+      - name: remove WebView2 test profile
+        shell: pwsh
+        run: |
+          $profiles = Get-ChildItem -Path dist/GobanStudio -Recurse -Force -Directory -Filter "*.WebView2"
+          foreach ($profile in $profiles) { Remove-Item -LiteralPath $profile.FullName -Recurse -Force }
+          $profiles = Get-ChildItem -Path dist/GobanStudio -Recurse -Force -Directory -Filter "EBWebView"
+          foreach ($profile in $profiles) { Remove-Item -LiteralPath $profile.FullName -Recurse -Force }
+          $left = Get-ChildItem -Path dist/GobanStudio -Recurse -Force -Directory -Filter "*.WebView2"
+          if ($left) { throw "WebView2 test profile remains in the package" }
+          Write-Host "WebView2 test profile removed"
       - name: zip
         run: |
           python scripts/make-zip.py dist/GobanStudio dist/GobanStudio-Windows-x64.zip GobanStudio
@@ -148,6 +162,7 @@ jobs:
           assert any(n.endswith("engine/windows/msvcp140.dll") for n in names), "missing MSVC runtime"
           assert any(n.endswith("engine/windows/libcrypto-3-x64.dll") for n in names), "missing OpenSSL runtime"
           assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"
+          assert not any(".WebView2/" in n or "/EBWebView/" in n for n in names), "WebView2 test profile leaked"
           info = z.getinfo(next(n for n in names if n.endswith("bin/goban-studio.exe")))
           assert info.external_attr >> 16 & 0o111, "exe has no execute bits"
           print(f"zip entries: {len(names)}; forward slashes; Unix modes present")
