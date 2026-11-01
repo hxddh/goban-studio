@@ -7,8 +7,12 @@
  * event — LaunchServices then reports that Goban Studio cannot open the
  * format.
  *
- * This file installs the one handler the app needs. It only forwards the
- * selected paths to Zig; reading and parsing stay in the web layer.
+ * NSApplication installs its own default Apple Event handlers while it
+ * finishes launching, so registering ours before `NSApp run` is not enough:
+ * the default can replace it. We register at will/did-finish notifications as
+ * well as installing delegate methods for the two messages AppKit sends for
+ * opened documents. Both paths only forward paths to Zig; reading and parsing
+ * stay in the web layer.
  */
 #import <Cocoa/Cocoa.h>
 
@@ -16,6 +20,12 @@ typedef void (*GobanOpenCallback)(void *context, const char *path);
 
 static GobanOpenCallback goban_callback = NULL;
 static void *goban_callback_context = NULL;
+
+static void GobanForwardPath(NSString *path) {
+    if (path.length == 0 || goban_callback == NULL) return;
+    const char *utf8 = path.fileSystemRepresentation;
+    if (utf8 != NULL) goban_callback(goban_callback_context, utf8);
+}
 
 @interface GobanOpenHandler : NSObject
 - (void)handleOpenDocuments:(NSAppleEventDescriptor *)event
@@ -32,16 +42,12 @@ static void *goban_callback_context = NULL;
     for (NSInteger index = 1; index <= count; index++) {
         NSAppleEventDescriptor *item = [list descriptorAtIndex:index];
         NSURL *url = [item fileURLValue];
-        if (url == nil) continue;
-        const char *path = [url fileSystemRepresentation];
-        if (path != NULL && goban_callback != NULL) goban_callback(goban_callback_context, path);
+        if (url != nil) GobanForwardPath(url.path);
     }
 }
 @end
 
-void goban_install_open_handler(void *context, GobanOpenCallback callback) {
-    goban_callback = callback;
-    goban_callback_context = context;
+static void GobanInstallEventManager(void) {
     static GobanOpenHandler *handler = nil;
     if (handler == nil) handler = [[GobanOpenHandler alloc] init];
     NSAppleEventManager *manager = [NSAppleEventManager sharedAppleEventManager];
@@ -49,4 +55,57 @@ void goban_install_open_handler(void *context, GobanOpenCallback callback) {
                  andSelector:@selector(handleOpenDocuments:withReplyEvent:)
                forEventClass:kCoreEventClass
                   andEventID:kAEOpenDocuments];
+}
+
+static BOOL GobanApplicationOpenFile(id self, SEL _cmd, NSApplication *sender, NSString *filename) {
+    (void)self;
+    (void)_cmd;
+    (void)sender;
+    GobanForwardPath(filename);
+    return YES;
+}
+
+static void GobanApplicationOpenFiles(id self, SEL _cmd, NSApplication *sender, NSArray<NSString *> *filenames) {
+    (void)self;
+    (void)_cmd;
+    (void)sender;
+    for (NSString *filename in filenames) GobanForwardPath(filename);
+}
+
+static void GobanInstallDelegateMethods(void) {
+    id delegate = NSApp.delegate;
+    if (delegate == nil) return;
+    Class cls = [delegate class];
+    class_addMethod(cls, @selector(application:openFile:), (IMP)GobanApplicationOpenFile, "c@:@@");
+    class_addMethod(cls, @selector(application:openFiles:), (IMP)GobanApplicationOpenFiles, "v@:@@");
+}
+
+void goban_install_open_handler(void *context, GobanOpenCallback callback) {
+    goban_callback = callback;
+    goban_callback_context = context;
+
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+        [center addObserverForName:NSApplicationWillFinishLaunchingNotification
+                            object:nil
+                             queue:[NSOperationQueue mainQueue]
+                        usingBlock:^(NSNotification *note) {
+                            (void)note;
+                            GobanInstallEventManager();
+                            GobanInstallDelegateMethods();
+                        }];
+        [center addObserverForName:NSApplicationDidFinishLaunchingNotification
+                            object:nil
+                             queue:[NSOperationQueue mainQueue]
+                        usingBlock:^(NSNotification *note) {
+                            (void)note;
+                            GobanInstallEventManager();
+                            GobanInstallDelegateMethods();
+                        }];
+    });
+
+    // Also try now; if the app is already running this takes effect at once.
+    GobanInstallEventManager();
+    GobanInstallDelegateMethods();
 }
