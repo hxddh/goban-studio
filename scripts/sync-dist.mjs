@@ -40,6 +40,23 @@ if (fs.existsSync(path.join(root, "engine", "model"))) {
   fs.cpSync(path.join(root, "engine", "model"), path.join(dist, "engine", "model"), { recursive: true });
 }
 
+// Licence texts travel with every package. The app's own MIT text is not
+// optional just because the source repository has it: a ZIP that only carries
+// third-party notices is an incomplete redistribution.
+fs.mkdirSync(path.join(dist, "licenses"), { recursive: true });
+fs.copyFileSync(path.join(root, "LICENSE"), path.join(dist, "licenses", "Goban-Studio-MIT.txt"));
+const licenseSources = [
+  [path.join(root, "node_modules", "@sabaki", "go-board", "LICENSE"), "sabaki-go-board-MIT.txt"],
+  [path.join(src, "moka", "LICENSE"), "Moka-MIT.txt"],
+  [path.join(src, "fonts", "Inter-OFL.txt"), "Inter-OFL.txt"],
+  [path.join(root, "engine", "model", "LICENSE-KataGo.txt"), "KataGo-MIT.txt"],
+  [path.join(src, "licenses", "README.txt"), "README.txt"],
+  [path.join(src, "moka", "THIRD_PARTY_NOTICES.md"), "Moka-THIRD_PARTY_NOTICES.md"],
+];
+for (const [from, name] of licenseSources) {
+  if (fs.existsSync(from)) fs.copyFileSync(from, path.join(dist, "licenses", name));
+}
+
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
 const version = (appZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1] || "0.0.0";
 fs.writeFileSync(

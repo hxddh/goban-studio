@@ -186,11 +186,11 @@ const CORE_LESSONS = [
       "빈 바둑판에서는 귀의 화점이 집을 만들기 쉽습니다. 왼쪽 위 화점에 두세요.",
       "空の碁盤では隅の星が地を作りやすい。左上の星に打ちます。",
     ),
-    hint: L("左上角，从边数第三条线。", "Upper-left, third line from each edge.", "왼쪽 위, 변에서 세 번째 선입니다.", "左上、辺から三本目です。"),
-    size: 9,
+    hint: L("左上角，从边数第四条线。", "Upper-left, fourth line from each edge.", "왼쪽 위, 변에서 네 번째 선입니다.", "左上、辺から四本目です。"),
+    size: 13,
     setup: [],
     toMove: 1,
-    line: [{ c: 1, x: 2, y: 2 }],
+    line: [{ c: 1, x: 3, y: 3 }],
   },
   {
     id: "capture-pair-side",
@@ -211,16 +211,16 @@ const CORE_LESSONS = [
     id: "atari-side",
     title: L("打吃：从侧面", "Atari: from the side", "단수: 옆에서", "アタリ：横から"),
     text: L(
-      "白子还有两口气。下在它上方，把气减到一口，形成打吃。",
-      "The white stone has two liberties. Play above it to leave one liberty and make atari.",
-      "백돌의 활로가 둘입니다. 위에 두어 하나로 줄이면 단수입니다.",
-      "白石の呼吸点は二つ。上に打って一つにすればアタリです。",
+      "白子在左边，只有两口气。下在它下方，把气减到一口，形成打吃。",
+      "The white stone is on the left side with two liberties. Play below it to leave one liberty and make atari.",
+      "백돌이 왼쪽 변에 있고 활로가 둘입니다. 아래에 두어 하나로 줄이면 단수입니다.",
+      "白石が左辺にあり、呼吸点は二つ。下に打って一つにすればアタリです。",
     ),
-    hint: L("白子上方。", "Above the white stone.", "백돌 위입니다.", "白石の上です。"),
+    hint: L("白子下方。", "Below the white stone.", "백돌 아래입니다.", "白石の下です。"),
     size: 9,
-    setup: [s(4, 4, -1), s(3, 4, 1), s(5, 4, 1)],
+    setup: [s(0, 4, -1), s(0, 3, 1)],
     toMove: 1,
-    line: [{ c: 1, x: 4, y: 3 }],
+    line: [{ c: 1, x: 0, y: 5 }],
   },
   {
     id: "ko-capture",
@@ -359,13 +359,25 @@ const READING_SUFFIX = {
  * bank. They are deliberately labelled as reading practice, not as forty
  * additional authored lectures; the same verified positions are also
  * available as spaced-review puzzles.
+ *
+ * A reading lesson must not silently repeat a foundation lesson: the course
+ * count is real only if every one of its sixty cards opens a different
+ * position. Positions introduced above are therefore removed from the pool.
  */
+function positionKey(item) {
+  return `size:${item.size}|` + item.setup
+    .map((stone) => `${stone.x},${stone.y},${stone.c}`)
+    .sort()
+    .join("|") + ":" + item.toMove;
+}
+
 function readingLessons(target) {
+  const excluded = new Set(CORE_LESSONS.map(positionKey));
   const seen = new Set();
   const picked = [];
   for (const puzzle of TSUMEGO) {
-    const key = puzzle.setup.map((stone) => `${stone.x},${stone.y},${stone.c}`).sort().join("|") + ":" + puzzle.toMove;
-    if (seen.has(key)) continue;
+    const key = positionKey(puzzle);
+    if (excluded.has(key) || seen.has(key)) continue;
     seen.add(key);
     picked.push(puzzle);
     if (picked.length >= target) break;

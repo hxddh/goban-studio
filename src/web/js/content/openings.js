@@ -4,7 +4,7 @@
  * opening drills, not a claim to a complete joseki dictionary. Source:
  * https://homepages.cwi.nl/~aeb/go/games/ (public-domain collection).
  */
-export const OPENINGS = [
+const RAW_OPENINGS = [
   {
     "id": "pro-01-shusaku-126-sgf",
     "title": {
@@ -2678,10 +2678,10 @@ export const OPENINGS = [
       "ja": "プロ布石：AlphaGo 対 李世石"
     },
     "text": {
-      "zh": "按黑棋的顺序，重演这盘职业对局的前八手。Google DeepMind Challenge Match，2016-03-10。你执黑。",
-      "en": "Replay the first eight moves from Google DeepMind Challenge Match. 2016-03-10. You play Black.",
-      "ko": "이 프로 대국의 첫 여덟 수를 따라 두세요. Google DeepMind Challenge Match, 2016-03-10. 당신은 흑입니다.",
-      "ja": "このプロ棋戦の最初の八手を並べます。Google DeepMind Challenge Match、2016-03-10。あなたは黒番です。"
+      "zh": "按黑棋的顺序，重演这盘职业对局的前八手。Google DeepMind Challenge Match，2016-03-09。你执黑。",
+      "en": "Replay the first eight moves from Google DeepMind Challenge Match. 2016-03-09. You play Black.",
+      "ko": "이 프로 대국의 첫 여덟 수를 따라 두세요. Google DeepMind Challenge Match, 2016-03-09. 당신은 흑입니다.",
+      "ja": "このプロ棋戦の最初の八手を並べます。Google DeepMind Challenge Match、2016-03-09。あなたは黒番です。"
     },
     "hint": {
       "zh": "轮到你时，下在黑棋的下一手。",
@@ -2695,7 +2695,7 @@ export const OPENINGS = [
     "line": [
       {
         "c": 1,
-        "x": 14,
+        "x": 15,
         "y": 3
       },
       {
@@ -2715,32 +2715,32 @@ export const OPENINGS = [
       },
       {
         "c": 1,
-        "x": 13,
+        "x": 14,
         "y": 15
-      },
-      {
-        "c": -1,
-        "x": 13,
-        "y": 16
-      },
-      {
-        "c": 1,
-        "x": 12,
-        "y": 16
       },
       {
         "c": -1,
         "x": 14,
         "y": 16
+      },
+      {
+        "c": 1,
+        "x": 13,
+        "y": 16
+      },
+      {
+        "c": -1,
+        "x": 15,
+        "y": 16
       }
     ],
     "source": {
       "event": "Google DeepMind Challenge Match",
-      "date": "2016-03-10",
+      "date": "2016-03-09",
       "black": "AlphaGo",
       "white": "Lee Sedol",
-      "result": "B+R",
-      "path": "AlphaGo/LeeSedol/2.sgf"
+      "result": "W+R",
+      "path": "AlphaGo/LeeSedol/1.sgf"
     }
   },
   {
@@ -2966,6 +2966,26 @@ export const OPENINGS = [
     }
   }
 ];
+
+/**
+ * A card title names the players; two games between the same pair are still
+ * two different games. Keep the short title when it is already unique and
+ * append the source date only to the repeated ones, so the library never
+ * shows two cards that look identical.
+ */
+const titleCounts = new Map();
+for (const opening of RAW_OPENINGS) {
+  titleCounts.set(opening.title.en, (titleCounts.get(opening.title.en) || 0) + 1);
+}
+
+export const OPENINGS = RAW_OPENINGS.map((opening) => {
+  if (titleCounts.get(opening.title.en) === 1) return opening;
+  const suffix = ` · ${opening.source.date}`;
+  const title = Object.fromEntries(
+    Object.entries(opening.title).map(([lang, text]) => [lang, text + suffix]),
+  );
+  return { ...opening, title };
+});
 
 export function openingById(id) {
   return OPENINGS.find((opening) => opening.id === id) || null;

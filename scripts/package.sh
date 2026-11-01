@@ -25,14 +25,23 @@ echo "==> install KataGo sidecar"
 node scripts/install-engine.mjs dist/GobanStudio.app macos
 codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
 codesign --force --deep --sign - dist/GobanStudio.app
+test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
 
 echo "==> zip"
 (
   cd dist
   rm -f GobanStudio-macOS-arm64.zip
+  cp ../packaging/README-macOS.txt README-macOS.txt
   ditto -c -k --sequesterRsrc --keepParent GobanStudio.app GobanStudio-macOS-arm64.zip
-  rm -rf GobanStudio.app
-  ls -lh GobanStudio-macOS-arm64.zip
+  zip -g -j GobanStudio-macOS-arm64.zip README-macOS.txt
+  rm -rf dmg
+  mkdir -p dmg
+  ditto GobanStudio.app "dmg/Goban Studio.app"
+  cp README-macOS.txt dmg/README-macOS.txt
+  rm -f GobanStudio-macOS-arm64.dmg
+  hdiutil create -volname "Goban Studio" -srcfolder dmg -ov -format UDZO GobanStudio-macOS-arm64.dmg
+  rm -rf GobanStudio.app dmg
+  ls -lh GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg
 )
 
 echo "==> install ~/Applications/GobanStudio.app"

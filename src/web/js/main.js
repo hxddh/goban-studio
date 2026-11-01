@@ -43,12 +43,15 @@ import {
   readTextFile,
   revealPath,
   saveFileDialog,
+  selftestConfig,
   setupChrome,
+  takeOpenFiles,
   writeTextFile,
 } from "./host.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const APP_VERSION = "1.1.0";
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -83,6 +86,8 @@ function icon(name) {
     check: '<path d="M3 8.5l3 3 7-7"/>',
     x: '<path d="M4 4l8 8M12 4l-8 8"/>',
     back: '<path d="M9.5 3.5L5 8l4.5 4.5"/>',
+    rail: '<rect x="2.5" y="3" width="11" height="10" rx="1.2"/><path d="M6.3 3v10"/>',
+    side: '<rect x="2.5" y="3" width="11" height="10" rx="1.2"/><path d="M9.7 3v10"/>',
     more: '<circle cx="3" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="13" cy="8" r="1"/>',
   };
   return `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.more}</svg>`;
@@ -504,6 +509,12 @@ function render() {
   const app = $("#app");
   app.dataset.view = state.view;
   app.dataset.theme = state.settings.theme === "night" ? "dark" : "light";
+  // Both side surfaces are optional while playing. Their state belongs to
+  // play only: Review and Learn always open with the full page fitted around
+  // the board, whichever layout the player prefers for a game.
+  const playingView = state.view === "play";
+  app.classList.toggle("rail-collapsed", playingView && !!state.settings.playRailCollapsed);
+  app.classList.toggle("side-collapsed", playingView && !!state.settings.playSideCollapsed);
   $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
   renderTitle();
   renderTopbar();
@@ -578,6 +589,10 @@ function btn(action, label, iconName, kind = "ghost", disabled = false) {
   return `<button type="button" class="btn ${kind}" data-action="${action}" ${disabled ? "disabled" : ""} title="${esc(label)}" aria-label="${esc(label)}">${icon(iconName)}<span class="btn-label">${esc(label)}</span></button>`;
 }
 
+function panelBtn(action, label, iconName) {
+  return `<button type="button" class="btn ghost panel-toggle" data-action="${action}" title="${esc(label)}" aria-label="${esc(label)}">${icon(iconName)}</button>`;
+}
+
 function renderTopbar() {
   const host = $("#topbar-actions");
   let html = "";
@@ -588,6 +603,8 @@ function renderTopbar() {
     html += btn("pass", t("common.pass"), "pass", "ghost", !playing || state.thinking);
     html += btn("resign", t("common.resign"), "flag", "ghost", !playing || state.thinking);
     html += btn("hint", t("common.hint"), "bulb", "ghost", !playing || state.thinking);
+    html += panelBtn("toggle-rail", state.settings.playRailCollapsed ? t("play.showLeftRail") : t("play.hideLeftRail"), "rail");
+    html += panelBtn("toggle-side", state.settings.playSideCollapsed ? t("play.showRightRail") : t("play.hideRightRail"), "side");
   } else if (state.view === "review") {
     html += btn("first", t("review.first"), "first");
     html += btn("prev", t("review.previous"), "prev");
@@ -617,6 +634,16 @@ function handleAction(action) {
       break;
     case "hint":
       askHint();
+      break;
+    case "toggle-rail":
+      state.settings.playRailCollapsed = !state.settings.playRailCollapsed;
+      saveSettings(state.settings);
+      render();
+      break;
+    case "toggle-side":
+      state.settings.playSideCollapsed = !state.settings.playSideCollapsed;
+      saveSettings(state.settings);
+      render();
       break;
     case "first":
       reviewGotoIndex(0);
@@ -899,13 +926,14 @@ function reviewSide() {
       </section>`
     : "";
   return `${classicCard}<section class="card graph-card">
-      <div class="card-head"><h3>${esc(t("review.eval"))}</h3><span class="muted">${esc(t("review.analyzed"))}</span></div>
+      <div class="card-head"><h3>${esc(t("review.eval"))}</h3><span class="muted">${esc(t("review.localEstimate"))}</span></div>
       <svg class="eval-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${esc(t("review.eval"))}">
         <line x1="8" y1="${h / 2}" x2="${w - 8}" y2="${h / 2}" class="graph-mid"/>
         <polyline points="${poly}" class="graph-line"/>
         ${dots}${labels}
       </svg>
       <div class="graph-legend"><span>${esc(t("common.black"))}</span><span>${esc(t("common.white"))}</span></div>
+      <p class="review-disclaimer">${esc(t("review.localNote"))}</p>
     </section>
     <section class="card">
       <div class="card-head"><h3>${esc(t("review.keyMoves"))}</h3><span class="muted">${r.moves} ${esc(t("common.moves"))}</span></div>
@@ -1104,7 +1132,7 @@ function renderSettingsPage() {
         <p class="muted small">${esc(t("settings.offline"))}</p>
       </section>
       <section class="settings-card"><h3>${esc(t("settings.data"))}</h3><button class="btn danger" data-action="clear-data">${esc(t("settings.clearData"))}</button></section>
-      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} 1.0.0 · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Moka (MIT) · KataGo (MIT) · Inter (OFL)</p></section>
+      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} ${APP_VERSION} · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Moka (MIT) · KataGo (MIT) · Inter (OFL)</p></section>
     </div>`;
 }
 
@@ -1392,7 +1420,7 @@ async function importSGF(file) {
     await importSGFText(await file.text(), file.name);
   } catch (e) {
     console.error("SGF import failed", e);
-    toast(t("library.importError"), "error");
+    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
   }
 }
 
@@ -1403,7 +1431,7 @@ async function importSGFPath(path) {
     await importSGFText(text, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
-    toast(t("library.importError"), "error");
+    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
   }
 }
 
@@ -1678,6 +1706,47 @@ function bootGame() {
   state.level = state.settings.level || 2;
 }
 
+async function drainOpenFiles() {
+  const paths = await takeOpenFiles();
+  for (const path of paths) {
+    if (/\.sgf$/i.test(path)) await importSGFPath(path);
+  }
+}
+
+/**
+ * A packaged build is launched by the release workflows with
+ * GOBAN_SELFTEST_OUT set. The report is written from the real WebView: it
+ * proves the page, the native bridge and KataGo all came up, not just that
+ * the executable linked.
+ */
+async function runSelfTest() {
+  if (!hasNative()) return;
+  const cfg = await selftestConfig();
+  if (!cfg?.enabled || !cfg.path) return;
+  let engineMove = "";
+  try {
+    const probe = new Game({ size: 19, komi: 6.5 });
+    const move = await chooseMove(probe, { level: 1, color: BLACK });
+    if (move && !move.pass) engineMove = `${move.x},${move.y}`;
+  } catch (_) {
+    engineMove = "";
+  }
+  const report = {
+    ok: Boolean(engineMove),
+    version: APP_VERSION,
+    boardSize: boardView?.model?.size || 0,
+    language: lang(),
+    engineMove,
+    checks: {
+      webview: true,
+      bridge: typeof window.zero?.invoke === "function",
+      board: boardView?.model?.size === 19,
+      engine: Boolean(engineMove),
+    },
+  };
+  await writeTextFile(cfg.path, JSON.stringify(report, null, 2) + "\n");
+}
+
 function init() {
   $$("[data-icon]").forEach((el) => {
     el.innerHTML = icon(el.dataset.icon);
@@ -1720,6 +1789,12 @@ function init() {
   };
   onDropFiles(importPaths);
   onOpenFiles(importPaths);
+  if (hasNative()) {
+    drainOpenFiles();
+    setInterval(drainOpenFiles, 1500);
+    window.addEventListener("focus", drainOpenFiles);
+    setTimeout(runSelfTest, 900);
+  }
   setTimeout(() => onboarding(), 120);
   setTimeout(() => {
     if (state.view === "play") maybeAiMove();

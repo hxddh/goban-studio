@@ -1,0 +1,70 @@
+/**
+ * Launch a packaged Goban Studio and wait for the page's self-test report.
+ *
+ * The report is written by the real WebView after it has initialized the
+ * native bridge and asked KataGo for one legal move. This is the step that
+ * distinguishes "the executable linked" from "the app a player double-clicks
+ * actually starts".
+ *
+ * Usage: node scripts/selftest-app.mjs <path-to-executable>
+ */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
+
+const exe = process.argv[2];
+if (!exe || !fs.existsSync(exe)) {
+  console.error("selftest: missing executable:", exe || "(none)");
+  process.exit(1);
+}
+
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), "goban-selftest-"));
+const reportPath = path.join(temp, "report.json");
+const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || 120000);
+const child = spawn(path.resolve(exe), [], {
+  cwd: path.dirname(path.resolve(exe)),
+  env: { ...process.env, GOBAN_SELFTEST_OUT: reportPath },
+  stdio: "inherit",
+});
+
+let exited = null;
+child.on("exit", (code, signal) => {
+  exited = { code, signal };
+});
+
+const deadline = Date.now() + timeoutMs;
+let report = null;
+while (Date.now() < deadline) {
+  if (fs.existsSync(reportPath)) {
+    try {
+      report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+      break;
+    } catch {
+      // The writer may be midway through the file; try again next tick.
+    }
+  }
+  if (exited) break;
+  await new Promise((resolve) => setTimeout(resolve, 200));
+}
+
+if (!exited) {
+  child.kill();
+  // Give WebView2 / WKWebView a moment to tear down before the next step.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
+if (!report) {
+  console.error("selftest: no report from the packaged app");
+  process.exit(1);
+}
+
+const checks = report.checks || {};
+const failed = Object.entries(checks).filter(([, value]) => value !== true).map(([key]) => key);
+const ok = report.ok === true && report.boardSize === 19 && checks.bridge === true && checks.engine === true && failed.length === 0;
+console.log(JSON.stringify(report, null, 2));
+if (!ok) {
+  console.error("selftest: failed checks:", failed.join(", ") || "report.ok/boardSize/engine");
+  process.exit(1);
+}
+console.log(`selftest: packaged app opened 19×19 and KataGo answered ${report.engineMove}`);

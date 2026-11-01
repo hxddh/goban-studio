@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS = {
   coords: true,
   sound: true,
   numbers: false,
+  playRailCollapsed: false,
+  playSideCollapsed: false,
   level: 2,
   firstRun: true,
 };

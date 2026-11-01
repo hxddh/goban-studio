@@ -11,6 +11,16 @@ existing Gomoku app. It deliberately uses a different bundle ID
 (`dev.hxddh.gobanstudio`), app name (`Goban Studio`) and repository
 (`goban-studio`), so the two apps can be installed and updated independently.
 
+## Download
+
+| Platform | File | First launch |
+| --- | --- | --- |
+| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
+| Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
+
+`SHA256SUMS` is attached to every GitHub release. The full v1.1.0 notes are in
+[`.github/release-notes/v1.1.0.md`](.github/release-notes/v1.1.0.md).
+
 ## What is here
 
 - **Play** — tap intersections on a canvas board. Captures, suicide, simple ko
@@ -18,18 +28,23 @@ existing Gomoku app. It deliberately uses a different bundle ID
   Japanese rules, with komi, up to nine handicap stones, and a human or
   computer opponent at five levels. On 19×19 the packaged app starts the
   bundled KataGo sidecar; 9×9 uses the bundled Moka INT8 network; 13×13 keeps
-  the local heuristic opponent.
+  the local heuristic opponent. Both sidebars retract independently during
+  play, and the layout choice is remembered.
 - **Scoring** — two passes enter scoring. Tap dead stones, see territory and
-  prisoners, confirm the result, or resume play.
+  prisoners, confirm the result, or resume play. A one-colour region counts
+  only when it is separated from at least one side of the board, so an open
+  board or a gapped wall is dame, not territory.
 - **Review** — a whole-game evaluation curve, key-move list and influence
-  overlay. The evaluator is a local heuristic; it is useful for finding
-  turning points, not a dan-level analysis report.
-- **Learn** — 60 lessons (20 foundation lessons plus 40 distinct reading
-  positions), 40 professional opening layouts, 20 classic games and 300
-  tsumego drills, all in the four launch languages, with hints, retry, answer
-  and spaced review.
+  overlay. The evaluator is a local heuristic and the UI labels it as such;
+  it is useful for finding turning points, not a dan-level analysis report.
+- **Learn** — 60 distinct lessons (20 foundation lessons plus 40 distinct
+  reading positions), 40 professional opening layouts with 40 unique
+  titles and eight-move lines, 20 classic games and 300 tsumego drills, all
+  in the four launch languages, with hints, retry, answer and spaced review.
 - **Library** — SGF import/export, saved games, a 200-game cap, and automatic
-  saving of the current game.
+  saving of the current game. Double-clicking an `.sgf` opens it, and a record
+  that declares a non-Japanese ruleset is rejected with an explanation rather
+  than silently re-scored.
 - **Settings** — language, wood/night/paper board themes, coordinates, move
   numbers, sound and default difficulty.
 - **Offline by design** — no account, no network request, no telemetry.
@@ -57,17 +72,18 @@ npm run release-check
 ```
 
 The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
-and variations, all four language tables, every lesson, opening, classic and
-puzzle line, the opponent's legality, the KataGo bridge request, review
-analysis and library persistence. It runs in Node without a browser or native
-SDK.
+and rules rejection, all four language tables, 60 distinct lesson positions,
+40 unique opening titles and lines, every classic and puzzle line, the
+opponent's legality, the KataGo bridge request, review analysis and library
+persistence. It runs in Node without a browser or native SDK.
 
 ## Desktop shell
 
 The macOS/Windows shell uses the Native SDK and the system WebView. It is
-intentionally thin: `src/main.zig` wires the window, bridge, file association
-and the KataGo sidecar; `src/runner.zig` is the platform runner; the app itself
-lives in `src/web`.
+intentionally thin: `src/main.zig` wires the window, bridge, document-open
+queue and the KataGo sidecar; `src/macos_open.m` receives the macOS Apple
+Event that a double-clicked `.sgf` produces; `src/runner.zig` is the platform
+runner; the app itself lives in `src/web`.
 
 On a machine with Zig 0.16 and the Native SDK:
 
@@ -81,11 +97,9 @@ node scripts/install-engine.mjs dist/GobanStudio.app macos
 ```
 
 `scripts/package.sh` wraps the build, packaging, sidecar install, signing, zip
-and `~/Applications/GobanStudio.app` install for macOS. The Zig source and
-manifest were validated in the Linux orb with Zig 0.16 and Native SDK 0.11.0:
-`native validate`, a null-backend `native build`, and five Zig tests. The
-macOS/Windows WebView package is built and gated by the GitHub workflows; local
-Linux cannot run the macOS or Windows host.
+and `~/Applications/GobanStudio.app` install for macOS. The release workflows
+also run `scripts/selftest-app.mjs` against the packaged executable: the real
+WebView writes a report after the native bridge and KataGo answer a probe.
 
 The KataGo binary is copied into the package after `native package` because
 the SDK asset bundler caps a single asset at 16 MiB. `scripts/install-engine.mjs`
@@ -100,13 +114,14 @@ the tag and GitHub Release. Release notes live in
 `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v1.0.0
+gh workflow run release.yml -f tag=v1.1.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
 publishing. The macOS job builds KataGo from the v1.16.0 source with the Eigen
 backend; the Windows job downloads the matching official Eigen build and ships
-its DLLs.
+its DLLs. The Windows zip is produced by `scripts/make-zip.py` (forward slashes
+and Unix mode bits), and `SHA256SUMS` is uploaded with all three assets.
 
 ## Architecture
 
@@ -125,9 +140,11 @@ src/web/js/i18n.js       one key → four strings, with missing-key fallback
 src/web/js/persist.js    guarded localStorage access
 src/web/js/library.js    saved SGF records and current game
 src/engine.zig           persistent KataGo GTP child process
-src/main.zig             Native SDK entry, bridge, window
+src/main.zig             Native SDK entry, bridge, window, open-file queue
+src/macos_open.m         macOS kAEOpenDocuments Apple Event handler
 src/runner.zig           platform runner
 engine/model/            KataGo network, config and licence
+packaging/               first-launch notes shipped inside the archives
 ```
 
 The rule layer is independent of the renderer and DOM. Content is data, so a
@@ -145,10 +162,16 @@ by Git; `npm run build` and `npm run sync` recreate them.
   claim to a sixty-hour professional course.
 - The 300 drills are 25 hand-checked base shapes plus deterministic
   symmetry/translation practice variants.
-- Review remains a local heuristic, separate from KataGo; it does not provide
-  KataGo ownership or win-rate analysis.
+- Review remains a local shape/influence estimate, separate from KataGo; the
+  UI labels it as such instead of claiming KataGo win-rate analysis.
+- Japanese scoring is a territory count after the player marks dead stones.
+  It does not adjudicate disputed life-and-death or seki for the player;
+  Japanese rules require the players to agree on those.
 - SGF support covers ordinary FF[4] game records, setup stones, comments,
   passes, marks and variations. It does not attempt every SGF property.
+- macOS is ad-hoc signed and Windows has no Authenticode signature: both need
+  certificates. The archive READMEs give the exact first-launch steps and the
+  release does not imply a trust level it cannot provide.
 - macOS/Windows packaging, WebView rendering and code signing are exercised by
   the release workflows, not by the Linux orb.
 
@@ -157,4 +180,6 @@ by Git; `npm run build` and `npm run sync` recreate them.
 MIT. `@sabaki/go-board` is MIT; Moka is MIT and its notices are in
 `src/web/moka/`; Inter is licensed under the SIL Open Font License (see
 `src/web/fonts/Inter-OFL.txt`). KataGo is MIT; the sidecar licence and model
-notice are in `engine/model/`.
+notice are in `engine/model/`. `npm run sync` copies the app licence and every
+third-party notice into `frontend/dist/licenses/`, so each archive carries
+them.

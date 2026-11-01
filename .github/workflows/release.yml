@@ -73,6 +73,12 @@ jobs:
           test -s dist-macos/GobanStudio-macOS-arm64.dmg
           test -s dist-windows/GobanStudio-Windows-x64.zip
           ls -lh dist-macos dist-windows
+      - name: checksums
+        run: |
+          set -euo pipefail
+          (cd dist-macos && sha256sum GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg) > SHA256SUMS
+          (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip) >> SHA256SUMS
+          cat SHA256SUMS
       - name: publish
         if: ${{ inputs.rehearse != true }}
         env:
@@ -87,6 +93,7 @@ jobs:
           gh release upload "$TAG" \
             dist-macos/GobanStudio-macOS-arm64.zip \
             dist-macos/GobanStudio-macOS-arm64.dmg \
-            dist-windows/GobanStudio-Windows-x64.zip
+            dist-windows/GobanStudio-Windows-x64.zip \
+            SHA256SUMS
           gh release edit "$TAG" --draft=false
           gh release view "$TAG" --json url,isDraft,assets

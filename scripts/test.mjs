@@ -170,6 +170,19 @@ await test("territory is not awarded for an open, sparse board", () => {
   assert.equal(t.flat().every((v) => v === 0), true);
 });
 
+await test("a wall that does not separate the board earns no territory", () => {
+  const g = setup(
+    [
+      { x: 2, y: 2, color: BLACK },
+      { x: 3, y: 2, color: BLACK },
+      { x: 4, y: 2, color: BLACK },
+    ],
+    BLACK,
+  );
+  const t = territoryMap(g.board);
+  assert.equal(t.flat().every((v) => v === 0), true);
+});
+
 await test("SGF export/import keeps moves, comments, setup and variations", () => {
   const g = setup(
     [
@@ -240,6 +253,13 @@ await test("SGF columns skip I on import and export", () => {
   assert.match(sgf, /;W\[qd\]/);
 });
 
+await test("a Chinese-rules SGF is rejected instead of silently scored as Japanese", () => {
+  assert.throws(
+    () => loadSGF("(;GM[1]FF[4]SZ[9]KM[7.5]RU[Chinese];B[ee])"),
+    (error) => error.code === "unsupported-rules" && error.rules === "Chinese",
+  );
+});
+
 await test("an empty SGF is rejected, not silently accepted", () => {
   assert.throws(() => loadSGF("not an sgf"), /no root node/);
 });
@@ -294,6 +314,8 @@ await test("all 20 classic games parse and carry four-language notes", () => {
 await test("all 40 openings are well-formed and legal in four languages", () => {
   assert.equal(OPENINGS.length, 40);
   const seen = new Set();
+  const titles = new Set();
+  const lines = new Set();
   for (const opening of OPENINGS) {
     for (const lang of LANG_IDS) {
       assert.ok(opening.title[lang]?.trim(), `${opening.id} title ${lang}`);
@@ -302,6 +324,11 @@ await test("all 40 openings are well-formed and legal in four languages", () => 
     }
     assert.ok(!seen.has(opening.id), `${opening.id} duplicate id`);
     seen.add(opening.id);
+    assert.ok(!titles.has(opening.title.en), `${opening.id} duplicate title`);
+    titles.add(opening.title.en);
+    const lineKey = JSON.stringify(opening.line);
+    assert.ok(!lines.has(lineKey), `${opening.id} duplicate line`);
+    lines.add(lineKey);
     const game = new Game({ size: opening.size || 19, komi: opening.komi ?? 6.5 });
     game.setup(opening.setup, opening.toMove);
     for (const move of opening.line) {
@@ -317,13 +344,19 @@ await test("all lesson and puzzle positions and lines are legal", () => {
   ];
   assert.equal(LESSONS.length, 60);
   assert.equal(TSUMEGO.length, 300);
+  const positions = new Set();
   for (const item of items) {
-    assert.equal(item.size, 9, `${item.id} size`);
+    assert.ok([9, 13, 19].includes(item.size), `${item.id} size`);
+    const positionKey = JSON.stringify({ size: item.size, setup: item.setup, toMove: item.toMove });
+    if (item.kind === "lesson") {
+      assert.ok(!positions.has(positionKey), `${item.id} duplicate lesson position`);
+      positions.add(positionKey);
+    }
     assert.ok(item.line.length > 0, `${item.id} line`);
     assert.equal(item.line[0].c, item.toMove, `${item.id} first move color`);
     const seen = new Set();
     for (const stone of item.setup) {
-      assert.ok(stone.x >= 0 && stone.y >= 0 && stone.x < 9 && stone.y < 9, `${item.id} setup bounds`);
+      assert.ok(stone.x >= 0 && stone.y >= 0 && stone.x < item.size && stone.y < item.size, `${item.id} setup bounds`);
       assert.ok(stone.c === BLACK || stone.c === WHITE, `${item.id} setup color`);
       const key = `${stone.x},${stone.y}`;
       assert.ok(!seen.has(key), `${item.id} duplicate setup`);
@@ -344,6 +377,7 @@ await test("all lesson and puzzle positions and lines are legal", () => {
       assert.equal(result.ok, true, `${item.id} solution illegal at ${move.x},${move.y}`);
     }
   }
+  assert.equal(positions.size, 60, "60 lessons must open 60 distinct positions");
 });
 
 await test("the built-in opponent returns a legal move on 9x9 and 19x19", async () => {

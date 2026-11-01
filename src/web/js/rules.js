@@ -77,12 +77,16 @@ export function territoryMap(board) {
       if (board.get([x, y]) !== EMPTY || seen.has(y * size + x)) continue;
       const region = [];
       const border = new Set();
-      const boundaryStones = new Set();
+      const edges = new Set();
       const stack = [[x, y]];
       seen.add(y * size + x);
       while (stack.length) {
         const [cx, cy] = stack.pop();
         region.push([cx, cy]);
+        if (cx === 0) edges.add("left");
+        if (cx === size - 1) edges.add("right");
+        if (cy === 0) edges.add("top");
+        if (cy === size - 1) edges.add("bottom");
         for (const [nx, ny] of [[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]]) {
           if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
           const v = board.get([nx, ny]);
@@ -94,18 +98,17 @@ export function territoryMap(board) {
             }
           } else {
             border.add(v);
-            boundaryStones.add(ny * size + nx);
           }
         }
       }
-      // A region "bordered by one colour" is not automatically territory: a
-      // single stone on an otherwise empty board would claim the whole board.
-      // Require either a small closed region or a real wall of stones. This is
-      // still a scoring heuristic, but it behaves like a finished game instead
-      // of a diagram.
-      const enclosed = boundaryStones.size >= 3 || region.length <= 2;
-      const notSparse = region.length <= size * size * 0.55 || boundaryStones.size >= 8;
-      if (border.size === 1 && enclosed && notSparse) {
+      // Japanese territory is an empty region bounded by stones of one
+      // colour. A region that still reaches all four sides of the board has
+      // not been separated from the rest of the board: a lone centre stone
+      // or a wall with gaps leaves exactly such a region, and it is dame, not
+      // territory. A corner eye (two sides) and a side territory (three
+      // sides) still count. This is the board-edge rule, not a stone-count
+      // heuristic; life and death are resolved by marking dead stones.
+      if (border.size === 1 && edges.size < 4) {
         const color = [...border][0];
         for (const [rx, ry] of region) out[ry][rx] = color;
       }
@@ -458,7 +461,7 @@ export class Game {
     const sgfColumn = (x) => String.fromCharCode(97 + x + (x >= 8 ? 1 : 0));
     const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
-      "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:1.0.0]SZ[" +
+      "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:1.1.0]SZ[" +
       this.size +
       "]KM[" +
       this.komi +

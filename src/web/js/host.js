@@ -124,6 +124,32 @@ export function onOpenFiles(handler) {
   }
 }
 
+/**
+ * Paths delivered by the operating system before the page was ready, or
+ * while the app was already running. The native queue is consumed by this
+ * call, so a document cannot be opened twice by two timers.
+ */
+export async function takeOpenFiles() {
+  if (!hasNative()) return [];
+  try {
+    const value = await invoke("studio.takeOpenFiles");
+    return normalizePaths(value && typeof value === "object" ? value.paths : value);
+  } catch (_) {
+    return [];
+  }
+}
+
+/** Release-build self-test configuration (empty in normal launches). */
+export async function selftestConfig() {
+  if (!hasNative()) return { enabled: false };
+  try {
+    const value = await invoke("studio.selftest");
+    return value && typeof value === "object" ? value : { enabled: false };
+  } catch (_) {
+    return { enabled: false };
+  }
+}
+
 export async function setupChrome() {
   const chrome = await windowChrome();
   const top = Math.max(0, Number(chrome.top) || 0);

@@ -206,6 +206,13 @@ export function loadSGF(text) {
   if (!roots.length) throw new Error("SGF has no root node");
   const root = roots[0];
   const data = root.data || {};
+  const rules = first(data, "RU").trim();
+  if (rules && !/^(japanese|uchikomi|日本|日本ルール)$/i.test(rules)) {
+    const error = new Error(`Unsupported rules in SGF: ${rules}`);
+    error.code = "unsupported-rules";
+    error.rules = rules;
+    throw error;
+  }
   const size = parseSize(first(data, "SZ"));
   const komiRaw = first(data, "KM");
   const komi = komiRaw === "" ? 6.5 : Number(komiRaw);

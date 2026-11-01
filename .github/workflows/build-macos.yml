@@ -99,6 +99,7 @@ jobs:
           codesign --force --deep --sign - dist/GobanStudio.app
           test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz"
+          test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
           codesign --verify --deep --strict dist/GobanStudio.app
           printf 'boardsize 19\nkata-set-rules japanese\ngenmove B\nquit\n' | \
             "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago" gtp \
@@ -106,10 +107,22 @@ jobs:
             -config "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/gtp.cfg" \
             -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1
+      - name: self-test the packaged app
+        timeout-minutes: 4
+        run: |
+          exe="$(find dist/GobanStudio.app/Contents/MacOS -type f -perm -u+x | head -n1)"
+          test -n "$exe"
+          node scripts/selftest-app.mjs "$exe"
       - name: zip and dmg
         run: |
+          cp packaging/README-macOS.txt dist/README-macOS.txt
           ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app dist/GobanStudio-macOS-arm64.zip
-          hdiutil create -volname "Goban Studio" -srcfolder dist/GobanStudio.app -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
+          zip -g -j dist/GobanStudio-macOS-arm64.zip dist/README-macOS.txt
+          mkdir -p dist/dmg
+          rm -rf dist/dmg/*
+          ditto dist/GobanStudio.app "dist/dmg/Goban Studio.app"
+          cp packaging/README-macOS.txt dist/dmg/README-macOS.txt
+          hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
           ls -lh dist
       - uses: actions/upload-artifact@v4
         with:

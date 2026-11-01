@@ -90,12 +90,32 @@ jobs:
           native package --target windows --assets frontend/dist \
             --output dist/GobanStudio --binary zig-out/bin/goban-studio.exe
           node scripts/install-engine.mjs dist/GobanStudio windows
+          cp packaging/README-Windows.txt dist/GobanStudio/README-Windows.txt
           test -f dist/GobanStudio/resources/frontend/dist/engine/windows/katago.exe
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
+          test -f dist/GobanStudio/resources/frontend/dist/licenses/Goban-Studio-MIT.txt
           ls -R dist/GobanStudio | head -40
+      - name: self-test the packaged app
+        timeout-minutes: 4
+        run: |
+          exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
+          test -n "$exe"
+          node scripts/selftest-app.mjs "$exe"
       - name: zip
         run: |
-          powershell -NoProfile -Command "Compress-Archive -Path 'dist/GobanStudio' -DestinationPath 'dist/GobanStudio-Windows-x64.zip' -Force"
+          python scripts/make-zip.py dist/GobanStudio dist/GobanStudio-Windows-x64.zip GobanStudio
+          python - <<'PY'
+          import zipfile
+          z = zipfile.ZipFile("dist/GobanStudio-Windows-x64.zip")
+          names = z.namelist()
+          assert names, "empty archive"
+          assert all("\\" not in n for n in names), "backslash in ZIP entry"
+          assert any(n.endswith("bin/goban-studio.exe") for n in names), "missing exe"
+          assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"
+          info = z.getinfo(next(n for n in names if n.endswith("bin/goban-studio.exe")))
+          assert info.external_attr >> 16 & 0o111, "exe has no execute bits"
+          print(f"zip entries: {len(names)}; forward slashes; Unix modes present")
+          PY
           ls -lh dist
       - uses: actions/upload-artifact@v4
         with:

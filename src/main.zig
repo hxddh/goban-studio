@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const runner = @import("runner");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
@@ -6,6 +7,10 @@ const engine_mod = @import("engine.zig");
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
 const allowed_origins = [_][]const u8{ "zero://app", "zero://inline", "http://127.0.0.1:5173" };
+const max_open_paths = 16;
+
+const OpenCallback = *const fn (context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void;
+extern fn goban_install_open_handler(context: ?*anyopaque, callback: OpenCallback) void;
 
 // Empty custom menus → host default bar (View → Full Screen, Window → Zoom).
 // Game actions: chrome / sidebar / in-page shortcuts.
@@ -13,11 +18,43 @@ const allowed_origins = [_][]const u8{ "zero://app", "zero://inline", "http://12
 const App = struct {
     env_map: *std.process.Environ.Map,
     io: std.Io,
+    allocator: std.mem.Allocator,
     /// 第一个事件(lifecycle.start)到来时记下;窗口拖动 / 标题栏几何要用它的平台服务。
     runtime: ?*native_sdk.Runtime = null,
     engine: engine_mod.Engine = .{},
-    handlers: [6]native_sdk.BridgeHandler = undefined,
-    policies: [6]native_sdk.BridgeCommandPolicy = undefined,
+    /// Paths handed to us by LaunchServices / argv. They are read by the page
+    /// once it is ready; keeping the queue here also covers an event that
+    /// arrives before the webview has subscribed.
+    open_paths: std.ArrayList([]u8) = .empty,
+    handlers: [8]native_sdk.BridgeHandler = undefined,
+    policies: [8]native_sdk.BridgeCommandPolicy = undefined,
+
+    fn deinit(self: *@This()) void {
+        for (self.open_paths.items) |path| self.allocator.free(path);
+        self.open_paths.deinit(self.allocator);
+    }
+
+    fn queueOpenPath(self: *@This(), path: []const u8) void {
+        if (path.len == 0 or path.len > 4096) return;
+        if (self.open_paths.items.len >= max_open_paths) return;
+        if (self.open_paths.items.len > 0) {
+            const last = self.open_paths.items[self.open_paths.items.len - 1];
+            if (std.mem.eql(u8, last, path)) return;
+        }
+        const copy = self.allocator.dupe(u8, path) catch return;
+        self.open_paths.append(self.allocator, copy) catch {
+            self.allocator.free(copy);
+        };
+    }
+
+    fn queueLaunchArgs(self: *@This(), args: std.process.Args) void {
+        var it = std.process.Args.Iterator.initAllocator(args, self.allocator) catch return;
+        defer it.deinit();
+        _ = it.next(); // executable
+        while (it.next()) |arg| {
+            if (std.ascii.endsWithIgnoreCase(arg, ".sgf")) self.queueOpenPath(arg);
+        }
+    }
 
     fn app(self: *@This()) native_sdk.App {
         return .{
@@ -67,6 +104,16 @@ const App = struct {
             .name = "studio.katagoStatus",
             .context = self,
             .invoke_fn = katagoStatus,
+        };
+        self.handlers[6] = .{
+            .name = "studio.takeOpenFiles",
+            .context = self,
+            .invoke_fn = takeOpenFiles,
+        };
+        self.handlers[7] = .{
+            .name = "studio.selftest",
+            .context = self,
+            .invoke_fn = selftestConfig,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -358,10 +405,59 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     ) catch error.HandlerFailed;
 }
 
+/// The page polls this once after boot (and while running) instead of relying
+/// on an event that may fire before the webview exists. The queue is consumed
+/// on read; a path never opens twice.
+fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, "{\"paths\":[")) return error.HandlerFailed;
+    var count: usize = 0;
+    for (self.open_paths.items) |path| {
+        if (count > 0 and !jsonAppend(output, &n, ",")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+        count += 1;
+    }
+    if (!jsonAppend(output, &n, "]}")) return error.HandlerFailed;
+    for (self.open_paths.items) |path| self.allocator.free(path);
+    self.open_paths.clearRetainingCapacity();
+    return output[0..n];
+}
+
+/// A closed packaged app can be launched with GOBAN_SELFTEST_OUT set by the
+/// release job. The page writes a small report to that path after the real
+/// WebView, bridge and engine are up; the platform workflow waits for it.
+fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
+    if (path.len == 0) return std.fmt.bufPrint(output, "{{\"enabled\":false}}", .{}) catch error.HandlerFailed;
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
+    if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    return output[0..n];
+}
+
+fn macOpenCallback(context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void {
+    const self: *App = @ptrCast(@alignCast(context orelse return));
+    self.queueOpenPath(std.mem.span(path));
+}
+
+fn installPlatformOpenHandler(self: *App) void {
+    if (comptime builtin.os.tag == .macos) {
+        goban_install_open_handler(self, macOpenCallback);
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
-    var app_state = App{ .env_map = init.environ_map, .io = init.io };
+    var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
+    defer app_state.deinit();
     app_state.engine.init(init.io, init.environ_map);
     defer app_state.engine.deinit(init.io);
+    app_state.queueLaunchArgs(init.minimal.args);
+    installPlatformOpenHandler(&app_state);
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "Goban Studio",
         .window_title = "Goban Studio",
