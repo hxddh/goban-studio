@@ -283,7 +283,18 @@ export function buildDaily(now = Date.now()) {
 
 export function todaysDaily() {
   const d = state.progress.daily;
-  return d && d.date === todayKey() && Array.isArray(d.items) ? d : null;
+  if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
+  // A saved set may name a problem a later version removed: drop it, and
+  // keep the position in the set on the item the learner was at.
+  const known = (it) => it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id);
+  if (!d.items.every(known)) {
+    const before = d.items.slice(0, d.index || 0).filter(known).length;
+    d.items = d.items.filter(known);
+    d.index = Math.min(d.items.length, before);
+    if (Array.isArray(d.done)) d.done = d.done.filter((id) => d.items.some((it) => it.id === id));
+    if (!d.items.length) return null;
+  }
+  return d;
 }
 
 export function startDaily() {

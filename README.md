@@ -97,9 +97,17 @@ The course and the problems are verified, not counted:
   proof size and number of tempting wrong moves).
 - `scripts/check-course.mjs` checks every lesson in four languages and proves
   every lesson problem the same way.
+- Every problem is proved under real-board rules: a captured point can be
+  played again (retake, throw back in, fill an eye), and the key stones of a
+  life or kill problem must be sealed in, so they can never live through a
+  liberty outside the problem area that nobody is allowed to fill. Both
+  checks run for the course too. Before v4, problems were proved with
+  captured points kept out of play and some lived through such outside
+  liberties; the v4 audit (`docs/problems-audit.md`) fixed 17 of those
+  problems and removed 37 that could not be fixed cleanly.
 - The solver treats a ko or an unsettled position as a failure for the
   attacker, so a problem is only listed when its answer is unconditional
-  (the 14 ko problems say so and are proved to be kos). Seki counts as life,
+  (the 10 ko problems say so and are proved to be kos). Seki counts as life,
   as under Japanese rules: a kill that only reaches seki fails.
 - Seki is recognised soundly: the defender survives even if the attacker
   moves first, cannot reach independent life even moving first (both with
@@ -107,12 +115,11 @@ The course and the problems are verified, not counted:
   rather than through a point outside the problem. The 13 seki problems
   (goal `seki`) are proved to have seki as their best result and to end in
   one. Bent four in the corner is never accepted as life.
-- 299 problems: 30 capturing races (eye against no eye, big eye against
+- 262 problems: 28 capturing races (eye against no eye, big eye against
   small eye, outside liberties), 13 seki problems and 20 classic textbook
   shapes (straight and bent three, pyramid four, bulky and crossed five,
   rabbity six, rectangular six, seven stones on the second line), each in
-  four languages and graded by measurement. The seki and classic-shape problems
-  are proved with captured points playable again, as on a real board.
+  four languages and graded by measurement.
 
 v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
 with cyclic difficulty labels. v2 removed them.

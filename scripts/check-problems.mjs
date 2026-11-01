@@ -2,7 +2,11 @@
  * Verify the practice problem set (src/web/js/content/problems.js).
  *
  * For every problem: unique id, known topic and goal, a theme from THEMES,
- * four-language title and hint, and the solver's validate(): every chain
+ * four-language title and hint, real-board rules (no `replay: false`: a
+ * captured point can be played again), sealed life and death (a life, kill
+ * or seki problem's key stones cannot reach a liberty outside the problem
+ * area, which nobody may fill; see outsideReach() in solver.js), and the
+ * solver's validate(): every chain
  * breathes, the start is not already decided, the first-move search is exact
  * with 1–3 correct first moves, a `ko: "ok"` problem really resolves to a ko
  * (and only ko problems have the "ko" theme), and the answer line is legal
@@ -21,7 +25,7 @@
 import fs from "node:fs";
 
 import { PROBLEMS, SHAPES, THEMES } from "../src/web/js/content/problems.js";
-import { GOALS as SOLVER_GOALS, createPuzzle, parseDiagram, validate } from "../src/web/js/solver.js";
+import { GOALS as SOLVER_GOALS, createPuzzle, outsideReach, parseDiagram, validate } from "../src/web/js/solver.js";
 import { GRADES_FILE, gradeProblem } from "./grade-problems.mjs";
 
 const TOPICS = new Set(["capture", "escape", "connect", "life", "kill", "race", "technique"]);
@@ -147,6 +151,14 @@ for (const p of PROBLEMS) {
     continue;
   }
   const { pz, d, entry } = graded;
+  // Real-board rules: captured points are always back in play, and a life
+  // or kill problem's key stones may not breathe through a point nobody may
+  // play (a race's walls are taken as alive; see outsideReach()).
+  if (p.replay === false) fail(id, "replay: false is not allowed (captured points are always back in play)");
+  if (pz.lifeGoal) {
+    const reach = outsideReach(pz, { throughCaptures: p.topic !== "race" });
+    if (reach.length) fail(id, `the key stones can reach a liberty outside the problem area at ${reach.map((q) => `(${q.x},${q.y})`).join(" ")}`);
+  }
   // difficulty() has already run solveFirstMoves() and solutionLine();
   // validate() reuses them for the remaining checks.
   const v = validate(pz, { maxCorrect: MAX_CORRECT, first: { correct: d.correct, exact: d.exact }, line: d.line });
