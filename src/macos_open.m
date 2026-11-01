@@ -15,6 +15,7 @@
  * stay in the web layer.
  */
 #import <Cocoa/Cocoa.h>
+#import <objc/runtime.h>
 
 typedef void (*GobanOpenCallback)(void *context, const char *path);
 
