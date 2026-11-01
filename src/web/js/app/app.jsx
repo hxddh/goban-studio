@@ -3,7 +3,7 @@
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
-import { Game, BLACK } from "../rules.js";
+import { Game } from "../rules.js";
 import * as Engine from "../engine.js";
 import * as KataGo from "../katago.js";
 import { t } from "../i18n.js";
@@ -185,6 +185,12 @@ function onKeyDown(e) {
     if (e.key === "Home") return C.reviewGoto(0);
     if (e.key === "End") return C.reviewGoto(Infinity);
   }
+  // ← in a live game steps back into review of that game.
+  if (!reviewing && state.space === "play" && e.key === "ArrowLeft" && !e.target.closest("canvas") && state.game?.game.mainLine().length > 1) {
+    e.preventDefault();
+    C.reviewCurrentGame();
+    return C.reviewStep(-1);
+  }
   if (state.space === "practice" && state.practice.view === "lesson" && e.key === "Enter" && !e.target.closest("button, canvas")) {
     const cur = state.practice.lesson?.cur;
     if (cur && (cur.kind === "read" || cur.result === "right" || cur.status === "won" || cur.answer)) C.lessonContinue();
@@ -268,4 +274,3 @@ export function start() {
   });
 }
 
-void BLACK;

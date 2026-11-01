@@ -279,7 +279,7 @@ export const MESSAGES = {
   "settings.clearBody": m("设置、学习进度、当前对局和所有棋谱都会被删除，无法恢复。", "Settings, progress, the current game and every saved game will be deleted. This cannot be undone.", "설정, 진도, 현재 대국과 저장한 기보가 모두 삭제되며 되돌릴 수 없습니다.", "設定、進捗、対局中の碁、保存した棋譜がすべて削除され、元に戻せません。"),
 
   "shortcuts.title": m("键盘快捷键", "Keyboard shortcuts", "단축키", "キーボードショートカット"),
-  "shortcuts.browse": m("复盘时前后翻手", "Step through a game in review", "복기에서 수 넘기기", "検討で手を進める・戻す"),
+  "shortcuts.browse": m("前后翻手（对局中按 ← 进入复盘）", "Step through moves (← in a live game opens review)", "수 넘기기 (대국 중 ←는 복기로)", "手を進める・戻す（対局中の←で検討へ）"),
   "shortcuts.continue": m("课程中进入下一步", "Next step in a lesson", "강의의 다음 단계", "講座の次のステップ"),
   "shortcuts.board": m("用键盘在棋盘上移动并落子", "Move on the board and place a stone", "키보드로 판 위를 움직이고 착수", "キーボードで盤上を移動して打つ"),
   "shortcuts.close": m("关闭面板或退出专注模式", "Close a panel or leave focus mode", "창 닫기 또는 집중 모드 종료", "パネルを閉じる・集中モード終了"),
