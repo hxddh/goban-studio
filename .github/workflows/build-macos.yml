@@ -50,6 +50,8 @@ jobs:
           git clone --depth 1 --branch v1.16.0 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build" \
             -G Ninja -DUSE_BACKEND=EIGEN -DUSE_AVX2=OFF -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
+            -DEIGEN3_INCLUDE_DIRS="$(brew --prefix eigen)/include/eigen3" \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build "$RUNNER_TEMP/KataGo/cpp/build" --parallel 4
           mkdir -p engine/macos
