@@ -19,6 +19,12 @@ const App = struct {
     env_map: *std.process.Environ.Map,
     io: std.Io,
     allocator: std.mem.Allocator,
+    /// Absolute `frontend/dist` inside the packaged app, or the development
+    /// path when running from the checkout. Native package puts the web
+    /// assets outside `bin` (Windows) / `Contents/MacOS` (macOS); a relative
+    /// path only worked when the process happened to start in the repository.
+    frontend_dist: []const u8 = "frontend/dist",
+    frontend_dist_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     /// 第一个事件(lifecycle.start)到来时记下;窗口拖动 / 标题栏几何要用它的平台服务。
     runtime: ?*native_sdk.Runtime = null,
     engine: engine_mod.Engine = .{},
@@ -56,6 +62,39 @@ const App = struct {
         }
     }
 
+    fn directoryExists(self: *@This(), path: []const u8) bool {
+        var dir = std.Io.Dir.cwd().openDir(self.io, path, .{}) catch return false;
+        dir.close(self.io);
+        return true;
+    }
+
+    /// Resolve the web assets from the executable rather than the caller's
+    /// current directory. The packaged layouts are:
+    ///
+    ///   GobanStudio/bin/goban-studio.exe + GobanStudio/resources/frontend/dist
+    ///   Goban Studio.app/Contents/MacOS/goban-studio + Contents/Resources/frontend/dist
+    ///
+    /// A development build has no package root, so it keeps `frontend/dist`
+    /// relative to the checkout.
+    fn resolveFrontendDist(self: *@This()) void {
+        var exe_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        const exe_len = std.process.executablePath(self.io, &exe_buf) catch 0;
+        if (exe_len > 0) {
+            if (std.fs.path.dirname(exe_buf[0..exe_len])) |exe_dir| {
+                if (std.fs.path.dirname(exe_dir)) |package_root| {
+                    const relative = if (builtin.os.tag == .macos) "Resources/frontend/dist" else "resources/frontend/dist";
+                    if (std.fmt.bufPrint(&self.frontend_dist_buf, "{s}{c}{s}", .{ package_root, std.fs.path.sep, relative })) |candidate| {
+                        if (self.directoryExists(candidate)) {
+                            self.frontend_dist = candidate;
+                            return;
+                        }
+                    } else |_| {}
+                }
+            }
+        }
+        self.frontend_dist = "frontend/dist";
+    }
+
     fn app(self: *@This()) native_sdk.App {
         return .{
             .context = self,
@@ -69,7 +108,7 @@ const App = struct {
     fn source(context: *anyopaque) anyerror!native_sdk.WebViewSource {
         const self: *@This() = @ptrCast(@alignCast(context));
         return native_sdk.frontend.sourceFromEnv(self.env_map, .{
-            .dist = "frontend/dist",
+            .dist = self.frontend_dist,
             .entry = "index.html",
         });
     }
@@ -456,6 +495,7 @@ pub fn main(init: std.process.Init) !void {
     defer app_state.deinit();
     app_state.engine.init(init.io, init.environ_map);
     defer app_state.engine.deinit(init.io);
+    app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);
     try runner.runWithOptions(app_state.app(), .{
