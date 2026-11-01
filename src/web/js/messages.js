@@ -291,7 +291,7 @@ export const MESSAGES = {
   "onboarding.new": m("从没下过", "Never", "처음입니다", "初めてです"),
   "onboarding.newHelp": m("从第一课开始：棋子、气和提子，十分钟就能下第一盘。", "Start with lesson one: stones, liberties and captures. You'll play a first game within minutes.", "1강부터 시작합니다. 돌, 활로, 따내기를 배우고 곧 첫 대국을 둡니다.", "第1課から始めます。石、呼吸点、石の取り方を学び、すぐに最初の一局を打てます。"),
   "onboarding.rules": m("懂规则，刚开始下", "I know the rules", "규칙은 압니다", "ルールは知っています"),
-  "onboarding.rulesHelp": m("在 9 路棋盘上和一个温和的对手下一盘。", "Play a gentle opponent on a 9×9 board.", "9줄 판에서 순한 상대와 한 판 둡니다.", "9路盤でやさしい相手と一局打ちます。"),
+  "onboarding.rulesHelp": m("在标准的 19 路棋盘上和一个温和的对手下一盘。", "Play a gentle opponent on the standard 19×19 board.", "표준 19줄 판에서 순한 상대와 한 판 둡니다.", "標準の19路盤でやさしい相手と一局打ちます。"),
   "onboarding.player": m("我会下", "I play regularly", "꾸준히 둡니다", "よく打ちます"),
   "onboarding.playerHelp": m("告诉我们大概棋力，在 19 路上下一盘。", "Tell us roughly how strong you are and play on 19×19.", "대략적인 기력을 알려 주고 19줄에서 둡니다.", "おおよその棋力を教えて、19路で打ちます。"),
   "onboarding.rankQuestion": m("你大概是什么棋力？", "Roughly how strong are you?", "기력이 대략 어느 정도인가요?", "棋力はどのくらいですか？"),

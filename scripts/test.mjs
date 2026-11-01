@@ -772,6 +772,32 @@ await test("Moka 9x9 assets are present and attributed", () => {
   assert.equal(fs.statSync(path.join(root, "src/web/moka/go-model.bin")).size, model.weightsBytes);
 });
 
+await test("design tokens meet the contrast rules in docs/design.md (light and dark)", () => {
+  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8");
+  const block = (sel) => css.slice(css.indexOf(sel + " {"), css.indexOf("}", css.indexOf(sel + " {")));
+  const tokens = (b) => Object.fromEntries([...b.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const light = tokens(block(":root"));
+  const dark = { ...light, ...tokens(block(':root[data-theme="dark"]')) };
+  for (const [name, t] of [["light", light], ["dark", dark]]) {
+    for (const bg of ["bg", "surface", "sidebar"]) {
+      assert.ok(ratio(t.text, t[bg]) >= 7, `${name} text on ${bg}`);
+      assert.ok(ratio(t["text-2"], t[bg]) >= 4.5, `${name} text-2 on ${bg}: ${ratio(t["text-2"], t[bg]).toFixed(2)}`);
+      assert.ok(ratio(t["text-3"], t[bg]) >= 3, `${name} text-3 on ${bg}: ${ratio(t["text-3"], t[bg]).toFixed(2)}`);
+    }
+    assert.ok(ratio(t["on-primary"], t.text) >= 7, `${name} primary button label`);
+    assert.ok(ratio(t.bad, t.surface) >= 3, `${name} bad on surface`);
+    assert.ok(ratio(t.good, t.surface) >= 3, `${name} good on surface`);
+  }
+});
+
 await test("static page inputs and build script are present", () => {
   for (const file of ["index.html", "styles.css", "js/main.jsx", "js/app/app.jsx"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
