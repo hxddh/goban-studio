@@ -12,6 +12,7 @@
  * Coordinates are zero-based from the top-left: x = column, y = row.
  */
 import GoBoard from "@sabaki/go-board";
+import { APP_VERSION } from "./version.js";
 
 export const BLACK = 1;
 export const WHITE = -1;
@@ -461,7 +462,7 @@ export class Game {
     const sgfColumn = (x) => String.fromCharCode(97 + x + (x >= 8 ? 1 : 0));
     const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
-      "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:1.1.0]SZ[" +
+      "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:" + APP_VERSION + "]SZ[" +
       this.size +
       "]KM[" +
       this.komi +

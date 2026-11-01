@@ -14,6 +14,7 @@ import { LESSONS } from "../src/web/js/content/lessons.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { TSUMEGO } from "../src/web/js/content/tsumego.js";
+import { APP_VERSION } from "../src/web/js/version.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const langs = ["zh", "en", "ko", "ja"];
@@ -53,5 +54,8 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), 
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
 const zonVersion = (appZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1];
 assert.equal(packageJson.version, zonVersion, "package.json and app.zon versions agree");
+assert.equal(APP_VERSION, packageJson.version, "web APP_VERSION agrees with package.json");
+const indexHtml = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+assert.match(indexHtml, new RegExp(`<span class="version">${APP_VERSION}</span>`), "index.html version label agrees");
 
-console.log("release-check: 60 unique lessons · 40 unique openings · 20 classics · 300 puzzles · 4 languages · Japanese rules · licences and native document handler present");
+console.log("release-check: 60 unique lessons · 40 unique openings · 20 classics · 300 puzzles · 4 languages · Japanese rules · licences · version labels · native document handler present");

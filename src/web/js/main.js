@@ -32,6 +32,7 @@ import {
   touchStreak,
 } from "./persist.js";
 import * as Lib from "./library.js";
+import { APP_VERSION } from "./version.js";
 import { lose, pass as soundPass, setSound, stone as soundStone, win } from "./audio.js";
 import {
   hasFileDialogs,
@@ -51,7 +52,6 @@ import {
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const APP_VERSION = "1.1.0";
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
