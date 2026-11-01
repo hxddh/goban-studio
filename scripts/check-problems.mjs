@@ -75,6 +75,34 @@ function canonicalKey({ size, stones }) {
   return best;
 }
 
+/** True when every chain on the board has at least one liberty. */
+function everyChainBreathes(pz, board) {
+  const n = pz.size;
+  const seen = new Uint8Array(board.length);
+  for (let i = 0; i < board.length; i++) {
+    if (!board[i] || seen[i]) continue;
+    let libs = 0;
+    const stack = [i];
+    seen[i] = 1;
+    while (stack.length) {
+      const p = stack.pop();
+      const x = p % n;
+      const y = (p / n) | 0;
+      const nbrs = [x > 0 ? p - 1 : -1, x < n - 1 ? p + 1 : -1, y > 0 ? p - n : -1, y < n - 1 ? p + n : -1];
+      for (const q of nbrs) {
+        if (q < 0) continue;
+        if (board[q] === 0) libs++;
+        else if (board[q] === board[i] && !seen[q]) {
+          seen[q] = 1;
+          stack.push(q);
+        }
+      }
+    }
+    if (!libs) return false;
+  }
+  return true;
+}
+
 let stored = {};
 try {
   stored = JSON.parse(fs.readFileSync(GRADES_FILE, "utf8"));
@@ -122,6 +150,11 @@ for (const p of PROBLEMS) {
   if (d.correct.length > MAX_CORRECT) fail(id, `${d.correct.length} correct first moves (max ${MAX_CORRECT})`);
 
   let st = initialState(pz);
+  // The start must be undecided: e.g. a capture target that already has
+  // `escape` liberties counts as escaped before the learner moves.
+  if (!everyChainBreathes(pz, st.board)) fail(id, "a chain in the diagram has no liberties");
+  const start = status(pz, st);
+  if (start !== "open") fail(id, `starting position is already ${start}`);
   let legal = true;
   for (const m of d.line) {
     const next = play(pz, st, indexOf(pz, m.x, m.y));

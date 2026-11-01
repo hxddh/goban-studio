@@ -208,7 +208,7 @@ export const MESSAGES = {
   "grade.5": m("挑战", "Challenge", "도전", "挑戦"),
 
   "topic.capture": m("吃子", "Capturing", "따내기", "石を取る"),
-  "topic.capture.desc": m("打吃方向、征子、枪口、倒扑、紧气。", "Atari direction, ladders, nets, snapbacks, shortage of liberties.", "단수 방향, 축, 장문, 환격, 수 줄이기.", "アタリの方向、シチョウ、ゲタ、ウッテガエシ、ダメヅマリ。"),
+  "topic.capture.desc": m("打吃方向、征子、双打吃、紧气。", "Atari direction, ladders, double atari, shortage of liberties.", "단수 방향, 축, 양단수, 수 줄이기.", "アタリの方向、シチョウ、両アタリ、ダメヅマリ。"),
   "topic.escape": m("逃子", "Escaping", "도망", "石を助ける"),
   "topic.escape.desc": m("长气、连回、反打吃。", "Extend, connect home, counter-atari.", "늘기, 연결, 역단수.", "延び、つなぎ、逆アタリ。"),
   "topic.connect": m("连接与切断", "Connect & cut", "연결과 끊기", "つなぎと切り"),
@@ -216,7 +216,7 @@ export const MESSAGES = {
   "topic.life": m("做活", "Living", "삶", "生き"),
   "topic.life.desc": m("扩大眼位，抢占要点，做出两只眼。", "Widen your eye space, take the vital point, make two eyes.", "궁도를 넓히고 급소를 차지해 두 눈을 만드세요.", "眼形を広げ、急所に打って二眼を作ります。"),
   "topic.kill": m("杀棋", "Killing", "잡기", "殺し"),
-  "topic.kill.desc": m("点眼、缩小眼位、制造假眼。", "Vital points, reducing eye space, false eyes.", "급소, 궁도 줄이기, 옥집 만들기.", "急所、眼形を狭める、欠け眼。"),
+  "topic.kill.desc": m("点眼、缩小眼位、破眼。", "Vital points, reducing eye space, destroying eyes.", "급소, 궁도 줄이기, 눈 없애기.", "急所、眼形を狭める、眼を奪う。"),
   "topic.race": m("对杀", "Capturing races", "수상전", "攻め合い"),
   "topic.race.desc": m("数清气，先紧外气。", "Count liberties; fill the outside ones first.", "수를 세고 바깥 공배부터 메우세요.", "ダメを数え、外ダメから詰めます。"),
   "topic.technique": m("手筋", "Techniques", "맥", "手筋"),
