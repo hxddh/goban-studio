@@ -9,6 +9,7 @@ import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
+import { storyText } from "./story.js";
 import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
@@ -491,15 +492,30 @@ export function ReviewView() {
         marks.push({ x: m.x, y: m.y, type: "candidate", rank: i, label: String(Math.round(wr * 100)) });
       });
   }
+  // A story step hides the stones its moves have captured.
+  let board = node.board.signMap;
+  let varMoves = r.variation ? r.variation.moves : null;
+  if (r.variation?.story) {
+    const km = r.keyMoves.find((k) => k.index === r.variation.index);
+    const steps = (km?.story?.[r.variation.kind] || []).slice(0, r.variation.step + 1);
+    const gone = new Set(steps.flatMap((st) => (st.captured || []).map((p) => p.x + "," + p.y)));
+    if (gone.size) {
+      board = board.map((row, y) => row.map((v, x) => (gone.has(x + "," + y) ? 0 : v)));
+      // A stone of the line itself can be captured later in the line.
+      const lastAt = new Map();
+      varMoves.forEach((m, i) => lastAt.set(m.x + "," + m.y, i));
+      varMoves = varMoves.filter((m, i) => lastAt.get(m.x + "," + m.y) === i && !steps.slice(m.n).some((st) => (st.captured || []).some((p) => p.x === m.x && p.y === m.y)));
+    }
+  }
   const model = {
     size: game.size,
-    board: node.board.signMap,
+    board,
     lastMove: node.move,
     marks,
     ownership: C.reviewOwnershipMap(),
     territory: null,
     deadStones: [],
-    variation: r.variation ? r.variation.moves : null,
+    variation: varMoves,
     moveNumbers: r.variation ? null : moveNumbers(game),
     showCoords: s.settings.coords,
     material: s.settings.board,
@@ -686,31 +702,70 @@ function sentenceFor(km, size) {
 function KeyMove({ km }) {
   const r = state.review;
   const size = r.game.size;
-  const active = r.variation?.index === km.index ? r.variation.kind : null;
+  const v = r.variation?.index === km.index ? r.variation : null;
+  const open = r.focus === km.index;
+  const story = km.story;
+  const line = v?.story ? v.kind : null;
+  const steps = line ? story?.[line] || [] : [];
+  const canBetter = story?.better?.length > 0;
+  const canPlayed = story?.played?.length > 0;
   return (
-    <li class={`key-move ${active ? "on" : ""}`}>
-      <button type="button" class="key-head" onClick={() => C.focusMistake(km)}>
+    <li class={`key-move ${open ? "on" : ""}`}>
+      <button type="button" class="key-head" aria-expanded={open} onClick={() => C.focusMistake(km)}>
         <Stone color={km.move.color} size={12} />
         <span>{t("review.moveLabel", [km.index, colorName(km.move.color), coordLabel(km.move.x, km.move.y, size)])}</span>
         <em>{t("review.lossN", [formatPoints(Math.round(km.loss * 2) / 2)])}</em>
       </button>
-      <p>{sentenceFor(km, size)}</p>
-      {km.theme && <span class="chip theme-chip">{t("explain.looksLike", [C.themeName(km.theme)])}</span>}
-      <div class="seg-mini">
-        <button type="button" class={active === "played" ? "on" : ""} onClick={() => C.showVariation(km, "played")}>
-          {t("review.showPlayed")}
-        </button>
-        {km.best && !km.best.pass && (
-          <button type="button" class={active === "better" ? "on" : ""} onClick={() => C.showVariation(km, "better")}>
-            {t("review.showBetter")}
-          </button>
-        )}
-        {km.best && !km.best.pass && (
-          <button type="button" onClick={() => C.practiceThis(km)}>
-            {t("review.practiceThis")}
-          </button>
-        )}
-      </div>
+      {open && (
+        <>
+          <p>{story?.summary ? storyText(story.summary) : sentenceFor(km, size)}</p>
+          <div class="seg-mini">
+            {km.attribution?.kind && <span class="chip theme-chip">{t("lossKind." + km.attribution.kind)}</span>}
+            {km.theme && <span class="chip theme-chip">{t("explain.looksLike", [C.themeName(km.theme)])}</span>}
+          </div>
+          <div class="seg-mini" role="group" aria-label={t("story.title")}>
+            {canBetter ? (
+              <button type="button" class={line === "better" ? "on" : ""} onClick={() => C.showStory(km, "better", 0)}>
+                {t("story.better")}
+              </button>
+            ) : (
+              km.best &&
+              !km.best.pass && (
+                <button type="button" class={v?.kind === "better" ? "on" : ""} onClick={() => C.showVariation(km, "better")}>
+                  {t("review.showBetter")}
+                </button>
+              )
+            )}
+            {canPlayed ? (
+              <button type="button" class={line === "played" ? "on" : ""} onClick={() => C.showStory(km, "played", 0)}>
+                {t("story.played")}
+              </button>
+            ) : (
+              <button type="button" class={v?.kind === "played" ? "on" : ""} onClick={() => C.showVariation(km, "played")}>
+                {t("review.showPlayed")}
+              </button>
+            )}
+            {km.best && !km.best.pass && (
+              <button type="button" onClick={() => C.practiceThis(km)}>
+                {t("review.practiceThis")}
+              </button>
+            )}
+          </div>
+          {steps.length > 0 && (
+            <ol class="story" aria-label={t("story.title")}>
+              {steps.map((st, i) => (
+                <li>
+                  <button type="button" class={i === v.step ? "on" : ""} aria-current={i === v.step ? "step" : undefined} onClick={() => C.showStory(km, line, i)}>
+                    <span class="sn">{st.n}</span>
+                    <span>{storyText(st)}</span>
+                  </button>
+                </li>
+              ))}
+              {line === "played" && story.playedFrom === "game" && <li class="fine">{t("story.playedGame")}</li>}
+            </ol>
+          )}
+        </>
+      )}
     </li>
   );
 }
@@ -791,6 +846,7 @@ function ReviewPanel() {
           )}
           <section class="key-moves">
             <h2 class="slot-title">{t("review.keyMoves")}</h2>
+            {r.refining && <p class="fine">{t("story.refining")}</p>}
             {r.keyMoves.length ? (
               <ol>
                 {r.keyMoves.map((km) => (

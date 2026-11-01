@@ -229,6 +229,10 @@ function onKeyDown(e) {
   }
   if (state.sheet || typing || e.altKey) return;
   const reviewing = state.review && (state.review.meta.space || "play") === state.space;
+  if (reviewing && state.review.variation?.story && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    e.preventDefault();
+    return C.storyStep(e.key === "ArrowLeft" ? -1 : 1);
+  }
   if (reviewing && !state.review.guess) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
