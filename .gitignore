@@ -1,0 +1,13 @@
+.native/
+zig-out/
+.zig-cache/
+node_modules/
+dist/
+.DS_Store
+*.log
+_legacy_native/
+src/web/js/worker-src.js
+
+frontend/dist/
+src/web/js/bundle.js
+.amp/

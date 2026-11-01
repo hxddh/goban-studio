@@ -1,0 +1,24 @@
+{
+  "name": "goban-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Goban Studio — a beginner-first Go (围棋 · 바둑 · 囲碁) app for macOS and Windows.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/bundle.mjs",
+    "sync": "node scripts/sync-dist.mjs",
+    "test": "node scripts/test.mjs",
+    "verify": "npm test && npm run build && npm run sync",
+    "package:macos": "bash scripts/package.sh"
+  },
+  "dependencies": {
+    "@sabaki/go-board": "1.4.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

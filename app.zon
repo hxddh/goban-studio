@@ -1,0 +1,42 @@
+.{
+    .id = "dev.hxddh.gobanstudio",
+    .name = "goban-studio",
+    .display_name = "Goban Studio",
+    .description = "Goban Studio — a beginner-first Go (围棋 · 바둑 · 囲碁) app for macOS & Windows.",
+    .version = "1.0.0",
+    .icons = .{"assets/icon.png"},
+    .platforms = .{ "macos", "windows" },
+    .permissions = .{},
+    .capabilities = .{"webview"},
+    .frontend = .{
+        .dist = "frontend/dist",
+        .entry = "index.html",
+        .spa_fallback = true,
+    },
+    .file_associations = .{
+        .{
+            .name = "Go game record (SGF)",
+            .role = "viewer",
+            .extensions = .{"sgf"},
+            .mime_types = .{"application/x-go-sgf"},
+        },
+    },
+    .security = .{
+        .navigation = .{
+            .allowed_origins = .{ "zero://app", "zero://inline", "http://127.0.0.1:5173" },
+            .external_links = .{ .action = "deny" },
+        },
+    },
+    .web_engine = "system",
+    .windows = .{
+        .{
+            .label = "main",
+            .title = "Goban Studio",
+            .width = 1200,
+            .height = 900,
+            .min_width = 720,
+            .min_height = 720,
+            .restore_state = true,
+        },
+    },
+}
