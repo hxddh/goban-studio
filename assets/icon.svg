@@ -1,37 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#efd2a3"/>
-      <stop offset="0.55" stop-color="#dcb681"/>
-      <stop offset="1" stop-color="#c99a61"/>
+    <linearGradient id="wood" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#ecc68a"/>
+      <stop offset="0.55" stop-color="#deb173"/>
+      <stop offset="1" stop-color="#cf9d5d"/>
     </linearGradient>
-    <radialGradient id="black" cx="0.34" cy="0.28" r="0.8">
-      <stop offset="0" stop-color="#74746e"/>
-      <stop offset="0.55" stop-color="#242422"/>
-      <stop offset="1" stop-color="#050505"/>
+    <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6e0" stop-opacity="0.55"/>
+      <stop offset="0.12" stop-color="#fff6e0" stop-opacity="0"/>
+      <stop offset="0.9" stop-color="#5a3510" stop-opacity="0"/>
+      <stop offset="1" stop-color="#5a3510" stop-opacity="0.28"/>
+    </linearGradient>
+    <radialGradient id="black" cx="0.36" cy="0.3" r="0.78">
+      <stop offset="0" stop-color="#4a4b4e"/>
+      <stop offset="0.5" stop-color="#1c1c1e"/>
+      <stop offset="1" stop-color="#09090a"/>
     </radialGradient>
-    <radialGradient id="white" cx="0.34" cy="0.28" r="0.8">
+    <radialGradient id="white" cx="0.36" cy="0.3" r="0.8">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.6" stop-color="#f2ecde"/>
-      <stop offset="1" stop-color="#c7c0af"/>
+      <stop offset="0.55" stop-color="#f3f1ea"/>
+      <stop offset="1" stop-color="#c9c6bd"/>
     </radialGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#3a2410" flood-opacity="0.32"/>
-    </filter>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.7" stop-color="#3a2108" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#3a2108" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="body"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
   </defs>
-  <rect x="32" y="32" width="960" height="960" rx="214" fill="#b68552"/>
-  <rect x="48" y="48" width="928" height="928" rx="200" fill="#dcb681"/>
-  <g stroke="#4a3018" stroke-width="9" opacity="0.52">
-    <path d="M208 208H816M208 360H816M208 512H816M208 664H816M208 816H816"/>
-    <path d="M208 208V816M360 208V816M512 208V816M664 208V816M816 208V816"/>
+  <g clip-path="url(#body)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#wood)"/>
+    <g stroke="#3b250f" stroke-opacity="0.62" stroke-width="7" fill="none"><path d="M212 100V924M100 212H924"/><path d="M412 100V924M100 412H924"/><path d="M612 100V924M100 612H924"/><path d="M812 100V924M100 812H924"/></g>
+    <circle cx="425.5421356237309" cy="433.6674169979695" r="148.96349186104044" fill="url(#shadow)"/>
+    <circle cx="625.5421356237309" cy="633.6674169979696" r="148.96349186104044" fill="url(#shadow)"/>
+    <circle cx="412" cy="412" r="135.42135623730948" fill="url(#black)"/>
+    <circle cx="612" cy="612" r="135.42135623730948" fill="url(#white)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#lip)"/>
   </g>
-  <g fill="#4a3018" opacity="0.7">
-    <circle cx="360" cy="360" r="11"/><circle cx="512" cy="360" r="11"/><circle cx="664" cy="360" r="11"/>
-    <circle cx="360" cy="512" r="11"/><circle cx="512" cy="512" r="11"/><circle cx="664" cy="512" r="11"/>
-    <circle cx="360" cy="664" r="11"/><circle cx="512" cy="664" r="11"/><circle cx="664" cy="664" r="11"/>
-  </g>
-  <circle cx="430" cy="430" r="128" fill="#1c1c1a"/>
-  <circle cx="664" cy="664" r="128" fill="#f5efe2"/>
-  <ellipse cx="390" cy="386" rx="32" ry="20" fill="#ffffff" opacity="0.20" transform="rotate(-30 390 386)"/>
-  <ellipse cx="624" cy="620" rx="34" ry="21" fill="#ffffff" opacity="0.85" transform="rotate(-30 624 620)"/>
 </svg>

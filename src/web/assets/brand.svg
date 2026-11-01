@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Goban Studio</title>
+  <circle cx="20.4" cy="20.4" r="15.455" fill="#1b1a17"/>
+  <circle cx="43.6" cy="43.6" r="13.855" fill="#fbf8f1" stroke="#1b1a17" stroke-width="3.2"/>
+</svg>
