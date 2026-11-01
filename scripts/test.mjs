@@ -798,6 +798,12 @@ await test("design tokens meet the contrast rules in docs/design.md (light and d
   }
 });
 
+await test("the native-speaker review sheet matches messages.js", () => {
+  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8").replace(/^\ufeff/, "");
+  const keys = csv.split("\n").slice(1).filter(Boolean).map((l) => JSON.parse(l.slice(0, l.indexOf('",') + 1)));
+  assert.deepEqual(keys, Object.keys(MESSAGES), "run: node scripts/export-strings.mjs");
+});
+
 await test("static page inputs and build script are present", () => {
   for (const file of ["index.html", "styles.css", "js/main.jsx", "js/app/app.jsx"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
