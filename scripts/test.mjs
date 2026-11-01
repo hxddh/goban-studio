@@ -928,7 +928,7 @@ await test("v4: the native update commands are fixed to this repository", () => 
   const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
   const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
-  assert.match(messages, /\/\/ v4 release\n/);
+  assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
