@@ -32,8 +32,8 @@ const App = struct {
     /// once it is ready; keeping the queue here also covers an event that
     /// arrives before the webview has subscribed.
     open_paths: std.ArrayList([]u8) = .empty,
-    handlers: [8]native_sdk.BridgeHandler = undefined,
-    policies: [8]native_sdk.BridgeCommandPolicy = undefined,
+    handlers: [9]native_sdk.BridgeHandler = undefined,
+    policies: [9]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -153,6 +153,11 @@ const App = struct {
             .name = "studio.selftest",
             .context = self,
             .invoke_fn = selftestConfig,
+        };
+        self.handlers[8] = .{
+            .name = "studio.katagoAnalyze",
+            .context = self,
+            .invoke_fn = katagoAnalyze,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -431,6 +436,36 @@ fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, out
     return std.fmt.bufPrint(output, "{{\"ok\":true,\"move\":\"{s}\"}}", .{move}) catch error.HandlerFailed;
 }
 
+/// A full KataGo search report for the position: the page uses it for the
+/// opponent at every strength, hints, the review curve and dead stones.
+/// Same request shape as katagoMove; the reply carries KataGo's final
+/// `info` line and its chosen move, unparsed.
+fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
+    const color_raw = jsonStringField(invocation.request.payload, "color") orelse return error.InvalidRequest;
+    var color_buf: [8]u8 = undefined;
+    const color = jsonUnescape(color_raw, &color_buf) orelse return error.InvalidRequest;
+
+    var script_buf: [96 * 1024]u8 = undefined;
+    const dec = std.base64.standard.Decoder;
+    const script_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
+    if (script_len > script_buf.len) return error.InvalidRequest;
+    dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
+
+    const result = self.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
+        error.InvalidRequest => return error.InvalidRequest,
+        else => return error.HandlerFailed,
+    };
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, "{\"ok\":true,\"play\":")) return error.HandlerFailed;
+    if (!jsonAppendString(output, &n, result.play)) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, ",\"info\":")) return error.HandlerFailed;
+    if (!jsonAppendString(output, &n, result.info)) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    return output[0..n];
+}
+
 fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
@@ -439,7 +474,7 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     const ready = self.engine.available();
     return std.fmt.bufPrint(
         output,
-        "{{\"available\":{s},\"engine\":\"KataGo 19x19\",\"version\":\"{s}\"}}",
+        "{{\"available\":{s},\"engine\":\"KataGo\",\"analyze\":true,\"version\":\"{s}\"}}",
         .{ if (ready) "true" else "false", version },
     ) catch error.HandlerFailed;
 }

@@ -623,3 +623,20 @@ export function difficulty(pz) {
 }
 
 export { PASS };
+
+/** The learner's winning moves from `st` (learner to move). For hints. */
+export function winningMoves(pz, st) {
+  const keyIdx = keyIndices(pz);
+  const out = [];
+  for (const m of candidates(pz, st, keyIdx)) {
+    if (userWins(pz, m.next).win) out.push(pointOf(pz, m.i));
+  }
+  return out;
+}
+
+/** Board as rows of signs, for the renderer. */
+export function signMap(pz, st) {
+  const rows = [];
+  for (let y = 0; y < pz.size; y++) rows.push(Array.from(st.board.subarray(y * pz.size, (y + 1) * pz.size)));
+  return rows;
+}

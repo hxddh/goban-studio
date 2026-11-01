@@ -47,6 +47,7 @@ fs.mkdirSync(path.join(dist, "licenses"), { recursive: true });
 fs.copyFileSync(path.join(root, "LICENSE"), path.join(dist, "licenses", "Goban-Studio-MIT.txt"));
 const licenseSources = [
   [path.join(root, "node_modules", "@sabaki", "go-board", "LICENSE"), "sabaki-go-board-MIT.txt"],
+  [path.join(root, "node_modules", "preact", "LICENSE"), "Preact-MIT.txt"],
   [path.join(src, "moka", "LICENSE"), "Moka-MIT.txt"],
   [path.join(src, "fonts", "Inter-OFL.txt"), "Inter-OFL.txt"],
   [path.join(root, "engine", "model", "LICENSE-KataGo.txt"), "KataGo-MIT.txt"],

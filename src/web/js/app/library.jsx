@@ -1,0 +1,206 @@
+/**
+ * Library: the game in progress, my games, classic games, pro openings.
+ */
+import * as Lib from "../library.js";
+import { t } from "../i18n.js";
+import { state, update } from "./store.js";
+import * as C from "./controller.js";
+import { ReviewView, rankLabel } from "./play.jsx";
+import { Button, Icon, MoreMenu, Segmented, Thumb } from "./parts.jsx";
+
+export function LibraryView() {
+  if (state.review && state.review.meta.space === "library") return <ReviewView />;
+  const L = state.library;
+  return (
+    <div class="page">
+      <div class="drag" data-drag />
+      <header class="page-head row-head">
+        <div>
+          <h1>{t("nav.library")}</h1>
+          <p class="muted">{t("library.caption")}</p>
+        </div>
+        <Button icon="upload" onClick={C.pickImport}>
+          {t("library.import")}
+        </Button>
+      </header>
+      <ContinueCard />
+      <div class="tabs-row">
+      <Segmented
+        class="tabs"
+        label={t("nav.library")}
+        value={L.tab}
+        onChange={(v) => update((s) => (s.library = { ...s.library, tab: v }))}
+        options={[
+          { value: "mine", label: t("library.mine") },
+          { value: "classics", label: t("library.classics") },
+          { value: "openings", label: t("library.openings") },
+        ]}
+      />
+      </div>
+      {L.tab === "mine" && <MyGames />}
+      {L.tab === "classics" && <Classics />}
+      {L.tab === "openings" && <Openings />}
+    </div>
+  );
+}
+
+function ContinueCard() {
+  const g = state.game;
+  if (!g || g.game.moveNumber === 0 || g.game.current.result) return null;
+  return (
+    <section class="card continue">
+      <Thumb thumb={Lib.thumbnail(g.game)} size={g.game.size} />
+      <div>
+        <span class="eyebrow">{t("library.inProgress")}</span>
+        <strong>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</strong>
+        <span class="muted">{g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.strength)]) : t("library.twoPlayers")}</span>
+      </div>
+      <Button kind="primary" onClick={C.continueCurrent}>
+        {t("library.continue")}
+      </Button>
+    </section>
+  );
+}
+
+function fmtDate(value) {
+  try {
+    const lang = state.settings.lang;
+    return new Date(value).toLocaleDateString(lang === "zh" ? "zh-CN" : lang, { year: "numeric", month: "short", day: "numeric" });
+  } catch (_) {
+    return "";
+  }
+}
+
+function recordTitle(g) {
+  if (g.name) return g.name;
+  if (g.source === "import") return t("library.untitled");
+  return g.opponent === "ai" ? t("library.vsEngine", [g.strength ? rankLabel(g.strength) : "KataGo"]) : t("library.twoPlayers");
+}
+
+function outcome(g) {
+  if (!g.result) return { label: t("library.unfinished"), cls: "" };
+  if (g.source === "import" || g.opponent !== "ai") return { label: C.resultText(g.result), cls: "" };
+  const won = g.result.startsWith("B") === (g.humanColor !== -1);
+  return { label: won ? t("library.won") : t("library.lost"), cls: won ? "good" : "bad" };
+}
+
+function MyGames() {
+  const L = state.library;
+  const all = Lib.listGames();
+  const games = Lib.filterGames(all, { kind: L.kind, query: L.query });
+  const set = (patch) => update((s) => (s.library = { ...s.library, ...patch }));
+  if (!all.length) {
+    return (
+      <section class="empty">
+        <Icon name="library" size={28} />
+        <h2>{t("library.empty")}</h2>
+        <p class="muted">{t("library.emptyHelp")}</p>
+        <div class="actions center">
+          <Button kind="primary" onClick={() => C.openSheet("newGame")}>
+            {t("common.newGame")}
+          </Button>
+          <Button onClick={C.pickImport}>{t("library.import")}</Button>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <>
+      <div class="filters">
+        <div class="chips" role="radiogroup" aria-label={t("library.filter")}>
+          {["all", "won", "lost", "imported"].map((k) => (
+            <button type="button" role="radio" aria-checked={L.kind === k} class={`chip ${L.kind === k ? "on" : ""}`} onClick={() => set({ kind: k })}>
+              {t("library.kind." + k)}
+            </button>
+          ))}
+        </div>
+        <label class="search">
+          <Icon name="search" size={15} />
+          <input type="search" placeholder={t("library.search")} aria-label={t("library.search")} value={L.query} onInput={(e) => set({ query: e.currentTarget.value })} />
+        </label>
+      </div>
+      {games.length === 0 ? (
+        <p class="muted center-text">{t("library.noMatch")}</p>
+      ) : (
+        <ul class="game-grid">
+          {games.map((g) => {
+            const o = outcome(g);
+            return (
+              <li class="game-card">
+                <button type="button" class="game-open" onClick={() => C.openRecord(g.id)} aria-label={`${recordTitle(g)} · ${o.label}`}>
+                  <Thumb thumb={g.thumb} size={g.size} />
+                  <span class="game-text">
+                    <strong>{recordTitle(g)}</strong>
+                    <span class="muted">
+                      {fmtDate(g.updatedAt)} · {g.size}×{g.size} · {t("play.moveN", [g.moves])}
+                    </span>
+                    <span class={`outcome ${o.cls}`}>{o.label}</span>
+                  </span>
+                </button>
+                <MoreMenu
+                  id={"rec-" + g.id}
+                  items={[
+                    {
+                      icon: "edit",
+                      label: t("library.rename"),
+                      onClick: () => C.openSheet("rename", { id: g.id, name: g.name || "" }),
+                    },
+                    { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportRecord(g.id) },
+                    "-",
+                    { icon: "trash", label: t("common.delete"), danger: true, onClick: () => C.deleteRecord(g.id) },
+                  ]}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function Classics() {
+  const p = state.progress;
+  return (
+    <ul class="collection">
+      {C.CLASSICS.map((g) => (
+        <li>
+          <button type="button" class={`collection-row ${p.classics[g.id]?.done ? "done" : ""}`} onClick={() => C.openClassic(g.id)}>
+            <span class="collection-main">
+              <strong>{C.tx(g.title)}</strong>
+              <span class="muted">
+                {C.tx(g.blackName)} · {C.tx(g.whiteName)}
+              </span>
+            </span>
+            <span class="fine">
+              {g.date} · {g.result}
+            </span>
+            {p.classics[g.id]?.done && <Icon name="check" size={15} />}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Openings() {
+  const p = state.progress;
+  return (
+    <>
+      <p class="muted section-sub">{t("library.openingsHelp")}</p>
+      <ul class="collection">
+        {C.OPENINGS.map((o, i) => (
+          <li>
+            <button type="button" class={`collection-row ${p.openings[o.id]?.done ? "done" : ""}`} onClick={() => C.openOpening(o.id)}>
+              <span class="collection-no">{String(i + 1).padStart(2, "0")}</span>
+              <span class="collection-main">
+                <strong>{C.tx(o.title)}</strong>
+              </span>
+              {p.openings[o.id]?.done && <Icon name="check" size={15} />}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}

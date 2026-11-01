@@ -2,7 +2,8 @@
  * Launch a packaged Goban Studio and wait for the page's self-test report.
  *
  * The report is written by the real WebView after it has initialized the
- * native bridge and asked KataGo for one legal move. This is the step that
+ * native bridge, run KataGo's analysis on 9×9 and 19×19, and chosen a move
+ * in a handicap game. This is the step that
  * distinguishes "the executable linked" from "the app a player double-clicks
  * actually starts".
  *
@@ -61,10 +62,11 @@ if (!report) {
 
 const checks = report.checks || {};
 const failed = Object.entries(checks).filter(([, value]) => value !== true).map(([key]) => key);
-const ok = report.ok === true && report.boardSize === 19 && checks.bridge === true && checks.engine === true && failed.length === 0;
+const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove"];
+const ok = report.ok === true && report.boardSize === 19 && required.every((k) => checks[k] === true) && failed.length === 0;
 console.log(JSON.stringify(report, null, 2));
 if (!ok) {
   console.error("selftest: failed checks:", failed.join(", ") || "report.ok/boardSize/engine");
   process.exit(1);
 }
-console.log(`selftest: packaged app opened 19×19 and KataGo answered ${report.engineMove}`);
+console.log(`selftest: packaged app analysed 9×9 and 19×19 with KataGo and played ${report.engineMove} in a handicap game`);
