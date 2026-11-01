@@ -154,6 +154,12 @@ export class BoardView {
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
     Object.assign(this.model, patch);
+    // A new board size (or problem window) invalidates the keyboard cursor
+    // and the hover point: they could now lie off the board.
+    if (this.model.size !== prevSize) {
+      this.model.cursor = null;
+      this.model.hover = null;
+    }
     if (patch.interactive === false) {
       this.model.hover = null;
       this.model.cursor = null;
@@ -286,7 +292,8 @@ export class BoardView {
   /** Keyboard: move the cursor inside the visible window. */
   moveCursor(dx, dy) {
     const win = this.window();
-    const c = this.model.cursor || { x: Math.round((win.x0 + win.x1) / 2), y: Math.round((win.y0 + win.y1) / 2) };
+    const inside = (p) => p && p.x >= win.x0 && p.x <= win.x1 && p.y >= win.y0 && p.y <= win.y1;
+    const c = (inside(this.model.cursor) && this.model.cursor) || { x: Math.round((win.x0 + win.x1) / 2), y: Math.round((win.y0 + win.y1) / 2) };
     this.model.cursor = {
       x: Math.max(win.x0, Math.min(win.x1, c.x + dx)),
       y: Math.max(win.y0, Math.min(win.y1, c.y + dy)),

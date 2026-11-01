@@ -171,6 +171,8 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
   await page.click(".preset >> nth=2");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
+  // Type once the new 9×9 board is on screen, as a person would.
+  await page.waitForFunction(() => window.__board?.model.size === 9);
   await page.focus("canvas.board");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
