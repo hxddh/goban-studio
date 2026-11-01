@@ -246,6 +246,26 @@ export function openProblem(id, { daily = null } = {}) {
  * Today's five: mistakes from your own games that are due, then problems on
  * your weakest theme, then due reviews and new problems at your level.
  */
+const GOAL_TOPICS = { capture: ["capture"], save: ["escape", "connect"], live: ["life"], kill: ["kill"] };
+
+/**
+ * New problems for today's five. Someone still working through the course
+ * only gets topics their finished lessons have taught (capturing from the
+ * start), so a beginner is never handed a vital-point kill on day two.
+ */
+export function dailyPool() {
+  const p = state.progress;
+  const lessons = allLessons();
+  const done = lessons.filter(({ lesson }) => p.lessons[lesson.id]?.done);
+  const beginner = state.settings.experience === "new" || (state.settings.playerRank ?? 30) >= 25;
+  if (!beginner || done.length >= lessons.length) return PROBLEMS;
+  const topics = new Set(["capture"]);
+  for (const { lesson } of done) for (const st of lesson.steps || []) for (const tp of GOAL_TOPICS[st.problem?.goal] || []) topics.add(tp);
+  if (done.length >= lessons.length * 0.75) topics.add("race").add("technique");
+  const pool = PROBLEMS.filter((x) => topics.has(x.topic));
+  return pool.length >= 5 ? pool : PROBLEMS;
+}
+
 export function buildDaily(now = Date.now()) {
   const p = state.progress;
   const items = [];
@@ -256,7 +276,7 @@ export function buildDaily(now = Date.now()) {
     const pool = problemsOfTheme(weak.theme).filter((x) => !p.problems[x.id]?.solved);
     for (const x of pool.slice(0, 2)) if (items.length < 4) items.push({ kind: "p", id: x.id, why: weak.theme });
   }
-  const rest = dailySet(p, PROBLEMS.filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
+  const rest = dailySet(p, dailyPool().filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
   for (const x of rest) items.push({ kind: "p", id: x.id });
   return items.slice(0, 5);
 }
@@ -420,7 +440,9 @@ export function feedbackKey(P) {
   if (!P) return null;
   if (P.feedback === "solved") return P.result === "seki" ? "practice.solvedSeki" : "practice.solved";
   if (P.feedback === "ko") return "practice.onlyKo";
-  if (P.feedback === "wrong") return P.result === "seki" && P.pz.userColor === P.pz.attacker ? "practice.onlySeki" : "practice.wrongExplained";
+  // The position resets by itself after a wrong move, so the message says so
+  // instead of pointing at buttons.
+  if (P.feedback === "wrong") return P.result === "seki" && P.pz.userColor === P.pz.attacker ? "practice.onlySeki" : "practice.resetting";
   return null;
 }
 

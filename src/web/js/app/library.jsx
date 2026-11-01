@@ -147,7 +147,7 @@ function MyGames() {
                     {
                       icon: "edit",
                       label: t("library.rename"),
-                      onClick: () => C.openSheet("rename", { id: g.id, name: g.name || "" }),
+                      onClick: () => C.openSheet("rename", { id: g.id, name: g.name || recordTitle(g) }),
                     },
                     { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportRecord(g.id) },
                     "-",
@@ -177,7 +177,7 @@ function Classics() {
               </span>
             </span>
             <span class="fine">
-              {g.date} · {g.result}
+              {String(g.date).split("..")[0]} · {C.resultText(g.result)}
             </span>
             {p.classics[g.id]?.done && <Icon name="check" size={15} />}
           </button>

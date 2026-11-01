@@ -222,7 +222,7 @@ kbd { font: 500 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; backgr
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 13px; background: transparent; color: var(--text-2); font: 500 12px/1 var(--font); cursor: pointer; }
 .chip:hover { color: var(--text); }
-.chip.on { background: var(--text); border-color: var(--text); color: var(--on-primary); }
+.chip.on { background: var(--fill-2); border-color: transparent; color: var(--text); }
 .theme-chip { cursor: default; height: 22px; border-color: var(--line); font-size: 11px; }
 
 .switch { cursor: pointer; }
@@ -652,3 +652,7 @@ button.group-row:hover { background: var(--fill); }
 .shape-chips .chip { height: 32px; padding: 0 12px; gap: 8px; font-size: 13px; }
 .chip-count { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 11px; }
 .chip.done .chip-count { color: var(--good); }
+:root:lang(ko) body { word-break: keep-all; }
+.score-detail { display: flex; flex-direction: column; gap: 1px; }
+.score-detail i { font-style: normal; white-space: nowrap; }
+.celebrate .fine { display: inline-flex; align-items: center; gap: 4px; }

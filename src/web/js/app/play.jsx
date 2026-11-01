@@ -325,6 +325,7 @@ function PlayPanel() {
               items={[
                 { icon: "bulb", label: t("common.hint"), kbd: `${SHIFT}${MOD}H`, onClick: C.askHint, disabled: !myTurn || g.thinking },
                 { icon: "chart", label: t("play.reviewSoFar"), onClick: C.reviewCurrentGame, disabled: game.mainLine().length < 2 },
+                { icon: "check", label: t("play.countNow"), onClick: C.acceptCount, disabled: game.moveNumber < game.size * 2 },
                 "-",
                 { icon: "save", label: g.saved ? t("play.saveAgain") : t("play.save"), onClick: () => C.saveToLibrary(), disabled: game.moveNumber === 0 },
                 { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportSGF() },
@@ -363,14 +364,14 @@ function ScoringCard() {
           <strong>
             <CountUp value={pending ? 0 : s.black} format={formatPoints} />
           </strong>
-          <span>{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory])}</span>
+          <span class="score-detail">{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory]).split(" · ").map((x) => <i>{x}</i>)}</span>
         </div>
         <div>
           <Stone color={WHITE} size={14} />
           <strong>
             <CountUp value={pending ? 0 : s.white} format={formatPoints} />
           </strong>
-          <span>{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)])}</span>
+          <span class="score-detail">{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)]).split(" · ").map((x) => <i>{x}</i>)}</span>
         </div>
       </div>
       {!pending && <p class="score-result enter-fade">{C.resultText(s.result)}</p>}
@@ -782,7 +783,7 @@ function LiveLine() {
         <i style={{ width: `${b}%` }} />
       </div>
       <span class="fine">
-        {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
+        {t("review.estimateAt", [Math.max(0, C.reviewIndex())])} · {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
         {live && !r.live.done ? ` · ${t("review.liveSearching")}` : ""}
       </span>
       {live && !r.variation && !r.guess && <span class="fine">{t("review.candidatesLegend")}</span>}
@@ -794,7 +795,7 @@ function Variations() {
   const r = state.review;
   const inVar = !C.onMainLine();
   const branches = C.branchPoints();
-  if (!inVar && !branches.length) return <p class="fine">{t("review.tryHint")}</p>;
+  if (!inVar && !branches.length) return null;
   return (
     <section class="variations">
       {inVar && (
@@ -820,10 +821,22 @@ function Variations() {
           ))}
         </ul>
       )}
-      {!inVar && <p class="fine">{t("review.tryHint")}</p>}
       {void r}
     </section>
   );
+}
+
+/** No key mistakes: praise only a player who did not fall behind. */
+function noMistakesText(r) {
+  if (r.meta.classic || r.meta.opening || r.meta.source === "import") return t("review.noKeyMovesNeutral");
+  const line = r.game.mainLine();
+  const res = line[line.length - 1].result || "";
+  const pts = r.points.filter(Boolean);
+  const lead = pts.length ? pts[pts.length - 1].scoreLead : 0;
+  const me = r.meta.humanColor ?? (r.source === "current" && state.game?.opponent === "ai" ? state.game.humanColor : null);
+  if (me == null) return t("review.noKeyMovesNeutral");
+  const lost = res ? res.startsWith("B") !== (me === BLACK) : me * lead < -2;
+  return lost ? t("review.noKeyMovesBehind") : t("review.noKeyMoves");
 }
 
 function ReviewPanel() {
@@ -854,7 +867,7 @@ function ReviewPanel() {
                 ))}
               </ol>
             ) : (
-              <p class="muted">{r.analyzing ? t("review.waiting") : t("review.noKeyMoves")}</p>
+              <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
             )}
           </section>
           <Variations />

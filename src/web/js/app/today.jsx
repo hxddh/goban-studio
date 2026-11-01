@@ -123,7 +123,7 @@ export function TodayView() {
             </span>
             <span class="gr-text">
               <strong>{dailyDone ? t("practice.dailyFinished") : t("practice.dailyTitle")}</strong>
-              <span>{dueMistakes ? t("today.dailyMistakes", [Math.min(2, dueMistakes)]) : t("practice.dailyHelp")}</span>
+              <span>{dailyDone ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : dueMistakes ? t("today.dailyMistakes", [Math.min(2, dueMistakes)]) : t("practice.dailyHelp")}</span>
             </span>
             <DailyDots daily={daily} />
             {!dailyDone && (
@@ -180,6 +180,7 @@ export function TodayView() {
           ))}
         </ul>
 
+        {r?.games > 0 && (
         <section class="section level enter-up">
           <div class="level-text">
             <span class="eyebrow">{t("today.level")}</span>
@@ -188,6 +189,7 @@ export function TodayView() {
           </div>
           {r && <Sparkline history={r.history} />}
         </section>
+        )}
 
         {recent.length > 0 && (
           <section class="section">

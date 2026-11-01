@@ -177,7 +177,7 @@ dark, in all four languages, before every release:
 - [ ] Every edge aligns to the 8 px grid; no element is off by 1–3 px.
 - [ ] Text uses only the type tokens; no bold (700) anywhere.
 - [ ] The accent appears at most once per region and never on a button.
-- [ ] No empty card, no panel with dead space taller than 48 px.
+- [ ] No empty card, no dead space taller than 48 px inside a group (a panel footer anchored to the bottom is intended).
 - [ ] No explanatory grey text visible that is not needed right now.
 - [ ] Board lines are crisp at 1× and 2×; star points and stones to spec.
 - [ ] Focus ring visible on every interactive element via keyboard.

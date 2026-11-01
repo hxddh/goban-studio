@@ -83,8 +83,8 @@ export const MESSAGES = {
 
   "score.title": m("数目", "Counting", "계가", "整地"),
   "score.judging": m("正在判断死活…", "Judging dead stones…", "사석을 판단하는 중…", "死に石を判定しています…"),
-  "score.engineMarked": m("KataGo 已标出死子。点一块棋可以改。", "KataGo marked the dead stones. Tap a group to change it.", "KataGo가 사석을 표시했습니다. 돌을 눌러 바꿀 수 있습니다.", "KataGoが死に石を示しました。石をタップすると変更できます。"),
-  "score.manual": m("点死掉的棋子，把它们标为死子。", "Tap the dead groups to mark them.", "죽은 돌을 눌러 사석으로 표시하세요.", "死んでいる石をタップして死に石にします。"),
+  "score.engineMarked": m("KataGo 已标出死子。点一块棋可以改。", "KataGo marked the dead stones. Click a group to change it.", "KataGo가 사석을 표시했습니다. 돌을 눌러 바꿀 수 있습니다.", "KataGoが死に石を示しました。石をタップすると変更できます。"),
+  "score.manual": m("点死掉的棋子，把它们标为死子。", "Click the dead groups to mark them.", "죽은 돌을 눌러 사석으로 표시하세요.", "死んでいる石をクリックして死に石にします。"),
   "score.detail": m("地 {0} · 提子 {1}", "Territory {0} · captures {1}", "집 {0} · 사석 {1}", "地 {0} · アゲハマ {1}"),
   "score.detailKomi": m("地 {0} · 提子 {1} · 贴 {2}", "Territory {0} · captures {1} · komi {2}", "집 {0} · 사석 {1} · 덤 {2}", "地 {0} · アゲハマ {1} · コミ {2}"),
   "score.confirm": m("确认结果", "Accept result", "결과 확인", "結果を確定"),
@@ -139,7 +139,7 @@ export const MESSAGES = {
 
   "newGame.board": m("棋盘", "Board", "바둑판", "碁盤"),
   "newGame.quick": m("快棋 · 约 10 分钟", "Quick · ~10 min", "속기 · 약 10분", "早碁 · 約10分"),
-  "newGame.medium": m("中盘 · 约 25 分钟", "Medium · ~25 min", "중간 · 약 25분", "中くらい · 約25分"),
+  "newGame.medium": m("中盘 · 约 25 分钟", "Medium · ~25 min", "중간 · 약 25분", "手ごろ · 約25分"),
   "newGame.full": m("标准棋盘 · 约 1 小时", "Standard · ~1 hr", "표준 · 약 1시간", "標準 · 約1時間"),
   "newGame.opponent": m("对手", "Opponent", "상대", "相手"),
   "newGame.computer": m("电脑", "Computer", "컴퓨터", "コンピュータ"),
@@ -354,7 +354,7 @@ export const MESSAGES = {
   "play.timeUp": m("时间到了。", "Time is up.", "시간이 다 됐습니다.", "時間切れです。"),
   "play.clock": m("剩余时间", "Time left", "남은 시간", "残り時間"),
   "play.evalLabel": m("形势", "Balance", "형세", "形勢"),
-  "play.evalText": m("{0}领先约 {1} 目", "{0} ahead by about {1}", "{0}가 약 {1}집 앞섬", "{0}が約{1}目リード"),
+  "play.evalText": m("{0}领先约 {1} 目", "{0} ahead by about {1}", "{0}이 약 {1}집 앞섬", "{0}が約{1}目リード"),
   "play.moveList": m("手顺", "Moves", "수순", "手順"),
   "play.noMoves": m("还没有落子。", "No moves yet.", "아직 둔 수가 없습니다.", "まだ着手はありません。"),
   "play.showAll": m("全部 {0} 手", "All {0}", "전체 {0}수", "全{0}手"),
@@ -403,7 +403,7 @@ export const MESSAGES = {
   "review.backToMain": m("回到实战", "Back to the game", "실전으로", "実戦に戻る"),
   "review.deleteVariation": m("删除这个变化", "Delete this variation", "이 변화 삭제", "この変化を削除"),
   "review.variations": m("变化", "Variations", "변화", "変化"),
-  "review.branchAt": m("第 {0} 手有 {1} 个变化", "{1} variation(s) at move {0}", "{0}수째 변화 {1}개", "{0}手目に変化 {1}"),
+  "review.branchAt": m("第 {0} 手有 {1} 个变化", "Variations at move {0}: {1}", "{0}수째 변화 {1}개", "{0}手目に変化 {1}"),
   "review.tryHint": m("在棋盘上落子即可试下变化。", "Play on the board to try a variation.", "판 위에 두면 변화를 시험할 수 있습니다.", "盤上に打つと変化を試せます。"),
   "review.liveToggle": m("实时分析", "Live analysis", "실시간 분석", "リアルタイム解析"),
   "review.liveSearching": m("计算中", "searching", "계산 중", "計算中"),
@@ -450,6 +450,11 @@ export const MESSAGES = {
   "theme.race-shared": m("对杀：公气", "Race: shared liberties", "수상전: 공동 공배", "攻め合い：内ダメ"),
 
   // v4 ui
+  "review.noKeyMovesBehind": m("没有哪一手特别大的失误，差距是一点点拉开的。点曲线找到转折点。", "No single big mistake — the lead slipped away gradually. Click the chart to find where.", "결정적인 실수 하나는 없습니다. 차이가 조금씩 벌어졌습니다. 그래프를 눌러 전환점을 찾아보세요.", "大きな悪手はありませんが、差は少しずつ開きました。グラフをクリックして転機を探しましょう。"),
+  "review.noKeyMovesNeutral": m("这盘棋没有超过 2 目的单手损失。", "No single move in this game lost more than 2 points.", "이 대국에서 2집 넘게 손해 본 수는 없습니다.", "この対局で2目以上損をした手はありません。"),
+  "review.estimateAt": m("第 {0} 手的形势", "At move {0}", "{0}수째 형세", "{0}手目の形勢"),
+  "practice.resetting": m("这步不对，看看对方怎么应。马上重来…", "Not this one — see the answer, then it resets…", "이 수는 아닙니다. 상대의 응수를 보세요. 곧 다시 시작합니다…", "この手ではありません。応手を見てください。すぐにやり直します…"),
+  "practice.finishDaily": m("完成", "Finish", "완료", "完了"),
   "today.quick9": m("来盘 9 路快棋", "Or a quick 9×9", "9줄 속기 한 판", "9路で早碁を一局"),
 
   // v4 review

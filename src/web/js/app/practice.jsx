@@ -345,7 +345,7 @@ function ProblemFeedback({ P, success }) {
   if (P.feedback === "solved") return <p class="feedback good">{P.result === "seki" ? t(C.feedbackKey(P)) : success || t("practice.solved")}</p>;
   if (P.feedback === "ko" || P.feedback === "wrong") return <p class="feedback bad">{t(C.feedbackKey(P))}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
-  if (P.feedback === "retry") return <p class="feedback bad">{t("practice.retryNow")}</p>;
+  if (P.feedback === "retry" && !P.hintAt) return <p class="feedback">{t("practice.retryNow")}</p>;
   if (P.busy) return <p class="feedback muted">{t("practice.answering")}</p>;
   return null;
 }
@@ -363,17 +363,12 @@ function ProblemControls({ P, onNext, nextLabel }) {
           {t("common.hint")}
         </Button>
       )}
-      {(P.status === "lost" || P.answer || P.history.length > 0) && (
-        <Button kind={P.status === "lost" ? "secondary" : "ghost"} icon="replay" onClick={C.retryProblem}>
+      {P.status !== "lost" && (P.answer || P.history.length > 0) && (
+        <Button kind="ghost" icon="replay" onClick={C.retryProblem}>
           {t("practice.retry")}
         </Button>
       )}
-      {P.status === "lost" && (
-        <Button kind="ghost" icon="undo" onClick={C.undoProblemMove}>
-          {t("practice.takeBack")}
-        </Button>
-      )}
-      {P.status !== "won" && !P.answer && (
+      {P.status === "open" && !P.answer && (
         <Button kind="ghost" onClick={C.showAnswer}>
           {t("practice.showAnswer")}
         </Button>
@@ -414,7 +409,7 @@ function ProblemView() {
         </p>
         {P.hintAt || P.used ? <p class="note">{C.tx(def.hint)}</p> : null}
         <ProblemFeedback P={P} />
-        <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t("practice.nextDaily") : t("practice.nextProblem")} />
+        <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t(daily.index >= daily.items.length - 1 ? "practice.finishDaily" : "practice.nextDaily") : t("practice.nextProblem")} />
         {!daily && (
           <footer class="panel-foot">
             <button type="button" class="link" onClick={C.prevProblem} disabled={n <= 1}>
@@ -439,7 +434,7 @@ function LessonView() {
     const next = C.nextLesson();
     return (
       <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} />
+      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} />
       <div class="page center-page">
         <section class="card celebrate">
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
@@ -567,7 +562,7 @@ function DailyDone() {
   const streak = state.progress.streak?.count || 0;
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.daily")} />
     <div class="page center-page">
       <section class="card celebrate">
         <span class="eyebrow">{t("practice.daily")}</span>

@@ -244,8 +244,16 @@ export class BoardView {
     const shortest = Math.max(1, Math.min(w, h));
     // Margin in cells: room for coordinates outside the grid, or a quiet
     // border when they are hidden. Clamped so a hidden board stays positive.
-    const marginCells = this.model.showCoords ? 1.25 : 0.8;
-    const cell = Math.max(0.001, shortest / (span + marginCells * 2));
+    // On a small board the cells are large; the coordinate margin is capped
+    // in pixels so the letters stay close to the grid.
+    // Margin = min(wantCells × cell, half a stone + a fixed band): on large
+    // cells the band (coordinates or a quiet edge) no longer grows with them.
+    const wantCells = this.model.showCoords ? 1.25 : 0.8;
+    const band = this.model.showCoords ? 34 : 14;
+    const cellA = shortest / (span + wantCells * 2);
+    const cellB = (shortest - band * 2) / (span + 1);
+    const cell = Math.max(0.001, cellA, cellB);
+    const marginCells = Math.min(wantCells, 0.5 + band / cell);
     const gridW = cell * cols;
     const gridH = cell * rows;
     const ox = (w - gridW) / 2 - win.x0 * cell;
@@ -406,7 +414,7 @@ export class BoardView {
       ctx.font = `500 ${fs}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const gap = cell * 0.8;
+      const gap = Math.min(cell * 0.8, cell * 0.5 + 18);
       for (let x = win.x0; x <= win.x1; x++) {
         ctx.fillText(LETTERS[x], px(x), py(win.y1) + gap + ext(win.y1 < size - 1) * 0.6);
       }

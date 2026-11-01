@@ -529,6 +529,7 @@ function RenameSheet({ id, name }) {
         type="text"
         data-autofocus
         value={value}
+        onFocus={(e) => e.currentTarget.select()}
         maxLength={120}
         aria-label={t("library.rename")}
         onInput={(e) => setValue(e.currentTarget.value)}
