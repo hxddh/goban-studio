@@ -114,7 +114,10 @@ export class BoardView {
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
     Object.assign(this.model, patch);
-    if (patch.interactive === false) this.model.hover = null;
+    if (patch.interactive === false) {
+      this.model.hover = null;
+      this.model.cursor = null;
+    }
     const board = this.model.board;
     if (prevBoard && board && prevSize === this.model.size && prevBoard !== board) {
       const now = performance.now();

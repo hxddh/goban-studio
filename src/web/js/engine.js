@@ -89,8 +89,12 @@ function moverLead(move, color) {
  * test suite.
  */
 export function pickCandidate(analysis, color, strength, rnd = Math.random) {
-  const moves = analysis.moves.filter((m) => (m.visits || 0) > 0 && Number.isFinite(m.scoreLead));
+  let moves = analysis.moves.filter((m) => (m.visits || 0) > 0 && Number.isFinite(m.scoreLead));
   if (!moves.length) return analysis.play;
+  // Pass only when it is the engine's own first choice: a weak level may
+  // misjudge a fight, but it never gives up a turn at random.
+  if (moves[0].pass) return { pass: true };
+  moves = moves.filter((m) => !m.pass);
   const best = Math.max(...moves.map((m) => moverLead(m, color)));
   if (strength.temp === 0) return toMove(moves[0]);
   let pool = moves.filter((m) => best - moverLead(m, color) <= strength.maxLoss);

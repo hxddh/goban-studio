@@ -146,9 +146,11 @@ function PlayPanel() {
         <PlayerRow color={BLACK} />
         <PlayerRow color={WHITE} />
       </section>
-      <p class="status-line" aria-live="off">
-        {statusText(g)}
-      </p>
+      {!g.scoring && !game.current.result && (
+        <p class="status-line" aria-live="off">
+          {statusText(g)}
+        </p>
+      )}
       {g.scoring && <ScoringCard />}
       {game.current.result && !g.scoring && <ResultCard />}
       {playing && (
@@ -236,7 +238,7 @@ function ResultCard() {
     <section class="card result-card" aria-live="polite">
       <span class="eyebrow">{t("play.gameOver")}</span>
       <strong class="result-big">{C.resultHeadline(g)}</strong>
-      <span class="muted">{C.resultText(r)}</span>
+      {C.resultHeadline(g) !== C.resultText(r) && <span class="muted">{C.resultText(r)}</span>}
       {aids.length > 0 && <span class="fine">{aids.join(" · ")}</span>}
       <div class="actions center">
         <Button kind="primary" icon="chart" onClick={C.reviewCurrentGame}>

@@ -165,7 +165,7 @@ function NewGameSheet() {
         {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
 
         <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
-          <Icon name={advanced ? "prev" : "next"} size={14} /> {t("newGame.advanced")}
+          <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
           <span class="fine">{t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}</span>
         </button>
         {advanced && (

@@ -1,10 +1,11 @@
 # Goban Studio
 
-A calm, offline Go app for macOS and Windows. Learn the first stone, play a
-friend or the built-in opponent, then review the game and keep the record.
+A calm, offline Go app for macOS and Windows. Learn from the first stone,
+play a computer opponent that is as strong as you want it to be, and review
+every game with KataGo.
 
 **Languages:** 中文 · English · 한국어 · 日本語  
-**Board:** standard 19×19 by default; 9×9 and 13×13 for teaching and quick games · Japanese rules · komi and handicap
+**Boards:** 9×9, 13×13, 19×19 · Japanese rules · komi and handicap up to nine stones
 
 Goban Studio is the Go application built alongside — not instead of — the
 existing Gomoku app. It deliberately uses a different bundle ID
@@ -18,41 +19,75 @@ existing Gomoku app. It deliberately uses a different bundle ID
 | macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
 
-`SHA256SUMS` is attached to every GitHub release. The full v1.1.1 notes are in
-[`.github/release-notes/v1.1.1.md`](.github/release-notes/v1.1.1.md).
+`SHA256SUMS` is attached to every GitHub release. The v2.0.0 notes are in
+[`.github/release-notes/v2.0.0.md`](.github/release-notes/v2.0.0.md).
 
-## What is here
+## Three places, one board
 
-- **Play** — tap intersections on a canvas board. Captures, suicide, simple ko
-  and positional superko are checked locally. Play 9/13/19 boards under
-  Japanese rules, with komi, up to nine handicap stones, and a human or
-  computer opponent at five levels. On 19×19 the packaged app starts the
-  bundled KataGo sidecar; 9×9 uses the bundled Moka v2.1 INT8 network; 13×13
-  keeps the local heuristic opponent. Both sidebars retract independently
-  during play, and the layout choice is remembered.
-- **Scoring** — two passes enter scoring. Tap dead stones, see territory and
-  prisoners, confirm the result, or resume play. A one-colour region counts
-  only when it is separated from at least one side of the board, so an open
-  board or a gapped wall is dame, not territory.
-- **Review** — a whole-game evaluation curve, key-move list and influence
-  overlay. The evaluator is a local heuristic and the UI labels it as such;
-  it is useful for finding turning points, not a dan-level analysis report.
-- **Learn** — 60 distinct lessons (20 foundation lessons plus 40 distinct
-  reading positions), 40 professional opening layouts with 40 unique
-  titles and eight-move lines, 20 classic games and 300 tsumego drills, all
-  in the four launch languages, with hints, retry, answer and spaced review.
-- **Library** — SGF import/export, saved games, a 200-game cap, and automatic
-  saving of the current game. Double-clicking an `.sgf` opens it on macOS and
-  Windows, and a record that declares a non-Japanese ruleset is rejected with
-  an explanation rather than silently re-scored.
-- **Settings** — language, wood/night/paper board themes, coordinates, move
-  numbers, sound and default difficulty.
+- **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
+  dan), or two players on one board. Handicap is suggested from your level.
+  The panel shows only the players, whose turn it is, **Pass** (with a
+  confirmation) and **Undo**; hint, review-so-far, save, export, focus mode
+  and resign sit behind one menu. When both players pass, KataGo marks the
+  dead stones and the score counts up; you accept it or keep playing.
+  Finished games go to the Library automatically; abandoned ones never do.
+- **Review** is a mode of any game, not a place: your current game, a saved
+  game, an imported SGF, a classic. KataGo analyses every position (win rate
+  and score lead), draws the balance of the game, and lists the three moves
+  that lost the most, each with the move played and KataGo's better line to
+  play through on the board. Territory estimate, “guess the next move” and
+  “play from here” are one click away.
+- **Practice** — a course that starts from zero (units → multi-step lessons
+  with explanation, placement exercises and live problems), problem
+  collections by topic, and a daily five with spaced review. Every problem is
+  answered live by a built-in solver: a wrong move is met with the real
+  refutation on the board, a right move with the most stubborn defence.
+- **Library** — the game in progress (“Continue”), your games with
+  thumbnails, filters (won / lost / imported) and search, 20 classic games
+  and 40 professional openings to replay as guess-the-move drills. SGF import
+  and export; double-clicking an `.sgf` opens it on macOS and Windows; a
+  record that declares a non-Japanese ruleset is rejected with an
+  explanation rather than silently re-scored.
+- **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
+  wood/paper/slate board, coordinates, move numbers, sound, your level.
+- **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
+  ⌘1/2/3 places, ←/→ through a review, and the board itself is playable with
+  Tab, the arrow keys and Space (⌘/ lists them all; Ctrl on Windows).
 - **Offline by design** — no account, no network request, no telemetry.
+
+## Honest content
+
+The course and the problems are verified, not counted:
+
+- `scripts/check-problems.mjs` proves every problem with the solver in
+  `src/web/js/solver.js`: it must have between one and three correct first
+  moves, the solution line must end in a won position, no two problems may be
+  the same shape under rotation or reflection, and the difficulty grade in
+  `problem-grades.json` must match a fresh measurement (solution length,
+  proof size and number of tempting wrong moves).
+- `scripts/check-course.mjs` checks every lesson in four languages and proves
+  every lesson problem the same way.
+- The solver treats a ko or an unsettled position as a failure for the
+  attacker, so a problem is only listed when its answer is unconditional.
+
+v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
+with cyclic difficulty labels. v2 removed them.
+
+## Engine
+
+The packaged app ships KataGo 1.18.1 (Eigen CPU build) with the b6c96
+network and uses it on every board size, through one bridge command
+(`studio.katagoAnalyze`) that returns KataGo's search report: candidates
+with visits, win rate, score lead, principal variations and ownership. The
+opponent's strength comes from the visit budget and from choosing among
+those candidates within a per-rank loss window; ranks are approximate and
+labelled “≈”. In the browser preview there is no KataGo: 9×9 falls back to
+Moka v2.1 and other sizes to a small heuristic engine, and the interface
+says so wherever it matters.
 
 ## Run the web app
 
-Requires Node.js 24 or newer. The desktop build uses the latest Node 26 LTS
-in CI.
+Requires Node.js 24 or newer.
 
 ```bash
 npm ci
@@ -62,8 +97,7 @@ python3 -m http.server 4173 --directory frontend/dist
 ```
 
 Open <http://127.0.0.1:4173>. The page is the exact asset bundle the desktop
-shell serves. The browser preview has no sidecar process, so it uses the local
-19×19 fallback; KataGo is active in the packaged desktop app.
+shell serves.
 
 ## Test
 
@@ -73,18 +107,21 @@ npm run release-check
 ```
 
 The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
-and rules rejection, all four language tables, 60 distinct lesson positions,
-40 unique opening titles and lines, every classic and puzzle line, the
-opponent's legality, the KataGo bridge request, review analysis and library
-persistence. It runs in Node without a browser or native SDK.
+and rules rejection, every UI string in four languages (and that every key
+the interface uses exists), the solver on classic shapes and ladders,
+Benson's unconditional life, every practice problem and course lesson, the
+KataGo report parser and strength picker, the native bridge request,
+handicap suggestion, v1 → v2 data migration, library rules and the
+spaced-review ladder. It runs in Node without a browser or native SDK.
 
 ## Desktop shell
 
 The macOS/Windows shell uses the Native SDK and the system WebView. It is
 intentionally thin: `src/main.zig` wires the window, bridge, document-open
-queue and the KataGo sidecar; `src/macos_open.m` receives the macOS Apple
-Event that a double-clicked `.sgf` produces; `src/runner.zig` is the platform
-runner; the app itself lives in `src/web`.
+queue and the KataGo sidecar; `src/engine.zig` owns the persistent GTP
+process and its narrow command vocabulary; `src/macos_open.m` receives the
+macOS Apple Event that a double-clicked `.sgf` produces; `src/runner.zig` is
+the platform runner.
 
 On a machine with Node.js 24+, Zig 0.16.0 and Native SDK 0.11.0:
 
@@ -97,92 +134,48 @@ native package --target macos --signing adhoc --assets frontend/dist \
 node scripts/install-engine.mjs dist/GobanStudio.app macos
 ```
 
-`scripts/package.sh` wraps the build, packaging, sidecar install, signing, zip
-and `~/Applications/GobanStudio.app` install for macOS. The release workflows
-also run `scripts/selftest-app.mjs` against the packaged executable: the real
-WebView writes a report after the native bridge and KataGo answer a probe.
+`scripts/package.sh` wraps the build, packaging, sidecar install, signing,
+zip and install for macOS. The release workflows run
+`scripts/selftest-app.mjs` against the packaged executable: the real WebView
+writes a report after KataGo has analysed a 9×9 and a 19×19 position
+(win rate, score lead and ownership) and chosen a move in a handicap game.
 
 The KataGo binary is copied into the package after `native package` because
-the SDK asset bundler caps a single asset at 16 MiB. `scripts/install-engine.mjs`
-places it at `…/frontend/dist/engine/<platform>/`, next to the network and
-config, where `src/engine.zig` resolves it.
+the SDK asset bundler caps a single asset at 16 MiB.
 
 ## Release
 
-The release flow follows the Chessboard model: one `release.yml` dispatch
-builds both platforms, runs the content and native gates, and only then creates
-the tag and GitHub Release. Release notes live in
-`.github/release-notes/<tag>.md`.
+One `release.yml` dispatch builds both platforms, runs the content and
+native gates, and only then creates the tag and GitHub Release. Release
+notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v1.1.1
+gh workflow run release.yml -f tag=v2.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
-publishing. The macOS job builds KataGo from the v1.18.1 source with the Eigen
-backend; the Windows job downloads the matching official Eigen build and ships
-its DLLs. v1.18.1 is the latest KataGo release with official Eigen CPU
-binaries; v1.18.2 only changes the CUDA Turing attention path. The Windows zip
-is produced by `scripts/make-zip.py` (forward slashes
-and Unix mode bits), and `SHA256SUMS` is uploaded with all three assets.
+publishing.
 
 ## Architecture
 
 ```
-src/web/index.html       shell markup
-src/web/styles.css       layout, themes, four-language font stacks
-src/web/js/main.js       view orchestration and the single canvas
-src/web/js/rules.js      Game tree, legality, Japanese scoring, SGF export
-src/web/js/sgf.js        dependency-free FF[4] reader
-src/web/js/board.js      canvas renderer and hit testing
-src/web/js/ai.js         KataGo bridge, Moka 9×9 and the local fallback
-src/web/js/katago.js     native bridge client for the 19×19 sidecar
-src/web/js/review.js     evaluation curve and key moves
-src/web/js/content/      lessons, openings, classics and tsumego in four languages
-src/web/js/i18n.js       one key → four strings, with missing-key fallback
-src/web/js/persist.js    guarded localStorage access
-src/web/js/library.js    saved SGF records and current game
-src/engine.zig           persistent KataGo GTP child process
-src/main.zig             Native SDK entry, bridge, window, open-file queue
-src/macos_open.m         macOS kAEOpenDocuments Apple Event handler
-src/runner.zig           platform runner
-engine/model/            KataGo network, config and licence
-packaging/               first-launch notes shipped inside the archives
+src/web/index.html            shell markup (one root element)
+src/web/styles.css            design tokens, light/dark, every component
+src/web/js/main.jsx           entry
+src/web/js/app/store.js       one state object, update(), toasts, announcements
+src/web/js/app/controller.js  everything the app does (play, review, practice, library)
+src/web/js/app/*.jsx          views: shell, play + review, practice, library, sheets
+src/web/js/board.js           canvas renderer: zoom windows, overlays, keyboard cursor
+src/web/js/engine.js          one engine interface: strength ladder, hints, review, dead stones
+src/web/js/katago.js          native bridge client and KataGo report parser
+src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engine
+src/web/js/solver.js          life-and-death / capturing solver for practice
+src/web/js/rules.js           game tree, legality, Japanese scoring, SGF export
+src/web/js/sgf.js             dependency-free FF[4] reader
+src/web/js/content/           course, problems (+ measured grades), openings, classics
+src/web/js/i18n.js            one key → four strings
+src/web/js/persist.js         guarded storage, v1 → v2 migration, spaced review
+src/web/js/library.js         saved games and the current game
+src/engine.zig                persistent KataGo GTP child process
+src/main.zig                  Native SDK entry, bridge, window, open-file queue
 ```
-
-The rule layer is independent of the renderer and DOM. Content is data, so a
-translation never changes the Go position. The generated
-`src/web/js/bundle.js` and `frontend/dist/` are build outputs and are ignored
-by Git; `npm run build` and `npm run sync` recreate them.
-
-## Honest limits
-
-- The 19×19 engine is the small b6c96 KataGo network on CPU (Eigen), not a
-  GPU-scale analysis engine. It is a genuine KataGo MCTS opponent with five
-  visit budgets, but it is not presented as a fixed dan rank.
-- The 60-lesson course is 20 foundation lessons plus 40 distinct reading
-  positions drawn from the drill bank; it is a complete v1 curriculum, not a
-  claim to a sixty-hour professional course.
-- The 300 drills are 25 hand-checked base shapes plus deterministic
-  symmetry/translation practice variants.
-- Review remains a local shape/influence estimate, separate from KataGo; the
-  UI labels it as such instead of claiming KataGo win-rate analysis.
-- Japanese scoring is a territory count after the player marks dead stones.
-  It does not adjudicate disputed life-and-death or seki for the player;
-  Japanese rules require the players to agree on those.
-- SGF support covers ordinary FF[4] game records, setup stones, comments,
-  passes, marks and variations. It does not attempt every SGF property.
-- macOS is ad-hoc signed and Windows has no Authenticode signature: both need
-  certificates. The archive READMEs give the exact first-launch steps and the
-  release does not imply a trust level it cannot provide.
-- macOS/Windows packaging, WebView rendering and code signing are exercised by
-  the release workflows, not by the Linux orb.
-
-## Licence
-
-MIT. `@sabaki/go-board` is MIT; Moka is MIT and its notices are in
-`src/web/moka/`; Inter is licensed under the SIL Open Font License (see
-`src/web/fonts/Inter-OFL.txt`). KataGo is MIT; the sidecar licence and model
-notice are in `engine/model/`. `npm run sync` copies the app licence and every
-third-party notice into `frontend/dist/licenses/`, so each archive carries
-them.
