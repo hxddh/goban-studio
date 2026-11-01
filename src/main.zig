@@ -99,7 +99,7 @@ const App = struct {
         return .{
             .context = self,
             .name = "goban-studio",
-            .source = native_sdk.frontend.productionSource(.{ .dist = "frontend/dist" }),
+            .source = native_sdk.frontend.productionSource(.{ .dist = self.frontend_dist }),
             .source_fn = source,
             .event_fn = onEvent,
         };
