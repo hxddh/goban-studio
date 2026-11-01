@@ -510,6 +510,43 @@ await test("the solver tells a ko from an unconditional result and survives repe
   assert.equal(S.status(corner, S.initialState(corner)), "lost");
 });
 
+await test("real-board rules: a captured point can be played again, and only replay: false keeps it empty", () => {
+  // The old kill-false-eye-01: Black's atari captures four stones, but White
+  // retakes on the captured point and lives. It only "worked" while a
+  // captured point stayed out of play.
+  const diagram = [", , , ,", "X X X X", "X O O O", "X X . O", ", X O .", ", X O O", ", X o O", ", X O ."];
+  const real = S.createPuzzle({ goal: "kill", corner: "br", diagram });
+  assert.equal(real.replay, true, "replay is the default");
+  assert.deepEqual(localCorrect(real), []);
+  assert.equal(S.status(real, S.initialState(real)), "lost");
+  const old = S.createPuzzle({ goal: "kill", corner: "br", diagram, replay: false });
+  assert.deepEqual(localCorrect(old), ["2,3"]);
+});
+
+await test("outsideReach() finds key stones that could breathe through a point nobody may play", () => {
+  // The old life-expand-03: the first-line point above the eye space is ','.
+  const open = [", , ,", ". O O", ". X O", ". X O", ". x O", ". X O", ". . O", "O O O", ", , ,"];
+  const pz = S.createPuzzle({ goal: "live", at: [0, 8], diagram: open });
+  assert.deepEqual(S.outsideReach(pz), [{ x: 0, y: 8 }]);
+  // Closed by a white stone the group is dead, which is the real answer.
+  const sealed = S.createPuzzle({ goal: "live", at: [0, 8], diagram: ["O , ,", ...open.slice(1)] });
+  assert.deepEqual(S.outsideReach(sealed), []);
+  assert.equal(S.status(sealed, S.initialState(sealed)), "lost");
+  // Through captures: capturing a cutting stone to run out is still running out.
+  const cut = S.createPuzzle({ goal: "live", corner: "tl", diagram: [". x O . ,", "X X X O ,", "O O O O ,", ", , , , ,"] });
+  assert.equal(S.outsideReach(cut).length > 0, true);
+  assert.deepEqual(S.outsideReach(cut, { throughCaptures: false }), []);
+});
+
+await test("a result that rests on superko is not reused on another line (the answer line stays a win)", () => {
+  // The old life-vital-02: before results that depend on a repetition above
+  // them stopped being cached, the answer line wandered into a loss.
+  const pz = S.createPuzzle({ goal: "live", corner: "br", diagram: [", , , , , ,", ", , O O O O", ", O O X X x", ", O X X . .", ", O . O . .", ", O . X . ."] });
+  const v = S.validate(pz);
+  assert.deepEqual(v.reasons, []);
+  assert.deepEqual(localCorrect(pz), ["4,4"]);
+});
+
 await test("the solver's validate() rejects a start that is already decided", () => {
   // Already captured in all but name: two liberties and no way out.
   const dead = S.createPuzzle({ goal: "capture", corner: "tl", diagram: ["o . X .", ". X . .", "X . . .", ". . . ."] });

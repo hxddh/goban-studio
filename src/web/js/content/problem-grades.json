@@ -380,7 +380,7 @@
   },
   "cut-04": {
     "grade": 3,
-    "score": 9.2,
+    "score": 9.3,
     "moves": 2,
     "correct": [
       {
@@ -473,7 +473,7 @@
   },
   "cut-02": {
     "grade": 3,
-    "score": 8.3,
+    "score": 8.4,
     "moves": 2,
     "correct": [
       {
@@ -554,17 +554,6 @@
       {
         "x": 17,
         "y": 9
-      }
-    ]
-  },
-  "life-expand-01": {
-    "grade": 3,
-    "score": 8.4,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 7,
-        "y": 0
       }
     ]
   },
@@ -653,31 +642,9 @@
       }
     ]
   },
-  "life-expand-02": {
-    "grade": 3,
-    "score": 7.8,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 11,
-        "y": 18
-      }
-    ]
-  },
-  "life-expand-03": {
-    "grade": 3,
-    "score": 9.4,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 0,
-        "y": 9
-      }
-    ]
-  },
   "life-false-eye-01": {
-    "grade": 1,
-    "score": 5.2,
+    "grade": 2,
+    "score": 6.6,
     "moves": 1,
     "correct": [
       {
@@ -939,17 +906,6 @@
       }
     ]
   },
-  "kill-rectangle-six-02": {
-    "grade": 3,
-    "score": 8.4,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 17,
-        "y": 18
-      }
-    ]
-  },
   "kill-descend-01": {
     "grade": 1,
     "score": 5.6,
@@ -963,23 +919,12 @@
   },
   "kill-descend-02": {
     "grade": 3,
-    "score": 8.8,
+    "score": 8.9,
     "moves": 2,
     "correct": [
       {
         "x": 4,
         "y": 18
-      }
-    ]
-  },
-  "kill-false-eye-01": {
-    "grade": 1,
-    "score": 3.1,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 17,
-        "y": 14
       }
     ]
   },
@@ -994,33 +939,15 @@
       }
     ]
   },
-  "kill-hane-01": {
-    "grade": 3,
-    "score": 8.2,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 9,
-        "y": 18
-      }
-    ]
-  },
-  "kill-false-eye-02": {
-    "grade": 1,
-    "score": 3.1,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 14,
-        "y": 1
-      }
-    ]
-  },
   "kill-placement-01": {
-    "grade": 2,
-    "score": 7,
-    "moves": 2,
+    "grade": 1,
+    "score": 5,
+    "moves": 1,
     "correct": [
+      {
+        "x": 1,
+        "y": 1
+      },
       {
         "x": 1,
         "y": 0
@@ -1028,20 +955,24 @@
     ]
   },
   "kill-placement-02": {
-    "grade": 2,
-    "score": 6.1,
+    "grade": 1,
+    "score": 5.4,
     "moves": 1,
     "correct": [
       {
         "x": 18,
         "y": 1
+      },
+      {
+        "x": 17,
+        "y": 0
       }
     ]
   },
   "kill-placement-03": {
     "grade": 2,
-    "score": 7.5,
-    "moves": 2,
+    "score": 6.4,
+    "moves": 1,
     "correct": [
       {
         "x": 1,
@@ -1095,7 +1026,7 @@
   },
   "race-01": {
     "grade": 2,
-    "score": 6.3,
+    "score": 6.8,
     "moves": 2,
     "correct": [
       {
@@ -1110,7 +1041,7 @@
   },
   "race-02": {
     "grade": 2,
-    "score": 6.9,
+    "score": 7.6,
     "moves": 1,
     "correct": [
       {
@@ -1125,7 +1056,7 @@
   },
   "race-03": {
     "grade": 2,
-    "score": 6.4,
+    "score": 6.8,
     "moves": 2,
     "correct": [
       {
@@ -1139,9 +1070,9 @@
     ]
   },
   "race-05": {
-    "grade": 3,
-    "score": 8.4,
-    "moves": 3,
+    "grade": 2,
+    "score": 6.8,
+    "moves": 2,
     "correct": [
       {
         "x": 5,
@@ -1155,7 +1086,7 @@
   },
   "race-06": {
     "grade": 2,
-    "score": 6.3,
+    "score": 6.8,
     "moves": 2,
     "correct": [
       {
@@ -1177,7 +1108,7 @@
   },
   "race-08": {
     "grade": 3,
-    "score": 8.4,
+    "score": 8.6,
     "moves": 3,
     "correct": [
       {
@@ -1192,7 +1123,7 @@
   },
   "race-10": {
     "grade": 2,
-    "score": 6.4,
+    "score": 7.4,
     "moves": 2,
     "correct": [
       {
@@ -1207,7 +1138,7 @@
   },
   "race-11": {
     "grade": 2,
-    "score": 7.4,
+    "score": 7.6,
     "moves": 2,
     "correct": [
       {
@@ -1218,7 +1149,7 @@
   },
   "race-13": {
     "grade": 3,
-    "score": 8.2,
+    "score": 9.1,
     "moves": 3,
     "correct": [
       {
@@ -1236,9 +1167,9 @@
     ]
   },
   "race-14": {
-    "grade": 4,
-    "score": 10.1,
-    "moves": 3,
+    "grade": 3,
+    "score": 8.4,
+    "moves": 2,
     "correct": [
       {
         "x": 4,
@@ -1251,9 +1182,9 @@
     ]
   },
   "race-15": {
-    "grade": 3,
-    "score": 8.4,
-    "moves": 3,
+    "grade": 2,
+    "score": 6.8,
+    "moves": 2,
     "correct": [
       {
         "x": 0,
@@ -1266,8 +1197,8 @@
     ]
   },
   "race-16": {
-    "grade": 2,
-    "score": 7.5,
+    "grade": 3,
+    "score": 8.8,
     "moves": 2,
     "correct": [
       {
@@ -1278,7 +1209,7 @@
   },
   "race-17": {
     "grade": 3,
-    "score": 7.9,
+    "score": 8.7,
     "moves": 2,
     "correct": [
       {
@@ -1293,7 +1224,7 @@
   },
   "race-18": {
     "grade": 2,
-    "score": 6.3,
+    "score": 7.3,
     "moves": 2,
     "correct": [
       {
@@ -1329,8 +1260,8 @@
     ]
   },
   "life-false-eye-02": {
-    "grade": 1,
-    "score": 5.2,
+    "grade": 2,
+    "score": 6.6,
     "moves": 1,
     "correct": [
       {
@@ -1341,7 +1272,7 @@
   },
   "race-20": {
     "grade": 3,
-    "score": 8.3,
+    "score": 9.4,
     "moves": 3,
     "correct": [
       {
@@ -1531,20 +1462,9 @@
       }
     ]
   },
-  "life-expand-04": {
-    "grade": 2,
-    "score": 7.5,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 18,
-        "y": 4
-      }
-    ]
-  },
   "race-21": {
     "grade": 3,
-    "score": 7.9,
+    "score": 8.4,
     "moves": 2,
     "correct": [
       {
@@ -1563,7 +1483,7 @@
   },
   "race-22": {
     "grade": 2,
-    "score": 6.9,
+    "score": 7.5,
     "moves": 2,
     "correct": [
       {
@@ -1600,7 +1520,7 @@
   },
   "life-capture-eye-10": {
     "grade": 1,
-    "score": 4.4,
+    "score": 4.8,
     "moves": 1,
     "correct": [
       {
@@ -1633,111 +1553,12 @@
   },
   "life-capture-eye-13": {
     "grade": 1,
-    "score": 4.4,
+    "score": 4.3,
     "moves": 1,
     "correct": [
       {
         "x": 0,
         "y": 10
-      }
-    ]
-  },
-  "life-expand-05": {
-    "grade": 2,
-    "score": 7,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 13,
-        "y": 18
-      }
-    ]
-  },
-  "life-expand-06": {
-    "grade": 4,
-    "score": 10.3,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 14,
-        "y": 18
-      }
-    ]
-  },
-  "life-expand-07": {
-    "grade": 2,
-    "score": 7,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 0,
-        "y": 3
-      }
-    ]
-  },
-  "life-expand-08": {
-    "grade": 2,
-    "score": 6.1,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 17,
-        "y": 0
-      }
-    ]
-  },
-  "life-expand-09": {
-    "grade": 4,
-    "score": 10.5,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 0,
-        "y": 2
-      }
-    ]
-  },
-  "life-expand-10": {
-    "grade": 4,
-    "score": 10.6,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 18,
-        "y": 9
-      }
-    ]
-  },
-  "life-expand-11": {
-    "grade": 1,
-    "score": 6,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 0,
-        "y": 14
-      }
-    ]
-  },
-  "life-expand-12": {
-    "grade": 3,
-    "score": 8.6,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 3,
-        "y": 18
-      }
-    ]
-  },
-  "life-expand-13": {
-    "grade": 4,
-    "score": 10.6,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 6,
-        "y": 0
       }
     ]
   },
@@ -1774,20 +1595,9 @@
       }
     ]
   },
-  "life-expand-14": {
-    "grade": 3,
-    "score": 7.7,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 7,
-        "y": 18
-      }
-    ]
-  },
   "cut-06": {
     "grade": 3,
-    "score": 8.4,
+    "score": 8.5,
     "moves": 2,
     "correct": [
       {
@@ -1811,20 +1621,9 @@
       }
     ]
   },
-  "life-ko-01": {
-    "grade": 4,
-    "score": 10.5,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 0,
-        "y": 2
-      }
-    ]
-  },
   "life-ko-02": {
     "grade": 4,
-    "score": 11.2,
+    "score": 11.3,
     "moves": 3,
     "correct": [
       {
@@ -1834,10 +1633,14 @@
     ]
   },
   "kill-ko-01": {
-    "grade": 5,
-    "score": 12.4,
-    "moves": 4,
+    "grade": 4,
+    "score": 10.7,
+    "moves": 3,
     "correct": [
+      {
+        "x": 2,
+        "y": 18
+      },
       {
         "x": 0,
         "y": 17
@@ -1848,57 +1651,24 @@
       }
     ]
   },
-  "kill-ko-02": {
-    "grade": 5,
-    "score": 11.7,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 18,
-        "y": 16
-      },
-      {
-        "x": 16,
-        "y": 18
-      }
-    ]
-  },
   "life-ko-03": {
     "grade": 4,
-    "score": 11.5,
+    "score": 10.7,
     "moves": 3,
     "correct": [
+      {
+        "x": 0,
+        "y": 1
+      },
       {
         "x": 1,
         "y": 3
       }
     ]
   },
-  "life-ko-04": {
-    "grade": 5,
-    "score": 13.4,
-    "moves": 4,
-    "correct": [
-      {
-        "x": 17,
-        "y": 1
-      }
-    ]
-  },
-  "kill-ko-03": {
-    "grade": 5,
-    "score": 14.3,
-    "moves": 4,
-    "correct": [
-      {
-        "x": 0,
-        "y": 16
-      }
-    ]
-  },
   "kill-ko-04": {
     "grade": 5,
-    "score": 12.3,
+    "score": 12.4,
     "moves": 4,
     "correct": [
       {
@@ -1923,12 +1693,16 @@
     ]
   },
   "life-ko-05": {
-    "grade": 5,
-    "score": 11.6,
+    "grade": 4,
+    "score": 10.7,
     "moves": 3,
     "correct": [
       {
         "x": 17,
+        "y": 1
+      },
+      {
+        "x": 18,
         "y": 1
       },
       {
@@ -1938,9 +1712,9 @@
     ]
   },
   "life-ko-06": {
-    "grade": 4,
-    "score": 11.3,
-    "moves": 3,
+    "grade": 5,
+    "score": 14,
+    "moves": 5,
     "correct": [
       {
         "x": 1,
@@ -1949,9 +1723,9 @@
     ]
   },
   "life-ko-07": {
-    "grade": 4,
-    "score": 10,
-    "moves": 3,
+    "grade": 5,
+    "score": 12,
+    "moves": 4,
     "correct": [
       {
         "x": 17,
@@ -2342,10 +2116,14 @@
     ]
   },
   "kill-vital-01": {
-    "grade": 4,
-    "score": 9.5,
-    "moves": 2,
+    "grade": 3,
+    "score": 8.7,
+    "moves": 3,
     "correct": [
+      {
+        "x": 1,
+        "y": 17
+      },
       {
         "x": 2,
         "y": 17
@@ -2354,7 +2132,7 @@
   },
   "kill-vital-02": {
     "grade": 3,
-    "score": 8.3,
+    "score": 8.7,
     "moves": 2,
     "correct": [
       {
@@ -2368,28 +2146,13 @@
     ]
   },
   "kill-vital-03": {
-    "grade": 4,
-    "score": 10.2,
-    "moves": 3,
+    "grade": 3,
+    "score": 8.8,
+    "moves": 1,
     "correct": [
       {
         "x": 1,
         "y": 0
-      }
-    ]
-  },
-  "kill-false-eye-03": {
-    "grade": 1,
-    "score": 4.4,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 16,
-        "y": 1
-      },
-      {
-        "x": 18,
-        "y": 1
       }
     ]
   },
@@ -2404,24 +2167,9 @@
       }
     ]
   },
-  "kill-false-eye-05": {
-    "grade": 2,
-    "score": 7,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 17,
-        "y": 16
-      },
-      {
-        "x": 17,
-        "y": 18
-      }
-    ]
-  },
   "kill-false-eye-06": {
-    "grade": 2,
-    "score": 7.6,
+    "grade": 3,
+    "score": 7.7,
     "moves": 1,
     "correct": [
       {
@@ -2431,13 +2179,21 @@
     ]
   },
   "kill-placement-04": {
-    "grade": 5,
-    "score": 12.6,
-    "moves": 4,
+    "grade": 3,
+    "score": 8.2,
+    "moves": 1,
     "correct": [
       {
         "x": 17,
+        "y": 1
+      },
+      {
+        "x": 17,
         "y": 3
+      },
+      {
+        "x": 18,
+        "y": 2
       }
     ]
   },
@@ -2448,19 +2204,15 @@
     "correct": [
       {
         "x": 1,
-        "y": 18
+        "y": 17
       }
     ]
   },
   "kill-placement-06": {
-    "grade": 3,
-    "score": 8.5,
-    "moves": 3,
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
     "correct": [
-      {
-        "x": 16,
-        "y": 18
-      },
       {
         "x": 17,
         "y": 18
@@ -2468,19 +2220,19 @@
     ]
   },
   "kill-placement-07": {
-    "grade": 4,
-    "score": 9.9,
-    "moves": 3,
+    "grade": 3,
+    "score": 9,
+    "moves": 2,
     "correct": [
       {
         "x": 1,
-        "y": 0
+        "y": 1
       }
     ]
   },
   "kill-placement-08": {
-    "grade": 4,
-    "score": 11,
+    "grade": 5,
+    "score": 12.1,
     "moves": 2,
     "correct": [
       {
@@ -2501,9 +2253,9 @@
     ]
   },
   "kill-placement-10": {
-    "grade": 5,
-    "score": 14.2,
-    "moves": 5,
+    "grade": 4,
+    "score": 11.2,
+    "moves": 2,
     "correct": [
       {
         "x": 16,
@@ -2516,47 +2268,44 @@
     ]
   },
   "kill-placement-11": {
-    "grade": 4,
-    "score": 10.1,
-    "moves": 3,
+    "grade": 3,
+    "score": 7.8,
+    "moves": 2,
     "correct": [
+      {
+        "x": 1,
+        "y": 2
+      },
+      {
+        "x": 1,
+        "y": 1
+      },
       {
         "x": 0,
-        "y": 1
-      }
-    ]
-  },
-  "kill-placement-12": {
-    "grade": 5,
-    "score": 13.6,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 16,
         "y": 1
       }
     ]
   },
   "kill-placement-13": {
     "grade": 4,
-    "score": 11.2,
+    "score": 10.7,
     "moves": 2,
     "correct": [
       {
         "x": 1,
         "y": 16
-      },
-      {
-        "x": 0,
-        "y": 16
       }
     ]
   },
   "kill-placement-14": {
-    "grade": 4,
-    "score": 9.5,
-    "moves": 2,
+    "grade": 3,
+    "score": 7.8,
+    "moves": 1,
     "correct": [
+      {
+        "x": 16,
+        "y": 17
+      },
       {
         "x": 18,
         "y": 18
@@ -2574,24 +2323,9 @@
       }
     ]
   },
-  "kill-placement-16": {
-    "grade": 3,
-    "score": 8.6,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 16,
-        "y": 3
-      },
-      {
-        "x": 16,
-        "y": 2
-      }
-    ]
-  },
   "kill-placement-17": {
     "grade": 2,
-    "score": 6.3,
+    "score": 6.4,
     "moves": 1,
     "correct": [
       {
@@ -2602,111 +2336,80 @@
   },
   "kill-vital-04": {
     "grade": 5,
-    "score": 14.5,
-    "moves": 4,
+    "score": 12.5,
+    "moves": 2,
     "correct": [
       {
-        "x": 16,
-        "y": 16
-      }
-    ]
-  },
-  "kill-reduce-01": {
-    "grade": 5,
-    "score": 12.2,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 4,
-        "y": 0
-      }
-    ]
-  },
-  "kill-reduce-02": {
-    "grade": 4,
-    "score": 11.5,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 14,
-        "y": 1
+        "x": 17,
+        "y": 17
       }
     ]
   },
   "kill-reduce-03": {
-    "grade": 4,
-    "score": 9.5,
-    "moves": 3,
+    "grade": 1,
+    "score": 5.6,
+    "moves": 1,
     "correct": [
       {
         "x": 2,
         "y": 18
-      }
-    ]
-  },
-  "kill-reduce-04": {
-    "grade": 5,
-    "score": 13.3,
-    "moves": 3,
-    "correct": [
+      },
       {
-        "x": 17,
-        "y": 13
+        "x": 0,
+        "y": 17
+      },
+      {
+        "x": 1,
+        "y": 18
       }
     ]
   },
   "kill-vital-05": {
     "grade": 5,
-    "score": 12.3,
-    "moves": 3,
+    "score": 12.9,
+    "moves": 4,
     "correct": [
       {
         "x": 1,
         "y": 2
-      }
-    ]
-  },
-  "kill-reduce-05": {
-    "grade": 5,
-    "score": 12.2,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 15,
-        "y": 3
       }
     ]
   },
   "kill-vital-06": {
-    "grade": 5,
-    "score": 12.1,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 1,
-        "y": 17
-      }
-    ]
-  },
-  "kill-reduce-06": {
     "grade": 4,
-    "score": 10.3,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 17,
-        "y": 14
-      }
-    ]
-  },
-  "kill-reduce-07": {
-    "grade": 4,
-    "score": 11.3,
+    "score": 10.8,
     "moves": 3,
     "correct": [
       {
         "x": 2,
+        "y": 18
+      },
+      {
+        "x": 1,
+        "y": 17
+      },
+      {
+        "x": 0,
+        "y": 17
+      }
+    ]
+  },
+  "kill-reduce-07": {
+    "grade": 3,
+    "score": 9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
         "y": 2
+      },
+      {
+        "x": 1,
+        "y": 2
+      },
+      {
+        "x": 0,
+        "y": 1
       }
     ]
   },
@@ -2723,22 +2426,18 @@
   },
   "life-vital-01": {
     "grade": 5,
-    "score": 12.6,
-    "moves": 4,
+    "score": 12.7,
+    "moves": 3,
     "correct": [
       {
         "x": 1,
         "y": 17
-      },
-      {
-        "x": 1,
-        "y": 18
       }
     ]
   },
   "life-vital-02": {
     "grade": 5,
-    "score": 13,
+    "score": 13.1,
     "moves": 4,
     "correct": [
       {
@@ -2749,8 +2448,8 @@
   },
   "life-vital-03": {
     "grade": 5,
-    "score": 14.4,
-    "moves": 4,
+    "score": 12.6,
+    "moves": 3,
     "correct": [
       {
         "x": 1,
@@ -2760,7 +2459,7 @@
   },
   "life-vital-04": {
     "grade": 5,
-    "score": 14.3,
+    "score": 14.4,
     "moves": 4,
     "correct": [
       {
@@ -2771,7 +2470,7 @@
   },
   "life-vital-05": {
     "grade": 5,
-    "score": 11.6,
+    "score": 11.9,
     "moves": 4,
     "correct": [
       {
@@ -2784,20 +2483,9 @@
       }
     ]
   },
-  "life-vital-06": {
-    "grade": 4,
-    "score": 10.1,
-    "moves": 3,
-    "correct": [
-      {
-        "x": 18,
-        "y": 17
-      }
-    ]
-  },
   "life-vital-07": {
     "grade": 4,
-    "score": 10.3,
+    "score": 10.5,
     "moves": 3,
     "correct": [
       {
@@ -2808,7 +2496,7 @@
   },
   "life-vital-08": {
     "grade": 4,
-    "score": 10.3,
+    "score": 10.5,
     "moves": 3,
     "correct": [
       {
@@ -2839,20 +2527,9 @@
       }
     ]
   },
-  "life-vital-11": {
-    "grade": 5,
-    "score": 12,
-    "moves": 4,
-    "correct": [
-      {
-        "x": 1,
-        "y": 2
-      }
-    ]
-  },
   "life-vital-12": {
     "grade": 5,
-    "score": 12.2,
+    "score": 12.3,
     "moves": 4,
     "correct": [
       {
@@ -2862,35 +2539,20 @@
     ]
   },
   "life-vital-13": {
-    "grade": 4,
-    "score": 11.4,
-    "moves": 3,
+    "grade": 5,
+    "score": 13.4,
+    "moves": 4,
     "correct": [
       {
         "x": 1,
         "y": 17
-      },
-      {
-        "x": 1,
-        "y": 16
-      }
-    ]
-  },
-  "life-expand-15": {
-    "grade": 4,
-    "score": 10.4,
-    "moves": 2,
-    "correct": [
-      {
-        "x": 14,
-        "y": 18
       }
     ]
   },
   "life-capture-eye-14": {
-    "grade": 1,
-    "score": 5.3,
-    "moves": 2,
+    "grade": 2,
+    "score": 6.4,
+    "moves": 1,
     "correct": [
       {
         "x": 0,
@@ -2899,9 +2561,9 @@
     ]
   },
   "life-capture-eye-15": {
-    "grade": 1,
-    "score": 4,
-    "moves": 1,
+    "grade": 2,
+    "score": 7.2,
+    "moves": 2,
     "correct": [
       {
         "x": 18,
@@ -2928,17 +2590,6 @@
       {
         "x": 18,
         "y": 17
-      }
-    ]
-  },
-  "life-capture-eye-18": {
-    "grade": 3,
-    "score": 7.9,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 1,
-        "y": 2
       }
     ]
   },
@@ -3080,7 +2731,7 @@
   },
   "seki-08": {
     "grade": 4,
-    "score": 10.5,
+    "score": 10.6,
     "moves": 2,
     "correct": [
       {
@@ -3145,8 +2796,8 @@
     ]
   },
   "race-23": {
-    "grade": 3,
-    "score": 8.3,
+    "grade": 4,
+    "score": 9.5,
     "moves": 1,
     "correct": [
       {
@@ -3156,8 +2807,8 @@
     ]
   },
   "race-24": {
-    "grade": 3,
-    "score": 9.2,
+    "grade": 4,
+    "score": 10,
     "moves": 1,
     "correct": [
       {
@@ -3172,7 +2823,7 @@
   },
   "race-25": {
     "grade": 4,
-    "score": 10.5,
+    "score": 10.3,
     "moves": 3,
     "correct": [
       {
@@ -3187,7 +2838,7 @@
   },
   "race-26": {
     "grade": 3,
-    "score": 7.8,
+    "score": 8.1,
     "moves": 3,
     "correct": [
       {
@@ -3205,8 +2856,8 @@
     ]
   },
   "race-27": {
-    "grade": 3,
-    "score": 9.3,
+    "grade": 5,
+    "score": 11.6,
     "moves": 1,
     "correct": [
       {
@@ -3216,8 +2867,8 @@
     ]
   },
   "race-28": {
-    "grade": 3,
-    "score": 9.3,
+    "grade": 4,
+    "score": 11.1,
     "moves": 1,
     "correct": [
       {
@@ -3227,8 +2878,8 @@
     ]
   },
   "race-29": {
-    "grade": 2,
-    "score": 6.8,
+    "grade": 3,
+    "score": 8,
     "moves": 2,
     "correct": [
       {
@@ -3238,8 +2889,8 @@
     ]
   },
   "race-30": {
-    "grade": 2,
-    "score": 6.7,
+    "grade": 3,
+    "score": 7.9,
     "moves": 2,
     "correct": [
       {
@@ -3250,7 +2901,7 @@
   },
   "race-31": {
     "grade": 4,
-    "score": 9.8,
+    "score": 10.9,
     "moves": 1,
     "correct": [
       {
@@ -3263,31 +2914,9 @@
       }
     ]
   },
-  "race-32": {
-    "grade": 2,
-    "score": 7.3,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 12,
-        "y": 0
-      }
-    ]
-  },
-  "race-33": {
-    "grade": 2,
-    "score": 7.4,
-    "moves": 1,
-    "correct": [
-      {
-        "x": 7,
-        "y": 0
-      }
-    ]
-  },
   "race-34": {
-    "grade": 3,
-    "score": 8.2,
+    "grade": 2,
+    "score": 7.6,
     "moves": 3,
     "correct": [
       {
@@ -3520,7 +3149,7 @@
   },
   "shape-second-line-seven-01": {
     "grade": 4,
-    "score": 9.5,
+    "score": 9.6,
     "moves": 1,
     "correct": [
       {

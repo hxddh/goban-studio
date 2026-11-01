@@ -40,7 +40,15 @@
  * unconditionally alive, dies when a key stone is captured, and two passes in
  * a row leave it alive (seki counts as life, as under Japanese rules: a kill
  * that only reaches seki is a failure). The region is finite, the superko
- * rule forbids repeating a position, and the depth limit backs it up.
+ * rule forbids repeating a position, and the depth limit backs it up. Points
+ * of captured stones are part of the region (real-board rules, `replay`).
+ * Points outside the region (',') are never played, so a chain with a
+ * liberty there can never be captured: key stones that join such a chain
+ * have survived (in a race, by capturing the stones inside their wall and
+ * joining it). The problem checks make sure no life or kill problem lets
+ * its key stones reach such a liberty in the first place (outsideReach()),
+ * so this rule only ends a race that is already won, and stops the search
+ * reading on inside the captured space after it.
  *
  * Seki. A "strict" search changes one rule: two passes in a row are a win
  * for the attacker, so the defender must reach Benson life (or, in a race on
@@ -157,15 +165,16 @@ export function parseDiagram(rows) {
  *   goal: "capture" | "save" | "kill" | "live" | "seki",
  *   ko: "ok" (a ko is an acceptable result for the learner),
  *   escape = 4 (liberties that count as escaped, capture/save only), maxDepth,
- *   replay = (goal === "seki") (captured points may be played again)
+ *   replay = true (captured points may be played again)
  * }
  *
- * `replay`: a problem's region is its '.' points. With `replay: true` the
- * points of the diagram's stones join it once they are captured, as on a
- * real board (throw back in, retake, fill an eye). Problems written before v4
- * leave it off: their region is fixed, and some of their answers depend on a
- * captured point staying out of play. Seki problems always have it, and the
- * v4 classic-shape problems set it.
+ * `replay`: a problem's region is its '.' points. With `replay` (the
+ * default) the points of the diagram's stones join it once they are
+ * captured, as on a real board (throw back in, retake, fill an eye).
+ * `replay: false` keeps the pre-v4 model, where a captured point stays out
+ * of play; it exists only for experiments, and the problem and course checks
+ * reject it, because an answer that needs a captured point to stay empty can
+ * be refuted on a real board (see docs/problems-audit.md).
  *
  * Goals: "capture" / "save" are about the key stones on an open board,
  * "kill" / "live" about a group inside a region. "seki" is a defence goal
@@ -206,7 +215,7 @@ export function createPuzzle(problem) {
   if (attackGoal && userColor !== -keyColor) throw new Error("the attacker must move first in an attack problem");
   if (!attackGoal && userColor !== keyColor) throw new Error("the defender must move first in a defence problem");
   const lifeGoal = goal === "kill" || goal === "live" || goal === "seki";
-  const replay = problem.replay ?? goal === "seki";
+  const replay = problem.replay ?? true;
   let region = null;
   if (lifeGoal || d.hasOutside) {
     region = d.region.map(shift);
@@ -427,40 +436,82 @@ function posKey(st) {
 
 /* -------------------------------------------------------------- analysis */
 
-/** Benson's unconditional life for the chains of `color` touching `keys`. */
+/**
+ * Benson's unconditional life for the chains of `color` touching `keys`.
+ *
+ * Every stone lies inside the diagram, so only the diagram plus a margin of
+ * two lines is scanned: a region that reaches the second line outside the
+ * diagram contains a point no stone touches, so it can never be vital, and
+ * the rest of the board does not change the answer.
+ */
 export function bensonAlive(pz, board, color, keyIdx) {
   const c = context(pz.size);
-  const n = c.n;
-  const chainOf = new Int32Array(n).fill(-1);
-  const chains = [];
-  for (let i = 0; i < n; i++) {
-    if (board[i] !== color || chainOf[i] >= 0) continue;
-    const ch = chain(c, board, i);
-    const id = chains.length;
-    for (const p of ch.stones) chainOf[p] = id;
-    chains.push({ libs: new Set(ch.libs), alive: true });
+  const size = pz.size;
+  const b = pz.box;
+  const ax0 = Math.max(0, b.x0 - 2);
+  const ay0 = Math.max(0, b.y0 - 2);
+  const ax1 = Math.min(size - 1, b.x1 + 2);
+  const ay1 = Math.min(size - 1, b.y1 + 2);
+  if (!c.bensonChain) {
+    c.bensonChain = new Int32Array(c.n);
+    c.bensonRegion = new Int32Array(c.n);
   }
-  const regionOf = new Int32Array(n).fill(-1);
+  const chainOf = c.bensonChain;
+  const regionOf = c.bensonRegion;
+  for (let y = ay0; y <= ay1; y++) {
+    for (let x = ax0; x <= ax1; x++) {
+      chainOf[y * size + x] = -1;
+      regionOf[y * size + x] = -1;
+    }
+  }
+  const inArea = (i) => {
+    const x = i % size;
+    const y = (i / size) | 0;
+    return x >= ax0 && x <= ax1 && y >= ay0 && y <= ay1;
+  };
+  // A point at least two lines outside the diagram touches no stone.
+  const far = (i) => {
+    const x = i % size;
+    const y = (i / size) | 0;
+    return x < b.x0 - 1 || x > b.x1 + 1 || y < b.y0 - 1 || y > b.y1 + 1;
+  };
+  const chains = [];
+  for (let y = b.y0; y <= b.y1; y++) {
+    for (let x = b.x0; x <= b.x1; x++) {
+      const i = y * size + x;
+      if (board[i] !== color || chainOf[i] >= 0) continue;
+      const ch = chain(c, board, i);
+      const id = chains.length;
+      for (const p of ch.stones) chainOf[p] = id;
+      chains.push({ libs: new Set(ch.libs), alive: true });
+    }
+  }
   const regions = [];
-  for (let i = 0; i < n; i++) {
-    if (board[i] === color || regionOf[i] >= 0) continue;
-    const id = regions.length;
-    const pts = [];
-    const borders = new Set();
-    const stack = [i];
-    regionOf[i] = id;
-    while (stack.length) {
-      const p = stack.pop();
-      pts.push(p);
-      for (const q of c.nbr[p]) {
-        if (board[q] === color) borders.add(chainOf[q]);
-        else if (regionOf[q] < 0) {
-          regionOf[q] = id;
-          stack.push(q);
+  for (let y = ay0; y <= ay1; y++) {
+    for (let x = ax0; x <= ax1; x++) {
+      const i = y * size + x;
+      if (board[i] === color || regionOf[i] >= 0) continue;
+      const id = regions.length;
+      const pts = [];
+      const borders = new Set();
+      let open = false;
+      const stack = [i];
+      regionOf[i] = id;
+      while (stack.length) {
+        const p = stack.pop();
+        pts.push(p);
+        if (far(p)) open = true;
+        for (const q of c.nbr[p]) {
+          if (!inArea(q)) continue;
+          if (board[q] === color) borders.add(chainOf[q]);
+          else if (regionOf[q] < 0) {
+            regionOf[q] = id;
+            stack.push(q);
+          }
         }
       }
+      regions.push({ pts, borders, healthy: true, open });
     }
-    regions.push({ pts, borders, healthy: true });
   }
   let changed = true;
   while (changed) {
@@ -470,7 +521,7 @@ export function bensonAlive(pz, board, color, keyIdx) {
       if (!ch.alive) continue;
       let vital = 0;
       for (const r of regions) {
-        if (!r.healthy || !r.borders.has(id)) continue;
+        if (r.open || !r.healthy || !r.borders.has(id)) continue;
         let all = true;
         for (const p of r.pts) {
           if (board[p] === 0 && !ch.libs.has(p)) {
@@ -488,7 +539,7 @@ export function bensonAlive(pz, board, color, keyIdx) {
       }
     }
   }
-  return keyIdx.every((i) => board[i] === color && chains[chainOf[i]].alive);
+  return keyIdx.every((i) => board[i] === color && chains[chainOf[i]]?.alive);
 }
 
 function keyIndices(pz) {
@@ -542,6 +593,36 @@ function keyLiberties(pz, board, keyIdx) {
 }
 
 /**
+ * Every key chain has a liberty nobody may play (outside the region), so no
+ * sequence can capture it: chains only grow, and that liberty stays empty.
+ * In a race this is the key stones joining their own outside wall after
+ * capturing the stones inside it; the problem check makes sure no life or
+ * kill problem lets the key stones reach such a liberty at all (see
+ * outsideReach()).
+ */
+function keysOutOfReach(pz, chains) {
+  for (const ch of chains) if (!ch.libs.some((l) => !playable(pz, l))) return false;
+  return true;
+}
+
+/**
+ * Benson life of the key chains, cached per position (the search meets the
+ * same positions again across iterations and searches). A chain with fewer
+ * than two liberties cannot have two vital regions.
+ */
+function keyBenson(pz, st, keyIdx, chains) {
+  for (const ch of chains) if (ch.libs.length < 2) return false;
+  if (!pz._benson || pz._benson.size > 1000000) pz._benson = new Map();
+  const k = posKey(st);
+  let alive = pz._benson.get(k);
+  if (alive === undefined) {
+    alive = bensonAlive(pz, st.board, pz.keyColor, keyIdx);
+    pz._benson.set(k, alive);
+  }
+  return alive;
+}
+
+/**
  * +1: attacker has won, -1: defender has won, 0: undecided. In a strict
  * search two passes are a win for the attacker: the defender must reach
  * independent life (or escape) by force.
@@ -550,7 +631,11 @@ function terminal(pz, st, keyIdx, info = null, strict = false) {
   for (const i of keyIdx) if (st.board[i] !== pz.keyColor) return 1;
   if (st.passes >= 2 && !strict) return -1;
   if (pz.lifeGoal) {
-    if (bensonAlive(pz, st.board, pz.keyColor, keyIdx)) return -1;
+    const chains = (info || keyInfo(pz, st.board, keyIdx)).chains;
+    // A strict search asks for life of the stones' own (Benson); sekiInfo()
+    // calls an uncapturable-by-fiat group "unknown" instead.
+    if (!strict && keysOutOfReach(pz, chains)) return -1;
+    if (keyBenson(pz, st, keyIdx, chains)) return -1;
   } else if ((info || keyInfo(pz, st.board, keyIdx)).minLibs >= pz.escape) return -1;
   if (st.passes >= 2) return 1;
   return 0;
@@ -662,6 +747,16 @@ function quickScore(pz, st, i, info, attacking) {
   let score = (onLib ? 3 * (fresh - 1) : 0) + empties + captures * 7;
   // Joining two key chains into one is usually the way out.
   if (onLib && info.chains.length > 1 && info.chains.filter((ch) => ch.libs.includes(i)).length > 1) score += 20;
+  // Joining the key stones to a chain that can never be captured settles it.
+  if (onLib && pz.lifeGoal) {
+    for (const q of c.nbr[i]) {
+      if (board[q] !== pz.keyColor || info.chains.some((ch) => ch.stones.includes(q))) continue;
+      if (chain(c, board, q).libs.some((l) => !playable(pz, l))) {
+        score += 100;
+        break;
+      }
+    }
+  }
   return score;
 }
 
@@ -679,7 +774,9 @@ class Search {
     let tt = pz._tt[slot];
     if (!tt || tt.size > 1500000) tt = pz._tt[slot] = new Map();
     this.tt = tt;
+    // Positions on the current line: posKey -> ply of its first occurrence.
     this.path = new Map();
+    this.ply = 0;
     this.nodes = 0;
     this.budget = budget;
     this.exhausted = false;
@@ -717,9 +814,13 @@ class Search {
     order.sort((a, b) => b.s - a.s);
     order.push({ i: PASS });
     const pk = posKey(st);
-    this.path.set(pk, (this.path.get(pk) || 0) + 1);
+    const ply = this.ply++;
+    const seen = this.path.get(pk);
+    this.path.set(pk, seen === undefined ? ply : seen);
     let exact = true;
     let result = !attacking; // attacker: assume loss until a win; defender: assume attacker wins
+    // The shallowest ply of the line this result depends on (see below).
+    let dep = Infinity;
     for (const { i } of order) {
       let next = play(pz, st, i);
       let retake = false;
@@ -730,25 +831,31 @@ class Search {
       if (!next) continue;
       // Superko inside the line; the ko master's retake stands for a threat
       // exchange played elsewhere, so it is not a repetition.
-      if (i !== PASS && !retake && this.path.has(posKey(next))) continue;
+      if (i !== PASS && !retake) {
+        const rep = this.path.get(posKey(next));
+        if (rep !== undefined) {
+          dep = Math.min(dep, rep);
+          continue;
+        }
+      }
       const r = this.run(next, depth - 1, pushes);
       if (!r.exact) exact = false;
-      if (attacking && r.win) {
-        result = true;
+      if ((attacking && r.win) || (!attacking && !r.win)) {
+        result = attacking;
         exact = r.exact;
+        dep = r.dep ?? Infinity;
         break;
       }
-      if (!attacking && !r.win) {
-        result = false;
-        exact = r.exact;
-        break;
-      }
+      dep = Math.min(dep, r.dep ?? Infinity);
     }
-    const left = this.path.get(pk) - 1;
-    if (left) this.path.set(pk, left);
-    else this.path.delete(pk);
-    const out = { win: result, exact, depth, pushes };
-    this.tt.set(k, out);
+    this.ply--;
+    if (seen === undefined) this.path.delete(pk);
+    const out = { win: result, exact, depth, pushes, dep };
+    // A result that rests on a move forbidden by superko, because it repeats
+    // a position played above this one, holds only on this line (the graph
+    // history problem): it is returned but not stored, so another line that
+    // reaches this position reads it afresh.
+    if (dep >= ply) this.tt.set(k, { win: result, exact, depth, pushes });
     return out;
   }
 }
@@ -1036,6 +1143,58 @@ function playable(pz, i) {
     return pz._regionSet.has(i);
   }
   return inBox(pz, i);
+}
+
+/**
+ * Can the key stones ever breathe through a point nobody may play? Spread
+ * from the key stones over empty points and their own stones and, with
+ * `throughCaptures`, over attacker chains that could be captured (all their
+ * liberties playable). Reaching an empty point outside the problem area, or
+ * a defending chain with a liberty there, means the key stones might
+ * survive only because that liberty can never be filled: on a real board it
+ * is open space the opponent could take, so the problem would be deciding
+ * life by fiat. Returns the offending points ({x, y}), empty when the key
+ * stones are sealed in.
+ *
+ * Life and kill problems use `throughCaptures: true` (capturing a cutting
+ * stone to run out is still running out). Capturing races use false: there
+ * the outside walls of both sides are taken as alive, and the race is over
+ * once the key stones capture the stones they are racing (the search still
+ * reads on after that capture, see keysOutOfReach()).
+ */
+export function outsideReach(pz, { throughCaptures = true, st = initialState(pz) } = {}) {
+  const c = context(pz.size);
+  const board = st.board;
+  const keyIdx = keyIndices(pz);
+  const seen = new Uint8Array(board.length);
+  const stack = [];
+  for (const k of keyIdx) {
+    if (board[k] !== pz.keyColor || seen[k]) continue;
+    seen[k] = 1;
+    stack.push(k);
+  }
+  const hits = new Set();
+  const libsPlayable = (i) => chain(c, board, i).libs.every((l) => playable(pz, l));
+  while (stack.length) {
+    const p = stack.pop();
+    if (board[p] === 0) {
+      if (!playable(pz, p)) {
+        hits.add(p);
+        continue;
+      }
+    } else if (board[p] === pz.keyColor) {
+      if (!libsPlayable(p)) {
+        hits.add(p);
+        continue;
+      }
+    } else if (!throughCaptures || !libsPlayable(p)) continue;
+    for (const q of c.nbr[p]) {
+      if (seen[q]) continue;
+      seen[q] = 1;
+      stack.push(q);
+    }
+  }
+  return [...hits].sort((a, b) => a - b).map((i) => pointOf(pz, i));
 }
 
 /**
