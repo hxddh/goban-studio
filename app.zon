@@ -36,7 +36,7 @@
             .height = 900,
             .min_width = 720,
             .min_height = 720,
-            .titlebar = "hidden_inset",
+            .titlebar = "hidden_inset_tall",
             .restore_state = true,
         },
     },

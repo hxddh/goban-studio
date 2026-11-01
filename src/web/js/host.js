@@ -204,7 +204,13 @@ export async function setupChrome() {
   const chrome = await windowChrome();
   const top = Math.max(0, Number(chrome.top) || 0);
   document.documentElement.style.setProperty("--titlebar-inset", top + "px");
-  if (top > 0) document.documentElement.dataset.nativeChrome = "inset";
+  if (top > 0) {
+    document.documentElement.dataset.nativeChrome = "inset";
+    // The toolbar row is centred on the traffic lights (docs/design.md §7).
+    const y = Number(chrome.buttonsY) || 0;
+    const h = Number(chrome.buttonsH) || 0;
+    if (h > 0) document.documentElement.style.setProperty("--tb", Math.max(44, Math.round(2 * y + h)) + "px");
+  }
   // Any element marked data-drag moves the window (hidden title bar); its
   // buttons keep their clicks.
   document.addEventListener("pointerdown", (e) => {
