@@ -45,12 +45,16 @@ jobs:
     uses: ./.github/workflows/build-macos.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
+    # Signing secrets are optional (docs/signing.md); without them the
+    # build is ad-hoc signed and the notes say so.
+    secrets: inherit
 
   windows:
     needs: preflight
     uses: ./.github/workflows/build-windows.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
+    secrets: inherit
 
   publish:
     needs: [preflight, macos, windows]
@@ -66,6 +70,44 @@ jobs:
         with:
           name: GobanStudio-Windows-x64
           path: dist-windows
+      - uses: actions/download-artifact@v8
+        with:
+          name: signing-status-macos
+          path: signing
+      - uses: actions/download-artifact@v8
+        with:
+          name: signing-status-windows
+          path: signing
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: release notes with the real signing status
+        env:
+          TAG: ${{ inputs.tag }}
+          MAC_SIGNING: ${{ needs.macos.outputs.signing }}
+          WIN_SIGNING: ${{ needs.windows.outputs.signing }}
+        run: |
+          set -euo pipefail
+          echo "macOS: ${MAC_SIGNING:-unknown}; Windows: ${WIN_SIGNING:-unknown}"
+          cat signing/signing-macos.json signing/signing-windows.json
+          notes=".github/release-notes/${TAG}.md"
+          if [ ! -f "$notes" ]; then
+            # Rehearsal without a notes file: a stub, so the table is still shown.
+            printf '# Goban Studio %s\n\n## Download and first launch\n' "$TAG" > "$RUNNER_TEMP/stub.md"
+            notes="$RUNNER_TEMP/stub.md"
+          fi
+          # The "First launch" table follows what the builds actually did,
+          # whatever the notes file says.
+          node scripts/signing-notes.mjs notes "$notes" signing/signing-macos.json signing/signing-windows.json > release-notes.md
+          {
+            echo "## Release notes as they will be published"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
       - name: verify packages
         run: |
           set -euo pipefail
@@ -89,7 +131,7 @@ jobs:
           gh release create "$TAG" \
             --draft \
             --title "Goban Studio $TAG" \
-            --notes-file ".github/release-notes/${TAG}.md"
+            --notes-file release-notes.md
           gh release upload "$TAG" \
             dist-macos/GobanStudio-macOS-arm64.zip \
             dist-macos/GobanStudio-macOS-arm64.dmg \

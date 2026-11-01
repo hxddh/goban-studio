@@ -21,6 +21,18 @@ on:
         type: string
         required: false
         default: "0.11.0"
+    # Optional: with both, the exe and katago.exe are Authenticode-signed;
+    # without them the build is unsigned (docs/signing.md). release.yml
+    # passes them with `secrets: inherit`.
+    secrets:
+      WINDOWS_CERT_PFX_BASE64:
+        required: false
+      WINDOWS_CERT_PASSWORD:
+        required: false
+    outputs:
+      signing:
+        description: "authenticode | unsigned"
+        value: ${{ jobs.build.outputs.signing }}
 
 permissions:
   contents: write
@@ -28,7 +40,9 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    outputs:
+      signing: ${{ steps.status.outputs.signing }}
     defaults:
       run:
         shell: bash
@@ -99,6 +113,71 @@ jobs:
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
           test -f dist/GobanStudio/resources/frontend/dist/licenses/Goban-Studio-MIT.txt
           ls -R dist/GobanStudio | head -40
+      - name: signing mode
+        id: mode
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if [ -n "$WINDOWS_CERT_PFX_BASE64" ] && [ -n "$WINDOWS_CERT_PASSWORD" ]; then
+            echo "mode=authenticode" >> "$GITHUB_OUTPUT"
+            echo "Windows signing: authenticode"
+          else
+            echo "mode=unsigned" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Windows signing::WINDOWS_CERT_PFX_BASE64 / WINDOWS_CERT_PASSWORD not set; building an UNSIGNED package. See docs/signing.md."
+          fi
+      - name: Authenticode-sign goban-studio.exe and katago.exe
+        if: ${{ steps.mode.outputs.mode == 'authenticode' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $pfx = Join-Path $env:RUNNER_TEMP "goban-cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          try {
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+              Where-Object { $_.FullName -match "\\x64\\" } | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signtool) { throw "signtool.exe not found in the Windows SDK" }
+            Write-Host "signtool: $($signtool.FullName)"
+            $files = @(
+              (Get-ChildItem -Recurse -Filter goban-studio.exe dist/GobanStudio | Select-Object -First 1).FullName,
+              (Get-ChildItem -Recurse -Filter katago.exe dist/GobanStudio | Select-Object -First 1).FullName
+            )
+            foreach ($f in $files) { if (-not $f -or -not (Test-Path $f)) { throw "missing file to sign: $f" } }
+            # SHA-256 file digest, RFC 3161 timestamp (SHA-256), so the
+            # signature stays valid after the certificate expires.
+            & $signtool.FullName sign /fd sha256 /f $pfx /p $env:WINDOWS_CERT_PASSWORD `
+              /tr http://timestamp.digicert.com /td sha256 /d "Goban Studio" $files
+            if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
+            foreach ($f in $files) {
+              & $signtool.FullName verify /pa /v $f
+              if ($LASTEXITCODE -ne 0) { throw "signtool verify failed for $f" }
+              $sig = Get-AuthenticodeSignature $f
+              Write-Host "$f : $($sig.Status) — $($sig.SignerCertificate.Subject) — timestamp: $($sig.TimeStamperCertificate.Subject)"
+              if ($sig.Status -ne "Valid") { throw "signature on $f is $($sig.Status)" }
+              if (-not $sig.TimeStamperCertificate) { throw "signature on $f has no timestamp" }
+            }
+          } finally {
+            Remove-Item -Force $pfx -ErrorAction SilentlyContinue
+          }
+      - name: signing status and README
+        id: status
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.mode.outputs.mode }}" = "authenticode" ]; then
+            node scripts/signing-notes.mjs status windows authenticode --timestamped > dist/signing-windows.json
+            echo "signing=authenticode" >> "$GITHUB_OUTPUT"
+            echo "### Windows: Authenticode-signed and timestamped" >> "$GITHUB_STEP_SUMMARY"
+          else
+            node scripts/signing-notes.mjs status windows unsigned > dist/signing-windows.json
+            echo "signing=unsigned" >> "$GITHUB_OUTPUT"
+            echo "### Windows: NOT Authenticode-signed (signing secrets not set; docs/signing.md)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cat dist/signing-windows.json
+          # The README in the package says how this build was signed.
+          node scripts/signing-notes.mjs readme packaging/README-Windows.txt dist/signing-windows.json > dist/GobanStudio/README-Windows.txt
       - name: capture packaged app
         shell: pwsh
         continue-on-error: true
@@ -139,6 +218,23 @@ jobs:
           exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
           test -n "$exe"
           node scripts/selftest-app.mjs "$exe"
+      - name: native screenshot tour
+        timeout-minutes: 6
+        env:
+          WEBVIEW2_USER_DATA_FOLDER: ${{ runner.temp }}\goban-webview2-tour
+        run: |
+          # Today, a 19x19 game, its review, Practice and Settings, captured
+          # with System.Drawing; each must be non-blank and differ from the
+          # one before (scripts/screenshots.mjs).
+          exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
+          node scripts/tour-app.mjs "$exe" screenshots-windows
+      - name: upload native screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-screenshots-windows
+          path: screenshots-windows
+          if-no-files-found: ignore
       - name: remove WebView2 test profile
         shell: pwsh
         run: |
@@ -172,6 +268,10 @@ jobs:
         with:
           name: GobanStudio-Windows-x64
           path: dist/GobanStudio-Windows-x64.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signing-status-windows
+          path: dist/signing-windows.json
       - name: upload to release
         if: ${{ inputs.release_tag != '' }}
         env:

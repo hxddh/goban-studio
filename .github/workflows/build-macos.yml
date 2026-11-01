@@ -29,6 +29,24 @@ on:
         type: string
         required: false
         default: "macos-15"
+    # Optional: with all five, the app is Developer ID signed and notarized;
+    # without them it is ad-hoc signed (docs/signing.md). release.yml passes
+    # them with `secrets: inherit`.
+    secrets:
+      MACOS_CERT_P12_BASE64:
+        required: false
+      MACOS_CERT_PASSWORD:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      APPLE_APP_PASSWORD:
+        required: false
+    outputs:
+      signing:
+        description: "developer-id+notarized | developer-id | adhoc"
+        value: ${{ jobs.build.outputs.signing }}
 
 permissions:
   contents: write
@@ -36,7 +54,15 @@ permissions:
 jobs:
   build:
     runs-on: ${{ inputs.runner || 'macos-15' }}
-    timeout-minutes: 50
+    timeout-minutes: 80
+    outputs:
+      signing: ${{ steps.status.outputs.signing }}
+    env:
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -107,6 +133,18 @@ jobs:
         run: |
           npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" build --yes \
             -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos -Doptimize=ReleaseFast
+      - name: signing mode
+        id: mode
+        run: |
+          # The fallback notice goes to stderr; echo it on stdout so the
+          # runner turns it into an annotation.
+          mode="$(bash scripts/macos-sign.sh mode 2> "$RUNNER_TEMP/signing-notice.txt")"
+          cat "$RUNNER_TEMP/signing-notice.txt"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "macOS signing: $mode"
+      - name: import Developer ID certificate
+        if: ${{ steps.mode.outputs.mode == 'developer-id' }}
+        run: bash scripts/macos-sign.sh import
       - name: package app, install engine, sign
         run: |
           mkdir -p dist
@@ -114,8 +152,9 @@ jobs:
           native package --target macos --signing adhoc --assets frontend/dist \
             --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
           node scripts/install-engine.mjs dist/GobanStudio.app macos
-          codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
-          codesign --force --deep --sign - dist/GobanStudio.app
+          # Ad-hoc ("-") without the secrets; Developer ID + hardened runtime
+          # + packaging/entitlements.plist with them. KataGo is signed first.
+          bash scripts/macos-sign.sh sign dist/GobanStudio.app
           test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
@@ -132,23 +171,78 @@ jobs:
           exe="$(find dist/GobanStudio.app/Contents/MacOS -type f -perm -u+x | head -n1)"
           test -n "$exe"
           node scripts/selftest-app.mjs "$exe"
+      - name: native screenshot tour
+        timeout-minutes: 6
+        run: |
+          # Today, a 19x19 game, its review, Practice and Settings, captured
+          # with screencapture; each must be non-blank and differ from the
+          # one before (scripts/screenshots.mjs).
+          exe="$(find dist/GobanStudio.app/Contents/MacOS -type f -perm -u+x | head -n1)"
+          node scripts/tour-app.mjs "$exe" dist/screenshots
+      - name: upload native screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-screenshots-macos
+          path: dist/screenshots
+          if-no-files-found: ignore
+      - name: notarize and staple the app
+        if: ${{ steps.mode.outputs.mode == 'developer-id' }}
+        timeout-minutes: 40
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app "$RUNNER_TEMP/GobanStudio-notarize.zip"
+          bash scripts/macos-sign.sh notarize "$RUNNER_TEMP/GobanStudio-notarize.zip"
+          xcrun stapler staple dist/GobanStudio.app
+          bash scripts/macos-sign.sh verify-app dist/GobanStudio.app
       - name: zip and dmg
         run: |
-          cp packaging/README-macOS.txt dist/README-macOS.txt
+          set -euo pipefail
+          if [ "${{ steps.mode.outputs.mode }}" = "developer-id" ]; then
+            node scripts/signing-notes.mjs status macos developer-id --notarized > dist/signing-macos.json
+          else
+            node scripts/signing-notes.mjs status macos adhoc > dist/signing-macos.json
+          fi
+          # The README in the package says how this build was signed.
+          node scripts/signing-notes.mjs readme packaging/README-macOS.txt dist/signing-macos.json > dist/README-macOS.txt
           ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app dist/GobanStudio-macOS-arm64.zip
           zip -g -j dist/GobanStudio-macOS-arm64.zip dist/README-macOS.txt
           mkdir -p dist/dmg
           rm -rf dist/dmg/*
           ditto dist/GobanStudio.app "dist/dmg/Goban Studio.app"
-          cp packaging/README-macOS.txt dist/dmg/README-macOS.txt
+          cp dist/README-macOS.txt dist/dmg/README-macOS.txt
           hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
+          bash scripts/macos-sign.sh sign-dmg dist/GobanStudio-macOS-arm64.dmg
           ls -lh dist
+      - name: notarize and staple the dmg
+        if: ${{ steps.mode.outputs.mode == 'developer-id' }}
+        timeout-minutes: 40
+        run: |
+          bash scripts/macos-sign.sh notarize dist/GobanStudio-macOS-arm64.dmg
+          spctl -a -vv -t open --context context:primary-signature dist/GobanStudio-macOS-arm64.dmg
+      - name: signing status
+        id: status
+        run: |
+          cat dist/signing-macos.json
+          if [ "${{ steps.mode.outputs.mode }}" = "developer-id" ]; then
+            echo "signing=developer-id+notarized" >> "$GITHUB_OUTPUT"
+            echo "### macOS: Developer ID signed, notarized and stapled" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "signing=adhoc" >> "$GITHUB_OUTPUT"
+            echo "### macOS: ad-hoc signed, NOT notarized (signing secrets not set; docs/signing.md)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: remove signing keychain
+        if: always()
+        run: bash scripts/macos-sign.sh cleanup
       - uses: actions/upload-artifact@v7
         with:
           name: GobanStudio-macOS-arm64
           path: |
             dist/GobanStudio-macOS-arm64.zip
             dist/GobanStudio-macOS-arm64.dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signing-status-macos
+          path: dist/signing-macos.json
       - name: upload to release
         if: ${{ inputs.release_tag != '' }}
         env:
