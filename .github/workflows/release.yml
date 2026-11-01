@@ -1,0 +1,92 @@
+name: release
+
+# One complete v1.0: all content, both desktop packages and the 19x19 KataGo
+# sidecar must be green before a tag or release exists.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v1.0.0; notes file must exist"
+        required: true
+      sdk_version:
+        description: "@native-sdk/cli version used by both platform builds"
+        required: false
+        default: "0.11.0"
+      rehearse:
+        description: "Run every gate and both builds, publish nothing"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: notes exist and tag is not already published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          REHEARSE: ${{ inputs.rehearse }}
+        run: |
+          set -euo pipefail
+          if [ "$REHEARSE" = "true" ]; then echo "rehearsal: nothing will be tagged"; exit 0; fi
+          test -f ".github/release-notes/${TAG}.md" || { echo "missing .github/release-notes/${TAG}.md"; exit 1; }
+          published=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name==\"${TAG}\") | select(.draft==false)] | .[0].id // empty")
+          [ -z "$published" ] || { echo "${TAG} is already published"; exit 1; }
+
+  macos:
+    needs: preflight
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      sdk_version: ${{ inputs.sdk_version }}
+
+  windows:
+    needs: preflight
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      sdk_version: ${{ inputs.sdk_version }}
+
+  publish:
+    needs: [preflight, macos, windows]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: GobanStudio-macOS-arm64
+          path: dist-macos
+      - uses: actions/download-artifact@v4
+        with:
+          name: GobanStudio-Windows-x64
+          path: dist-windows
+      - name: verify packages
+        run: |
+          set -euo pipefail
+          test -s dist-macos/GobanStudio-macOS-arm64.zip
+          test -s dist-macos/GobanStudio-macOS-arm64.dmg
+          test -s dist-windows/GobanStudio-Windows-x64.zip
+          ls -lh dist-macos dist-windows
+      - name: publish
+        if: ${{ inputs.rehearse != true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --draft \
+            --title "Goban Studio $TAG" \
+            --notes-file ".github/release-notes/${TAG}.md"
+          gh release upload "$TAG" \
+            dist-macos/GobanStudio-macOS-arm64.zip \
+            dist-macos/GobanStudio-macOS-arm64.dmg \
+            dist-windows/GobanStudio-Windows-x64.zip
+          gh release edit "$TAG" --draft=false
+          gh release view "$TAG" --json url,isDraft,assets

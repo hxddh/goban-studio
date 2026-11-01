@@ -22,6 +22,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run release-check
       - run: npm run build
       - run: npm run sync
       - run: test -s frontend/dist/js/bundle.js && test -s frontend/dist/index.html

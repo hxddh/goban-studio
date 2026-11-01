@@ -138,11 +138,17 @@ function parseSize(raw) {
   return n === 9 || n === 13 || n === 19 ? n : 19;
 }
 
+/** SGF columns skip I, like board coordinates: a..h, j..z. */
+function sgfColumn(code) {
+  if (code < 97) return -1;
+  return code - 97 - (code > 105 ? 1 : 0);
+}
+
 function sgfVertex(raw, size) {
   const s = String(raw || "");
   if (!s) return null;
   if (s.length < 2) return null;
-  const x = s.charCodeAt(0) - 97;
+  const x = sgfColumn(s.charCodeAt(0));
   const y = s.charCodeAt(1) - 97;
   if (x < 0 || y < 0 || x >= size || y >= size) return null;
   return { x, y };
@@ -202,9 +208,7 @@ export function loadSGF(text) {
   const data = root.data || {};
   const size = parseSize(first(data, "SZ"));
   const komiRaw = first(data, "KM");
-  const komi = komiRaw === "" ? (size === 19 ? 7.5 : 6.5) : Number(komiRaw);
-  const ru = first(data, "RU").toLowerCase();
-  const rules = ru.includes("japan") ? "japanese" : "chinese";
+  const komi = komiRaw === "" ? 6.5 : Number(komiRaw);
   const ab = expandPoints(data.AB, size);
   const aw = expandPoints(data.AW, size);
   const ha = parseInt(first(data, "HA") || "0", 10) || 0;
@@ -216,8 +220,7 @@ export function loadSGF(text) {
     : new Date();
   const game = new Game({
     size,
-    rules,
-    komi: Number.isFinite(komi) ? komi : size === 19 ? 7.5 : 6.5,
+    komi: Number.isFinite(komi) ? komi : 6.5,
     handicap,
     date,
     playerBlack: first(data, "PB") || "Black",
@@ -292,8 +295,8 @@ export function loadSGF(text) {
 }
 
 /** A fresh game with handicap stones on the standard points. */
-export function handicapSetup(size, count, rules = "chinese") {
-  const game = new Game({ size, rules, handicap: count });
+export function handicapSetup(size, count) {
+  const game = new Game({ size, handicap: count });
   game.setup(
     starPoints(size).slice(0, count).map(([x, y]) => ({ x, y, color: BLACK })),
     WHITE,

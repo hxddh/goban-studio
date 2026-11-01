@@ -19,7 +19,12 @@ zig build -Doptimize=ReleaseFast
 echo "==> native package"
 mkdir -p dist
 rm -rf dist/GobanStudio.app
-native package --target macos --signing adhoc --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
+native package --target macos --signing adhoc --assets frontend/dist --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
+
+echo "==> install KataGo sidecar"
+node scripts/install-engine.mjs dist/GobanStudio.app macos
+codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
+codesign --force --deep --sign - dist/GobanStudio.app
 
 echo "==> zip"
 (

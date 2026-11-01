@@ -31,6 +31,14 @@ if (fs.existsSync(path.join(root, "assets/icon.png"))) {
 if (fs.existsSync(path.join(src, "moka"))) {
   fs.cpSync(path.join(src, "moka"), path.join(dist, "moka"), { recursive: true });
 }
+// The network and config are small enough for the normal asset bundle. The
+// platform binary is copied into the packaged app after `native package`:
+// the SDK's asset bundler caps a single file at 16 MiB, and the CPU KataGo
+// executable can be larger than that.
+if (fs.existsSync(path.join(root, "engine", "model"))) {
+  fs.mkdirSync(path.join(dist, "engine"), { recursive: true });
+  fs.cpSync(path.join(root, "engine", "model"), path.join(dist, "engine", "model"), { recursive: true });
+}
 
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
 const version = (appZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1] || "0.0.0";

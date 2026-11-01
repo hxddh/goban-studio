@@ -6,26 +6,29 @@ README.
 
 ## Automated
 
-`npm test` — 22 checks:
+`npm test` — 26 checks:
 
-- default 19×19 board and 7.5 komi
+- default 19×19 board, 6.5 komi and Japanese rules only
 - coordinates and point formatting
 - undo discards a leaf instead of leaving a hidden branch
 - alternating turns, occupied/outside rejection
 - capture and prisoner accounting
 - suicide
 - simple ko
-- Chinese area scoring and Japanese territory scoring
+- Japanese territory scoring (territory + prisoners + komi)
 - dead-stone removal
 - sparse-board territory guard
 - SGF export/import with setup stones, comments, result and variations
+- SGF columns skip I on import and export (J…T are not shifted)
 - SGF import with pass, setup, comments and `YYYY-MM-DD` dates
 - invalid SGF rejection
 - every UI string present in zh/en/ko/ja
 - the eight basics cards present in all four languages
 - Moka 9×9 assets present, model size matches its manifest, attribution files shipped
-- 20 lessons and 300 drill setups/solutions legal
-- opponent legality on 9×9 and 19×19
+- 60 lessons, 40 openings and 300 drills: every setup/solution legal
+- 20 classic games parse with four-language notes and preserved results
+- the native KataGo bridge sends a Japanese position and parses the reply
+- opponent legality on 9×9 and 19×19 (local fallback)
 - review point count
 - library save/open/delete
 - spaced-review ladder and due puzzle selection
@@ -39,15 +42,21 @@ Static asset checks are intentionally limited to source inputs; the bundle and
   language updates the dialog, rail and page; Start persists `firstRun: false`
 - Chinese, English, Korean and Japanese settings pages; four-language font
   stacks and Korean `keep-all` do not overflow the cards
-- fresh app opens a standard 19×19 / 7.5-komi board; 9×9 and 19×19 play;
+- fresh app opens a standard 19×19 / 6.5-komi board under Japanese rules;
+  the New game dialog has no rules selector; 9×9 and 19×19 play;
   human-vs-human and human-vs-computer; computer replies after the human move
   and after undo
 - Moka 9×9 model initializes in the browser, answers a human move with a
-  legal policy move; 13×13/19×19 fall back to the heuristic
+  legal policy move; 13×13/19×19 fall back to the heuristic in the browser
+  preview (KataGo is only present in the packaged desktop app)
 - capture lesson `capture-corner`: setup stones render, the correct move
   captures the white stone, `1/1` and “lesson complete” appear, Next works
 - tsumego `cap-1`: setup renders, correct move is accepted, progress is
   persisted, Next opens the next puzzle
+- Openings tab: 40 cards, first card opens a 19×19 professional opening and
+  advances through eight scripted moves
+- Classics tab: 20 cards, first card opens at move 0 with the four-language
+  note, review curve, players, date and result; Back returns to Classics
 - daily session starts from the Daily tab
 - two passes enter scoring; tapping a dead stone changes the score; Confirm
   writes a result and the board badge; library record keeps the result
@@ -80,13 +89,25 @@ Static asset checks are intentionally limited to source inputs; the bundle and
 - SGF export omitted root setup stones and used only the current node's
   result; import mis-parsed `YYYY-MM-DD` dates.
 - Importing a record immediately let the AI answer its last move.
+- SGF coordinates counted I as a column, shifting every imported stone from
+  J onward one line. Parser, exporter and the generated opening cards now
+  skip I like the board labels.
+- The six Learn tabs wrapped into an uneven row; they now use a 3×2 grid.
+- A classic game opened at its final move; it now opens at the empty board.
+- The KataGo binary exceeds the SDK per-asset 16 MiB cap, so it is copied into
+  the package after `native package`, not through the asset bundler.
 
 ## Native shell checks
 
 - `native validate` — `app.zon` is valid.
-- `native test -Dplatform=null` — 3/3 Zig tests pass (production source,
-  Windows path unescaping, plain path).
+- `native test -Dplatform=null` — 5/5 Zig tests pass (production source,
+  Windows path unescaping, plain path, engine script vocabulary).
 - `native build -Dplatform=null` — ReleaseFast executable links and builds.
+- Direct Linux KataGo v1.16.0 probe: model loads, one 19×19 GTP move returns
+  in about 1.1 s cold and a second move in the same process in about 1.3 s.
+- `native package --target linux --assets frontend/dist` plus
+  `scripts/install-engine.mjs` produces the expected
+  `resources/frontend/dist/engine/{model,linux}` layout.
 - Native file open/save dialogs are wired through the Native SDK web API,
   with a browser file-input/download fallback.
 - OS open-with events are forwarded by `src/main.zig` to the page as
@@ -101,5 +122,8 @@ Static asset checks are intentionally limited to source inputs; the bundle and
 - OS “open with” delivery for `.sgf` and drag/drop on a real desktop session.
 - WKWebView/WebView2 download behavior for the SGF export fallback.
 - Real Safari/WebKit and real Windows touch hardware.
-- KataGo, professional-level strength, large-curriculum content review and
-  store submission.
+- KataGo inside the packaged macOS/Windows app, the native bridge on a real
+  desktop WebView, store submission, notarization and auto-update.
+- Professional review of the 60 lessons, 40 opening cards and 20 classic
+  annotations. The content is complete and machine-validated, not
+  professionally reviewed.

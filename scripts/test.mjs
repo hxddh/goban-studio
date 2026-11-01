@@ -16,6 +16,8 @@ import { chooseMove } from "../src/web/js/ai.js";
 import { analyze } from "../src/web/js/review.js";
 import { BASICS } from "../src/web/js/content/basics.js";
 import { LESSONS } from "../src/web/js/content/lessons.js";
+import { OPENINGS } from "../src/web/js/content/openings.js";
+import { CLASSICS } from "../src/web/js/content/classics.js";
 import { TSUMEGO } from "../src/web/js/content/tsumego.js";
 import { MESSAGES } from "../src/web/js/messages.js";
 import { LANG_IDS, setLang, t } from "../src/web/js/i18n.js";
@@ -60,7 +62,7 @@ await test("coordinates skip I and count rows from the bottom", () => {
 await test("a fresh game uses the standard 19x19 board", () => {
   const g = newGame();
   assert.equal(g.size, 19);
-  assert.equal(g.komi, 7.5);
+  assert.equal(g.komi, 6.5);
   assert.equal(g.mainLine().length, 1);
 });
 
@@ -134,24 +136,17 @@ await test("simple ko cannot be recaptured immediately", () => {
   assert.equal(g.play(1, 1).reason, "ko");
 });
 
-await test("Chinese area scoring and Japanese territory scoring", () => {
+await test("Japanese territory scoring counts territory, prisoners and komi", () => {
   const shape = [
     { x: 1, y: 0, color: BLACK },
     { x: 0, y: 1, color: BLACK },
   ];
-  const chinese = setup(shape, BLACK);
-  const cs = chinese.score();
-  assert.equal(cs.blackStones, 2);
-  assert.equal(cs.blackTerritory, 1);
-  assert.equal(cs.white, 6.5);
-  assert.equal(cs.result, "W+3.5");
-
   const japanese = setup(shape, BLACK);
-  japanese.rules = "japanese";
   const js = japanese.score();
   assert.equal(js.black, 1);
   assert.equal(js.white, 6.5);
   assert.equal(js.result, "W+5.5");
+  assert.equal(js.blackStones, undefined);
 });
 
 await test("dead stones are removed before scoring", () => {
@@ -194,6 +189,7 @@ await test("SGF export/import keeps moves, comments, setup and variations", () =
 
   const sgf = g.toSGF();
   assert.match(sgf, /^\(;GM\[1\]/);
+  assert.match(sgf, /RU\[Japanese\]/);
   assert.match(sgf, /AB\[ba\]/);
   assert.match(sgf, /AW\[aa\]/);
   assert.match(sgf, /RE\[B\+2\.5\]/);
@@ -233,6 +229,17 @@ await test("SGF import accepts pass, setup, comments and four-digit dates", () =
   assert.equal(line[3].move.color, WHITE);
 });
 
+await test("SGF columns skip I on import and export", () => {
+  const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[jd];W[qd])");
+  const line = game.mainLine();
+  assert.equal(line[1].move.x, 8);
+  assert.equal(line[1].move.y, 3);
+  assert.equal(line[2].move.x, 15);
+  const sgf = game.toSGF();
+  assert.match(sgf, /;B\[jd\]/);
+  assert.match(sgf, /;W\[qd\]/);
+});
+
 await test("an empty SGF is rejected, not silently accepted", () => {
   assert.throws(() => loadSGF("not an sgf"), /no root node/);
 });
@@ -264,12 +271,51 @@ await test("the rules primer is complete in all four languages", () => {
   }
 });
 
+await test("all 20 classic games parse and carry four-language notes", () => {
+  assert.equal(CLASSICS.length, 20);
+  const seen = new Set();
+  for (const classic of CLASSICS) {
+    assert.ok(!seen.has(classic.id), `${classic.id} duplicate id`);
+    seen.add(classic.id);
+    for (const lang of LANG_IDS) {
+      for (const field of ["title", "note"]) {
+        assert.ok(classic[field]?.[lang]?.trim(), `${classic.id} ${field} ${lang}`);
+      }
+      assert.ok(classic.blackName?.[lang]?.trim(), `${classic.id} black ${lang}`);
+      assert.ok(classic.whiteName?.[lang]?.trim(), `${classic.id} white ${lang}`);
+    }
+    const { game } = loadSGF(classic.sgf);
+    assert.equal(game.size, 19, `${classic.id} board size`);
+    assert.ok(game.mainLine().length > 100, `${classic.id} move count`);
+    assert.equal(game.current.result, classic.result, `${classic.id} result preserved`);
+  }
+});
+
+await test("all 40 openings are well-formed and legal in four languages", () => {
+  assert.equal(OPENINGS.length, 40);
+  const seen = new Set();
+  for (const opening of OPENINGS) {
+    for (const lang of LANG_IDS) {
+      assert.ok(opening.title[lang]?.trim(), `${opening.id} title ${lang}`);
+      assert.ok(opening.text[lang]?.trim(), `${opening.id} text ${lang}`);
+      assert.ok(opening.hint[lang]?.trim(), `${opening.id} hint ${lang}`);
+    }
+    assert.ok(!seen.has(opening.id), `${opening.id} duplicate id`);
+    seen.add(opening.id);
+    const game = new Game({ size: opening.size || 19, komi: opening.komi ?? 6.5 });
+    game.setup(opening.setup, opening.toMove);
+    for (const move of opening.line) {
+      assert.equal(game.play(move.x, move.y, { color: move.c }).ok, true, `${opening.id} illegal line`);
+    }
+  }
+});
+
 await test("all lesson and puzzle positions and lines are legal", () => {
   const items = [
     ...LESSONS.map((item) => ({ ...item, kind: "lesson" })),
     ...TSUMEGO.map((item) => ({ ...item, kind: "puzzle" })),
   ];
-  assert.equal(LESSONS.length, 20);
+  assert.equal(LESSONS.length, 60);
   assert.equal(TSUMEGO.length, 300);
   for (const item of items) {
     assert.equal(item.size, 9, `${item.id} size`);
@@ -309,6 +355,34 @@ await test("the built-in opponent returns a legal move on 9x9 and 19x19", async 
     assert.ok(move.x >= 0 && move.y >= 0 && move.x < size && move.y < size, `${size} bounds`);
     assert.equal(game.board.get([move.x, move.y]), EMPTY, `${size} occupied`);
     assert.equal(game.canPlay(move.x, move.y).ok, true, `${size} illegal`);
+  }
+});
+
+await test("the native bridge sends a Japanese KataGo position and parses its move", async () => {
+  let script = "";
+  globalThis.zero = {
+    invoke: async (command, payload) => {
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo 19x19", version: "KataGo test" };
+      if (command === "studio.katagoMove") {
+        script = Buffer.from(payload.b64, "base64").toString("utf8");
+        assert.equal(payload.color, "W");
+        return { ok: true, move: "D4" };
+      }
+      throw new Error("unexpected command " + command);
+    },
+  };
+  try {
+    const { chooseMove: chooseKataGo } = await import("../src/web/js/katago.js?bridge-test");
+    const game = newGame(19);
+    game.play(15, 3);
+    const move = await chooseKataGo(game, { level: 2 });
+    assert.deepEqual(move, { x: 3, y: 15 });
+    assert.match(script, /boardsize 19/);
+    assert.match(script, /komi 6\.5/);
+    assert.match(script, /kata-set-rules japanese/);
+    assert.match(script, /play B Q16/);
+  } finally {
+    delete globalThis.zero;
   }
 });
 

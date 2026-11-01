@@ -72,6 +72,8 @@ export function loadProgress() {
   const p = readJSON(KEYS.progress, {});
   return {
     lessons: p.lessons && typeof p.lessons === "object" ? p.lessons : {},
+    openings: p.openings && typeof p.openings === "object" ? p.openings : {},
+    classics: p.classics && typeof p.classics === "object" ? p.classics : {},
     puzzles: p.puzzles && typeof p.puzzles === "object" ? p.puzzles : {},
     daily: p.daily && typeof p.daily === "object" ? p.daily : null,
     streak: p.streak && typeof p.streak === "object" ? p.streak : { count: 0, last: null },
@@ -93,6 +95,18 @@ const DAY = 86400000;
 export function todayKey(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+export function markOpening(progress, id) {
+  progress.openings[id] = { done: true, at: Date.now() };
+  saveProgress(progress);
+  return progress;
+}
+
+export function markClassic(progress, id) {
+  progress.classics[id] = { done: true, at: Date.now() };
+  saveProgress(progress);
+  return progress;
 }
 
 export function markPuzzle(progress, id, correct) {

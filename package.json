@@ -10,7 +10,8 @@
     "sync": "node scripts/sync-dist.mjs",
     "test": "node scripts/test.mjs",
     "verify": "npm test && npm run build && npm run sync",
-    "package:macos": "bash scripts/package.sh"
+    "package:macos": "bash scripts/package.sh",
+    "release-check": "node scripts/release-check.mjs"
   },
   "dependencies": {
     "@sabaki/go-board": "1.4.3"

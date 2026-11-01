@@ -18,8 +18,6 @@ export const WHITE = -1;
 export const EMPTY = 0;
 export const LETTERS = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
 
-export const RULESETS = ["chinese", "japanese"];
-
 export function other(color) {
   return color === BLACK ? WHITE : BLACK;
 }
@@ -153,8 +151,7 @@ let nextNodeId = 1;
 export class Game {
   constructor({
     size = 19,
-    rules = "chinese",
-    komi = size === 19 ? 7.5 : 6.5,
+    komi = 6.5,
     handicap = 0,
     date = new Date(),
     playerBlack = "Black",
@@ -162,7 +159,8 @@ export class Game {
     event = "",
   } = {}) {
     this.size = size;
-    this.rules = RULESETS.includes(rules) ? rules : "chinese";
+    // Japanese territory scoring is the app's only ruleset.
+    this.rules = "japanese";
     this.komi = Number(komi);
     this.handicap = Math.max(0, Math.min(9, Number(handicap) || 0));
     this.date = date instanceof Date ? date : new Date(date);
@@ -390,7 +388,7 @@ export class Game {
     if (result) this.current.phase = "ended";
   }
 
-  /** Chinese area or Japanese territory score, after removing dead stones. */
+  /** Japanese territory score (territory + prisoners + komi), after removing dead stones. */
   score(deadStones = []) {
     const board = this.current.board.clone();
     const dead = [];
@@ -399,15 +397,6 @@ export class Game {
       if (v !== EMPTY) {
         dead.push({ x: d.x, y: d.y, color: v });
         board.set([d.x, d.y], EMPTY);
-      }
-    }
-    let blackStones = 0;
-    let whiteStones = 0;
-    for (let y = 0; y < this.size; y++) {
-      for (let x = 0; x < this.size; x++) {
-        const v = board.get([x, y]);
-        if (v === BLACK) blackStones++;
-        else if (v === WHITE) whiteStones++;
       }
     }
     const territory = territoryMap(board);
@@ -420,21 +409,14 @@ export class Game {
         else if (territory[y][x] === WHITE) whiteTerritory++;
       }
     }
-    let black;
-    let white;
-    if (this.rules === "japanese") {
-      let blackPrisoners = this.current.board.getCaptures(BLACK) || 0;
-      let whitePrisoners = this.current.board.getCaptures(WHITE) || 0;
-      for (const d of dead) {
-        if (d.color === BLACK) whitePrisoners++;
-        else blackPrisoners++;
-      }
-      black = blackTerritory + blackPrisoners;
-      white = whiteTerritory + whitePrisoners + this.komi;
-    } else {
-      black = blackStones + blackTerritory;
-      white = whiteStones + whiteTerritory + this.komi;
+    let blackPrisoners = this.current.board.getCaptures(BLACK) || 0;
+    let whitePrisoners = this.current.board.getCaptures(WHITE) || 0;
+    for (const d of dead) {
+      if (d.color === BLACK) whitePrisoners++;
+      else blackPrisoners++;
     }
+    const black = blackTerritory + blackPrisoners;
+    const white = whiteTerritory + whitePrisoners + this.komi;
     const diff = black - white;
     const result = diff > 0 ? "B+" + formatPoints(diff) : diff < 0 ? "W+" + formatPoints(-diff) : "Draw";
     return {
@@ -442,8 +424,6 @@ export class Game {
       white,
       diff,
       result,
-      blackStones,
-      whiteStones,
       blackTerritory,
       whiteTerritory,
       captures: {
@@ -473,8 +453,10 @@ export class Game {
     const dt = this.date instanceof Date ? this.date : new Date(this.date);
     const pad = (n) => String(n).padStart(2, "0");
     const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-    const rules = this.rules === "japanese" ? "Japanese" : "Chinese";
-    const sgfCoord = (x, y) => String.fromCharCode(97 + x) + String.fromCharCode(97 + y);
+    const rules = "Japanese";
+    // SGF skips I in columns, exactly as the board labels do.
+    const sgfColumn = (x) => String.fromCharCode(97 + x + (x >= 8 ? 1 : 0));
+    const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
       "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:1.0.0]SZ[" +
       this.size +

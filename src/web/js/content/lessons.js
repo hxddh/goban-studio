@@ -5,10 +5,13 @@
  * colour is `toMove`; the app answers with the other colour from the line.
  * Positions and solutions are data, so a translation never changes the Go.
  */
+import { Game } from "../rules.js";
+import { TSUMEGO } from "./tsumego.js";
+
 const L = (zh, en, ko, ja) => ({ zh, en, ko, ja });
 const s = (x, y, c) => ({ x, y, c });
 
-export const LESSONS = [
+const CORE_LESSONS = [
   {
     id: "first-stone",
     title: L("第一手：天元", "First stone: the centre", "첫 수: 천원", "第一手：天元"),
@@ -310,6 +313,82 @@ export const LESSONS = [
     line: [{ c: 1, x: 3, y: 3 }],
   },
 ];
+
+const READING_TEXT = {
+  capture: {
+    zh: "找出白棋最后一口气，一手提掉它。",
+    en: "Find White's last liberty and capture the group in one move.",
+    ko: "백 돌의 마지막 활로를 찾아 한 수로 따내세요.",
+    ja: "白の最後の呼吸点を見つけ、一手で取ります。",
+  },
+  atari: {
+    zh: "找出让白棋只剩一口气的要点，形成打吃。",
+    en: "Find the point that leaves White with one liberty and makes atari.",
+    ko: "백의 활로를 하나로 줄이는 곳을 찾아 단수를 만드세요.",
+    ja: "白の呼吸点を一つにする急所を見つけ、アタリにします。",
+  },
+  save: {
+    zh: "找出黑棋唯一的出路，把自己的棋救出来。",
+    en: "Find Black's only way out and save the group.",
+    ko: "흑의 유일한 활로를 찾아 돌을 살리세요.",
+    ja: "黒の唯一の逃げ道を見つけ、石を救います。",
+  },
+  connect: {
+    zh: "找出连接两颗黑棋的要点，让它们连成一块。",
+    en: "Find the point that connects the two black stones.",
+    ko: "두 흑돌을 연결하는 곳을 찾으세요.",
+    ja: "二つの黒石をつなぐ点を見つけます。",
+  },
+  cut: {
+    zh: "占住白棋之间的空点，把白棋分开。",
+    en: "Take the point between the white stones and cut them apart.",
+    ko: "백 돌 사이의 빈 점을 차지해 백을 끊으세요.",
+    ja: "白の間の空点を占めて分断します。",
+  },
+};
+
+const READING_SUFFIX = {
+  zh: " · 读棋",
+  en: " · Reading",
+  ko: " · 수읽기",
+  ja: " · 読み",
+};
+
+/**
+ * Forty reading-practice lessons drawn from distinct positions in the drill
+ * bank. They are deliberately labelled as reading practice, not as forty
+ * additional authored lectures; the same verified positions are also
+ * available as spaced-review puzzles.
+ */
+function readingLessons(target) {
+  const seen = new Set();
+  const picked = [];
+  for (const puzzle of TSUMEGO) {
+    const key = puzzle.setup.map((stone) => `${stone.x},${stone.y},${stone.c}`).sort().join("|") + ":" + puzzle.toMove;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(puzzle);
+    if (picked.length >= target) break;
+  }
+  return picked.map((puzzle, index) => {
+    const n = String(index + 1).padStart(2, "0");
+    const base = READING_TEXT[puzzle.kind] || READING_TEXT.capture;
+    return {
+      id: `reading-${n}`,
+      title: Object.fromEntries(Object.keys(puzzle.title).map((lang) => [lang, puzzle.title[lang] + READING_SUFFIX[lang] + " " + n])),
+      text: base,
+      hint: puzzle.hint,
+      size: puzzle.size,
+      setup: puzzle.setup,
+      toMove: puzzle.toMove,
+      line: puzzle.line,
+      level: puzzle.level,
+      readingOf: puzzle.id,
+    };
+  });
+}
+
+export const LESSONS = [...CORE_LESSONS, ...readingLessons(40)];
 
 export function lessonById(id) {
   return LESSONS.find((l) => l.id === id) || null;

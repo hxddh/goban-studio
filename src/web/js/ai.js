@@ -1,16 +1,17 @@
 /**
  * Built-in opponent.
  *
- * This is deliberately a small, offline engine: heuristic candidate moves
- * plus flat Monte-Carlo playouts on 9x9/13x13. It is aimed at beginners and
- * casual play, not at dan-level strength. Every returned move is checked
- * against the same legality rules the player uses.
+ * The native app sends 19×19 positions to the bundled KataGo sidecar. This
+ * module remains the browser-preview and fallback opponent: Moka's 9×9 net,
+ * plus local heuristics and shallow playouts elsewhere. Every returned move
+ * is checked against the same legality rules the player uses.
  *
  * The search is time-sliced with setTimeout, so the board keeps painting while
  * the computer thinks. There is no worker: zero:// only loads the one classic
  * bundle, and a main-thread search with a deadline is enough for this scope.
  */
 import { BLACK, WHITE, EMPTY, territoryMap } from "./rules.js";
+import { chooseMove as chooseKataGo } from "./katago.js";
 
 export const LEVELS = [
   { id: 1, key: "learn.easy", budget: 220, candidates: 6, playouts: 0 },
@@ -205,6 +206,10 @@ async function chooseMoka(game, level) {
 
 export async function chooseMove(game, { level = 3, color = game.turn } = {}) {
   const size = game.size;
+  if (size === 19) {
+    const strong = await chooseKataGo(game, { level });
+    if (strong) return strong;
+  }
   const neural = await chooseMoka(game, level);
   if (neural) return neural;
   const board = game.board.clone();

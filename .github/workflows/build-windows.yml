@@ -1,0 +1,109 @@
+name: build-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to upload to (optional)
+        required: false
+        default: ""
+      sdk_version:
+        description: "@native-sdk/cli version"
+        required: false
+        default: "0.11.0"
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: false
+        default: ""
+      sdk_version:
+        type: string
+        required: false
+        default: "0.11.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: install build dependencies
+        run: npm ci
+      - name: content gate
+        run: npm run release-check
+      - name: unit tests
+        run: npm test
+      - name: download KataGo Eigen sidecar
+        run: |
+          curl -L --fail -sS -o "$RUNNER_TEMP/katago.zip" \
+            https://github.com/lightvector/KataGo/releases/download/v1.16.0/katago-v1.16.0-eigen-windows-x64.zip
+          mkdir -p engine/windows
+          powershell -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/katago.zip' -DestinationPath 'engine/windows' -Force"
+          test -f engine/windows/katago.exe
+      - name: KataGo smoke test
+        run: |
+          set -euo pipefail
+          move=$(printf 'boardsize 19\nkomi 6.5\nkata-set-rules japanese\nplay B Q16\ngenmove W\nquit\n' | \
+            ./engine/windows/katago.exe gtp -model engine/model/model.txt.gz -config engine/model/gtp.cfg \
+            -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
+            | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
+          test -n "$move"
+          echo "KataGo answered: $move"
+      - name: install Native SDK CLI
+        env:
+          SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
+        run: |
+          npm install -g "@native-sdk/cli@${SDK_VERSION}"
+          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
+          native --version
+      - name: build frontend
+        run: |
+          npm run build
+          npm run sync
+          node scripts/release-check.mjs
+      - name: native validate and tests
+        run: |
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" validate
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" test --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=windows
+      - name: native release build
+        run: |
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" build --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=windows -Doptimize=ReleaseFast
+      - name: package app and install engine
+        run: |
+          mkdir -p dist
+          rm -rf dist/GobanStudio
+          native package --target windows --assets frontend/dist \
+            --output dist/GobanStudio --binary zig-out/bin/goban-studio.exe
+          node scripts/install-engine.mjs dist/GobanStudio windows
+          test -f dist/GobanStudio/resources/frontend/dist/engine/windows/katago.exe
+          test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
+          ls -R dist/GobanStudio | head -40
+      - name: zip
+        run: |
+          powershell -NoProfile -Command "Compress-Archive -Path 'dist/GobanStudio' -DestinationPath 'dist/GobanStudio-Windows-x64.zip' -Force"
+          ls -lh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GobanStudio-Windows-x64
+          path: dist/GobanStudio-Windows-x64.zip
+      - name: upload to release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$TAG" dist/GobanStudio-Windows-x64.zip --clobber

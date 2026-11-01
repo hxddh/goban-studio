@@ -4,7 +4,7 @@ A calm, offline Go app for macOS and Windows. Learn the first stone, play a
 friend or the built-in opponent, then review the game and keep the record.
 
 **Languages:** 中文 · English · 한국어 · 日本語  
-**Board:** standard 19×19 by default; 9×9 and 13×13 for teaching and quick games · Chinese and Japanese rules · komi and handicap
+**Board:** standard 19×19 by default; 9×9 and 13×13 for teaching and quick games · Japanese rules · komi and handicap
 
 Goban Studio is the Go application built alongside — not instead of — the
 existing Gomoku app. It deliberately uses a different bundle ID
@@ -14,17 +14,20 @@ existing Gomoku app. It deliberately uses a different bundle ID
 ## What is here
 
 - **Play** — tap intersections on a canvas board. Captures, suicide, simple ko
-  and positional superko are checked locally. Choose Chinese or Japanese
-  rules, 9/13/19 boards, komi, up to nine handicap stones, and a human or
-  computer opponent at five levels. On 9×9 the opponent uses the bundled
-  Moka INT8 neural network (MIT); 13×13 and 19×19 use the local heuristic.
-- **Scoring** — two passes enter scoring. Tap dead stones, see the area or
-  territory estimate, confirm the result, or resume play.
+  and positional superko are checked locally. Play 9/13/19 boards under
+  Japanese rules, with komi, up to nine handicap stones, and a human or
+  computer opponent at five levels. On 19×19 the packaged app starts the
+  bundled KataGo sidecar; 9×9 uses the bundled Moka INT8 network; 13×13 keeps
+  the local heuristic opponent.
+- **Scoring** — two passes enter scoring. Tap dead stones, see territory and
+  prisoners, confirm the result, or resume play.
 - **Review** — a whole-game evaluation curve, key-move list and influence
   overlay. The evaluator is a local heuristic; it is useful for finding
-  turning points, not a dan-level engine.
-- **Learn** — twenty short, playable lessons and three hundred tsumego drills,
-  each in all four languages, with hints, retry, answer and spaced review.
+  turning points, not a dan-level analysis report.
+- **Learn** — 60 lessons (20 foundation lessons plus 40 distinct reading
+  positions), 40 professional opening layouts, 20 classic games and 300
+  tsumego drills, all in the four launch languages, with hints, retry, answer
+  and spaced review.
 - **Library** — SGF import/export, saved games, a 200-game cap, and automatic
   saving of the current game.
 - **Settings** — language, wood/night/paper board themes, coordinates, move
@@ -42,26 +45,29 @@ npm run sync
 python3 -m http.server 4173 --directory frontend/dist
 ```
 
-Open <http://127.0.0.1:4173>. The page is also the exact asset bundle the
-desktop shell serves.
+Open <http://127.0.0.1:4173>. The page is the exact asset bundle the desktop
+shell serves. The browser preview has no sidecar process, so it uses the local
+19×19 fallback; KataGo is active in the packaged desktop app.
 
 ## Test
 
 ```bash
 npm test
+npm run release-check
 ```
 
-The suite covers rules and scoring, ko and suicide, SGF round trips and
-variations, all four language tables, every lesson/puzzle line, the opponent's
-legality, review analysis and library persistence. It runs in Node without a
-browser or native SDK.
+The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
+and variations, all four language tables, every lesson, opening, classic and
+puzzle line, the opponent's legality, the KataGo bridge request, review
+analysis and library persistence. It runs in Node without a browser or native
+SDK.
 
 ## Desktop shell
 
 The macOS/Windows shell uses the Native SDK and the system WebView. It is
-intentionally thin: `src/main.zig` wires the window, bridge and file
-association; `src/runner.zig` is the platform runner; the app itself lives in
-`src/web`.
+intentionally thin: `src/main.zig` wires the window, bridge, file association
+and the KataGo sidecar; `src/runner.zig` is the platform runner; the app itself
+lives in `src/web`.
 
 On a machine with Zig 0.16 and the Native SDK:
 
@@ -69,17 +75,38 @@ On a machine with Zig 0.16 and the Native SDK:
 npm run build
 npm run sync
 zig build -Doptimize=ReleaseFast
-native package --target macos --signing adhoc \
+native package --target macos --signing adhoc --assets frontend/dist \
   --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
+node scripts/install-engine.mjs dist/GobanStudio.app macos
 ```
 
-`scripts/package.sh` wraps the build, packaging, zip and
-`~/Applications/GobanStudio.app` install for macOS. The Zig source and
-manifest have been validated in the Linux orb with Zig 0.16 and Native SDK
-0.11.0 (`native validate`, a null-backend `native build`, and three Zig tests).
-The macOS/Windows WebView package, signing and notarization still require those
-hosts: treat the packaged app as an explicit validation step, not as a result
-claimed by this repository.
+`scripts/package.sh` wraps the build, packaging, sidecar install, signing, zip
+and `~/Applications/GobanStudio.app` install for macOS. The Zig source and
+manifest were validated in the Linux orb with Zig 0.16 and Native SDK 0.11.0:
+`native validate`, a null-backend `native build`, and five Zig tests. The
+macOS/Windows WebView package is built and gated by the GitHub workflows; local
+Linux cannot run the macOS or Windows host.
+
+The KataGo binary is copied into the package after `native package` because
+the SDK asset bundler caps a single asset at 16 MiB. `scripts/install-engine.mjs`
+places it at `…/frontend/dist/engine/<platform>/`, next to the network and
+config, where `src/engine.zig` resolves it.
+
+## Release
+
+The release flow follows the Chessboard model: one `release.yml` dispatch
+builds both platforms, runs the content and native gates, and only then creates
+the tag and GitHub Release. Release notes live in
+`.github/release-notes/<tag>.md`.
+
+```bash
+gh workflow run release.yml -f tag=v1.0.0
+```
+
+Use `-f rehearse=true` to run every gate and both builds without tagging or
+publishing. The macOS job builds KataGo from the v1.16.0 source with the Eigen
+backend; the Windows job downloads the matching official Eigen build and ships
+its DLLs.
 
 ## Architecture
 
@@ -87,18 +114,20 @@ claimed by this repository.
 src/web/index.html       shell markup
 src/web/styles.css       layout, themes, four-language font stacks
 src/web/js/main.js       view orchestration and the single canvas
-src/web/js/rules.js      Game tree, legality, scoring, SGF export
+src/web/js/rules.js      Game tree, legality, Japanese scoring, SGF export
 src/web/js/sgf.js        dependency-free FF[4] reader
 src/web/js/board.js      canvas renderer and hit testing
-src/web/js/ai.js         offline heuristic / flat Monte-Carlo opponent
-src/web/moka/            Moka 9×9 INT8 model, worker and attribution
+src/web/js/ai.js         KataGo bridge, Moka 9×9 and the local fallback
+src/web/js/katago.js     native bridge client for the 19×19 sidecar
 src/web/js/review.js     evaluation curve and key moves
-src/web/js/content/      lessons and tsumego, side by side in four languages
+src/web/js/content/      lessons, openings, classics and tsumego in four languages
 src/web/js/i18n.js       one key → four strings, with missing-key fallback
 src/web/js/persist.js    guarded localStorage access
 src/web/js/library.js    saved SGF records and current game
+src/engine.zig           persistent KataGo GTP child process
 src/main.zig             Native SDK entry, bridge, window
 src/runner.zig           platform runner
+engine/model/            KataGo network, config and licence
 ```
 
 The rule layer is independent of the renderer and DOM. Content is data, so a
@@ -108,36 +137,24 @@ by Git; `npm run build` and `npm run sync` recreate them.
 
 ## Honest limits
 
-This is a complete, runnable v1 foundation, not a claim that the full
-sixty-hour curriculum from the feasibility study is already written.
-
-- The bundled Moka model makes 9×9 noticeably stronger than a pure heuristic,
-  but it is not KataGo. 13×13 and 19×19 remain beginner/casual heuristic
-  opponents; dan-level analysis would need a separate KataGo engine project.
-- The shipped curriculum is 20 hand-authored lessons and 300 drills: 25
-  hand-checked base shapes plus deterministic symmetry/translation variants.
-  The feasibility report scopes a larger, independently authored and
-  native-reviewed course; the data schema here is ready for it.
-- The desktop shell, native file dialogs, code signing and auto-update have
-  not been verified in this environment.
+- The 19×19 engine is the small b6c96 KataGo network on CPU (Eigen), not a
+  GPU-scale analysis engine. It is a genuine KataGo MCTS opponent with five
+  visit budgets, but it is not presented as a fixed dan rank.
+- The 60-lesson course is 20 foundation lessons plus 40 distinct reading
+  positions drawn from the drill bank; it is a complete v1 curriculum, not a
+  claim to a sixty-hour professional course.
+- The 300 drills are 25 hand-checked base shapes plus deterministic
+  symmetry/translation practice variants.
+- Review remains a local heuristic, separate from KataGo; it does not provide
+  KataGo ownership or win-rate analysis.
 - SGF support covers ordinary FF[4] game records, setup stones, comments,
   passes, marks and variations. It does not attempt every SGF property.
-
-## Publish
-
-The working tree is a normal Git checkout. Once the GitHub account has
-permission to create a repository (or the empty `hxddh/goban-studio`
-repository has been created), run:
-
-```bash
-bash scripts/publish.sh
-```
-
-It creates a private `hxddh/goban-studio` on the first run and pushes
-`main`. Pass `PUBLIC` as the second argument to create a public repository.
+- macOS/Windows packaging, WebView rendering and code signing are exercised by
+  the release workflows, not by the Linux orb.
 
 ## Licence
 
-MIT. `@sabaki/go-board` is MIT; Moka is MIT and its model notices are in
+MIT. `@sabaki/go-board` is MIT; Moka is MIT and its notices are in
 `src/web/moka/`; Inter is licensed under the SIL Open Font License (see
-`src/web/fonts/Inter-OFL.txt`). KataGo is not bundled.
+`src/web/fonts/Inter-OFL.txt`). KataGo is MIT; the sidecar licence and model
+notice are in `engine/model/`.

@@ -11,3 +11,8 @@ src/web/js/worker-src.js
 frontend/dist/
 src/web/js/bundle.js
 .amp/
+
+# KataGo platform binaries are fetched/built by the release workflows
+engine/*/katago
+engine/*/katago.exe
+engine/*/*.dll

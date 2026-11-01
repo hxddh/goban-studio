@@ -1,0 +1,123 @@
+name: build-macos
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to upload to (optional)
+        required: false
+        default: ""
+      sdk_version:
+        description: "@native-sdk/cli version"
+        required: false
+        default: "0.11.0"
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: false
+        default: ""
+      sdk_version:
+        type: string
+        required: false
+        default: "0.11.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: install build dependencies
+        run: |
+          npm ci
+          brew install cmake ninja eigen
+      - name: content gate
+        run: npm run release-check
+      - name: unit tests
+        run: npm test
+      - name: build KataGo Eigen sidecar
+        run: |
+          git clone --depth 1 --branch v1.16.0 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
+          cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build" \
+            -G Ninja -DUSE_BACKEND=EIGEN -DUSE_AVX2=OFF -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/KataGo/cpp/build" --parallel 4
+          mkdir -p engine/macos
+          cp "$RUNNER_TEMP/KataGo/cpp/build/katago" engine/macos/katago
+          chmod +x engine/macos/katago
+          codesign --force --sign - engine/macos/katago
+      - name: KataGo smoke test
+        run: |
+          set -euo pipefail
+          move=$(printf 'boardsize 19\nkomi 6.5\nkata-set-rules japanese\nplay B Q16\ngenmove W\nquit\n' | \
+            engine/macos/katago gtp -model engine/model/model.txt.gz -config engine/model/gtp.cfg \
+            -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
+            | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
+          test -n "$move"
+          echo "KataGo answered: $move"
+      - name: install Native SDK CLI
+        env:
+          SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
+        run: |
+          npm install -g "@native-sdk/cli@${SDK_VERSION}"
+          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
+          native --version
+      - name: build frontend
+        run: |
+          npm run build
+          npm run sync
+          node scripts/release-check.mjs
+      - name: native validate and tests
+        run: |
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" validate
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" test --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos
+      - name: native release build
+        run: |
+          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" build --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos -Doptimize=ReleaseFast
+      - name: package app, install engine, sign
+        run: |
+          mkdir -p dist
+          rm -rf dist/GobanStudio.app
+          native package --target macos --signing adhoc --assets frontend/dist \
+            --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
+          node scripts/install-engine.mjs dist/GobanStudio.app macos
+          codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
+          codesign --force --deep --sign - dist/GobanStudio.app
+          test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
+          test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz"
+          codesign --verify --deep --strict dist/GobanStudio.app
+          printf 'boardsize 19\nkata-set-rules japanese\ngenmove B\nquit\n' | \
+            "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago" gtp \
+            -model "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz" \
+            -config "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/gtp.cfg" \
+            -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
+            | grep -E '^= [A-HJ-T][0-9]+' | tail -1
+      - name: zip and dmg
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app dist/GobanStudio-macOS-arm64.zip
+          hdiutil create -volname "Goban Studio" -srcfolder dist/GobanStudio.app -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
+          ls -lh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GobanStudio-macOS-arm64
+          path: |
+            dist/GobanStudio-macOS-arm64.zip
+            dist/GobanStudio-macOS-arm64.dmg
+      - name: upload to release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$TAG" dist/GobanStudio-macOS-arm64.zip dist/GobanStudio-macOS-arm64.dmg --clobber

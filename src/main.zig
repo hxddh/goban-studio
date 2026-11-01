@@ -1,6 +1,7 @@
 const std = @import("std");
 const runner = @import("runner");
 const native_sdk = @import("native_sdk");
+const engine_mod = @import("engine.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -14,8 +15,9 @@ const App = struct {
     io: std.Io,
     /// 第一个事件(lifecycle.start)到来时记下;窗口拖动 / 标题栏几何要用它的平台服务。
     runtime: ?*native_sdk.Runtime = null,
-    handlers: [4]native_sdk.BridgeHandler = undefined,
-    policies: [4]native_sdk.BridgeCommandPolicy = undefined,
+    engine: engine_mod.Engine = .{},
+    handlers: [6]native_sdk.BridgeHandler = undefined,
+    policies: [6]native_sdk.BridgeCommandPolicy = undefined,
 
     fn app(self: *@This()) native_sdk.App {
         return .{
@@ -55,6 +57,16 @@ const App = struct {
             .name = "studio.windowChrome",
             .context = self,
             .invoke_fn = windowChrome,
+        };
+        self.handlers[4] = .{
+            .name = "studio.katagoMove",
+            .context = self,
+            .invoke_fn = katagoMove,
+        };
+        self.handlers[5] = .{
+            .name = "studio.katagoStatus",
+            .context = self,
+            .invoke_fn = katagoStatus,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -308,8 +320,48 @@ fn windowChrome(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     });
 }
 
+
+/// One move from the bundled KataGo 19x19 engine. The page sends a base64
+/// GTP setup script (newline-separated, limited to the setup vocabulary in
+/// engine.zig) and the side to move. The child process is persistent, so
+/// model load is paid once per app session.
+fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
+    const color_raw = jsonStringField(invocation.request.payload, "color") orelse return error.InvalidRequest;
+    var color_buf: [8]u8 = undefined;
+    const color = jsonUnescape(color_raw, &color_buf) orelse return error.InvalidRequest;
+
+    var script_buf: [96 * 1024]u8 = undefined;
+    const dec = std.base64.standard.Decoder;
+    const script_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
+    if (script_len > script_buf.len) return error.InvalidRequest;
+    dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
+
+    const move = self.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
+        error.InvalidRequest => return error.InvalidRequest,
+        else => return error.HandlerFailed,
+    };
+    return std.fmt.bufPrint(output, "{{\"ok\":true,\"move\":\"{s}\"}}", .{move}) catch error.HandlerFailed;
+}
+
+fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    var version_buf: [128]u8 = undefined;
+    const version = self.engine.versionText(&version_buf);
+    const ready = self.engine.available();
+    return std.fmt.bufPrint(
+        output,
+        "{{\"available\":{s},\"engine\":\"KataGo 19x19\",\"version\":\"{s}\"}}",
+        .{ if (ready) "true" else "false", version },
+    ) catch error.HandlerFailed;
+}
+
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io };
+    app_state.engine.init(init.io, init.environ_map);
+    defer app_state.engine.deinit(init.io);
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "Goban Studio",
         .window_title = "Goban Studio",
@@ -322,6 +374,10 @@ pub fn main(init: std.process.Init) !void {
             .navigation = .{ .allowed_origins = &allowed_origins },
         },
     }, init);
+}
+
+test {
+    std.testing.refAllDecls(engine_mod);
 }
 
 test "production source uses frontend assets" {

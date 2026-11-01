@@ -13,6 +13,10 @@ function invoke(command, payload = {}) {
   return Promise.resolve(global.zero.invoke(command, payload));
 }
 
+export async function nativeInvoke(command, payload) {
+  return invoke(command, payload);
+}
+
 export async function windowChrome() {
   if (!hasNative()) return { top: 0, left: 0, right: 0 };
   try {

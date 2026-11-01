@@ -9,18 +9,23 @@ import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints } from "./rules.js"
 import { loadSGF } from "./sgf.js";
 import { BoardView } from "./board.js";
 import { chooseMove, hintMove, LEVELS } from "./ai.js";
+import { status as katagoStatus } from "./katago.js";
 import { analyze, ownership } from "./review.js";
 import { apply, detectLang, LANG_IDS, LANG_NAMES, setLang, t } from "./i18n.js";
 import { BASICS } from "./content/basics.js";
 import { LESSONS } from "./content/lessons.js";
+import { OPENINGS } from "./content/openings.js";
 import { TSUMEGO } from "./content/tsumego.js";
+import { CLASSICS } from "./content/classics.js";
 import {
   KEYS,
   DEFAULT_SETTINGS,
   duePuzzles,
   loadProgress,
   loadSettings,
+  markClassic,
   markLesson,
+  markOpening,
   markPuzzle,
   saveProgress,
   saveSettings,
@@ -119,15 +124,18 @@ const state = {
   opponent: "ai",
   level: 2,
   thinking: false,
+  engine: { available: false, engine: "Local", version: "" },
   gen: 0,
   hint: null,
   scoring: null,
   review: null,
   reviewOwnership: false,
+  classic: null,
   learn: {
     tab: "lessons",
     mode: null,
     lesson: null,
+    opening: null,
     puzzle: null,
     game: null,
     step: 0,
@@ -145,6 +153,10 @@ function lang() {
   return state.settings.lang;
 }
 
+function learnItem(l = state.learn) {
+  return l.lesson || l.opening || l.puzzle;
+}
+
 function resultText(result) {
   if (!result) return t("play.gameOver");
   if (result === "Draw") return t("common.draw");
@@ -160,6 +172,7 @@ function captureTotal(game = state.game) {
 }
 
 function goView(view) {
+  if (view !== "review") state.classic = null;
   if (view !== "play" && state.thinking) {
     state.gen++;
     state.thinking = false;
@@ -168,7 +181,7 @@ function goView(view) {
   if (view === "review") {
     state.review = state.game && state.game.mainLine().length > 1 ? analyze(state.game) : null;
   }
-  if (view === "learn" && state.learn.mode && state.learn.lesson === null && state.learn.puzzle === null) {
+  if (view === "learn" && state.learn.mode && state.learn.lesson === null && state.learn.opening === null && state.learn.puzzle === null) {
     state.learn.mode = null;
   }
   render();
@@ -368,10 +381,9 @@ function resumePlay() {
 function newGame(opts = {}) {
   const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : 19;
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
-  const komi = opts.komi !== undefined ? Number(opts.komi) : handicap > 0 ? 0.5 : size === 19 ? 7.5 : 6.5;
+  const komi = opts.komi !== undefined ? Number(opts.komi) : handicap > 0 ? 0.5 : 6.5;
   state.game = new Game({
     size,
-    rules: opts.rules === "japanese" ? "japanese" : "chinese",
     komi: Number.isFinite(komi) ? komi : 6.5,
     handicap,
   });
@@ -384,6 +396,7 @@ function newGame(opts = {}) {
   state.hint = null;
   state.review = null;
   state.reviewOwnership = false;
+  state.classic = null;
   state.thinking = false;
   state.gen++;
   state.view = "play";
@@ -410,10 +423,7 @@ function newGameDialog() {
         <select id="ng-size">${[9, 13, 19].map((n) => `<option value="${n}" ${n === s ? "selected" : ""}>${n} × ${n}</option>`).join("")}</select>
       </label>
       <label class="field"><span>${esc(t("play.difficulty"))}</span><select id="ng-level">${levelOptions}</select></label>
-      <label class="field"><span>${esc(t("play.ruleset"))}</span>
-        <select id="ng-rules"><option value="chinese">${esc(t("common.chinese"))}</option><option value="japanese">${esc(t("common.japanese"))}</option></select>
-      </label>
-      <label class="field"><span>${esc(t("common.komi"))}</span><input id="ng-komi" type="number" step="0.5" min="0" max="15" value="${s === 19 ? 7.5 : 6.5}" /></label>
+      <label class="field"><span>${esc(t("common.komi"))}</span><input id="ng-komi" type="number" step="0.5" min="0" max="15" value="6.5" /></label>
       <label class="field"><span>${esc(t("common.handicap"))}</span>
         <select id="ng-handicap">${[0, 2, 3, 4, 5].map((n) => `<option value="${n}">${n || t("common.none")}</option>`).join("")}</select>
       </label>
@@ -435,7 +445,6 @@ function newGameDialog() {
           opponent,
           color,
           level: Number($("#ng-level").value),
-          rules: $("#ng-rules").value,
           komi: handicap > 0 ? Math.min(komiInput, 0.5) : komiInput,
           handicap,
         });
@@ -447,7 +456,7 @@ function newGameDialog() {
   const handicapSelect = $("#ng-handicap");
   sizeSelect?.addEventListener("change", () => {
     if (!komiInput) return;
-    komiInput.value = Number(sizeSelect.value) === 19 ? "7.5" : "6.5";
+    komiInput.value = "6.5";
   });
   handicapSelect?.addEventListener("change", () => {
     if (!komiInput) return;
@@ -519,10 +528,16 @@ function renderTitle() {
     title.textContent = t("nav.play");
     status.textContent = statusText();
   } else if (state.view === "review") {
-    title.textContent = t("nav.review");
-    status.textContent = state.review ? `${state.review.moves} ${t("common.moves")}` : "";
+    if (state.classic) {
+      title.textContent = tx(state.classic.title);
+      status.textContent = `${state.classic.date} · ${state.classic.result}`;
+    } else {
+      title.textContent = t("nav.review");
+      status.textContent = state.review ? `${state.review.moves} ${t("common.moves")}` : "";
+    }
   } else if (state.view === "learn") {
     if (state.learn.lesson) title.textContent = tx(state.learn.lesson.title);
+    else if (state.learn.opening) title.textContent = tx(state.learn.opening.title);
     else if (state.learn.puzzle) title.textContent = tx(state.learn.puzzle.title);
     else title.textContent = t("nav.learn");
     status.textContent = state.learn.mode === "lesson" ? t("learn.lesson", [1]) : "";
@@ -537,7 +552,10 @@ function renderTitle() {
     const idx = LESSONS.findIndex((l) => l.id === state.learn.lesson.id) + 1;
     status.textContent = t("learn.lesson", [idx]);
   } else if (state.view === "learn" && !state.learn.mode) {
-    status.textContent = `${LESSONS.length} ${t("learn.lessons")} · ${TSUMEGO.length} ${t("learn.tsumego")}`;
+    status.textContent = `${LESSONS.length} ${t("learn.lessons")} · ${OPENINGS.length} ${t("learn.openings")} · ${CLASSICS.length} ${t("learn.classics")}`;
+  } else if (state.view === "learn" && state.learn.mode === "opening" && state.learn.opening) {
+    const idx = OPENINGS.findIndex((p) => p.id === state.learn.opening.id) + 1;
+    status.textContent = `${idx} / ${OPENINGS.length} · ${t("learn.openings")}`;
   } else if (state.view === "learn" && state.learn.mode === "puzzle" && state.learn.puzzle) {
     const idx = TSUMEGO.findIndex((p) => p.id === state.learn.puzzle.id) + 1;
     status.textContent = t("learn.puzzle", [idx]);
@@ -622,6 +640,7 @@ function handleAction(action) {
     case "learn-back":
       state.learn.mode = null;
       state.learn.lesson = null;
+      state.learn.opening = null;
       state.learn.puzzle = null;
       state.learn.game = null;
       state.learn.daily = null;
@@ -635,6 +654,17 @@ function handleAction(action) {
       break;
     case "review-game":
       enterReview();
+      break;
+    case "classic-back":
+      state.classic = null;
+      state.view = "learn";
+      state.learn.tab = "classics";
+      state.learn.mode = null;
+      state.learn.lesson = null;
+      state.learn.opening = null;
+      state.learn.puzzle = null;
+      state.learn.game = null;
+      render();
       break;
     case "confirm-score":
       confirmScore();
@@ -763,9 +793,16 @@ function renderSide() {
 function playSide() {
   const game = state.game;
   if (!game) return "";
+  const engineLabel = game.size === 19 && state.engine.available
+    ? state.engine.version || "KataGo 19×19"
+    : game.size === 9
+      ? "Moka 9×9"
+      : esc(t("play.localEngine"));
+  const engineTitle = game.size === 19 && !state.engine.available ? t("play.katagoMissing") : engineLabel;
   const meta = `<div class="chips">
     <span class="chip">${game.size} × ${game.size}</span>
-    <span class="chip">${esc(game.rules === "japanese" ? t("common.japanese") : t("common.chinese"))}</span>
+    <span class="chip" title="${esc(engineTitle)}">${esc(engineLabel)}</span>
+    <span class="chip">${esc(t("common.japanese"))}</span>
     <span class="chip">${esc(t("common.komi"))} ${formatPoints(game.komi)}</span>
     ${game.handicap ? `<span class="chip">${esc(t("common.handicap"))} ${game.handicap}</span>` : ""}
   </div>`;
@@ -852,7 +889,16 @@ function reviewSide() {
         })
         .join("")
     : `<p class="empty-line">${esc(t("review.noKeyMoves"))}</p>`;
-  return `<section class="card graph-card">
+  const classicCard = state.classic
+    ? `<section class="card classic-card">
+        <div class="card-head"><h3>${esc(t("review.classic"))}</h3><span class="chip">${esc(state.classic.result)}</span></div>
+        <p class="classic-players">${esc(tx(state.classic.blackName))} (B) · ${esc(tx(state.classic.whiteName))} (W)</p>
+        <p class="muted small">${esc(state.classic.event || "")} · ${esc(state.classic.date)}</p>
+        <p class="lesson-text">${esc(tx(state.classic.note))}</p>
+        <div class="card-actions"><button class="btn ghost" data-action="classic-back">${esc(t("review.backClassics"))}</button></div>
+      </section>`
+    : "";
+  return `${classicCard}<section class="card graph-card">
       <div class="card-head"><h3>${esc(t("review.eval"))}</h3><span class="muted">${esc(t("review.analyzed"))}</span></div>
       <svg class="eval-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${esc(t("review.eval"))}">
         <line x1="8" y1="${h / 2}" x2="${w - 8}" y2="${h / 2}" class="graph-mid"/>
@@ -878,21 +924,25 @@ function reviewSide() {
 
 function learnSide() {
   const l = state.learn;
-  if (l.mode === "lesson" && l.lesson) return lessonPlayerSide();
+  if ((l.mode === "lesson" && l.lesson) || (l.mode === "opening" && l.opening)) return lessonPlayerSide();
   if (l.mode === "puzzle" && l.puzzle) return puzzlePlayerSide();
   const doneLessons = LESSONS.filter((lesson) => state.progress.lessons[lesson.id]?.done).length;
   const solvedPuzzles = TSUMEGO.filter((puzzle) => state.progress.puzzles[puzzle.id]?.solved).length;
+  const doneOpenings = OPENINGS.filter((opening) => state.progress.openings?.[opening.id]?.done).length;
+  const studiedClassics = CLASSICS.filter((game) => state.progress.classics?.[game.id]?.done).length;
   const streak = state.progress.streak?.count || 0;
   const stats = `<div class="learn-stats">
     <span><strong>${doneLessons}</strong> / ${LESSONS.length} ${esc(t("learn.lessons"))}</span>
+    <span><strong>${doneOpenings}</strong> / ${OPENINGS.length} ${esc(t("learn.openings"))}</span>
+    <span><strong>${studiedClassics}</strong> / ${CLASSICS.length} ${esc(t("learn.classics"))}</span>
     <span><strong>${solvedPuzzles}</strong> / ${TSUMEGO.length} ${esc(t("learn.tsumego"))}</span>
     <span>${esc(t("learn.streak", [streak]))}</span>
   </div>`;
-  const tabs = ["basics", "lessons", "tsumego", "daily"];
+  const tabs = ["basics", "lessons", "openings", "classics", "tsumego", "daily"];
   const tabHtml = tabs
     .map(
       (id) =>
-        `<button class="seg ${l.tab === id ? "on" : ""}" data-tab="${id}">${esc(t(id === "basics" ? "learn.basics" : id === "lessons" ? "learn.lessons" : id === "tsumego" ? "learn.tsumego" : "learn.daily"))}</button>`,
+        `<button class="seg ${l.tab === id ? "on" : ""}" data-tab="${id}">${esc(t(id === "basics" ? "learn.basics" : id === "lessons" ? "learn.lessons" : id === "openings" ? "learn.openings" : id === "classics" ? "learn.classics" : id === "tsumego" ? "learn.tsumego" : "learn.daily"))}</button>`,
     )
     .join("");
   let body = "";
@@ -906,6 +956,26 @@ function learnSide() {
       return `<button class="lesson-card ${done ? "done" : ""}" data-lesson="${lesson.id}">
         <span class="lesson-no">${String(i + 1).padStart(2, "0")}</span>
         <span class="lesson-title">${esc(tx(lesson.title))}</span>
+        <span class="lesson-mark">${done ? icon("check") : "→"}</span>
+      </button>`;
+    }).join("")}</div>`;
+  } else if (l.tab === "openings") {
+    body = `<div class="lesson-grid">${OPENINGS.map((opening, i) => {
+      const done = state.progress.openings?.[opening.id]?.done;
+      return `<button class="lesson-card ${done ? "done" : ""}" data-opening="${opening.id}">
+        <span class="lesson-no">${String(i + 1).padStart(2, "0")}</span>
+        <span class="lesson-title">${esc(tx(opening.title))}</span>
+        <span class="lesson-mark">${done ? icon("check") : "→"}</span>
+      </button>`;
+    }).join("")}</div>`;
+  } else if (l.tab === "classics") {
+    body = `<div class="classic-grid">${CLASSICS.map((game) => {
+      const done = state.progress.classics?.[game.id]?.done;
+      return `<button class="classic-card ${done ? "done" : ""}" data-classic="${game.id}">
+        <span class="classic-meta">${esc(game.date)} · ${esc(game.result)}</span>
+        <strong>${esc(tx(game.title))}</strong>
+        <span class="classic-players">${esc(tx(game.blackName))} · ${esc(tx(game.whiteName))}</span>
+        <span class="classic-event">${esc(game.event || "")}</span>
         <span class="lesson-mark">${done ? icon("check") : "→"}</span>
       </button>`;
     }).join("")}</div>`;
@@ -942,7 +1012,7 @@ function learnSide() {
 
 function lessonPlayerSide() {
   const l = state.learn;
-  const lesson = l.lesson;
+  const lesson = l.lesson || l.opening;
   const total = lesson.line.length;
   const done = l.step >= total;
   return `<section class="card player-card">
@@ -950,7 +1020,7 @@ function lessonPlayerSide() {
     <p class="lesson-text">${esc(tx(lesson.text))}</p>
     ${l.feedback === "wrong" ? `<p class="feedback bad">${esc(t("learn.wrong"))}</p>` : ""}
     ${l.feedback === "correct" ? `<p class="feedback good">${esc(t("learn.correct"))}</p>` : ""}
-    ${done ? `<p class="feedback good">${esc(t("learn.lessonDone"))}</p>` : ""}
+    ${done ? `<p class="feedback good">${esc(t(l.mode === "opening" ? "learn.openingDone" : "learn.lessonDone"))}</p>` : ""}
     <div class="card-actions">
       <button class="btn ghost" data-action="learn-hint">${esc(t("learn.hint"))}</button>
       <button class="btn ghost" data-action="learn-reset">${esc(t("learn.tryAgain"))}</button>
@@ -1034,7 +1104,7 @@ function renderSettingsPage() {
         <p class="muted small">${esc(t("settings.offline"))}</p>
       </section>
       <section class="settings-card"><h3>${esc(t("settings.data"))}</h3><button class="btn danger" data-action="clear-data">${esc(t("settings.clearData"))}</button></section>
-      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} 1.0.0 · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Moka (MIT) · Inter (OFL)</p></section>
+      <section class="settings-card about-card"><h3>${esc(t("settings.about"))}</h3><p>${esc(t("settings.aboutText"))}</p><p class="muted small">${esc(t("settings.version"))} 1.0.0 · ${esc(t("settings.licenses"))}: MIT · @sabaki/go-board · Moka (MIT) · KataGo (MIT) · Inter (OFL)</p></section>
     </div>`;
 }
 
@@ -1051,6 +1121,8 @@ function bindSide() {
     render();
   }));
   $$("[data-lesson]", host).forEach((b) => b.addEventListener("click", () => startLesson(b.dataset.lesson)));
+  $$("[data-opening]", host).forEach((b) => b.addEventListener("click", () => startOpening(b.dataset.opening)));
+  $$("[data-classic]", host).forEach((b) => b.addEventListener("click", () => startClassic(b.dataset.classic)));
   $$("[data-puzzle]", host).forEach((b) => b.addEventListener("click", () => startPuzzle(b.dataset.puzzle)));
   const cur = host.querySelector(".move-row.current");
   if (cur && state.view === "play") cur.scrollIntoView({ block: "nearest" });
@@ -1079,6 +1151,7 @@ function startLesson(id) {
   state.learn.daily = null;
   state.learn.mode = "lesson";
   state.learn.lesson = lesson;
+  state.learn.opening = null;
   state.learn.puzzle = null;
   state.learn.game = game;
   state.learn.step = 0;
@@ -1097,6 +1170,25 @@ function startPuzzle(id, { daily = false } = {}) {
   state.learn.mode = "puzzle";
   state.learn.puzzle = puzzle;
   state.learn.lesson = null;
+  state.learn.opening = null;
+  state.learn.game = game;
+  state.learn.step = 0;
+  state.learn.feedback = null;
+  state.learn.showHint = false;
+  state.view = "learn";
+  render();
+}
+
+function startOpening(id) {
+  const opening = OPENINGS.find((item) => item.id === id);
+  if (!opening) return;
+  const game = new Game({ size: opening.size || 19, komi: opening.komi ?? 6.5 });
+  game.setup(opening.setup, opening.toMove);
+  state.learn.daily = null;
+  state.learn.mode = "opening";
+  state.learn.opening = opening;
+  state.learn.lesson = null;
+  state.learn.puzzle = null;
   state.learn.game = game;
   state.learn.step = 0;
   state.learn.feedback = null;
@@ -1107,7 +1199,7 @@ function startPuzzle(id, { daily = false } = {}) {
 
 function nextLearnTarget() {
   const l = state.learn;
-  const item = l.lesson || l.puzzle;
+  const item = learnItem(l);
   if (!item) return null;
   const expected = item.line[l.step];
   return expected && expected.c === item.toMove ? expected : null;
@@ -1115,7 +1207,7 @@ function nextLearnTarget() {
 
 function learnPlay(x, y) {
   const l = state.learn;
-  const item = l.lesson || l.puzzle;
+  const item = learnItem(l);
   if (!item || !l.game || l.busy) return;
   const expected = item.line[l.step];
   if (!expected) return;
@@ -1146,7 +1238,7 @@ function learnPlay(x, y) {
 
 function autoLearnReplies() {
   const l = state.learn;
-  const item = l.lesson || l.puzzle;
+  const item = learnItem(l);
   if (!item) return;
   while (l.step < item.line.length && item.line[l.step].c !== item.toMove) {
     const m = item.line[l.step];
@@ -1161,6 +1253,9 @@ function learnComplete() {
   if (l.mode === "lesson" && l.lesson) {
     markLesson(state.progress, l.lesson.id);
     win();
+  } else if (l.mode === "opening" && l.opening) {
+    markOpening(state.progress, l.opening.id);
+    win();
   } else if (l.mode === "puzzle" && l.puzzle) {
     markPuzzle(state.progress, l.puzzle.id, true);
     win();
@@ -1170,7 +1265,7 @@ function learnComplete() {
 
 function resetLearn() {
   const l = state.learn;
-  const item = l.lesson || l.puzzle;
+  const item = learnItem(l);
   if (!item) return;
   const game = new Game({ size: item.size, komi: 6.5 });
   game.setup(item.setup, item.toMove);
@@ -1183,7 +1278,7 @@ function resetLearn() {
 
 function answerLearn() {
   const l = state.learn;
-  const item = l.lesson || l.puzzle;
+  const item = learnItem(l);
   if (!item) return;
   resetLearn();
   for (const m of item.line) {
@@ -1232,6 +1327,36 @@ function nextLesson() {
   }
 }
 
+function startClassic(id) {
+  const classic = CLASSICS.find((game) => game.id === id);
+  if (!classic) return;
+  try {
+    const { game } = loadSGF(classic.sgf);
+    // A classic opens at the empty board: study starts from the first move,
+    // not from the final position.
+    game.goto(0);
+    state.game = game;
+    state.gameRecordId = null;
+    state.gameName = classic.title.en || classic.title.zh;
+    state.humanColor = BLACK;
+    state.opponent = "human";
+    state.scoring = null;
+    state.classic = classic;
+    state.thinking = false;
+    markClassic(state.progress, classic.id);
+    persistCurrent();
+    state.learn.mode = null;
+    state.learn.lesson = null;
+    state.learn.opening = null;
+    state.learn.puzzle = null;
+    state.learn.game = null;
+    goView("review");
+  } catch (error) {
+    console.error("Classic game failed to load", error);
+    toast(t("library.importError"), "error");
+  }
+}
+
 function startDaily() {
   if (state.learn.daily && state.learn.daily.index < state.learn.daily.ids.length) {
     startPuzzle(state.learn.daily.ids[state.learn.daily.index], { daily: true });
@@ -1253,6 +1378,7 @@ async function importSGFText(text, name = "goban-studio.sgf") {
   state.opponent = "human";
   state.scoring = null;
   state.review = null;
+  state.classic = null;
   state.thinking = false;
   persistCurrent();
   saveToLibrary();
@@ -1304,6 +1430,7 @@ function openRecord(id) {
     state.level = rec.level || state.settings.level;
     state.scoring = null;
     state.review = null;
+    state.classic = null;
     state.thinking = false;
     persistCurrent();
     goView("play");
@@ -1431,8 +1558,10 @@ function bindGlobal() {
       if (v === "learn" && state.view === "learn" && state.learn.mode) {
         state.learn.mode = null;
         state.learn.lesson = null;
+        state.learn.opening = null;
         state.learn.puzzle = null;
         state.learn.game = null;
+        state.learn.daily = null;
         render();
         return;
       }
@@ -1543,7 +1672,7 @@ function bootGame() {
       /* fall through to a fresh game */
     }
   }
-  state.game = new Game({ size: 19, komi: 7.5 });
+  state.game = new Game({ size: 19, komi: 6.5 });
   state.humanColor = BLACK;
   state.opponent = "ai";
   state.level = state.settings.level || 2;
@@ -1578,6 +1707,10 @@ function init() {
   render();
 
 
+  katagoStatus().then((value) => {
+    state.engine = value || state.engine;
+    render();
+  });
   setTimeout(() => setupChrome().catch(() => {}), 0);
   const importPaths = (detail) => {
     const paths = normalizePaths((detail && detail.paths) || detail);

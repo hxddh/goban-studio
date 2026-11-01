@@ -299,9 +299,10 @@ html[data-theme="dark"] .nav-btn.active { color: var(--accent-2); }
 .grade-dot.blunder { background: var(--danger); }
 
 /* ---------------------------------------------------------------- learn */
-.learn-stats { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 10px; }
+.learn-stats { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; margin-bottom: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 10px; }
 .learn-stats strong { color: var(--text); font-weight: 600; }
-.seg-row { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.seg-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.seg-row .seg { justify-content: center; text-align: center; }
 .seg { flex: 1; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11.5px; }
 .seg.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .basics-list { display: flex; flex-direction: column; gap: 7px; }
@@ -485,3 +486,19 @@ html[data-theme="dark"] .nav-btn.active { color: var(--accent-2); }
   .lib-main { flex-basis: 100%; }
   .settings-card { padding: 13px; }
 }
+
+.classic-grid { display: flex; flex-direction: column; gap: 6px; }
+.classic-card { position: relative; display: grid; gap: 2px; width: 100%; padding: 9px 34px 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left; }
+.classic-card:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.classic-card.done { border-color: color-mix(in srgb, var(--good) 30%, var(--line)); }
+.classic-card strong { font-size: 12px; font-weight: 600; }
+.classic-meta { color: var(--muted); font-size: 9px; letter-spacing: .02em; text-transform: uppercase; }
+.classic-players { color: var(--text); font-size: 10px; }
+.classic-event { color: var(--muted); font-size: 9px; line-height: 1.3; }
+.classic-card .lesson-mark { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.classic-card.done .lesson-mark { color: var(--good); }
+.classic-card.done .lesson-mark svg { width: 14px; height: 14px; }
+.classic-card .classic-players, .classic-card .classic-event { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.player-card .card-head .muted { flex: 0 0 auto; white-space: nowrap; }
+.player-card .card-head h3 { min-width: 0; }
