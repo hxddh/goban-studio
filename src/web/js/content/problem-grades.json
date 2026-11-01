@@ -1,0 +1,1319 @@
+{
+  "capture-basic-01": {
+    "grade": 2,
+    "score": 7.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 1
+      }
+    ]
+  },
+  "capture-basic-02": {
+    "grade": 1,
+    "score": 3.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 17
+      }
+    ]
+  },
+  "capture-basic-03": {
+    "grade": 1,
+    "score": 4.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 10
+      }
+    ]
+  },
+  "capture-basic-04": {
+    "grade": 1,
+    "score": 4.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 6,
+        "y": 2
+      }
+    ]
+  },
+  "capture-rescue-01": {
+    "grade": 1,
+    "score": 4.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 11,
+        "y": 18
+      }
+    ]
+  },
+  "capture-atari-01": {
+    "grade": 1,
+    "score": 5.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 1
+      }
+    ]
+  },
+  "capture-atari-02": {
+    "grade": 1,
+    "score": 5.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      }
+    ]
+  },
+  "capture-ladder-00": {
+    "grade": 3,
+    "score": 11.8,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 3,
+        "y": 16
+      }
+    ]
+  },
+  "capture-ladder-01": {
+    "grade": 4,
+    "score": 12.3,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 4,
+        "y": 4
+      }
+    ]
+  },
+  "capture-ladder-02": {
+    "grade": 4,
+    "score": 12.1,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 3,
+        "y": 13
+      }
+    ]
+  },
+  "capture-ladder-03": {
+    "grade": 4,
+    "score": 14.7,
+    "moves": 8,
+    "correct": [
+      {
+        "x": 13,
+        "y": 13
+      }
+    ]
+  },
+  "capture-snapback-01": {
+    "grade": 1,
+    "score": 2.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      },
+      {
+        "x": 8,
+        "y": 0
+      }
+    ]
+  },
+  "capture-snapback-02": {
+    "grade": 1,
+    "score": 2.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 0
+      },
+      {
+        "x": 18,
+        "y": 0
+      }
+    ]
+  },
+  "capture-snapback-03": {
+    "grade": 1,
+    "score": 2.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 10
+      },
+      {
+        "x": 18,
+        "y": 10
+      }
+    ]
+  },
+  "capture-double-atari-01": {
+    "grade": 1,
+    "score": 5.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 17
+      }
+    ]
+  },
+  "capture-double-atari-02": {
+    "grade": 3,
+    "score": 10.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 15,
+        "y": 2
+      }
+    ]
+  },
+  "capture-shortage-01": {
+    "grade": 1,
+    "score": 2.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 0
+      }
+    ]
+  },
+  "capture-ladder-04": {
+    "grade": 5,
+    "score": 15.9,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 14,
+        "y": 4
+      }
+    ]
+  },
+  "capture-ladder-05": {
+    "grade": 4,
+    "score": 14.7,
+    "moves": 8,
+    "correct": [
+      {
+        "x": 13,
+        "y": 15
+      }
+    ]
+  },
+  "capture-ladder-06": {
+    "grade": 4,
+    "score": 13.3,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 4,
+        "y": 14
+      }
+    ]
+  },
+  "capture-ladder-07": {
+    "grade": 4,
+    "score": 12.7,
+    "moves": 6,
+    "correct": [
+      {
+        "x": 4,
+        "y": 4
+      }
+    ]
+  },
+  "capture-ladder-08": {
+    "grade": 4,
+    "score": 14.9,
+    "moves": 8,
+    "correct": [
+      {
+        "x": 15,
+        "y": 13
+      }
+    ]
+  },
+  "capture-basic-05": {
+    "grade": 1,
+    "score": 5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 1
+      }
+    ]
+  },
+  "escape-extend-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 2
+      }
+    ]
+  },
+  "escape-extend-02": {
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 15,
+        "y": 2
+      }
+    ]
+  },
+  "escape-extend-03": {
+    "grade": 1,
+    "score": 5.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 9
+      }
+    ]
+  },
+  "escape-ladder-01": {
+    "grade": 3,
+    "score": 9.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 5,
+        "y": 4
+      }
+    ]
+  },
+  "escape-ladder-02": {
+    "grade": 3,
+    "score": 9.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 13
+      }
+    ]
+  },
+  "escape-capture-01": {
+    "grade": 1,
+    "score": 5.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 11,
+        "y": 1
+      },
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "escape-capture-02": {
+    "grade": 1,
+    "score": 4.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 16,
+        "y": 18
+      }
+    ]
+  },
+  "escape-connect-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 16
+      }
+    ]
+  },
+  "connect-01": {
+    "grade": 2,
+    "score": 7.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 1
+      }
+    ]
+  },
+  "connect-02": {
+    "grade": 1,
+    "score": -6.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 5,
+        "y": 2
+      },
+      {
+        "x": 6,
+        "y": 1
+      },
+      {
+        "x": 4,
+        "y": 1
+      },
+      {
+        "x": 5,
+        "y": 0
+      },
+      {
+        "x": 4,
+        "y": 2
+      },
+      {
+        "x": 4,
+        "y": 3
+      },
+      {
+        "x": 8,
+        "y": 3
+      },
+      {
+        "x": 5,
+        "y": 4
+      },
+      {
+        "x": 7,
+        "y": 4
+      },
+      {
+        "x": 4,
+        "y": 0
+      },
+      {
+        "x": 6,
+        "y": 0
+      },
+      {
+        "x": 8,
+        "y": 0
+      },
+      {
+        "x": 8,
+        "y": 1
+      },
+      {
+        "x": 8,
+        "y": 2
+      },
+      {
+        "x": 5,
+        "y": 3
+      },
+      {
+        "x": 6,
+        "y": 4
+      },
+      {
+        "x": 7,
+        "y": 0
+      },
+      {
+        "x": 7,
+        "y": 3
+      }
+    ]
+  },
+  "connect-03": {
+    "grade": 2,
+    "score": 6.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 17
+      }
+    ]
+  },
+  "cut-01": {
+    "grade": 3,
+    "score": 9.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 13,
+        "y": 1
+      }
+    ]
+  },
+  "capture-connect-01": {
+    "grade": 3,
+    "score": 9.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 9
+      }
+    ]
+  },
+  "capture-connect-02": {
+    "grade": 2,
+    "score": 7.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 2
+      },
+      {
+        "x": 3,
+        "y": 2
+      },
+      {
+        "x": 2,
+        "y": 3
+      }
+    ]
+  },
+  "life-bent-three-01": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 1
+      }
+    ]
+  },
+  "life-pyramid-four-01": {
+    "grade": 1,
+    "score": 5.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 16,
+        "y": 0
+      }
+    ]
+  },
+  "life-pyramid-four-02": {
+    "grade": 1,
+    "score": 5.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 17
+      }
+    ]
+  },
+  "life-bulky-five-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 9
+      },
+      {
+        "x": 2,
+        "y": 9
+      },
+      {
+        "x": 1,
+        "y": 10
+      }
+    ]
+  },
+  "life-flower-six-01": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 16,
+        "y": 9
+      },
+      {
+        "x": 17,
+        "y": 10
+      },
+      {
+        "x": 17,
+        "y": 9
+      }
+    ]
+  },
+  "life-expand-01": {
+    "grade": 2,
+    "score": 7.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "life-capture-eye-01": {
+    "grade": 1,
+    "score": 3.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 4,
+        "y": 18
+      }
+    ]
+  },
+  "life-capture-eye-02": {
+    "grade": 1,
+    "score": 3.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 15,
+        "y": 0
+      }
+    ]
+  },
+  "life-bent-three-02": {
+    "grade": 1,
+    "score": 4.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 0
+      }
+    ]
+  },
+  "life-bulky-five-02": {
+    "grade": 1,
+    "score": 5.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 16
+      },
+      {
+        "x": 17,
+        "y": 17
+      },
+      {
+        "x": 18,
+        "y": 17
+      }
+    ]
+  },
+  "life-two-eyes-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 17
+      },
+      {
+        "x": 1,
+        "y": 18
+      },
+      {
+        "x": 0,
+        "y": 18
+      }
+    ]
+  },
+  "life-two-eyes-02": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 1
+      },
+      {
+        "x": 0,
+        "y": 2
+      }
+    ]
+  },
+  "life-two-eyes-03": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 17
+      },
+      {
+        "x": 17,
+        "y": 18
+      }
+    ]
+  },
+  "life-two-eyes-04": {
+    "grade": 1,
+    "score": 4.2,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      },
+      {
+        "x": 18,
+        "y": 1
+      }
+    ]
+  },
+  "life-two-eyes-05": {
+    "grade": 2,
+    "score": 6.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 17
+      },
+      {
+        "x": 14,
+        "y": 18
+      }
+    ]
+  },
+  "life-two-eyes-06": {
+    "grade": 2,
+    "score": 6.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 14
+      },
+      {
+        "x": 1,
+        "y": 15
+      }
+    ]
+  },
+  "life-capture-eye-03": {
+    "grade": 1,
+    "score": 3.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 13,
+        "y": 0
+      }
+    ]
+  },
+  "life-capture-eye-04": {
+    "grade": 1,
+    "score": 2.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 5,
+        "y": 18
+      }
+    ]
+  },
+  "life-capture-eye-05": {
+    "grade": 1,
+    "score": 5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 13
+      }
+    ]
+  },
+  "life-expand-02": {
+    "grade": 2,
+    "score": 6.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 11,
+        "y": 18
+      }
+    ]
+  },
+  "life-expand-03": {
+    "grade": 2,
+    "score": 8.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 9
+      }
+    ]
+  },
+  "life-false-eye-01": {
+    "grade": 1,
+    "score": 5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 4,
+        "y": 17
+      }
+    ]
+  },
+  "kill-straight-three-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "kill-straight-three-02": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 0
+      }
+    ]
+  },
+  "kill-straight-three-03": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 18
+      }
+    ]
+  },
+  "kill-straight-three-04": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 9
+      }
+    ]
+  },
+  "kill-bent-three-01": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 0
+      }
+    ]
+  },
+  "kill-bent-three-02": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 11,
+        "y": 18
+      }
+    ]
+  },
+  "kill-bent-three-03": {
+    "grade": 1,
+    "score": 4.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 17
+      }
+    ]
+  },
+  "kill-pyramid-four-01": {
+    "grade": 1,
+    "score": 5.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "kill-pyramid-four-02": {
+    "grade": 1,
+    "score": 5.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 0
+      }
+    ]
+  },
+  "kill-pyramid-four-03": {
+    "grade": 1,
+    "score": 5.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 9
+      }
+    ]
+  },
+  "kill-pyramid-four-04": {
+    "grade": 1,
+    "score": 5.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 14
+      }
+    ]
+  },
+  "kill-bulky-five-01": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 1,
+        "y": 18
+      }
+    ]
+  },
+  "kill-bulky-five-02": {
+    "grade": 2,
+    "score": 6.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 18
+      }
+    ]
+  },
+  "kill-bulky-five-03": {
+    "grade": 2,
+    "score": 6.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 7
+      }
+    ]
+  },
+  "kill-bulky-five-04": {
+    "grade": 2,
+    "score": 7.5,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      }
+    ]
+  },
+  "kill-bulky-five-05": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 1
+      }
+    ]
+  },
+  "kill-cross-five-01": {
+    "grade": 2,
+    "score": 6.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 2,
+        "y": 1
+      }
+    ]
+  },
+  "kill-cross-five-02": {
+    "grade": 2,
+    "score": 6.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 13,
+        "y": 1
+      }
+    ]
+  },
+  "kill-flower-six-01": {
+    "grade": 2,
+    "score": 7.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 16,
+        "y": 1
+      }
+    ]
+  },
+  "kill-flower-six-02": {
+    "grade": 2,
+    "score": 7.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 17
+      }
+    ]
+  },
+  "kill-flower-six-03": {
+    "grade": 2,
+    "score": 8.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 17
+      }
+    ]
+  },
+  "kill-corner-four-01": {
+    "grade": 1,
+    "score": 5.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 18
+      }
+    ]
+  },
+  "kill-rectangle-six-01": {
+    "grade": 2,
+    "score": 8.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 1
+      },
+      {
+        "x": 0,
+        "y": 1
+      }
+    ]
+  },
+  "kill-rectangle-six-02": {
+    "grade": 3,
+    "score": 9.4,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 17,
+        "y": 18
+      }
+    ]
+  },
+  "kill-descend-01": {
+    "grade": 1,
+    "score": 5.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 4
+      }
+    ]
+  },
+  "kill-descend-02": {
+    "grade": 2,
+    "score": 8.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 4,
+        "y": 18
+      }
+    ]
+  },
+  "kill-false-eye-01": {
+    "grade": 1,
+    "score": 3.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 14
+      }
+    ]
+  },
+  "kill-flower-six-04": {
+    "grade": 3,
+    "score": 9.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 6,
+        "y": 1
+      }
+    ]
+  },
+  "kill-hane-01": {
+    "grade": 2,
+    "score": 7.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 18
+      }
+    ]
+  },
+  "kill-false-eye-02": {
+    "grade": 1,
+    "score": 3.1,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 1
+      }
+    ]
+  },
+  "kill-placement-01": {
+    "grade": 2,
+    "score": 6.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 0
+      }
+    ]
+  },
+  "kill-placement-02": {
+    "grade": 2,
+    "score": 6.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 1
+      }
+    ]
+  },
+  "kill-placement-03": {
+    "grade": 2,
+    "score": 8.5,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 1,
+        "y": 17
+      }
+    ]
+  },
+  "race-01": {
+    "grade": 1,
+    "score": 5.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      },
+      {
+        "x": 7,
+        "y": 1
+      }
+    ]
+  },
+  "race-02": {
+    "grade": 2,
+    "score": 6.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 17
+      },
+      {
+        "x": 8,
+        "y": 18
+      }
+    ]
+  },
+  "race-03": {
+    "grade": 1,
+    "score": 5.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 1
+      },
+      {
+        "x": 0,
+        "y": 0
+      }
+    ]
+  },
+  "race-04": {
+    "grade": 1,
+    "score": 5.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 17
+      },
+      {
+        "x": 18,
+        "y": 18
+      }
+    ]
+  },
+  "race-05": {
+    "grade": 2,
+    "score": 8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 5,
+        "y": 0
+      },
+      {
+        "x": 5,
+        "y": 1
+      }
+    ]
+  },
+  "race-06": {
+    "grade": 2,
+    "score": 6.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 7
+      }
+    ]
+  },
+  "race-07": {
+    "grade": 2,
+    "score": 7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 9
+      }
+    ]
+  },
+  "race-08": {
+    "grade": 2,
+    "score": 8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 18,
+        "y": 1
+      },
+      {
+        "x": 18,
+        "y": 0
+      }
+    ]
+  },
+  "race-10": {
+    "grade": 1,
+    "score": 5.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 10,
+        "y": 0
+      },
+      {
+        "x": 10,
+        "y": 1
+      }
+    ]
+  },
+  "race-11": {
+    "grade": 2,
+    "score": 6.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 11,
+        "y": 18
+      }
+    ]
+  },
+  "race-13": {
+    "grade": 2,
+    "score": 7.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 11,
+        "y": 0
+      },
+      {
+        "x": 11,
+        "y": 1
+      },
+      {
+        "x": 11,
+        "y": 2
+      }
+    ]
+  }
+}

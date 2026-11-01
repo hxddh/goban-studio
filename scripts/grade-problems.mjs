@@ -12,8 +12,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { PROBLEMS, GRADE_CUTS } from "../src/web/js/content/problems.js";
+import * as content from "../src/web/js/content/problems.js";
 import { createPuzzle, difficulty } from "../src/web/js/solver.js";
+
+const { PROBLEMS } = content;
+// Optional score thresholds for grades 2..5; see problems.js.
+const GRADE_CUTS = content.GRADE_CUTS;
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const GRADES_FILE = path.join(root, "src/web/js/content/problem-grades.json");
