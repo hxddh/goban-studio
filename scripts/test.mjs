@@ -14,7 +14,8 @@ import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap } fro
 import { loadSGF } from "../src/web/js/sgf.js";
 import { execFileSync } from "node:child_process";
 import { chooseMove } from "../src/web/js/ai.js";
-import { STRENGTHS, pickCandidate, strengthById, suggestHandicap } from "../src/web/js/engine.js";
+import { STRENGTHS, beginnerMove, moveFromAnalysis, pickCandidate, rankParts, strengthById, suggestHandicap } from "../src/web/js/engine.js";
+import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
 import { parseInfo, parseVertex } from "../src/web/js/katago.js";
 import * as S from "../src/web/js/solver.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
@@ -566,21 +567,131 @@ await test("KataGo reports parse into candidates, lines and ownership", () => {
 await test("the strength ladder keeps strong levels exact and weak levels inside their loss window", () => {
   const analysis = { moves: parseInfo(SAMPLE_INFO, 19).moves, play: { x: 3, y: 15 } };
   assert.deepEqual(pickCandidate(analysis, BLACK, strengthById("2d"), () => 0.99), { x: 3, y: 15 });
-  // 10k allows up to 6 points: D4 and Q16, never K10 (8.9 points worse)
+  // 1k allows up to 6 points: D4 and Q16, never K10 (8.9 points worse)
   // unless its 2% deliberate slip fires (the first draw below 0.02).
   for (let i = 0; i < 50; i++) {
-    const m = pickCandidate(analysis, BLACK, strengthById("10k"), () => 0.05 + (i / 50) * 0.94);
-    assert.ok(!(m.x === 9 && m.y === 9), "10k must not take a 9-point loss");
+    const m = pickCandidate(analysis, BLACK, strengthById("1k"), () => 0.05 + (i / 50) * 0.94);
+    assert.ok(!(m.x === 9 && m.y === 9), "1k must not take a 9-point loss");
   }
-  const slipped = pickCandidate(analysis, BLACK, strengthById("10k"), () => 0.01);
+  const slipped = pickCandidate(analysis, BLACK, strengthById("1k"), () => 0.01);
   assert.deepEqual(slipped, { x: 9, y: 9 }, "the deliberate slip picks outside the window");
   // White's point of view flips the score lead: K10 is White's best here.
   assert.deepEqual(pickCandidate(analysis, WHITE, { ...strengthById("2d"), temp: 0 }), { x: 3, y: 15 });
   assert.equal(new Set(STRENGTHS.map((s) => s.id)).size, STRENGTHS.length);
+  // One stone per rank of the level's calibrated label.
   assert.equal(suggestHandicap(25, "15k", 19), 9);
   assert.equal(suggestHandicap(15, "10k", 19), 5);
   assert.equal(suggestHandicap(10, "10k", 19), 0);
   assert.equal(suggestHandicap(null, "10k", 19), 0);
+});
+
+await test("the strength ladder is monotonic and keeps its saved IDs", () => {
+  // Saved settings, library games and ratings refer to these IDs.
+  assert.deepEqual(
+    STRENGTHS.map((s) => s.id),
+    ["30k", "25k", "20k", "15k", "10k", "5k", "1k", "2d"],
+  );
+  for (let i = 1; i < STRENGTHS.length; i++) {
+    const a = STRENGTHS[i - 1];
+    const b = STRENGTHS[i];
+    assert.ok(b.rank < a.rank, `${b.id} is labelled stronger than ${a.id}`);
+    assert.ok(b.visits >= a.visits, `${b.id} searches at least as much as ${a.id}`);
+    assert.ok(b.temp <= a.temp, `${b.id} samples no wider than ${a.id}`);
+    assert.ok(b.maxLoss <= a.maxLoss, `${b.id} tolerates no bigger loss than ${a.id}`);
+    assert.ok(b.slip <= a.slip, `${b.id} slips no more often than ${a.id}`);
+    assert.ok(b.local >= a.local, `${b.id} offline fallback is no weaker than ${a.id}`);
+    assert.ok((b.blunder ?? 0) <= (a.blunder ?? 0), `${b.id} blunders no more often than ${a.id}`);
+    assert.ok(b.visits > a.visits || b.temp < a.temp || b.maxLoss < a.maxLoss || b.slip < a.slip || (b.blunder ?? 0) < (a.blunder ?? 0), `${b.id} differs from ${a.id}`);
+  }
+  for (const s of STRENGTHS) {
+    assert.ok(Number.isInteger(s.rank) && s.rank <= 30 && s.rank >= -8, `${s.id} rank`);
+    assert.ok(s.visits >= 1 && s.visits <= 1000, `${s.id} visits fit a laptop CPU`);
+    const parts = rankParts(s.id);
+    assert.ok(parts.n >= 1 && (parts.unit === "kyu" || parts.unit === "dan"));
+  }
+});
+
+await test("a level's pick falls back to KataGo's own move when the app's rules forbid it", () => {
+  const g = newGame(9);
+  g.play(4, 4);
+  // E5 (4,4) is occupied: the pick is illegal, so KataGo's choice is played.
+  const analysis = {
+    moves: [{ x: 4, y: 4, visits: 10, scoreLead: 1, winrate: 0.5, order: 0 }],
+    play: { x: 2, y: 2 },
+  };
+  assert.deepEqual(moveFromAnalysis(g, analysis, strengthById("2d")), { x: 2, y: 2 });
+  assert.equal(moveFromAnalysis(g, { moves: analysis.moves, play: { x: 4, y: 4 } }, strengthById("2d")), null);
+});
+
+await test("beginner moves are legal, local and never fill the player's own eye", () => {
+  const rnd = mulberry32(3);
+  const g = newGame(9);
+  // Black's eye at A9 (0,0): B9 and A8 are black.
+  g.play(1, 0);
+  g.play(8, 8);
+  g.play(0, 1);
+  g.play(7, 7);
+  for (let i = 0; i < 200; i++) {
+    const m = beginnerMove(g, rnd);
+    assert.ok(m && g.canPlay(m.x, m.y).ok, "legal");
+    assert.ok(!(m.x === 0 && m.y === 0), "never its own eye");
+    let near = false;
+    for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (g.board.get([x, y]) !== EMPTY && Math.max(Math.abs(x - m.x), Math.abs(y - m.y)) <= 2) near = true;
+    assert.ok(near, "near the stones on the board");
+  }
+  // An empty 19×19 board: the third or fourth line.
+  const e = newGame(19);
+  for (let i = 0; i < 50; i++) {
+    const m = beginnerMove(e, rnd);
+    const line = Math.min(m.x, m.y, 18 - m.x, 18 - m.y);
+    assert.ok(line === 2 || line === 3, `opening on the 3rd/4th line, got ${line + 1}`);
+  }
+  // A level with blunder 1 always plays a beginner move, unless KataGo passes.
+  const analysis = { moves: [{ x: 4, y: 4, visits: 10, scoreLead: 1, order: 0 }], play: { x: 4, y: 4 } };
+  const level = { ...strengthById("30k"), blunder: 1 };
+  const g2 = newGame(9);
+  g2.play(2, 2);
+  const m = moveFromAnalysis(g2, analysis, level, mulberry32(1));
+  assert.ok(Math.max(Math.abs(m.x - 2), Math.abs(m.y - 2)) <= 2);
+  assert.deepEqual(moveFromAnalysis(g2, { moves: [{ pass: true, visits: 10, scoreLead: 0 }], play: { pass: true } }, level, mulberry32(1)), { pass: true });
+});
+
+await test("the calibration fit recovers known strengths and maps them onto the EGF scale", () => {
+  // EGF expectancy: one rank at 10k is worth about two wins in three.
+  assert.ok(Math.abs(egfExpected(1200, 1100) - 0.659) < 0.01);
+  assert.ok(Math.abs(egfExpected(2200, 2100) - 0.73) < 0.01);
+  assert.ok(Math.abs(egfNats(1000, 1100) - 100 / (205 - 1050 / 20)) < 0.01);
+  assert.equal(profileGoR("rank_5k"), 1600);
+  assert.equal(profileGoR("rank_2d"), 2200);
+  assert.equal(goRLabel(1600), "5k");
+  assert.equal(goRLabel(2100), "1d");
+  assert.equal(goRLabel(2180), "2d");
+  const [lo, hi] = wilson(20, 40);
+  assert.ok(lo > 0.34 && lo < 0.36 && hi > 0.64 && hi < 0.66);
+
+  const truth = { "L:a": 0, "L:b": 0.7, "L:c": 1.5, "H:rank_10k": 1.1 };
+  const players = Object.keys(truth);
+  const rnd = mulberry32(7);
+  const games = [];
+  for (let i = 0; i < 4; i++) {
+    for (let j = i + 1; j < 4; j++) {
+      for (let k = 0; k < 800; k++) {
+        const [black, white] = k % 2 ? [players[i], players[j]] : [players[j], players[i]];
+        const p = 1 / (1 + Math.exp(-(truth[black] - truth[white] + 0.2)));
+        games.push({ black, white, winner: rnd() < p ? "B" : "W", plies: 100, reason: "passes" });
+      }
+    }
+  }
+  const fit = fitBT(games, players, { ref: "L:a" });
+  for (const p of players) assert.ok(Math.abs(fit.theta[p] - truth[p]) < 0.15, `${p} θ ${fit.theta[p]}`);
+  assert.ok(Math.abs(fit.eta - 0.2) < 0.1);
+  // One anchor: its own rating, and the EGF curve elsewhere.
+  const m = anchorMap(fit.theta, [{ player: "H:rank_10k", gor: 1100 }]);
+  assert.equal(Math.round(m.map(fit.theta["H:rank_10k"])), 1100);
+  assert.ok(m.map(fit.theta["L:c"]) > 1100 && m.map(fit.theta["L:a"]) < 1100);
+  const r = analyse(games, { boot: 20 });
+  assert.equal(r.rows.length, 4);
+  for (const row of r.rows) assert.ok(row.lo <= row.theta + 1e-9 && row.theta <= row.hi + 1e-9 || row.player === "L:a");
 });
 
 await test("the native bridge sends setup stones, handicap and moves to KataGo for any size", async () => {

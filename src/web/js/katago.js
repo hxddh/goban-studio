@@ -56,7 +56,7 @@ function b64(text) {
   return btoa(bin);
 }
 
-function maxTimeFor(visits) {
+export function maxTimeFor(visits) {
   return visits > 600 ? 12 : visits > 150 ? 6 : 3;
 }
 
@@ -171,8 +171,8 @@ export function parseInfo(info, size) {
   return out;
 }
 
-/** The analysis object every caller gets (final or partial), or null. */
-function toAnalysis(info, playText, size) {
+/** The analysis object every caller gets (final or partial), or null. Exported for the calibration harness. */
+export function toAnalysis(info, playText, size) {
   const parsed = parseInfo(String(info || ""), size);
   const play = parseVertex(String(playText || ""), size);
   const top = parsed.moves[0];

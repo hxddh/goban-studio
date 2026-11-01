@@ -17,20 +17,29 @@ import * as KataGo from "./katago.js";
 import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 
 /**
- * Strength ladder. Ranks are honest approximations for the bundled b6c96
- * network: weaker levels search less and choose among the candidate moves
- * KataGo considered, never a move that loses more than `maxLoss` points
- * (except the occasional deliberate slip at the weakest levels).
+ * Strength ladder, calibrated by self-play and against KataGo's human SL
+ * model (docs/strength.md, scripts/calibrate-strength.mjs). IDs are stable
+ * (saved settings and games refer to them); `rank` is the measured 19×19
+ * label (kyu > 0, 0 = 1 dan, -1 = 2 dan), shown as "≈".
+ *
+ *   visits   KataGo's search budget
+ *   maxLoss  choose only among candidates within this many points of the best
+ *   temp     how widely to sample those candidates (0 = always the best)
+ *   slip     chance of taking a searched candidate outside the window
+ *   blunder  chance of a beginner's move instead (see beginnerMove): the
+ *            lever for every level below ≈ 6 kyu, since even KataGo's worst
+ *            candidates are moves a strong network finds plausible
+ *   local    offline fallback level (ai.js) when KataGo is unavailable
  */
 export const STRENGTHS = [
-  { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, local: 1 },
-  { id: "25k", rank: 25, visits: 10, temp: 1.6, maxLoss: 28, slip: 0.2, local: 1 },
-  { id: "20k", rank: 20, visits: 14, temp: 1.3, maxLoss: 18, slip: 0.12, local: 2 },
-  { id: "15k", rank: 15, visits: 20, temp: 1.0, maxLoss: 11, slip: 0.06, local: 3 },
-  { id: "10k", rank: 10, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, local: 4 },
-  { id: "5k", rank: 5, visits: 64, temp: 0.45, maxLoss: 3.5, slip: 0, local: 5 },
-  { id: "1k", rank: 1, visits: 160, temp: 0.2, maxLoss: 1.5, slip: 0, local: 5 },
-  { id: "2d", rank: -1, visits: 500, temp: 0, maxLoss: 0, slip: 0, local: 5 },
+  { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1 },
+  { id: "25k", rank: 25, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1 },
+  { id: "20k", rank: 20, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.9, local: 2 },
+  { id: "15k", rank: 15, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3 },
+  { id: "10k", rank: 10, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4 },
+  { id: "5k", rank: 6, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0, local: 5 },
+  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5 },
+  { id: "2d", rank: -2, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5 },
 ];
 
 export function strengthById(id) {
@@ -122,6 +131,74 @@ export function pickCandidate(analysis, color, strength, rnd = Math.random) {
   return toMove(pick);
 }
 
+/**
+ * A move a beginner might play without reading: a legal point near the
+ * stones already on the board, most often near the opponent's last move,
+ * never filling one of its own eyes. KataGo's candidates are all moves a
+ * strong network finds plausible, so choosing among them alone cannot play
+ * below single-digit kyu; this is what lets the lowest levels really be
+ * beginners (docs/strength.md). Exported for the test suite.
+ */
+export function beginnerMove(game, rnd = Math.random) {
+  const size = game.size;
+  const board = game.board;
+  const color = game.turn;
+  const last = game.current.move && !game.current.move.pass ? game.current.move : null;
+  const stones = [];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (board.get([x, y]) !== EMPTY) stones.push([x, y]);
+  const lo = size >= 13 ? 2 : 1;
+  const hi = size - 1 - lo;
+  const weights = new Float64Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (board.get([x, y]) !== EMPTY || ownEye(board, x, y, color, size)) continue;
+      let w = 0;
+      // Opening: the third and fourth lines, like every beginner's book.
+      if (stones.length < 4 && x >= lo && x <= hi && y >= lo && y <= hi && (x <= lo + 1 || x >= hi - 1 || y <= lo + 1 || y >= hi - 1)) w = 1;
+      for (const [sx, sy] of stones) {
+        if (Math.max(Math.abs(sx - x), Math.abs(sy - y)) <= 2) {
+          w = Math.max(w, 1);
+          break;
+        }
+      }
+      if (last && Math.max(Math.abs(last.x - x), Math.abs(last.y - y)) <= 2) w = 4;
+      if (w && (x === 0 || y === 0 || x === size - 1 || y === size - 1)) w *= 0.3;
+      weights[y * size + x] = w;
+    }
+  }
+  // Sample, then check legality (cheaper than testing every point for ko).
+  for (let tries = 0; tries < 12; tries++) {
+    let total = 0;
+    for (const w of weights) total += w;
+    if (!(total > 0)) return null;
+    let r = rnd() * total;
+    let i = 0;
+    for (; i < weights.length - 1; i++) {
+      r -= weights[i];
+      if (r <= 0 && weights[i] > 0) break;
+    }
+    const x = i % size;
+    const y = Math.floor(i / size);
+    if (weights[i] > 0 && game.canPlay(x, y).ok) return { x, y };
+    weights[i] = 0;
+  }
+  return null;
+}
+
+/** A point whose every neighbour is the player's own stone or the edge. */
+function ownEye(board, x, y, color, size) {
+  for (const [nx, ny] of [
+    [x - 1, y],
+    [x + 1, y],
+    [x, y - 1],
+    [x, y + 1],
+  ]) {
+    if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+    if (board.get([nx, ny]) !== color) return false;
+  }
+  return true;
+}
+
 function toMove(m) {
   if (!m) return { pass: true };
   return m.pass ? { pass: true } : { x: m.x, y: m.y };
@@ -130,6 +207,26 @@ function toMove(m) {
 function legal(game, move) {
   if (!move || move.pass) return true;
   return game.canPlay(move.x, move.y).ok;
+}
+
+/**
+ * The move a strength level plays from a finished KataGo search: the
+ * level's pick, or KataGo's own choice when the pick is illegal under the
+ * app's rules (superko). Null when neither is legal. Exported so the
+ * calibration harness (scripts/calibrate-strength.mjs) measures exactly
+ * what players get.
+ */
+export function moveFromAnalysis(game, analysis, strength, rnd = Math.random) {
+  // A beginner's move now and then, except when KataGo would pass (the
+  // game is over; a stray move then only drags it out).
+  const top = analysis.moves?.[0];
+  if (strength.blunder > 0 && !top?.pass && rnd() < strength.blunder) {
+    const b = beginnerMove(game, rnd);
+    if (b) return b;
+  }
+  let move = pickCandidate(analysis, game.turn, strength, rnd);
+  if (!legal(game, move)) move = analysis.play;
+  return legal(game, move) ? move : null;
 }
 
 /**
@@ -142,9 +239,8 @@ export async function decide(game, strengthId, { signal } = {}) {
   const analysis = await analyzeQ(game, { visits: strength.visits, signal });
   if (signal?.aborted) return { move: null, analysis: null };
   if (analysis) {
-    let move = pickCandidate(analysis, game.turn, strength);
-    if (!legal(game, move)) move = analysis.play;
-    if (legal(game, move)) return { move, analysis };
+    const move = moveFromAnalysis(game, analysis, strength);
+    if (move) return { move, analysis };
   }
   const move = await chooseLocal(game, { level: strength.local, color: game.turn });
   return { move, analysis: null };
@@ -170,9 +266,8 @@ export async function chooseMove(game, strengthId) {
   if (analysis) {
     // Never resign, never pass early while the board is open: KataGo's own
     // choice is a pass only when the game is really over.
-    let move = pickCandidate(analysis, game.turn, strength);
-    if (!legal(game, move)) move = analysis.play;
-    if (legal(game, move)) return move;
+    const move = moveFromAnalysis(game, analysis, strength);
+    if (move) return move;
   }
   return chooseLocal(game, { level: strength.local, color: game.turn });
 }
