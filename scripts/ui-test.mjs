@@ -87,6 +87,12 @@ async function pointOf(page, x, y) {
   );
 }
 async function clickPoint(page, x, y) {
+  // The board on screen must be the one the page registered (a new view
+  // registers after its first paint).
+  await page.waitForFunction(() => {
+    const c = document.querySelector("canvas.board");
+    return !!(c && window.__board && window.__board.canvas === c && window.__board.geom);
+  });
   const p = await pointOf(page, x, y);
   assert(p, "board geometry not exposed");
   await page.mouse.click(p.x, p.y);
