@@ -57,6 +57,9 @@ in this table. Usage targets:
 | squeeze | 挤 / 滚打包收 | squeeze | 조이기 | シボリ | |
 | counter-atari | 反打吃 | counter-atari | 역단수 | 逆アタリ | |
 | capture to escape | 反吃 | capture back | 되잡기 | 取り返す | |
+| capture to save (theme) | 吃子解围 / 提子解围 | capture to save | 따내서 살리기 | 取って助ける | problem theme `capture-to-save`; ko title v3 따내서 구하기 → 따내서 살리기 |
+| escape (theme) | 逃子 | running away / escape | 도망가기 | 逃げ出し | problem theme `escape` |
+| atari (theme) | 打吃 | atari | 단수 | アタリ | problem theme `atari` |
 | extend | 长 | extend | 뻗기 | 伸び（ノビ） | ko v3 messages used 늘기, course used 뻗기 → unified to 뻗기; ja v3 延び → 伸び |
 | tesuji | 手筋 | tesuji / technique | 맥 | 手筋 | |
 
@@ -66,7 +69,7 @@ in this table. Usage targets:
 |---|---|---|---|---|---|
 | cut | 切断 | cut | 끊기 | 切り | |
 | cutting point | 断点 | cutting point | 끊는 점 | 切りの点 / 切れ目 | |
-| connection | 连接 | connection | 연결 / 잇기 | つなぎ（ツギ） | ja unit title v3 継ぎと切り vs topic つなぎと切り → both つなぎと切り |
+| connection | 连接 | connection | 연결 / 잇기 | つなぎ（ツギ） | problem theme `connect`: ja v3 ツギ → つなぎ, to match the topic label; ja unit title v3 継ぎと切り vs topic つなぎと切り → both つなぎと切り |
 | solid connection | 实连 | solid connection | 꽉 잇기 | カタツギ | |
 | hanging connection | 虎口 | hanging connection (tiger's mouth) | 호구 | カケツギ（虎の口） | |
 | bamboo joint | 双 | bamboo joint | 쌍립 | 竹ふし | not used in v3 strings |
@@ -78,17 +81,20 @@ in this table. Usage targets:
 | life and death (problems) | 死活 | life and death | 사활 | 死活 / 詰碁 | |
 | live / living | 做活 / 活棋 | live | 살다 / 삶 | 生きる / 生き | |
 | kill | 杀棋 | kill | 잡다 / 잡기 | 殺す / 殺し | |
-| eye | 眼 | eye | 눈 / 집 | 眼 | |
+| eye | 眼 | eye | 눈 | 眼 | ko: 집 for an eye (두 집) is idiomatic but collides with 집 = territory; the course and the problem bank use 눈 (problem hints v3 used 집 → 눈) |
+| capture to make an eye | 吃子做眼 | capture for an eye | 따내서 눈 만들기 | 取って眼を作る | problem theme `capture-eye` |
 | false eye | 假眼 | false eye | 옥집 | 欠け眼 | |
 | two eyes | 两眼 / 两只眼 | two eyes | 두 눈 | 二眼 | |
 | eye space | 眼位 | eye space | 궁도 | 眼形 | ko course v3 used 공간 / 눈 공간 → 궁도 |
 | vital point | 要点 / 急所 | vital point | 급소 | 急所 | ko v3 once used 요점 → 급소 |
-| placement (nakade-style) | 点眼 / 点 | placement | 치중 | 置き（オキ） | |
+| placement (nakade-style) | 点眼 / 点 | placement | 치중 | 置き（オキ） | problem theme `placement` |
 | straight three | 直三 | straight three | 직삼 | 直三 | see decisions below |
 | bent three | 曲三 | bent three | 곡삼 | 曲がり三 | |
 | T-four / pyramid four | 丁四 | pyramid four | 삿갓 사궁 | 丁四 | see decisions below; en v3 "T-four" → "pyramid four" |
 | bulky five | 刀把五 | bulky five | 뭉친 오궁 | 刀五 | see decisions below; ja v3 かたまった五目 → 刀五 |
-| flower six (rabbity six) | 梅花六 / 葡萄六 | flower six / rabbity six | 매화육궁 | 花六 | not used in v3 strings |
+| crossed five | 梅花五 | crossed five | 오궁도화 | 花五 | |
+| flower six (rabbity six) | 梅花六 / 葡萄六 | flower six / rabbity six | 매화육궁 | 花六 | |
+| rectangular six | 板六 | rectangular six | 판육궁 | 板六 | |
 
 ## Capturing races
 
@@ -100,7 +106,8 @@ in this table. Usage targets:
 | outside liberty | 外气 | outside liberty | 바깥 공배 | 外ダメ | |
 | shared liberty | 公气 | shared liberty | 공동 공배 | 内ダメ | see decisions below; ja course v3 used 共通のダメ → 内ダメ |
 | neutral point (dame) | 单官 | neutral point | 공배 | ダメ | |
-| seki | 双活 | seki | 빅 | セキ | not used in v3 strings |
+| eye versus no eye | 有眼杀无眼 | eye versus no eye | 유가무가 | 眼あり眼なし | problem theme `race-eye` |
+| seki | 双活 | seki | 빅 | セキ | problem theme `seki` |
 
 ## Scoring and rules
 
@@ -118,6 +125,7 @@ in this table. Usage targets:
 | byo-yomi | 读秒 | byo-yomi | 초읽기 | 秒読み | UI shows "10 min + 3×30 s" in every language |
 | main time | 基本用时 | main time | 제한 시간 | 持ち時間 | |
 | kyu / dan | 级 / 段 | kyu / dan | 급 / 단 | 級 / 段 | |
+| kaya / katsura (board wood) | 榧木 / 桂木 | kaya / katsura | 비자 / 계수나무 | 榧 / 桂 | settings labels |
 | strength / rank | 棋力 | strength / level | 기력 | 棋力 | |
 
 ## Board areas and opening
@@ -215,5 +223,8 @@ The items I am least sure about:
    used loosely in this sense.
 5. ko greetings on the Today screen (좋은 아침입니다 / 안녕하세요 / 좋은 저녁
    되세요). They are natural, but a Korean UI writer may prefer other wording.
-6. ja: the app keeps 呼吸点 (beginner style) for liberty and ダメ inside
-   capturing races. A Japanese reviewer may prefer ダメ throughout.
+6. ja: the course keeps 呼吸点 (beginner style) for liberty and uses ダメ
+   inside capturing races; the problem bank uses ダメ throughout. A Japanese
+   reviewer may prefer ダメ everywhere.
+7. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
+   bank. I kept them as the author wrote them, but I have not confirmed them.
