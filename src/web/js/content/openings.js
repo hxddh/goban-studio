@@ -2670,7 +2670,7 @@ const RAW_OPENINGS = [
     }
   },
   {
-    "id": "pro-37-alphago-leesedol-2-sgf",
+    "id": "pro-37-alphago-leesedol-1-sgf",
     "title": {
       "zh": "职业布局：阿尔法围棋 对 李世石",
       "en": "Pro opening: AlphaGo vs Lee Sedol",

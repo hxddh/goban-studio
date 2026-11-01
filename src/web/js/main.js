@@ -1730,8 +1730,9 @@ async function runSelfTest() {
   const cfg = await selftestConfig();
   if (!cfg?.enabled || !cfg.path) return;
   let engineMove = "";
+  let probe = null;
   try {
-    const probe = new Game({ size: 19, komi: 6.5 });
+    probe = new Game({ size: 19, komi: 6.5 });
     const move = await chooseMove(probe, { level: 1, color: BLACK });
     if (move && !move.pass) engineMove = `${move.x},${move.y}`;
   } catch (_) {
@@ -1740,13 +1741,13 @@ async function runSelfTest() {
   const report = {
     ok: Boolean(engineMove),
     version: APP_VERSION,
-    boardSize: boardView?.model?.size || 0,
+    boardSize: probe?.size || 0,
     language: lang(),
     engineMove,
     checks: {
       webview: true,
       bridge: typeof window.zero?.invoke === "function",
-      board: boardView?.model?.size === 19,
+      board: probe?.size === 19,
       engine: Boolean(engineMove),
     },
   };
