@@ -142,10 +142,24 @@ function parseSize(raw) {
   return n === 9 || n === 13 || n === 19 ? n : 19;
 }
 
-/** SGF columns skip I, like board coordinates: a..h, j..z. */
+/**
+ * SGF columns are a, b, c … in order, the letter i included (FF[4]); only
+ * the board's labels skip I. Goban Studio before v7 wrote (and read)
+ * columns without the i — a..h, j..t — so records it saved, which carry
+ * AP[Goban Studio:<version>] with a version below 7, are read that way.
+ */
+let legacyColumns = false;
+
+/** True for a record written by Goban Studio before v7 (columns skip i). */
+export function isLegacyGobanSgf(ap) {
+  const m = /^Goban Studio:(\d+)/.exec(String(ap || "").trim());
+  return !!m && Number(m[1]) < 7;
+}
+
 function sgfColumn(code) {
   if (code < 97) return -1;
-  return code - 97 - (code > 105 ? 1 : 0);
+  if (legacyColumns) return code - 97 - (code > 105 ? 1 : 0);
+  return code - 97;
 }
 
 function sgfVertex(raw, size) {
@@ -239,6 +253,7 @@ export function loadSGF(text) {
   if (!roots.length) throw new Error("SGF has no root node");
   const root = roots[0];
   const data = root.data || {};
+  legacyColumns = isLegacyGobanSgf(first(data, "AP"));
   // v5: Japanese, Chinese and Korean records are read under their own
   // rules (spellings and the rulesets that stay rejected are listed at
   // rulesFromSgf). No RU means Japanese, as every record before v5.
