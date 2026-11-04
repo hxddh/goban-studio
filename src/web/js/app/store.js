@@ -25,6 +25,7 @@ export const state = {
   announce: "",
   game: null,
   review: null,
+  report: null, // v6 report page (app/report-ctl.js)
   practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   library: { tab: "mine", kind: "all", query: "" },
   models: initialModels(), // v5 optional downloads (app/models-ctl.js)

@@ -631,7 +631,8 @@ function finishGame() {
   }
   announce(resultText(result));
   update();
-  if (g.opponent === "ai") summarize(g);
+  // v6: the report waits for this analysis (report-ctl).
+  if (g.opponent === "ai") g.summaryJob = summarize(g);
 }
 
 /**

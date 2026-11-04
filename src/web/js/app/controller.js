@@ -25,6 +25,7 @@ import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
+import { dropReport, restoreReport } from "./report-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
@@ -32,6 +33,7 @@ export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
+export * from "./report-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -79,6 +81,12 @@ export const SPACES = ["today", "play", "practice", "library"];
 export function goSpace(space) {
   // Clicking the place you are in returns to its top level.
   if (space === state.space) {
+    // v6: the report page closes back to the place.
+    if (state.report && state.report.space === space) {
+      remember();
+      dropReport();
+      return update();
+    }
     if (space === "practice" && state.practice.view !== "home") return practiceHome();
     if (state.review && (state.review.meta.space || "play") === space) {
       remember();
@@ -125,6 +133,8 @@ function restore(loc) {
     else if (rv.source === "opening" && rv.openingId) openOpening(rv.openingId);
     if (state.review && rv.index >= 0) reviewGoto(rv.index);
   }
+  // v6: the report page, when the entry had one open.
+  restoreReport(loc);
   update();
 }
 

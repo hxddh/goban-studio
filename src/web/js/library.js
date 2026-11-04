@@ -84,6 +84,15 @@ export function renameGame(id, name) {
   return rec;
 }
 
+/** v6: merge fields into a record (e.g. its report) without moving it in the list. */
+export function patchGame(id, patch) {
+  const games = listGames();
+  const rec = games.find((g) => g.id === id);
+  if (!rec) return null;
+  Object.assign(rec, patch);
+  return writeGames(games) ? rec : null;
+}
+
 export function deleteGame(id) {
   const next = listGames().filter((g) => g.id !== id);
   writeGames(next);

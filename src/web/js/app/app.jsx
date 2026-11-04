@@ -17,6 +17,7 @@ import { PlayView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryView } from "./library.jsx";
 import { Sheets } from "./sheets.jsx";
+import { ReportView } from "./report.jsx";
 
 function Toasts() {
   return (
@@ -39,15 +40,17 @@ function App() {
   if (!s.ready) return null;
   const focus = isFocus();
   const reviewKey = s.review ? "review-" + s.review.source : "";
+  const report = C.reportVisible();
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
-        <div class="place" key={s.space + reviewKey + (s.space === "practice" ? s.practice.view : "")}>
-          {s.space === "today" && <TodayView />}
-          {s.space === "play" && <PlayView />}
-          {s.space === "practice" && <PracticeView />}
-          {s.space === "library" && <LibraryView />}
+        <div class="place" key={s.space + reviewKey + (report ? "report" : "") + (s.space === "practice" ? s.practice.view : "")}>
+          {report && <ReportView />}
+          {!report && s.space === "today" && <TodayView />}
+          {!report && s.space === "play" && <PlayView />}
+          {!report && s.space === "practice" && <PracticeView />}
+          {!report && s.space === "library" && <LibraryView />}
         </div>
       </main>
       <Sheets />
@@ -180,6 +183,7 @@ function onKeyDown(e) {
       return update();
     }
     if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
+    if (C.reportVisible()) return C.closeReport();
     if (state.settings.focus) return C.toggleFocus();
     return;
   }

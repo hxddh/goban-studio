@@ -2311,6 +2311,166 @@ await test("v5: the packaged self-test checks the downloads only when the workfl
   assert.match(main, /GOBAN_MODELS_DIR/);
 });
 
+/* --------------------------------------------------------------- v6 report */
+
+const R = await import("../src/web/js/app/report-model.js");
+const { addMistake } = await import("../src/web/js/persist.js");
+
+/**
+ * A 13×13 game of 80 moves with no captures (Black fills the top rows,
+ * White the bottom) and a whole-game analysis where each listed move loses
+ * the given points; the engine's best move is always the empty 7-7 point.
+ */
+function reportGame({ losses = {}, source = "katago", result = "W+R" } = {}) {
+  const size = 13;
+  const game = new Game({ size, komi: 6.5 });
+  const bl = [];
+  const wh = [];
+  for (let y = 0; y < 6; y++) for (let x = 0; x < size; x++) bl.push([x, y]);
+  for (let y = 12; y > 6; y--) for (let x = 0; x < size; x++) wh.push([x, y]);
+  for (let i = 0; i < 40; i++) {
+    assert.ok(game.play(...bl[i]).ok);
+    assert.ok(game.play(...wh[i]).ok);
+  }
+  if (result) game.setResult(result);
+  const line = game.mainLine();
+  const lead = [0];
+  for (let i = 1; i < line.length; i++) lead[i] = lead[i - 1] + (line[i].move.color === BLACK ? -(losses[i] || 0) : losses[i] || 0);
+  const best = { x: 6, y: 6 };
+  const points = line.map((n, i) =>
+    source === "katago"
+      ? { source, winrate: 0.5, scoreLead: lead[i], best, pv: [best], moves: [{ ...best, visits: 20, scoreLead: lead[i] }], ownership: null }
+      : { source, winrate: 0.5, scoreLead: lead[i], best: null, pv: [], ownership: null },
+  );
+  return { game, points };
+}
+
+await test("v6 report: the model has the result, the three phases and three key moments", () => {
+  const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 30: 4, 79: 2.5 } });
+  const m = R.buildReport({ game, points, humanColor: BLACK, at: 1 });
+  assert.equal(m.v, R.REPORT_VERSION);
+  assert.equal(m.confidence, "high");
+  assert.deepEqual([m.result, m.won, m.size, m.moves, m.rules, m.komi], ["W+R", false, 13, 80, game.rules, 6.5]);
+  assert.deepEqual(m.players, ["black"]);
+  assert.deepEqual(m.phases.map((p) => [p.id, p.from, p.to]), [["opening", 1, 20], ["middle", 21, 75], ["endgame", 76, 80]]);
+  assert.deepEqual([m.phases[1].players.black.loss, m.phases[1].players.black.blunders], [8, 1]);
+  assert.deepEqual([m.totals.black.loss, m.totals.black.mistakes, m.totals.black.blunders], [13.5, 2, 1]);
+  assert.ok(m.takeaways.length > 0 && m.takeaways.every((tk) => tk.kind !== "estimate" && tk.key));
+  // The player's three costliest moves, in game order, with the position before each.
+  assert.deepEqual(m.moments.map((mo) => mo.index), [5, 25, 79]);
+  const mo = m.moments[1];
+  assert.deepEqual([mo.color, mo.loss, mo.best], [BLACK, 8, { x: 6, y: 6 }]);
+  assert.equal(mo.thumb.length, 169);
+  assert.equal(mo.thumb, R.thumbOf(game.mainLine()[24].board.signMap));
+  assert.equal(mo.thumb[mo.played.y * 13 + mo.played.x], ".", "the move is not on the board yet");
+  // It is plain JSON (it is stored with the library record) and knows its game.
+  assert.deepEqual(JSON.parse(JSON.stringify(m)), m);
+  assert.ok(R.reportFits(m, game));
+  const longer = loadSGF(game.toSGF()).game;
+  assert.ok(R.reportFits(m, longer), "the same moves read back from SGF");
+  longer.goto(longer.mainLine().at(-1).id);
+  longer.current.result = null;
+  longer.play(6, 6, { force: true });
+  assert.equal(R.reportFits(m, longer), false, "an edited main line needs a new report");
+  assert.equal(R.reportFits({ ...m, v: 0 }, game), false);
+  // A game between two people describes both sides; a won game says so.
+  const both = R.buildReport({ game, points, humanColor: null });
+  assert.deepEqual([both.players, both.won, both.moments.length], [["black", "white"], null, 3]);
+  const won = reportGame({ result: "B+3.5" });
+  assert.equal(R.buildReport({ ...won, humanColor: BLACK }).won, true);
+  assert.equal(R.buildReport({ ...won, humanColor: WHITE }).won, false);
+});
+
+await test("v6 report: the low-confidence offline estimate shows turning points, not numbers", () => {
+  const { game, points } = reportGame({ losses: { 25: 8, 27: 5 }, source: "estimate" });
+  const m = R.buildReport({ game, points, humanColor: BLACK });
+  assert.equal(m.confidence, "low");
+  assert.equal(m.phases, null, "no per-phase numbers from an estimate");
+  assert.equal(m.totals, null);
+  assert.deepEqual(m.takeaways, []);
+  assert.deepEqual(m.moments.map((mo) => mo.index), [25, 27]);
+  for (const mo of m.moments) assert.deepEqual([mo.best, mo.loss, mo.why, mo.theme, mo.accept], [null, null, null, null, []]);
+  // Nothing to practise without KataGo's better move.
+  assert.deepEqual(R.drillMoments(m), []);
+  assert.deepEqual(R.reportDrills(m, { sgf: game.toSGF(), gameKey: "g1", existing: [] }), { add: [], have: [] });
+  // The estimate's tempo bias (the mover gains about a point each move) is not a turning point.
+  const tempo = reportGame({ source: "estimate" });
+  tempo.points.forEach((p, i) => (p.scoreLead = i % 2 ? 1.2 : -0.2));
+  assert.deepEqual(R.turningPoints(tempo.game, tempo.points, BLACK), []);
+  // No analysis at all.
+  const none = R.buildReport({ game, points: points.map(() => null), humanColor: BLACK });
+  assert.deepEqual([none.confidence, none.phases, none.moments], ["none", null, []]);
+});
+
+await test("v6 report: practising a game adds its worst mistakes as drills, never twice", () => {
+  const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 41: 1.5, 79: 2.5 } });
+  const m = R.buildReport({ game, points, humanColor: BLACK });
+  const sgf = game.toSGF();
+  // Worst first; 1.5 points is not a mistake.
+  assert.deepEqual(R.drillMoments(m).map((mo) => mo.index), [25, 5, 79]);
+  const progress = { mistakes: [] };
+  const first = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: progress.mistakes });
+  assert.deepEqual(first.add.map((d) => d.id), ["rec-1-25", "rec-1-5", "rec-1-79"]);
+  assert.deepEqual(first.have, []);
+  const d = first.add[0];
+  assert.deepEqual([d.gameKey, d.index, d.sgf, d.color, d.best, d.loss, d.size], ["rec-1", 25, sgf, BLACK, { x: 6, y: 6 }, 8, 13]);
+  assert.deepEqual(d.played, m.moments[1].played);
+  assert.ok(d.accept.some((p) => p.x === 6 && p.y === 6));
+  for (const e of first.add) addMistake(progress, e);
+  assert.equal(progress.mistakes.length, 3);
+  // Again: nothing new, the three are found.
+  const again = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: progress.mistakes });
+  assert.deepEqual(again.add, []);
+  assert.deepEqual(again.have.sort(), ["rec-1-25", "rec-1-5", "rec-1-79"]);
+  // A drill made from the review under another key is the same position.
+  const fromReview = [{ id: "game-7-25", gameKey: "game-7", index: 25, sgf }];
+  const mixed = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: fromReview });
+  assert.deepEqual(mixed.add.map((x) => x.index), [5, 79]);
+  assert.deepEqual(mixed.have, ["game-7-25"]);
+  // At most three, and a clean game has none.
+  const many = reportGame({ losses: { 3: 3, 5: 4, 7: 5, 9: 6 } });
+  assert.ok(R.drillMoments(R.buildReport({ ...many, humanColor: BLACK })).length <= R.MAX_DRILLS);
+  const clean = reportGame();
+  assert.deepEqual(R.drillMoments(R.buildReport({ ...clean, humanColor: BLACK })), []);
+});
+
+await test("v6 report: the report is stored with its library record without moving it", () => {
+  Lib.clearLibrary();
+  const a = Lib.saveGame(reportGame().game, { name: "a" });
+  const b = Lib.saveGame(reportGame({ result: "B+2.5" }).game, { name: "b" });
+  const order = Lib.listGames().map((g) => g.id);
+  assert.ok(Lib.patchGame(a.id, { report: { v: 1, lineKey: "x" } }));
+  assert.deepEqual(Lib.listGames().map((g) => g.id), order);
+  assert.deepEqual(Lib.getGame(a.id).report, { v: 1, lineKey: "x" });
+  assert.equal(Lib.getGame(b.id).report, undefined);
+  // Saving the game again (review edits) keeps the report; reportFits decides if it still holds.
+  Lib.saveGame(reportGame().game, { id: a.id });
+  assert.deepEqual(Lib.getGame(a.id).report, { v: 1, lineKey: "x" });
+  assert.equal(Lib.patchGame("nope", { report: {} }), null);
+  Lib.clearLibrary();
+});
+
+await test("v6 report: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 report").length, 2);
+  const block = src.slice(src.indexOf("// v6 report"), src.indexOf("// end v6 report"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("report."));
+  assert.ok(keys.length >= 20);
+  for (const k of keys) {
+    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((x) => x[1]).sort().join();
+    for (const lang of LANG_IDS) {
+      assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+      assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+    }
+  }
+  // The result card leads to the report after a rated game; Library rows offer it.
+  const play = fs.readFileSync(path.join(root, "src/web/js/app/play.jsx"), "utf8");
+  assert.match(play, /kind="primary" icon="chart"[^>]*onClick=\{C\.openCurrentReport\}/);
+  const lib = fs.readFileSync(path.join(root, "src/web/js/app/library.jsx"), "utf8");
+  assert.match(lib, /C\.openReport\(g\.id, \{ space: "library" \}\)/);
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);
