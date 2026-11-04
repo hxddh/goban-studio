@@ -878,8 +878,9 @@ await test("v6 explorer: book moves, out of the book, back/forward, reset and pl
   assert.equal(g.root.board.signMap.flat().filter(Boolean).length, 4);
   assert.equal(state.game.humanColor, BLACK);
   assert.equal(state.game.opponent, "ai");
-  // Review: where a game leaves the whole-board book (this SGF reader skips "i" in columns).
-  const { game } = loadSGF("(;GM[1]SZ[19];B[qd];W[dp];B[qp];W[aa];B[dd])");
+  // Review: where a game leaves the whole-board book (Q16 D4 Q4, the named
+  // two-star opening, then a first-line move; SGF columns include the i).
+  const { game } = loadSGF("(;GM[1]SZ[19];B[pd];W[dp];B[pp];W[aa];B[dd])");
   assert.equal(X.bookExit(game), 3);
   assert.equal(X.bookExit(loadSGF("(;GM[1]SZ[9];B[ee])").game), null);
   X.closeExplorer();
