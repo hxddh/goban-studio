@@ -39,8 +39,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - run: npm ci --ignore-scripts
       - id: m
-        run: echo "matrix=$(node scripts/calibrate-strength.mjs matrix docs/calibration/plan.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          m=$(node scripts/calibrate-strength.mjs matrix docs/calibration/plan.json)
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
 
   play:
     needs: plan
@@ -110,6 +114,7 @@ jobs:
           pattern: games-*
           path: in
           merge-multiple: true
+      - run: npm ci --ignore-scripts
       - name: merge and commit the games
         run: |
           set -euo pipefail
