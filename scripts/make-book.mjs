@@ -48,7 +48,7 @@ import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { BLACK, WHITE, LETTERS } from "../src/web/js/rules.js";
-import { BOOK_FORMAT, GROUPS, SYMMETRIES, INVERSE, canonical, decodeMove, encodeMove, playOn, setupSignMap, stonesOf } from "../src/web/js/book.js";
+import { BOOK_FORMAT, GROUPS, SYMMETRIES, INVERSE, canonical, decodeMove, encodeMove, loadBook, playOn, setupSignMap, stonesOf } from "../src/web/js/book.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -70,6 +70,7 @@ const PARTS = arg("parts", "book-parts");
 const SHARD = Number(arg("shard", 0));
 const SHARDS = Number(arg("shards", 1));
 const DEADLINE = Date.now() + Number(arg("deadline-min", 100000)) * 60000;
+const REUSE = arg("reuse", null);
 const N = 19;
 const KOMI = 6.5;
 const RULES = "japanese";
@@ -144,7 +145,7 @@ const TREES = {
     local: () => true,
     rootAuto: true,
     // The seed searches the positions up to this depth.
-    seedDepth: 2,
+    seedDepth: Number(arg("seed-depth-whole", 2)),
   },
   corner: {
     setup: { b: ["D4", "K10"].map(gtpToXY), w: ["D16", "Q4"].map(gtpToXY) },
@@ -156,14 +157,14 @@ const TREES = {
     local: (x, y) => x >= 9 && y <= 9,
     // Black's first corner stone comes from the named lines only.
     rootAuto: false,
-    seedDepth: 3,
+    seedDepth: Number(arg("seed-depth-corner", 3)),
   },
 };
 
 /** Expand a candidate only when it has this share of the visits... */
-const SHARE = 0.07;
+const SHARE = Number(arg("share", 0.07));
 /** ...and loses at most this many points against KataGo's first choice. */
-const AUTO_LOSS = 3;
+const AUTO_LOSS = Number(arg("auto-loss", 3));
 
 /* ------------------------------------------------------------- KataGo */
 
@@ -285,6 +286,43 @@ function namedIndex(id) {
   return { next, names };
 }
 
+/* -------------------------------------------------------------- reuse */
+
+/**
+ * With `--reuse <book.json>`: the positions of an earlier book made with
+ * the same network and visits are not searched again. Their stored
+ * candidates still choose their children, so a run with a larger budget
+ * or looser expansion only searches what is new.
+ */
+function reusable(id) {
+  if (!REUSE || !fs.existsSync(REUSE)) return new Map();
+  const raw = JSON.parse(fs.readFileSync(REUSE, "utf8"));
+  const want = arg("network-name", null);
+  if (raw.visits !== VISITS || (want && raw.network !== want) || !raw.trees?.[id]) {
+    console.log(`${id}: ${REUSE} was made with ${raw.network} at ${raw.visits} visits; not reused`);
+    return new Map();
+  }
+  const out = new Map();
+  for (const n of loadBook(raw).trees[id].nodes) {
+    out.set(n.key, {
+      w: Math.round(n.winrate * 1000),
+      s: Math.round(n.score * 10),
+      v: n.visits,
+      c: n.candidates.map((c) => [toCanon(c.move, n.sym), c.visits, Math.round(c.winrate * 1000), Math.round(c.score * 10)]),
+    });
+  }
+  console.log(`${id}: reusing ${out.size} positions from ${REUSE}`);
+  return out;
+}
+
+/** A stored position as KataGo's answer, in the node's own frame. */
+function answerOf(e, sym) {
+  return {
+    rootInfo: { visits: e.v, winrate: e.w / 1000, scoreLead: e.s / 10 },
+    moveInfos: e.c.map(([cm, v, w, sc], order) => ({ move: xyToGtp(fromCanon(cm, sym)), visits: v, winrate: w / 1000, scoreLead: sc / 10, order })),
+  };
+}
+
 /* --------------------------------------------------------------- grow */
 
 /**
@@ -304,6 +342,8 @@ async function grow(engine, id, starts, store, { stopBelow = Infinity, label = i
   const { next: named } = namedIndex(id);
   const queued = new Set(starts.map((s) => s.key));
   const queue = starts.slice();
+  const reuseStore = reusable(id);
+  let reused = 0;
   const frontier = [];
   let inFlight = 0;
   let searched = 0;
@@ -382,6 +422,11 @@ async function grow(engine, id, starts, store, { stopBelow = Infinity, label = i
           frontier.push(node);
           continue;
         }
+        if (reuseStore.has(node.key)) {
+          reused++;
+          expand(node, answerOf(reuseStore.get(node.key), node.sym));
+          continue;
+        }
         inFlight++;
         engine
           .query({
@@ -410,7 +455,7 @@ async function grow(engine, id, starts, store, { stopBelow = Infinity, label = i
     };
     pump();
   });
-  console.log(`${label}: ${searched} searched in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  console.log(`${label}: ${searched} searched, ${reused} reused, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   return frontier;
 }
 
@@ -453,6 +498,9 @@ function plan(seeds, shards) {
     const total = weights.reduce((a, b) => a + b, 0) || 1;
     sd.frontier.forEach((f, i) => items.push({ id: sd.id, ...f, budget: Math.max(4, Math.round((left * weights[i]) / total)) }));
   }
+  // No subtree gets more than twice a shard's share, so no job runs long.
+  const cap = Math.ceil((2 * items.reduce((a, b) => a + b.budget, 0)) / shards);
+  for (const it of items) it.budget = Math.min(it.budget, cap);
   items.sort((a, b) => b.budget - a.budget || (a.key < b.key ? -1 : 1));
   const load = Array(shards).fill(0);
   const out = Array.from({ length: shards }, () => []);
