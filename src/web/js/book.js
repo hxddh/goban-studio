@@ -249,7 +249,7 @@ export function loadBook(json) {
   if (!json || json.format !== BOOK_FORMAT) throw new Error("unknown book format");
   const trees = {};
   for (const [id, tree] of Object.entries(json.trees || {})) trees[id] = indexTree(id, tree);
-  return { meta: { network: json.network, engine: json.engine, visits: json.visits, rules: json.rules, komi: json.komi, made: json.made }, trees };
+  return { meta: { network: json.network, engine: json.engine, katago: json.katago || null, visits: json.visits, rules: json.rules, komi: json.komi, made: json.made }, trees };
 }
 
 /* -------------------------------------------------------------- lookup */

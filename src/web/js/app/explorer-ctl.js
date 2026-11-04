@@ -176,6 +176,34 @@ export function isLocal(mode, x, y) {
   return x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1;
 }
 
+/**
+ * v7: the corner tree zooms to its own area while every move of the line is
+ * in it (a tenuki shows the whole board). The player can turn it off.
+ */
+export function explorerZoomable(e = explorerState()) {
+  if (!e || e.mode !== "corner") return false;
+  for (let n = e.game.current; n && n.parent; n = n.parent) {
+    if (n.move && !n.move.pass && !isLocal("corner", n.move.x, n.move.y)) return false;
+  }
+  return true;
+}
+
+export function explorerZoomed(e = explorerState()) {
+  return explorerZoomable(e) && e.zoom !== false;
+}
+
+/** The board window for the explorer: the corner area, or null. */
+export function explorerView(e = explorerState()) {
+  return explorerZoomed(e) ? { ...CORNER_AREA } : null;
+}
+
+export function toggleExplorerZoom() {
+  const e = explorerState();
+  if (!e || e.mode !== "corner") return;
+  e.zoom = e.zoom === false;
+  update();
+}
+
 export function pointLabel(x, y) {
   return coordLabel(x, y, 19);
 }
