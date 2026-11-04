@@ -30,7 +30,7 @@ import {
   strengthById,
   suggestHandicap,
 } from "../src/web/js/engine.js";
-import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
+import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, humanStyleParams, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
 import { enginePayload, parseInfo, parseVertex } from "../src/web/js/katago.js";
 import * as M from "../src/web/js/models.js";
 import * as S from "../src/web/js/solver.js";
@@ -1479,6 +1479,16 @@ await test("v5: the downloader fetches only pinned KataGo release files, verifie
   assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
   const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
   assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
+});
+
+await test("v5: the calibration harness sends the app's own human-style parameters", () => {
+  const p = humanStyleParams();
+  assert.equal(p.raw.length, 9);
+  assert.deepEqual(p.raw.map(([k]) => k), p.search.map(([k]) => k));
+  assert.deepEqual(Object.fromEntries(p.search).humanSLChosenMovePiklLambda, "0.08");
+  // The raw style is the shipped human.cfg's starting point.
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8");
+  for (const [k, v] of p.raw) assert.equal(Number(new RegExp(`^${k} = (\\S+)`, "m").exec(cfg)?.[1]), Number(v), k);
 });
 
 await test("v5: the strings are one block in four languages", () => {

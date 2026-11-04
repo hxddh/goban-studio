@@ -90,6 +90,12 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   until you turn it on in Settings. Nothing about you or your games is
   sent; everything else (KataGo, lessons, your library) stays on your
   computer.
+- **Optional downloads** (v5) — two KataGo networks you may add in
+  Settings, fetched only when you choose them: KataGo's human model, which
+  makes the opponent play like a person of its level, and a larger network
+  for analysis and review. They come from KataGo's official GitHub
+  releases (pinned addresses and SHA-256 hashes), are verified before use,
+  live in the app's data folder and can be removed again.
 
 ## Honest content
 
@@ -148,6 +154,16 @@ Method, raw results and limitations: [docs/strength.md](docs/strength.md).
 In the browser preview there is no KataGo: 9×9 falls back to Moka v2.1 and
 other sizes to a small heuristic engine, and the interface says so
 wherever it matters.
+
+v5 adds two optional networks (`src/models.zig`, `studio.modelDownload`):
+KataGo's human SL model `b18c384nbt-humanv0` (99 MB) and the larger
+standard network `g170e-b15c192` (48 MB), each pinned by URL, size and
+SHA-256, downloaded into `<app data>/models` with resume, verified and
+renamed into place. With the human model the opponent plays human-style
+(a second KataGo process, `-human-model`, started only for those games,
+`engine/model/human.cfg`); with the larger network, analysis, review,
+hints, scoring and the top level use it (a third process). The shipped
+b6c96 process stays the ladder's engine and every fallback.
 
 ## Run the web app
 
@@ -255,7 +271,10 @@ src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
 src/web/js/update.js          update check: version compare, opt-in weekly schedule
-src/update.zig                the one network request: GitHub's latest-release API
+src/update.zig                update check: GitHub's latest-release API
+src/models.zig                optional downloads: pinned URLs, resume, SHA-256, atomic rename
+src/web/js/models.js          optional downloads: status logic and host calls
+src/web/js/app/models-ctl.js  optional downloads for the interface (state.models)
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)
