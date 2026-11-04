@@ -588,7 +588,7 @@ await test("v5 rules: the defaultRules setting and library records", () => {
   assert.equal(Lib.describeGame(g).rules, "korean");
   assert.equal(Lib.recordRules({}), "japanese");
   assert.equal(Lib.recordRules({ rules: "chinese" }), "chinese");
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
   assert.equal(messages.match(/\/\/ v5 rules\r?\n/g)?.length, 1);
 });
 
@@ -1326,7 +1326,7 @@ await test("the library holds finished and saved games; the current game is sepa
 await test("today's five puts due reviews first and the review ladder spaces repeats", () => {
   writeJSON(KEYS.progress, {});
   const progress = loadProgress();
-  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
+  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8").replace(/\r\n/g, "\n"));
   const picks = dailySet(progress, PROBLEMS, grades, 5);
   assert.equal(picks.length, 5);
   assert.equal(new Set(picks.map((p) => p.id)).size, 5);
@@ -1350,13 +1350,13 @@ await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web/moka", file)), `moka/${file}`);
   }
-  const model = JSON.parse(fs.readFileSync(path.join(root, "src/web/moka/go-model.json"), "utf8"));
+  const model = JSON.parse(fs.readFileSync(path.join(root, "src/web/moka/go-model.json"), "utf8").replace(/\r\n/g, "\n"));
   assert.equal(model.architecture.boardSize, 9);
   assert.equal(fs.statSync(path.join(root, "src/web/moka/go-model.bin")).size, model.weightsBytes);
 });
 
 await test("design tokens meet the contrast rules in docs/design.md (light and dark)", () => {
-  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8");
+  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8").replace(/\r\n/g, "\n");
   const block = (sel) => css.slice(css.indexOf(sel + " {"), css.indexOf("}", css.indexOf(sel + " {")));
   const tokens = (b) => Object.fromEntries([...b.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
   const lum = (hex) => {
@@ -1382,7 +1382,7 @@ await test("design tokens meet the contrast rules in docs/design.md (light and d
 });
 
 await test("the native-speaker review sheet matches messages.js", () => {
-  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8").replace(/^\ufeff/, "");
+  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8").replace(/\r\n/g, "\n").replace(/^\ufeff/, "");
   const keys = csv.split("\n").slice(1).filter(Boolean).map((l) => JSON.parse(l.slice(0, l.indexOf('",') + 1)));
   assert.deepEqual(keys, Object.keys(MESSAGES), "run: node scripts/export-strings.mjs");
 });
@@ -1411,7 +1411,7 @@ await test("static page inputs and build script are present", () => {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
   }
   assert.ok(fs.existsSync(path.join(root, "scripts/bundle.mjs")));
-  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8").replace(/\r\n/g, "\n");
   assert.match(html, /js\/bundle\.js/);
   // WebView2 injects window.zero as an inline script; without unsafe-inline
   // its CSP drops the bridge and the packaged page silently becomes static.
@@ -1508,8 +1508,8 @@ await test("v4: checkNow / autoCheckIfDue ask only when allowed and remember suc
 });
 
 await test("v4: the native update commands are fixed to this repository", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
-  const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /"studio\.checkUpdate"/);
   assert.match(main, /"studio\.openReleasePage"/);
   assert.match(zig, /releases_api_url = "https:\/\/api\.github\.com\/repos\/hxddh\/goban-studio\/releases\/latest"/);
@@ -1519,17 +1519,17 @@ await test("v4: the native update commands are fixed to this repository", () => 
   assert.match(open, /_ = invocation;/);
   assert.doesNotMatch(open, /payload/);
   // The page itself still cannot reach the network.
-  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8").replace(/\r\n/g, "\n");
   assert.match(html, /connect-src 'self'/);
-  const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
+  const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8").replace(/\r\n/g, "\n");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
   assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
 await test("v4: release notes and package READMEs say how the build was really signed", () => {
-  const v3 = fs.readFileSync(path.join(root, ".github/release-notes/v3.0.0.md"), "utf8");
+  const v3 = fs.readFileSync(path.join(root, ".github/release-notes/v3.0.0.md"), "utf8").replace(/\r\n/g, "\n");
   const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
   const unsigned = Sign.normalizeStatus("windows", {});
   const notarized = Sign.normalizeStatus("macos", { mode: "developer-id", notarized: true });
@@ -1594,17 +1594,17 @@ await test("v4: screenshot checks catch blank and repeated screens", () => {
 });
 
 await test("v4: the screenshot tour visits five screens and starts only with GOBAN_TOUR_OUT", () => {
-  const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8");
+  const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8").replace(/\r\n/g, "\n");
   const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
   const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
   assert.deepEqual(names, ["today", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
-  const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
+  const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /c\?\.tour && import\("\.\.\/tour\.js"\)/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_TOUR_OUT/);
   for (const wf of ["build-macos.yml", "build-windows.yml"]) {
-    const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8");
+    const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8").replace(/\r\n/g, "\n");
     assert.match(y, /scripts\/tour-app\.mjs/, wf);
     assert.match(y, wf.includes("macos") ? /native-screenshots-macos/ : /native-screenshots-windows/, wf);
   }
@@ -1990,8 +1990,8 @@ await test("v5: the interface goes available → downloading → ready → insta
 });
 
 await test("v5: the native install commands are fixed to this repository's release downloads", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8").replace(/\r\n/g, "\n");
   for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
   assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
   // The page's payload carries a tag and nothing else; no URL is ever read from it.
@@ -1999,7 +1999,7 @@ await test("v5: the native install commands are fixed to this repository's relea
   assert.match(payload, /tag: \[\]const u8/);
   assert.doesNotMatch(payload, /url|path/i);
   // Every asset this app can install is one the release publishes.
-  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8").replace(/\r\n/g, "\n");
   for (const asset of ["GobanStudio-macOS-arm64.zip", "GobanStudio-macOS-x64.zip", "GobanStudio-Windows-x64.zip", "SHA256SUMS"]) {
     assert.ok(zig.includes(`"${asset}"`) || asset === "SHA256SUMS", asset);
     assert.ok(release.includes(asset), `release.yml publishes ${asset}`);
@@ -2007,19 +2007,19 @@ await test("v5: the native install commands are fixed to this repository's relea
   // The helpers are embedded in the app, not downloaded.
   assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
   assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
   assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
   for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
 });
 
 await test("v5: both platform builds test the update helpers, and an Intel Mac build is released", () => {
-  const mac = fs.readFileSync(path.join(root, ".github/workflows/build-macos.yml"), "utf8");
-  const win = fs.readFileSync(path.join(root, ".github/workflows/build-windows.yml"), "utf8");
-  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+  const mac = fs.readFileSync(path.join(root, ".github/workflows/build-macos.yml"), "utf8").replace(/\r\n/g, "\n");
+  const win = fs.readFileSync(path.join(root, ".github/workflows/build-windows.yml"), "utf8").replace(/\r\n/g, "\n");
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8").replace(/\r\n/g, "\n");
   for (const y of [mac, win]) assert.match(y, /scripts\/test-updater\.mjs/);
   assert.match(release, /macos-15-intel/);
   assert.match(release, /GobanStudio-macOS-x64\.dmg/);
-  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8").replace(/\r\n/g, "\n");
   assert.match(readme, /GobanStudio-macOS-x64\.dmg/);
   assert.match(readme, /Windows on ARM/);
   const status = { macos: Sign.normalizeStatus("macos", { mode: "adhoc" }), win: Sign.normalizeStatus("windows", {}) };
@@ -2182,7 +2182,7 @@ await test("v5: a human-style move is KataGo's human choice, legal, with beginne
 });
 
 await test("v5: the downloader fetches only pinned KataGo release files, verified before use", () => {
-  const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8");
+  const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8").replace(/\r\n/g, "\n");
   const urls = [...zig.matchAll(/\.url = "([^"]+)"/g)].map((m) => m[1]);
   // No other address is ever built: every http(s) literal outside the specs is a test value.
   assert.equal([...zig.slice(0, zig.indexOf("// ------------------------------------------------------------------ tests")).matchAll(/"https?:\/\//g)].length, 2);
@@ -2199,17 +2199,17 @@ await test("v5: the downloader fetches only pinned KataGo release files, verifie
   // Only the verified file is renamed into place, inside the models folder.
   assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
   assert.match(zig, /renameAbsolute\(part, final/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
   // The page names a kind; the payload has no URL or path field.
   assert.match(main, /const ModelPayload = struct \{\n    kind: \[\]const u8 = "",\n\};/);
   // The human process: the shipped config, KataGo's human recipe, Black's view.
-  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8");
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8").replace(/\r\n/g, "\n");
   for (const line of ["humanSLChosenMoveProp = 1.0", "humanSLChosenMoveIgnorePass = true", "reportAnalysisWinratesAs = BLACK", "ignorePreRootHistory = false", "allowResignation = false", "ponderingEnabled = false"]) {
     assert.ok(cfg.includes(line), line);
   }
   assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
-  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
+  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
 });
 
@@ -2219,12 +2219,12 @@ await test("v5: the calibration harness sends the app's own human-style paramete
   assert.deepEqual(p.raw.map(([k]) => k), p.search.map(([k]) => k));
   assert.deepEqual(Object.fromEntries(p.search).humanSLChosenMovePiklLambda, "0.08");
   // The raw style is the shipped human.cfg's starting point.
-  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8");
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8").replace(/\r\n/g, "\n");
   for (const [k, v] of p.raw) assert.equal(Number(new RegExp(`^${k} = (\\S+)`, "m").exec(cfg)?.[1]), Number(v), k);
 });
 
 await test("v5: the strings are one block in four languages", () => {
-  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
   assert.equal(src.split("// v5 models").length, 2);
   const block = src.slice(src.indexOf("// v5 models"));
   const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("models."));
@@ -2242,13 +2242,13 @@ await test("v5: the strings are one block in four languages", () => {
 });
 
 await test("v5: the packaged self-test checks the downloads only when the workflow asks", () => {
-  const st = fs.readFileSync(path.join(root, "src/web/js/selftest.js"), "utf8");
+  const st = fs.readFileSync(path.join(root, "src/web/js/selftest.js"), "utf8").replace(/\r\n/g, "\n");
   assert.match(st, /if \(cfg\.models\) await modelChecks\(checks, report\)/);
   for (const k of ["modelsResume", "modelsHuman", "modelsStrong", "modelsRemove"]) assert.ok(st.includes(`checks.${k} =`), k);
-  const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8");
+  const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);
   assert.match(app, /fs\.rmSync\(modelsDir/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_SELFTEST_MODELS/);
   assert.match(main, /GOBAN_MODELS_DIR/);
 });
