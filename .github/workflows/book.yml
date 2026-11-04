@@ -31,8 +31,13 @@ env:
   NET_URL: https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz
   NET_SHA256: 09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967
   NET_NAME: g170e-b15c192-s1672170752-d466197061
-  # Visits per position and the size of each tree.
-  BOOK_ARGS: --visits 2000 --max-whole 1500 --max-corner 2100 --threads 4 --search-threads 2
+  # Visits per position, the size of each tree and how freely KataGo's own
+  # choices are expanded. Positions the committed book already holds (same
+  # network and visits) are reused, not searched again.
+  BOOK_ARGS: >-
+    --visits 2000 --max-whole 2200 --max-corner 3200 --share 0.03 --auto-loss 3
+    --seed-depth-whole 3 --seed-depth-corner 4 --threads 4 --search-threads 2
+    --reuse src/web/js/content/book.json
   SHARDS: "16"
 
 jobs:
