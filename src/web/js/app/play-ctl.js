@@ -697,8 +697,11 @@ export function reviewCurrentGame() {
 export async function exportSGF(game = state.game?.game, name = state.game?.name) {
   if (!game) return;
   update({ menu: null });
-  const text = game.toSGF();
-  const filename = (name || "goban-studio") + ".sgf";
+  await saveText((name || "goban-studio") + ".sgf", game.toSGF(), "application/x-go-sgf");
+}
+
+/** Save text through the native save dialog, or as a browser download. */
+export async function saveText(filename, text, mime = "text/plain") {
   if (hasNative() && hasFileDialogs()) {
     const path = await saveFileDialog({ title: t("common.export"), defaultName: filename });
     if (path == null || (Array.isArray(path) && path.length === 0)) return;
@@ -709,7 +712,7 @@ export async function exportSGF(game = state.game?.game, name = state.game?.name
       return;
     }
   }
-  const blob = new Blob([text], { type: "application/x-go-sgf" });
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

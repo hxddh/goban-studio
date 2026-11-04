@@ -550,4 +550,16 @@ export const MESSAGES = {
   "shape.rabbity-six": m("梅花六", "Rabbity six", "매화육궁", "花六"),
   "shape.rectangular-six": m("板六", "Rectangular six", "판육궁", "板六"),
   "shape.second-line-seven": m("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
+
+  // v5 ui
+  "backup.title": m("备份", "Backup", "백업", "バックアップ"),
+  "backup.export": m("导出备份…", "Export backup…", "백업 내보내기…", "バックアップを書き出す…"),
+  "backup.import": m("从备份恢复…", "Restore from backup…", "백업에서 복원…", "バックアップから復元…"),
+  "backup.help": m("把设置、进度、棋力记录、错题和全部棋谱存成一个文件；换电脑时用它恢复。", "Saves your settings, progress, level, mistake drills and every game in one file. Use it to move to another computer.", "설정, 진도, 기력 기록, 오답 연습과 모든 기보를 파일 하나로 저장합니다. 다른 컴퓨터로 옮길 때 쓰세요.", "設定・進み具合・棋力の記録・間違えた問題・すべての棋譜を1つのファイルに保存します。別のコンピュータへ移るときに使います。"),
+  "backup.confirmTitle": m("用这份备份替换现有数据？", "Replace your data with this backup?", "이 백업으로 현재 데이터를 바꿀까요?", "このバックアップで今のデータを置き換えますか？"),
+  "backup.confirmBody": m("备份里有 {0} 盘棋谱、{1} 节完成的课、{2} 道解出的题。现在的数据会被全部替换。", "The backup holds {0} games, {1} finished lessons and {2} solved problems. Everything you have now will be replaced.", "백업에는 기보 {0}개, 마친 강의 {1}개, 푼 문제 {2}개가 있습니다. 지금의 데이터는 모두 바뀝니다.", "バックアップには棋譜 {0} 局、終えた講座 {1}、解いた問題 {2} があります。今のデータはすべて置き換わります。"),
+  "backup.restore": m("恢复", "Restore", "복원", "復元"),
+  "backup.error.notBackup": m("这不是 Goban Studio 的备份文件。", "That isn't a Goban Studio backup.", "Goban Studio 백업 파일이 아닙니다.", "Goban Studio のバックアップではありません。"),
+  "backup.error.newerFormat": m("这份备份来自更新的版本，请先更新 Goban Studio。", "This backup is from a newer version. Update Goban Studio first.", "더 새 버전에서 만든 백업입니다. 먼저 Goban Studio를 업데이트하세요.", "新しいバージョンのバックアップです。先に Goban Studio を更新してください。"),
+  "backup.error.damaged": m("备份文件已损坏，无法恢复。", "The backup file is damaged and can't be restored.", "백업 파일이 손상되어 복원할 수 없습니다.", "バックアップが壊れているため復元できません。"),
 };

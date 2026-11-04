@@ -329,3 +329,45 @@ export function touchStreak(progress, now = Date.now()) {
 export function clearAll() {
   for (const k of [...Object.values(KEYS), ...Object.values(V1_KEYS)]) removeKey(k);
 }
+
+/* ---------------------------------------------------------------- backup */
+
+export const BACKUP_FORMAT = 1;
+
+/**
+ * Everything the player owns, as one JSON document: settings, progress
+ * (rating, lessons, problems, mistakes, trends), the game in progress and the
+ * library. Nothing else is stored anywhere, so this is a complete backup.
+ */
+export function exportBackup(appVersion = "", now = new Date()) {
+  const data = {};
+  for (const [name, key] of Object.entries(KEYS)) data[name] = readJSON(key, null);
+  return { app: "goban-studio", format: BACKUP_FORMAT, version: appVersion, exportedAt: now.toISOString(), data };
+}
+
+/**
+ * Validate a backup document. Returns { ok, error?, summary? } without
+ * writing anything; `restoreBackup` writes it.
+ */
+export function checkBackup(doc) {
+  if (!doc || typeof doc !== "object" || doc.app !== "goban-studio") return { ok: false, error: "notBackup" };
+  if (!Number.isInteger(doc.format) || doc.format > BACKUP_FORMAT) return { ok: false, error: "newerFormat" };
+  const d = doc.data;
+  if (!d || typeof d !== "object") return { ok: false, error: "notBackup" };
+  for (const name of Object.keys(KEYS)) if (d[name] != null && typeof d[name] !== "object") return { ok: false, error: "damaged" };
+  const games = Array.isArray(d.library?.games) ? d.library.games.length : 0;
+  const lessons = d.progress?.lessons ? Object.values(d.progress.lessons).filter((x) => x?.done).length : 0;
+  const problems = d.progress?.problems ? Object.values(d.progress.problems).filter((x) => x?.solved).length : 0;
+  return { ok: true, summary: { games, lessons, problems, exportedAt: doc.exportedAt || null, version: doc.version || "" } };
+}
+
+/** Replace all stored data with the backup (call checkBackup first). */
+export function restoreBackup(doc) {
+  const c = checkBackup(doc);
+  if (!c.ok) return c;
+  for (const [name, key] of Object.entries(KEYS)) {
+    if (doc.data[name] == null) removeKey(key);
+    else writeJSON(key, doc.data[name]);
+  }
+  return c;
+}

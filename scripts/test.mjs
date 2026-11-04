@@ -1076,6 +1076,25 @@ await test("the native-speaker review sheet matches messages.js", () => {
   assert.deepEqual(keys, Object.keys(MESSAGES), "run: node scripts/export-strings.mjs");
 });
 
+await test("v5: a backup carries every stored key and restores it", async () => {
+  const P = await import("../src/web/js/persist.js");
+  for (const k of Object.values(P.KEYS)) P.removeKey(k);
+  P.writeJSON(P.KEYS.settings, { lang: "ko", boardSize: 13 });
+  P.writeJSON(P.KEYS.progress, { lessons: { a: { done: true } }, problems: { p1: { solved: true }, p2: {} } });
+  P.writeJSON(P.KEYS.library, { v: 2, games: [{ id: "g1" }, { id: "g2" }] });
+  const doc = JSON.parse(JSON.stringify(P.exportBackup("5.0.0", new Date("2026-11-04T00:00:00Z"))));
+  assert.equal(doc.app, "goban-studio");
+  assert.deepEqual(P.checkBackup(doc).summary, { games: 2, lessons: 1, problems: 1, exportedAt: "2026-11-04T00:00:00.000Z", version: "5.0.0" });
+  for (const k of Object.values(P.KEYS)) P.removeKey(k);
+  assert.equal(P.restoreBackup(doc).ok, true);
+  assert.equal(P.readJSON(P.KEYS.settings, {}).boardSize, 13);
+  assert.equal(P.readJSON(P.KEYS.library, {}).games.length, 2);
+  assert.equal(P.readJSON(P.KEYS.current, null), null);
+  assert.equal(P.checkBackup({ app: "other" }).error, "notBackup");
+  assert.equal(P.checkBackup({ ...doc, format: 99 }).error, "newerFormat");
+  assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
+});
+
 await test("static page inputs and build script are present", () => {
   for (const file of ["index.html", "styles.css", "js/main.jsx", "js/app/app.jsx"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);

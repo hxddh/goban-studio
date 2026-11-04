@@ -11,6 +11,8 @@ import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
 import { DEFAULT_SETTINGS, clearAll, loadProgress, loadSettings, markClassic, migrate, saveProgress, saveSettings } from "../persist.js";
 import { detectLang, setLang, t } from "../i18n.js";
+import * as Backup from "../persist.js";
+import { APP_VERSION } from "../version.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
 import { OPENINGS } from "../content/openings.js";
@@ -222,6 +224,57 @@ export async function pickImport() {
     return;
   }
   document.getElementById("file-input")?.click();
+}
+
+/* ----------------------------------------------------------------- backup */
+
+export async function exportBackup() {
+  const { saveText } = await import("./play-ctl.js");
+  const doc = Backup.exportBackup(APP_VERSION);
+  const day = new Date().toISOString().slice(0, 10);
+  await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json");
+}
+
+/** Pick a backup file, show what it holds, and replace everything on confirm. */
+export async function importBackup() {
+  let text = null;
+  if (hasNative() && hasFileDialogs()) {
+    const files = await openFileDialog({ title: t("backup.import"), allowMultiple: false });
+    const path = normalizePaths(files)[0];
+    if (!path) return;
+    text = await readTextFile(path);
+  } else {
+    text = await new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (!f) return resolve(null);
+        f.text().then(resolve, () => resolve(null));
+      };
+      input.click();
+    });
+  }
+  if (text == null) return;
+  let doc = null;
+  try {
+    doc = JSON.parse(text);
+  } catch (_) {
+    doc = null;
+  }
+  const c = Backup.checkBackup(doc);
+  if (!c.ok) return toast(t("backup.error." + c.error), "warn");
+  confirmAction({
+    title: t("backup.confirmTitle"),
+    body: t("backup.confirmBody", [c.summary.games, c.summary.lessons, c.summary.problems]),
+    confirm: t("backup.restore"),
+    danger: true,
+    onConfirm: () => {
+      Backup.restoreBackup(doc);
+      location.reload();
+    },
+  });
 }
 
 export function clearData() {

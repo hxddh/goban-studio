@@ -309,6 +309,18 @@ function SettingsSheet() {
         <p class="fine">{t("settings.rankHelp")}</p>
       </section>
       <section class="settings-group">
+        <h3>{t("backup.title")}</h3>
+        <p class="fine">{t("backup.help")}</p>
+        <div class="actions">
+          <Button icon="download" onClick={C.exportBackup}>
+            {t("backup.export")}
+          </Button>
+          <Button kind="ghost" icon="upload" onClick={C.importBackup}>
+            {t("backup.import")}
+          </Button>
+        </div>
+      </section>
+      <section class="settings-group">
         <h3>{t("settings.about")}</h3>
         <p class="about">
           <strong>Goban Studio {APP_VERSION}</strong>
