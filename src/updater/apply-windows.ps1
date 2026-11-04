@@ -75,16 +75,34 @@ function Stop-InstallProcesses([string]$Dir) {
   }
 }
 
+# WebView2's own processes (msedgewebview2.exe) outlive the app for a few
+# seconds; their profile folder (bin\goban-studio.exe.WebView2) and the
+# working directory they inherited are inside the install folder, so they
+# keep it locked. Find them by their command line.
+function Get-WebViewProcesses([string]$Dir) {
+  try {
+    return @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction Stop | Where-Object {
+      $_.CommandLine -and $_.CommandLine.IndexOf($Dir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+  } catch { return @() }
+}
+
 function Wait-InstallProcesses([string]$Dir, [int]$Seconds) {
   $prefix = $Dir + "\"
   for ($i = 0; $i -lt $Seconds * 2; $i++) {
     $left = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
       try { $_.Path -and $_.Path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) } catch { $false }
     })
-    if ($left.Count -eq 0) { return }
+    $views = Get-WebViewProcesses $Dir
+    if ($left.Count -eq 0 -and $views.Count -eq 0) { return }
     Start-Sleep -Milliseconds 500
   }
   Stop-InstallProcesses $Dir
+  foreach ($v in (Get-WebViewProcesses $Dir)) {
+    Log "stopping WebView2 process $($v.ProcessId)"
+    try { Stop-Process -Id $v.ProcessId -Force -ErrorAction Stop } catch { }
+  }
+  Start-Sleep -Milliseconds 500
 }
 
 function Start-App([string]$Dir, [string]$Argument) {
@@ -108,7 +126,7 @@ function Move-Profiles([string]$From, [string]$To) {
       if (-not (Retry { Remove-Item -LiteralPath $dest -Recurse -Force } "remove $dest")) { return $false }
     }
     $src = $profile.FullName
-    if (-not (Retry { Move-Item -LiteralPath $src -Destination $dest } "move profile $($profile.Name)")) { return $false }
+    if (-not (Retry { [System.IO.Directory]::Move($src, $dest) } "move profile $($profile.Name)")) { return $false }
     Log "moved profile $($profile.Name)"
   }
   return $true
@@ -155,15 +173,15 @@ try {
 }
 
 # 3. Swap, retrying while files are locked.
-if (-not (Retry { Move-Item -LiteralPath $InstallDir -Destination $old } "move the install folder aside")) {
+if (-not (Retry { [System.IO.Directory]::Move($InstallDir, $old) } "move the install folder aside")) {
   Log "the install folder stayed locked; nothing changed"
   try { Remove-Item -LiteralPath $new -Recurse -Force -ErrorAction SilentlyContinue } catch { }
   Relaunch-Old
   exit 2
 }
-if (-not (Retry { Move-Item -LiteralPath $new -Destination $InstallDir } "move the new folder into place")) {
+if (-not (Retry { [System.IO.Directory]::Move($new, $InstallDir) } "move the new folder into place")) {
   Log "could not move the new folder into place; restoring"
-  if (Retry { Move-Item -LiteralPath $old -Destination $InstallDir } "restore the install folder") {
+  if (Retry { [System.IO.Directory]::Move($old, $InstallDir) } "restore the install folder") {
     try { Remove-Item -LiteralPath $new -Recurse -Force -ErrorAction SilentlyContinue } catch { }
     Relaunch-Old
     exit 1
@@ -176,11 +194,12 @@ Log "swapped; backup at $old"
 function Rollback([string]$Why) {
   Log "rolling back: $Why"
   Stop-InstallProcesses $InstallDir
-  Start-Sleep -Seconds 1
+  # Its WebView2 processes too: they hold the folder after the app is gone.
+  Wait-InstallProcesses $InstallDir 10
   # The player's profile goes back with the old version.
   $null = Move-Profiles $InstallDir $old
-  if ((Retry { Move-Item -LiteralPath $InstallDir -Destination $failed } "move the new version aside") -and
-      (Retry { Move-Item -LiteralPath $old -Destination $InstallDir } "restore the previous version")) {
+  if ((Retry { [System.IO.Directory]::Move($InstallDir, $failed) } "move the new version aside") -and
+      (Retry { [System.IO.Directory]::Move($old, $InstallDir) } "restore the previous version")) {
     try { Remove-Item -LiteralPath $failed -Recurse -Force -ErrorAction SilentlyContinue } catch { }
     try { Remove-Item -LiteralPath $AckFile -Force -ErrorAction SilentlyContinue } catch { }
     Log "previous version restored"

@@ -358,7 +358,7 @@ if (!liveTag) {
       fs.chmodSync(roParent, 0o555);
       fs.chmodSync(path.join(ro, "Contents"), 0o555);
     } else {
-      execFileSync("icacls", [roParent, "/deny", `${process.env.USERDOMAIN}\\${process.env.USERNAME}:(OI)(CI)(W)`], { stdio: "ignore" });
+      execFileSync("icacls", [roParent, "/deny", `${process.env.USERDOMAIN}\\${process.env.USERNAME}:(OI)(CI)(WD,AD)`], { stdio: "ignore" });
     }
     try {
       const report = await probe(ro);
