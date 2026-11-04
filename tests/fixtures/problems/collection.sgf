@@ -1,0 +1,8 @@
+(;GM[1]FF[4]SZ[19]GN[Straight three]C[Black to kill.]AB[ga][ma][gb][mb][gc][hc][ic][jc][kc][lc][mc]AW[ha][la][hb][ib][jb][kb][lb]PL[B](;B[ja];W[ia]C[RIGHT])(;B[ia]C[Wrong]))
+(;GM[1]FF[4]SZ[19]GN[Bent three]C[Black to live.]AB[ha][ja][ka][hb][kb][hc][ic][jc][kc]AW[ga][la][gb][lb][gc][lc][gd][hd][id][jd][kd][ld]PL[B];B[ib]C[Correct])
+(;GM[1]FF[4]SZ[19]GN[Bulky five]C[Black to live.]AB[qp][rp][sp][qq][qr][qs][rs]AW[po][qo][ro][so][pp][pq][pr][ps]PL[B];B[rq]C[Correct!])
+(;GM[1]FF[4]SZ[19]AB[pa][pb][pc][qc][qd][rd][sd]AW[qa][qb][rb][rc][sc]PL[B])
+(;GM[1]FF[4]SZ[19]GN[Corner four]C[Black to kill.]AB[qp][rp][sp][oq][pq][qq][or][os]AW[rq][sq][pr][qr][rr][ps]PL[B])
+(;GM[1]FF[4]SZ[19]GN[Corner four, ko]C[Black to play: ko.]AB[qp][rp][sp][oq][pq][qq][or][os]AW[rq][sq][pr][qr][rr][ps]PL[B])
+(;GM[1]FF[4]SZ[19]GN[Open centre]C[Black to kill.]AB[jj][kk][ik]AW[jk][kl]PL[B])
+(;GM[1]FF[4]SZ[19]GN[One colour]AB[aa][bb][cc]PL[B])

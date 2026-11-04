@@ -723,15 +723,17 @@ function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   );
 }
 
-function RenameSheet({ id, name }) {
+function RenameSheet({ id, name, title, onSave }) {
   const [value, setValue] = useState(name || "");
   const save = () => {
-    C.renameRecord(id, value.trim());
+    // v7: a collection (or anything else) can bring its own save.
+    if (onSave) onSave(value.trim());
+    else C.renameRecord(id, value.trim());
     update({ sheet: null });
   };
   return (
     <Modal
-      title={t("library.rename")}
+      title={title || t("library.rename")}
       footer={
         <>
           <Button kind="ghost" onClick={C.closeSheet}>
@@ -750,7 +752,7 @@ function RenameSheet({ id, name }) {
         value={value}
         onFocus={(e) => e.currentTarget.select()}
         maxLength={120}
-        aria-label={t("library.rename")}
+        aria-label={title || t("library.rename")}
         onInput={(e) => setValue(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && save()}
       />

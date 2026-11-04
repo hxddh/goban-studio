@@ -17,6 +17,8 @@ export const KEYS = {
   progress: "goban-studio.progress.v2",
   current: "goban-studio.current.v2",
   library: "goban-studio.library.v2",
+  // v7: your own problem collections (problem-import.js, app/collections-store.js)
+  collections: "goban-studio.collections.v1",
 };
 
 export const V1_KEYS = {

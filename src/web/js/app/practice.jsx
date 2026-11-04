@@ -11,6 +11,7 @@ import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { DailyDots } from "./today.jsx";
+import { CollectionPage, YourCollections } from "./collections.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
@@ -22,6 +23,7 @@ export function PracticeView() {
   if (v === "topic") return <TopicPage />;
   if (v === "mistake") return <MistakeView />;
   if (v === "dailyDone") return <DailyDone />;
+  if (v === "collection") return <CollectionPage />;
   return <PracticeHome />;
 }
 
@@ -131,6 +133,8 @@ function PracticeHome() {
             </div>
           </section>
         )}
+
+        <YourCollections />
       </div>
     </>
   );
@@ -499,11 +503,14 @@ function ProblemView() {
   const P = pr.problem;
   const def = P.def;
   const daily = pr.daily;
-  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
+  // v7: a problem from your own collection is browsed in that collection.
+  const own = def.collection ? C.getCollection(def.collection) : null;
+  const list = own ? own.problems : state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
   const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
-  if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
+  if (!daily && own) crumbs.push({ label: own.name, onClick: () => C.openCollection(own.id) });
+  else if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
     <Toolbar crumbs={crumbs} title={daily ? t("practice.daily") : C.tx(def.title)} sub={daily ? t("practice.dailyOf", [daily.index + 1, daily.items.length]) : t("practice.ofN", [n, list.length])} />

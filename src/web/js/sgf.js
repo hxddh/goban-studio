@@ -355,6 +355,12 @@ export function loadSGF(text) {
   return { game, warnings };
 }
 
+/** v7: the raw game trees of an SGF text (problem import, problem-import.js). */
+export function parseSgfTrees(text) {
+  nodeSeq = 1;
+  return parseTree(String(text || ""));
+}
+
 /** A fresh game with handicap stones on the standard points. */
 export function handicapSetup(size, count) {
   const game = new Game({ size, handicap: count });
