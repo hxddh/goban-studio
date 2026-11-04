@@ -133,6 +133,13 @@ pub const Engine = struct {
         // `write_lock`; retract it before the process goes away.
         self.setStdin(null);
         if (self.child) |*child| {
+            // std's kill sends SIGTERM and then waits; a KataGo that does not
+            // exit on SIGTERM (it may still be blocked reading our stdin)
+            // would block the caller forever. SIGKILL cannot be caught, so
+            // the wait that follows only reaps. Windows terminates outright.
+            if (comptime @import("builtin").os.tag != .windows) {
+                if (child.id) |pid| std.posix.kill(pid, std.posix.SIG.KILL) catch {};
+            }
             child.kill(io);
             self.child = null;
         }
@@ -1239,4 +1246,20 @@ test "engine script vocabulary is narrow" {
     try std.testing.expect(!Engine.validateLine("kata-genmove_analyze B"));
     try std.testing.expect(!Engine.validateLine("quit"));
     try std.testing.expect(!Engine.validateLine("loadsgf /etc/passwd"));
+}
+
+test "stopping a process that ignores SIGTERM does not hang" {
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const io = std.testing.io;
+    var engine: Engine = .{};
+    // A stand-in for a KataGo that catches SIGTERM and keeps reading stdin.
+    const argv = [_][]const u8{ "/bin/sh", "-c", "trap '' TERM; while :; do sleep 1; done" };
+    engine.child = try std.process.spawn(io, .{ .argv = &argv, .stdin = .pipe, .stdout = .pipe, .stderr = .ignore });
+    engine.stdin = engine.child.?.stdin;
+    engine.stdout = engine.child.?.stdout;
+    const started = std.Io.Timestamp.now(io, .awake);
+    engine.deinit(io);
+    const elapsed = started.durationTo(std.Io.Timestamp.now(io, .awake)).toMilliseconds();
+    try std.testing.expect(engine.child == null);
+    try std.testing.expect(elapsed < 5000);
 }
