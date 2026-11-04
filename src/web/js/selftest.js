@@ -18,11 +18,26 @@
  *                         stepping back is a single `undo`
  *   cancel                a long search stops < 1 s after studio.katagoCancel
  *                         and the engine answers normally afterwards
+ *
+ * v5, when the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
+ * GOBAN_MODELS_DIR pointing at an empty temporary folder):
+ *
+ *   modelsResume          a download of the human model stops when asked,
+ *                         keeps its partial file, resumes from it after a
+ *                         restart of the download and is verified (pinned
+ *                         SHA-256) before it is used
+ *   modelsHuman           the human-style opponent (-human-model, human.cfg)
+ *                         plays a legal 19×19 move
+ *   modelsStrong          the stronger network downloads, verifies and
+ *                         analyses a 19×19 position on its own process
+ *   modelsRemove          both files are removed, and a request for a
+ *                         removed network fails (the page then falls back)
  */
 import { Game } from "./rules.js";
 import * as Engine from "./engine.js";
 import * as KataGo from "./katago.js";
 import { APP_VERSION } from "./version.js";
+import * as Models from "./models.js";
 import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, writeTextFile } from "./host.js";
 
 const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
@@ -69,6 +84,66 @@ function playAll(game, moves) {
 }
 
 const validAnalysis = (a, size) => !!(a && Number.isFinite(a.winrate) && a.ownership?.length === size * size && a.moves.length > 0);
+
+const MODELS_REQUIRED = ["modelsResume", "modelsHuman", "modelsStrong", "modelsRemove"];
+
+/** Poll the host until `done(one)` holds for `kind` (or the time is up). */
+async function waitModel(kind, done, ms) {
+  const end = now() + ms;
+  let st = await Models.fetchStatus();
+  while (!done(st[kind]) && now() < end) {
+    await sleep(250);
+    st = await Models.fetchStatus();
+  }
+  return st[kind];
+}
+
+/** v5: the optional downloads, end to end against the pinned URLs. */
+async function modelChecks(checks, report) {
+  const out = (report.models = {});
+  for (const kind of Models.KINDS) await Models.remove(kind);
+  const start = await Models.fetchStatus();
+  out.start = { available: start.available, human: start.human.status, strong: start.strong.status };
+
+  // Human model: stop part-way, resume, verify, play.
+  let t = now();
+  await Models.download("human");
+  const partway = await waitModel("human", (o) => o.bytes > 0 || !Models.isBusy(o), 60000);
+  await Models.cancel("human");
+  const paused = (await Models.fetchStatus()).human;
+  const resumed = await Models.download("human");
+  const human = await waitModel("human", (o) => !Models.isBusy(o), 240000);
+  out.human = { pausedAt: paused.bytes, pausedStatus: paused.status, resumedOk: resumed.ok, status: human.status, error: human.error, ms: Math.round(now() - t) };
+  checks.modelsResume = !!(partway.bytes > 0 && (paused.status === "partial" || paused.status === "ready") && resumed.ok && human.status === "ready" && human.bytes === Models.MODELS.human.bytes);
+
+  Engine.setModels({ human: human.status === "ready", humanStyle: true });
+  const gH = playAll(new Game({ size: 19, komi: 6.5 }), [[15, 3], [3, 15], [16, 15]]);
+  t = now();
+  const decided = await Engine.decide(gH, "10k");
+  out.humanMove = { mode: decided.mode, engine: decided.analysis?.engine ?? null, move: decided.move && !decided.move.pass ? `${decided.move.x},${decided.move.y}` : "", ms: Math.round(now() - t) };
+  checks.modelsHuman = !!(decided.mode === "human" && decided.analysis?.engine === "human" && decided.move && !decided.move.pass && gH.canPlay(decided.move.x, decided.move.y).ok);
+
+  // Stronger network: download, verify, analyse on its own process.
+  t = now();
+  const started = await Models.download("strong");
+  const strong = await waitModel("strong", (o) => !Models.isBusy(o), 240000);
+  out.strong = { startedOk: started.ok, status: strong.status, error: strong.error, ms: Math.round(now() - t) };
+  const g19 = playAll(new Game({ size: 19, komi: 6.5 }), [[3, 3], [15, 15]]);
+  t = now();
+  const a = await KataGo.analyze(g19, { visits: 16, engine: "strong" });
+  out.strongAnalysis = { engine: a?.engine ?? null, visits: a?.visits ?? null, ms: Math.round(now() - t) };
+  checks.modelsStrong = !!(started.ok && strong.status === "ready" && validAnalysis(a, 19) && a.engine === "strong");
+
+  // Remove both; a removed network is refused and the page falls back.
+  const removedHuman = await Models.remove("human");
+  const removedStrong = await Models.remove("strong");
+  const after = await Models.fetchStatus();
+  const refused = await KataGo.analyze(g19, { visits: 16, engine: "strong" });
+  Engine.setModels({ human: false, strong: false });
+  const fallback = await KataGo.analyze(g19, { visits: 16 });
+  out.removed = { human: after.human.status, strong: after.strong.status, refused: refused === null };
+  checks.modelsRemove = !!(removedHuman.ok && removedStrong.ok && after.human.status === "absent" && after.strong.status === "absent" && refused === null && validAnalysis(fallback, 19));
+}
 
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
@@ -189,10 +264,14 @@ export async function runSelfTest({ state } = {}) {
       checks.menus = false;
     }
     checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < MAX_CANCEL_MS && validAnalysis(after, 9));
+
+    if (cfg.models) await modelChecks(checks, report);
   } catch (error) {
     report.error = String(error?.message || error);
   }
-  report.ok = Object.values(checks).every(Boolean) && REQUIRED.every((k) => checks[k] === true);
+  const required = cfg.models ? [...REQUIRED, ...MODELS_REQUIRED] : REQUIRED;
+  report.modelsChecked = !!cfg.models;
+  report.ok = Object.values(checks).every(Boolean) && required.every((k) => checks[k] === true);
   await writeTextFile(cfg.path, JSON.stringify(report, null, 2) + "\n");
   return report;
 }

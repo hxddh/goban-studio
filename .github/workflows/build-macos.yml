@@ -166,7 +166,10 @@ jobs:
             -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1
       - name: self-test the packaged app
-        timeout-minutes: 4
+        # v5: includes the optional downloads end to end (pinned KataGo
+        # release assets, 99 MB + 48 MB, into a temporary folder; see
+        # scripts/selftest-app.mjs). GOBAN_SELFTEST_MODELS=0 skips them.
+        timeout-minutes: 10
         run: |
           exe="$(find dist/GobanStudio.app/Contents/MacOS -type f -perm -u+x | head -n1)"
           test -n "$exe"

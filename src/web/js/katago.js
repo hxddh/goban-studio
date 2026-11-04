@@ -19,7 +19,13 @@
  *                     script; blocks the host's UI thread while searching.
  *
  * All numbers are reported from Black's point of view
- * (reportAnalysisWinratesAs = BLACK in gtp.cfg).
+ * (reportAnalysisWinratesAs = BLACK in gtp.cfg and human.cfg).
+ *
+ * v5: a request may name the KataGo process that serves it (`engine`):
+ * "standard" (the shipped network, default), "strong" (the optional larger
+ * network) or "human" (the optional human SL model, with a `profile` such
+ * as "rank_12k" and a `humanStyle` "raw" | "search"). The host answers
+ * `ModelMissing` when that network is not installed; callers fall back.
  *
  * The browser preview has no child processes, so status() reports
  * unavailable and engine.js uses its offline fallbacks.
@@ -39,7 +45,7 @@ export async function status() {
     try {
       const value = await nativeInvoke("studio.katagoStatus");
       if (!value || typeof value !== "object") return OFFLINE;
-      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream };
+      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
     } catch (_) {
       return OFFLINE;
     }
@@ -214,10 +220,17 @@ function listen() {
   } catch (_) {}
 }
 
-function analyzeAsync(game, node, visits, onInfo, signal) {
+/** The v5 fields of a request (nothing for the standard engine, as in v4). */
+export function enginePayload({ engine = "standard", profile = "", humanStyle = "raw" } = {}) {
+  if (engine === "strong") return { engine };
+  if (engine === "human") return { engine, profile, humanStyle: humanStyle === "search" ? "search" : "raw" };
+  return {};
+}
+
+function analyzeAsync(game, node, visits, onInfo, signal, select) {
   const id = `k${++nextId}`;
   const stream = typeof onInfo === "function";
-  const payload = { id, ...positionPayload(game, node, visits), stream };
+  const payload = { id, ...positionPayload(game, node, visits), stream, ...enginePayload(select) };
   if (stream) listen();
   return new Promise((resolve) => {
     const entry = { size: game.size, onInfo: stream ? onInfo : null, finish: null };
@@ -242,6 +255,7 @@ function analyzeAsync(game, node, visits, onInfo, signal) {
         if (!reply || typeof reply !== "object" || reply.ok !== true) return finish(null);
         const result = toAnalysis(reply.info, reply.play, game.size);
         if (result && reply.sync && typeof reply.sync === "object") result.sync = reply.sync;
+        if (result) result.engine = typeof reply.engine === "string" ? reply.engine : "standard";
         finish(result);
       },
       (error) => {
@@ -273,16 +287,21 @@ async function analyzeSync(game, node, visits) {
  *   onInfo(partial)  called with partial results (same shape) while the
  *                    search runs, about five times a second (async hosts)
  *   signal           AbortSignal: abort cancels the search; resolves null
+ *   engine           v5: "standard" | "strong" | "human" (see above)
+ *   profile, humanStyle   v5, human engine only
  *
- * Resolves { moves, ownership, winrate, scoreLead, play, visits } or null
- * when KataGo is not available, the request fails, or it was cancelled or
+ * Resolves { moves, ownership, winrate, scoreLead, play, visits, engine }
+ * or null when KataGo is not available, the request fails (including an
+ * optional network that is not installed), or it was cancelled or
  * superseded by a newer request.
  */
-export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null } = {}) {
+export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null, engine = "standard", profile = "", humanStyle = "raw" } = {}) {
   if (!hasNative() || signal?.aborted) return null;
   const st = await status();
   if (!st?.available || signal?.aborted) return null;
-  if (st.async) return analyzeAsync(game, node, visits, onInfo, signal);
+  // Optional networks need a v5 host (async, with `models`).
+  if (engine !== "standard" && !(st.async && st.models)) return null;
+  if (st.async) return analyzeAsync(game, node, visits, onInfo, signal, { engine, profile, humanStyle });
   const result = await analyzeSync(game, node, visits);
   return signal?.aborted ? null : result;
 }

@@ -22,12 +22,14 @@ import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, re
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates } from "./update-ctl.js";
+import { initModels } from "./models-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
 export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
+export * from "./models-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -58,6 +60,9 @@ export function boot() {
     maybeComputerMove();
     ponder();
   });
+  // v5: which optional networks are installed (a local status call, no
+  // network request).
+  initModels().catch(() => {});
   // v4: the opt-in weekly update check (no request unless it is on and due).
   if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
 }
