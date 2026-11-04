@@ -57,7 +57,7 @@ export function ExplorerView() {
     moveNumbers: null,
     showCoords: state.settings.coords,
     material: state.settings.board,
-    view: null,
+    view: X.explorerView(e),
     hoverColor: node.turn,
     interactive: true,
   };
@@ -66,6 +66,14 @@ export function ExplorerView() {
     <>
       <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
         <div class="tool-group">
+          {mode === "corner" && (
+            <IconButton
+              icon={e.zoom === false ? "focus" : "grid"}
+              class="explorer-zoom"
+              label={t(e.zoom === false ? "explorer.zoomCorner" : "explorer.zoomWhole")}
+              onClick={X.toggleExplorerZoom}
+            />
+          )}
           <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={X.closeExplorer} />
         </div>
       </Toolbar>
@@ -176,6 +184,7 @@ function ExplorerPanel({ cands }) {
       <details class="explorer-about">
         <summary>{t("explorer.about")}</summary>
         <p class="fine">{t("explorer.aboutBook", [meta.visits, meta.network])}</p>
+        <p class="fine explorer-build">{t("explorer.aboutBuild", [X.theBook().trees[mode]?.nodes.length || 0, meta.network, meta.visits, meta.katago || "–", meta.made || "–"])}</p>
         <p class="fine">{t("explorer.aboutTags", ["1.5", "4"])}</p>
         {mode === "corner" && <p class="fine">{t("explorer.aboutCorner")}</p>}
       </details>

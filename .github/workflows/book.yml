@@ -1,0 +1,177 @@
+# v7: build the opening and joseki book (src/web/js/content/book.json) with
+# KataGo on GitHub's runners, and commit it back to the branch.
+#
+# Runs on a push to a book/** branch only (never on main or v7), when the
+# generator or this workflow changes. The work is split in three steps:
+# two seed jobs search the top of each tree, a matrix of shard jobs grows
+# the subtrees below them in parallel, and the merge job joins everything
+# into one book (see scripts/make-book.mjs).
+name: book
+
+on:
+  push:
+    branches: ["book/**"]
+    paths:
+      - ".github/workflows/book.yml"
+      - "scripts/make-book.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # KataGo's official Linux release, Eigen (CPU) with AVX2.
+  KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
+  KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
+  KATAGO_VERSION: "1.18.1"
+  # The strong network pinned in src/models.zig.
+  NET_URL: https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz
+  NET_SHA256: 09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967
+  NET_NAME: g170e-b15c192-s1672170752-d466197061
+  # Visits per position and the size of each tree.
+  BOOK_ARGS: --visits 2000 --max-whole 1500 --max-corner 2100 --threads 4 --search-threads 2
+  SHARDS: "16"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: true
+      matrix:
+        tree: [whole, corner]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: KataGo and the network
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kg"
+          cd "$RUNNER_TEMP/kg"
+          for i in 1 2 3; do curl -fsSL -o katago.zip "$KATAGO_URL" && break || sleep 10; done
+          echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -
+          for i in 1 2 3; do curl -fsSL -o net.txt.gz "$NET_URL" && break || sleep 10; done
+          echo "$NET_SHA256  net.txt.gz" | sha256sum -c -
+          unzip -q katago.zip
+          chmod +x katago
+          # The release is a self-extracting image; without FUSE it unpacks itself.
+          APPIMAGE_EXTRACT_AND_RUN=1 ./katago version
+      - name: Seed ${{ matrix.tree }}
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: >
+          node scripts/make-book.mjs --phase seed --tree ${{ matrix.tree }}
+          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
+          --network-name "$NET_NAME" $BOOK_ARGS --parts book-parts --deadline-min 150
+      - uses: actions/upload-artifact@v7
+        with:
+          name: seed-${{ matrix.tree }}
+          path: book-parts/seed-${{ matrix.tree }}.json
+          retention-days: 7
+
+  shard:
+    needs: seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: KataGo and the network
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kg"
+          cd "$RUNNER_TEMP/kg"
+          for i in 1 2 3; do curl -fsSL -o katago.zip "$KATAGO_URL" && break || sleep 10; done
+          echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -
+          for i in 1 2 3; do curl -fsSL -o net.txt.gz "$NET_URL" && break || sleep 10; done
+          echo "$NET_SHA256  net.txt.gz" | sha256sum -c -
+          unzip -q katago.zip
+          chmod +x katago
+          # The release is a self-extracting image; without FUSE it unpacks itself.
+          APPIMAGE_EXTRACT_AND_RUN=1 ./katago version
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: seed-*
+          path: seeds
+          merge-multiple: true
+      - name: Shard ${{ matrix.shard }}
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        # Stops starting new searches after 300 minutes, inside the job limit.
+        run: >
+          node scripts/make-book.mjs --phase shard --shard ${{ matrix.shard }} --shards $SHARDS
+          --seed-dir seeds --parts book-parts
+          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
+          --network-name "$NET_NAME" $BOOK_ARGS --deadline-min 300
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shard-${{ matrix.shard }}
+          path: book-parts/shard-${{ matrix.shard }}.json
+          retention-days: 7
+
+  merge:
+    needs: [seed, shard]
+    # A failed shard leaves its subtrees out; the rest of the book still merges.
+    if: ${{ !cancelled() && needs.seed.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: seed-*
+          path: seeds
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: shard-*
+          path: book-parts
+          merge-multiple: true
+      - name: Merge
+        run: >
+          node scripts/make-book.mjs --phase merge --seed-dir seeds --parts book-parts
+          --network-name "$NET_NAME" $BOOK_ARGS
+          --katago-version "$KATAGO_VERSION"
+      - name: Check the book loads
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import { loadBook } from "./src/web/js/book.js";
+            const raw = JSON.parse(fs.readFileSync("src/web/js/content/book.json", "utf8"));
+            const b = loadBook(raw);
+            for (const [id, t] of Object.entries(b.trees)) console.log(id, t.nodes.length, "positions");
+            console.log(raw.network, raw.visits, "visits");
+          '
+          gzip -9 -c src/web/js/content/book.json | wc -c
+      - name: Commit the book
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/web/js/content/book.json
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "v7 book: regenerate with $NET_NAME" -m "Built by the book workflow, run ${{ github.run_id }}." \
+            -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+          Claude-Session: https://claude.ai/code/session_01Ua4GqDCH9DneaLhvctDyaf"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

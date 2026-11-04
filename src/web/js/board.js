@@ -293,6 +293,22 @@ export class BoardView {
     // cells the band (coordinates or a quiet edge) no longer grows with them.
     const wantCells = wantCellsFor(this.model);
     const band = bandFor(this.model);
+    if (this.model.view && this.model.showCoords) {
+      // v7: a zoomed window with coordinates. The labels on an open side
+      // sit past the lines that run off the window, so each side gets its
+      // own margin (in cells) and nothing is clipped.
+      const size = this.model.size;
+      const open = { l: win.x0 > 0, r: win.x1 < size - 1, t: win.y0 > 0, b: win.y1 < size - 1 };
+      // Numbers are drawn on the left and letters below the grid.
+      const mL = open.l ? 1.75 : wantCells;
+      const mR = open.r ? 0.75 : wantCells;
+      const mT = open.t ? 0.75 : wantCells;
+      const mB = open.b ? 1.75 : wantCells;
+      const cell = Math.max(0.001, Math.min(w / (Math.max(1, cols) + mL + mR), h / (Math.max(1, rows) + mT + mB)));
+      const ox = (w - (cols + mL + mR) * cell) / 2 + mL * cell - win.x0 * cell;
+      const oy = (h - (rows + mT + mB) * cell) / 2 + mT * cell - win.y0 * cell;
+      return { w, h, cell, ox, oy, win, marginCells: Math.min(mL, mR, mT, mB) };
+    }
     const cell = Math.max(0.001, Math.min(fit(w, Math.max(1, cols)), fit(h, Math.max(1, rows))));
     const marginCells = Math.min(wantCells, 0.5 + band / cell);
     const gridW = cell * cols;
