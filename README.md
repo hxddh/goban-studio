@@ -98,9 +98,16 @@ The packaged app ships KataGo 1.18.1 (Eigen CPU build) with the b6c96
 network and uses it on every board size, through one bridge command
 (`studio.katagoAnalyze`) that returns KataGo's search report: candidates
 with visits, win rate, score lead, principal variations and ownership. The
-opponent's strength comes from the visit budget and from choosing among
-those candidates within a per-rank loss window; ranks are approximate and
-labelled “≈”. In the browser preview there is no KataGo: 9×9 falls back to
+opponent's strength comes from the visit budget, from choosing among
+those candidates within a per-level loss window and, below ≈6 kyu, from a
+share of deliberate beginner's moves. The eight levels are calibrated
+(v4): `scripts/calibrate-strength.mjs` plays them against each other and
+against KataGo's human-imitation model on 19×19 and 9×9 and fits
+Bradley–Terry ratings, mapped to kyu/dan with the EGF rating formula and a
+10-kyu anchor. They run from ≈21 kyu to ≈1 dan, about three ranks apart;
+labels stay “≈” because the anchor is a model, not people. Method, raw
+results and limitations: [docs/strength.md](docs/strength.md). In the
+browser preview there is no KataGo: 9×9 falls back to
 Moka v2.1 and other sizes to a small heuristic engine, and the interface
 says so wherever it matters.
 
@@ -195,6 +202,7 @@ src/web/js/materials.js       board textures and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
+scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)
 scripts/make-assets.mjs       regenerates every texture, stone, sound and icon
 scripts/patch-sdk.mjs         keeps the system Edit/Window menus beside app menus
 src/web/js/rules.js           game tree, legality, Japanese scoring, SGF export
