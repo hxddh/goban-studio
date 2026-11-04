@@ -169,7 +169,18 @@ export async function cancel(kind, deps = {}) {
 }
 
 /** Delete a model (and any partial download). */
+/**
+ * Remove a downloaded network. The host never waits on a running search:
+ * it answers Busy and stops that KataGo process when the search ends, so
+ * this retries for a while (about 15 s) before giving up.
+ */
 export async function remove(kind, deps = {}) {
   checkKind(kind);
-  return actionResult(await call("studio.modelRemove", { kind }, deps));
+  const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  let result = actionResult(await call("studio.modelRemove", { kind }, deps));
+  for (let i = 0; i < 60 && !result.ok && result.error === "Busy"; i++) {
+    await sleep(250);
+    result = actionResult(await call("studio.modelRemove", { kind }, deps));
+  }
+  return result;
 }

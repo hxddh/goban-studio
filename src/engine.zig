@@ -723,6 +723,9 @@ pub const Worker = struct {
     results: [16]Result = undefined,
     results_len: usize = 0,
     stream: ?StreamInfo = null,
+    /// Slots whose process must stop once the running request ends
+    /// (`stopSlot` found the engine busy).
+    stop_after: [slot_count]bool = [_]bool{false} ** slot_count,
 
     // --- set on the UI thread before the worker starts
     wake_context: ?*anyopaque = null,
@@ -860,15 +863,24 @@ pub const Worker = struct {
         self.engine_lock.unlock(self.io);
     }
 
-    /// Stop one slot's process (its network is being removed). The caller
-    /// cancels async work first, so this waits only for KataGo to stop.
+    /// Stop one slot's process (its network is being removed). Returns
+    /// false when the worker is busy: the slot then stops as soon as the
+    /// running request ends, and the caller should try again shortly.
     /// The next request for the slot starts it again if its file exists.
-    /// UI thread.
-    pub fn stopSlot(self: *Worker, slot: Slot) void {
-        self.engine_lock.lockUncancelable(self.io);
-        defer self.engine_lock.unlock(self.io);
-        self.engines[@intFromEnum(slot)].deinit(self.io);
-        self.states[@intFromEnum(slot)].invalidate();
+    /// UI thread; never blocks.
+    pub fn stopSlot(self: *Worker, slot: Slot) bool {
+        // Never wait on the worker from the UI thread: a search or a
+        // network still loading can hold the engine for a long time.
+        if (self.engine_lock.tryLock()) {
+            defer self.engine_lock.unlock(self.io);
+            self.engines[@intFromEnum(slot)].deinit(self.io);
+            self.states[@intFromEnum(slot)].invalidate();
+            return true;
+        }
+        self.lock.lockUncancelable(self.io);
+        self.stop_after[@intFromEnum(slot)] = true;
+        self.lock.unlock(self.io);
+        return false;
     }
 
     /// App exit. Stops the worker without waiting for it; KataGo is told to
@@ -916,10 +928,24 @@ pub const Worker = struct {
             var result = Result{ .seq = self.current.seq };
             self.engine_lock.lockUncancelable(self.io);
             self.process(&self.current, &result);
+            self.stopRequested();
             self.engine_lock.unlock(self.io);
 
             self.publish(result);
             self.notify();
+        }
+    }
+
+    /// `engine_lock` held: stop the slots `stopSlot` could not stop at once.
+    fn stopRequested(self: *Worker) void {
+        self.lock.lockUncancelable(self.io);
+        const stops = self.stop_after;
+        self.stop_after = [_]bool{false} ** slot_count;
+        self.lock.unlock(self.io);
+        for (stops, 0..) |stop, i| {
+            if (!stop) continue;
+            self.engines[i].deinit(self.io);
+            self.states[i].invalidate();
         }
     }
 

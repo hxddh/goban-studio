@@ -30,7 +30,8 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "goban-selftest-"));
 const reportPath = path.join(temp, "report.json");
 const withModels = process.env.GOBAN_SELFTEST_MODELS !== "0";
 const modelsDir = path.join(temp, "models");
-const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || (withModels ? 600000 : 180000));
+// Below the workflow step's 10-minute limit, so a stall is reported here.
+const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || (withModels ? 480000 : 180000));
 const child = spawn(path.resolve(exe), [], {
   cwd: path.dirname(path.resolve(exe)),
   env: {
@@ -73,6 +74,8 @@ fs.rmSync(modelsDir, { recursive: true, force: true });
 
 if (!report) {
   console.error("selftest: no report from the packaged app");
+  const progress = reportPath + ".progress";
+  if (fs.existsSync(progress)) console.error("selftest: last progress mark:\n" + fs.readFileSync(progress, "utf8"));
   process.exit(1);
 }
 

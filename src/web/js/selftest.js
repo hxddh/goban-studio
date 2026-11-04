@@ -119,12 +119,15 @@ async function waitModel(kind, done, ms) {
 }
 
 /** v5: the optional downloads, end to end against the pinned URLs. */
-async function modelChecks(checks, report) {
+async function modelChecks(checks, report, cfg = {}) {
   const out = (report.models = {});
+  // Breadcrumbs: if the app stalls, the runner prints how far it got.
+  const mark = (step) => (cfg.path ? writeTextFile(cfg.path + ".progress", JSON.stringify({ step, at: Math.round(now()), models: out }, null, 2)) : null);
   for (const kind of Models.KINDS) await Models.remove(kind);
   const start = await Models.fetchStatus();
   out.start = { available: start.available, human: start.human.status, strong: start.strong.status };
 
+  await mark("human download");
   // Human model: stop part-way, resume, verify, play.
   let t = now();
   await Models.download("human");
@@ -136,6 +139,7 @@ async function modelChecks(checks, report) {
   out.human = { pausedAt: paused.bytes, pausedStatus: paused.status, resumedOk: resumed.ok, status: human.status, error: human.error, ms: Math.round(now() - t) };
   checks.modelsResume = !!(partway.bytes > 0 && (paused.status === "partial" || paused.status === "ready") && resumed.ok && human.status === "ready" && human.bytes === Models.MODELS.human.bytes);
 
+  await mark("human move");
   Engine.setModels({ human: human.status === "ready", humanStyle: true });
   const gH = playAll(new Game({ size: 19, komi: 6.5 }), [[15, 3], [3, 15], [16, 15]]);
   t = now();
@@ -143,21 +147,26 @@ async function modelChecks(checks, report) {
   out.humanMove = { mode: decided.mode, engine: decided.analysis?.engine ?? null, move: decided.move && !decided.move.pass ? `${decided.move.x},${decided.move.y}` : "", ms: Math.round(now() - t) };
   checks.modelsHuman = !!(decided.mode === "human" && decided.analysis?.engine === "human" && decided.move && !decided.move.pass && gH.canPlay(decided.move.x, decided.move.y).ok);
 
+  await mark("strong download");
   // Stronger network: download, verify, analyse on its own process.
   t = now();
   const started = await Models.download("strong");
   const strong = await waitModel("strong", (o) => !Models.isBusy(o), 240000);
   out.strong = { startedOk: started.ok, status: strong.status, error: strong.error, ms: Math.round(now() - t) };
+  await mark("strong analysis");
   const g19 = playAll(new Game({ size: 19, komi: 6.5 }), [[3, 3], [15, 15]]);
   t = now();
   const a = await KataGo.analyze(g19, { visits: 16, engine: "strong" });
   out.strongAnalysis = { engine: a?.engine ?? null, visits: a?.visits ?? null, ms: Math.round(now() - t) };
   checks.modelsStrong = !!(started.ok && strong.status === "ready" && validAnalysis(a, 19) && a.engine === "strong");
 
+  await mark("remove human");
   // Remove both; a removed network is refused and the page falls back.
   const removedHuman = await Models.remove("human");
+  await mark("remove strong");
   const removedStrong = await Models.remove("strong");
   const after = await Models.fetchStatus();
+  await mark("refused and fallback");
   const refused = await KataGo.analyze(g19, { visits: 16, engine: "strong" });
   Engine.setModels({ human: false, strong: false });
   const fallback = await KataGo.analyze(g19, { visits: 16 });
@@ -286,7 +295,7 @@ export async function runSelfTest({ state } = {}) {
     }
     checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < MAX_CANCEL_MS && validAnalysis(after, 9));
 
-    if (cfg.models) await modelChecks(checks, report);
+    if (cfg.models) await modelChecks(checks, report, cfg);
   } catch (error) {
     report.error = String(error?.message || error);
   }

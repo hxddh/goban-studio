@@ -1406,6 +1406,21 @@ await test("v5: a backup carries every stored key and restores it", async () => 
   assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
 });
 
+await test("v5: removing a network retries while the engine is busy, without blocking", async () => {
+  let calls = 0;
+  const invoke = async (cmd) => {
+    calls++;
+    return calls < 3 ? { ok: false, error: "Busy", models: {} } : { ok: true, models: {} };
+  };
+  const r = await M.remove("human", { invoke, hasHost: true, sleep: async () => {} });
+  assert.equal(r.ok, true);
+  assert.equal(calls, 3);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
+  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
+  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
+});
+
 await test("static page inputs and build script are present", () => {
   for (const file of ["index.html", "styles.css", "js/main.jsx", "js/app/app.jsx"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
@@ -2243,7 +2258,7 @@ await test("v5: the strings are one block in four languages", () => {
 
 await test("v5: the packaged self-test checks the downloads only when the workflow asks", () => {
   const st = fs.readFileSync(path.join(root, "src/web/js/selftest.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(st, /if \(cfg\.models\) await modelChecks\(checks, report\)/);
+  assert.match(st, /if \(cfg\.models\) await modelChecks\(checks, report, cfg\)/);
   for (const k of ["modelsResume", "modelsHuman", "modelsStrong", "modelsRemove"]) assert.ok(st.includes(`checks.${k} =`), k);
   const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);

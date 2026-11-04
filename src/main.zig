@@ -1362,7 +1362,9 @@ fn modelRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, ou
     const self: *App = @ptrCast(@alignCast(context));
     const kind = try modelKind(self, invocation.request.payload);
     _ = cancelJobs(self, null);
-    self.katago.stopSlot(modelSlot(kind));
+    // The worker may be mid-search: never block the UI thread on it. The
+    // page retries on Busy; the slot stops as soon as the search ends.
+    if (!self.katago.stopSlot(modelSlot(kind))) return modelReply(self, output, false, "Busy");
     self.models.remove(kind) catch |err| return modelReply(self, output, false, @errorName(err));
     return modelReply(self, output, true, "");
 }
