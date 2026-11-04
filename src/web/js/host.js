@@ -253,6 +253,87 @@ export async function openReleasePage() {
   }
 }
 
+/* ---------------------------------------------------- v5 update install */
+
+/** How the bridge reports a command an older host does not have. */
+function missingCommand(e) {
+  return /unknown|not found|unsupported|no handler/i.test(String(e?.message || e));
+}
+
+/**
+ * Where an update download / install stands (`studio.updateStatus`):
+ *
+ *   { ok: true, phase, tag, asset, platform, received, total, error,
+ *     canInstall, blocked, justUpdated, installFailed }
+ *
+ * phase: "idle" | "downloading" | "verifying" | "unpacking" | "ready" |
+ *        "installing" | "failed" | "cancelled"
+ * blocked (canInstall false): "Unsupported" | "NotPackaged" |
+ *        "Translocated" | "ReadOnlyLocation" | "NoTempDir", or "NotChecked"
+ *        until a call with { probe: true } — which tests, once a session,
+ *        whether the app's folder is writable — has looked.
+ * justUpdated: this launch is the new version, started by the updater.
+ * installFailed: this launch is the old version, restored after a failed install.
+ *
+ * `{ ok: false, error: "unavailable" }` without a host or on an older host.
+ */
+export async function updateStatus({ probe = false } = {}) {
+  if (!hasNative()) return { ok: false, error: "unavailable" };
+  try {
+    const reply = await invoke("studio.updateStatus", { probe: !!probe });
+    return reply && typeof reply === "object" ? reply : { ok: false, error: "BadResponse" };
+  } catch (e) {
+    return { ok: false, error: missingCommand(e) ? "unavailable" : "Unavailable" };
+  }
+}
+
+/**
+ * Download, verify and unpack release `tag` for this platform
+ * (`studio.updateDownload`). The host builds the address itself
+ * (github.com/hxddh/goban-studio/releases/download/<tag>/…); the page only
+ * names the tag. Resolves when done — this can take minutes; poll
+ * `updateStatus()` for progress meanwhile:
+ *
+ *   { ok: true, phase: "ready", tag, asset }
+ *   { ok: false, error }   see update.js INSTALL_ERRORS
+ */
+export async function updateDownload(tag) {
+  if (!hasNative()) return { ok: false, error: "unavailable" };
+  try {
+    const reply = await invoke("studio.updateDownload", { tag: String(tag || "") });
+    return reply && typeof reply === "object" ? reply : { ok: false, error: "BadResponse" };
+  } catch (e) {
+    return { ok: false, error: missingCommand(e) ? "unavailable" : "Network" };
+  }
+}
+
+/** Stop a download, or discard a downloaded update. Resolves `{ ok, phase }`. */
+export async function updateCancel() {
+  if (!hasNative()) return { ok: false, error: "unavailable" };
+  try {
+    const reply = await invoke("studio.updateCancel", {});
+    return reply && typeof reply === "object" ? reply : { ok: false, error: "BadResponse" };
+  } catch (e) {
+    return { ok: false, error: missingCommand(e) ? "unavailable" : "Unavailable" };
+  }
+}
+
+/**
+ * Install the downloaded update (`studio.updateApply`): the host starts its
+ * helper, answers `{ ok: true, phase: "installing" }` and quits; the helper
+ * restarts the app. `{ ok: false, error }` otherwise (NotReady,
+ * ReadOnlyLocation, Translocated, NotPackaged, Helper, QuitFailed, …).
+ */
+export async function updateApply() {
+  if (!hasNative()) return { ok: false, error: "unavailable" };
+  try {
+    const reply = await invoke("studio.updateApply", {});
+    return reply && typeof reply === "object" ? reply : { ok: false, error: "BadResponse" };
+  } catch (e) {
+    return { ok: false, error: missingCommand(e) ? "unavailable" : "Unavailable" };
+  }
+}
+
 export async function setupChrome() {
   const chrome = await windowChrome();
   const top = Math.max(0, Number(chrome.top) || 0);

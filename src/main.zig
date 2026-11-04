@@ -4,6 +4,7 @@ const runner = @import("runner");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
 const update_mod = @import("update.zig");
+const install_mod = @import("install.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -27,6 +28,10 @@ const max_jobs = 8;
 /// deadline) while one is open; same role as the KataGo timer.
 const update_timer_id: u64 = 0x7570_6461_7465;
 const update_timer_interval_ns: u64 = 250 * std.time.ns_per_ms;
+/// Timer that collects a finished update download (and runs its stall
+/// watchdog) while `studio.updateDownload` is open.
+const install_timer_id: u64 = 0x696e_7374_616c;
+const install_timer_interval_ns: u64 = 500 * std.time.ns_per_ms;
 
 /// An async analysis the page is waiting for. UI thread only.
 const Job = struct {
@@ -109,9 +114,23 @@ const App = struct {
     update_responder: native_sdk.bridge.AsyncResponder = undefined,
     update_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
     update_bridge_id_len: usize = 0,
-    handlers: [12]native_sdk.BridgeHandler = undefined,
-    async_handlers: [2]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [14]native_sdk.BridgeCommandPolicy = undefined,
+    /// Update install (v5; see install.zig). One open `studio.updateDownload`
+    /// call at a time; progress is read with `studio.updateStatus`.
+    installer: *install_mod.Installer = undefined,
+    install_wake_installed: bool = false,
+    install_active: bool = false,
+    install_gen: u64 = 0,
+    install_timer_running: bool = false,
+    install_responder: native_sdk.bridge.AsyncResponder = undefined,
+    install_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
+    install_bridge_id_len: usize = 0,
+    /// Whether this installation can be replaced in place, decided once.
+    install_target: install_mod.Target = .{},
+    install_target_known: bool = false,
+    staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    handlers: [14]native_sdk.BridgeHandler = undefined,
+    async_handlers: [4]native_sdk.bridge.AsyncHandler = undefined,
+    policies: [18]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -137,6 +156,8 @@ const App = struct {
         _ = it.next(); // executable
         while (it.next()) |arg| {
             if (std.ascii.endsWithIgnoreCase(arg, ".sgf")) self.queueOpenPath(arg);
+            // Launched by the update helper (install.zig).
+            self.installer.note.noteArg(arg);
         }
     }
 
@@ -261,6 +282,26 @@ const App = struct {
             .name = "studio.checkUpdate",
             .context = self,
             .invoke_fn = checkUpdate,
+        };
+        self.handlers[12] = .{
+            .name = "studio.updateStatus",
+            .context = self,
+            .invoke_fn = updateStatus,
+        };
+        self.handlers[13] = .{
+            .name = "studio.updateCancel",
+            .context = self,
+            .invoke_fn = updateCancel,
+        };
+        self.async_handlers[2] = .{
+            .name = "studio.updateDownload",
+            .context = self,
+            .invoke_fn = updateDownload,
+        };
+        self.async_handlers[3] = .{
+            .name = "studio.updateApply",
+            .context = self,
+            .invoke_fn = updateApply,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -391,10 +432,12 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
         .effects_wake => {
             drainKatago(self);
             drainUpdate(self);
+            drainInstall(self);
         },
         .timer => |timer| {
             if (timer.id == katago_timer_id) drainKatago(self);
             if (timer.id == update_timer_id) drainUpdate(self);
+            if (timer.id == install_timer_id) drainInstall(self);
         },
         else => {},
     }
@@ -983,6 +1026,207 @@ fn spawnBrowser(io: std.Io, url: []const u8) bool {
     return true;
 }
 
+// ------------------------------------------------------------ update install
+//
+// v5: after a check found a newer release, the player may download and
+// install it (install.zig). The download runs on its own thread; the page
+// polls `studio.updateStatus` for progress and is answered on
+// `studio.updateDownload` when the thread is done (platform wake, or the
+// fallback timer, which also runs the stall watchdog).
+
+fn stagingRoot(self: *App) ?[]const u8 {
+    return install_mod.stagingRoot(self.env_map, &self.staging_root_buf);
+}
+
+/// Can this installation be replaced in place? Probed once a session (it
+/// writes and removes a test file next to the app), again before a download.
+fn installTarget(self: *App, refresh: bool) *const install_mod.Target {
+    if (!self.install_target_known or refresh) {
+        var token_bytes: [6]u8 = undefined;
+        self.io.random(&token_bytes);
+        const token = std.fmt.bytesToHex(token_bytes, .lower);
+        self.install_target = install_mod.detectTarget(self.io, &token);
+        if (self.install_target.blocked == .none and stagingRoot(self) == null) self.install_target.blocked = .NoTempDir;
+        self.install_target_known = true;
+    }
+    return &self.install_target;
+}
+
+fn installWakeUp(self: *App) void {
+    if (self.install_wake_installed) return;
+    const runtime = self.runtime orelse return;
+    const services = runtime.options.platform.services;
+    self.installer.setWake(services.context, services.wake_fn);
+    self.install_wake_installed = true;
+}
+
+fn stopInstallTimer(self: *App) void {
+    if (!self.install_timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.cancelTimer(install_timer_id) catch {};
+    self.install_timer_running = false;
+}
+
+const StatusPayload = struct {
+    probe: bool = false,
+};
+
+/// `studio.updateStatus` {probe?}: where an update download / install
+/// stands. Replies `{ok:true, phase, tag, asset, platform, received, total,
+/// error, canInstall, blocked, justUpdated, installFailed}`; phase is one of
+/// idle, downloading, verifying, unpacking, ready, installing, failed,
+/// cancelled. `blocked` (when canInstall is false): Unsupported,
+/// NotPackaged, Translocated, ReadOnlyLocation, NoTempDir, or NotChecked
+/// until a call with `probe:true` (which writes and removes one test file
+/// next to the app, once a session) has looked.
+fn updateStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    install_mod.writeAck(self.io, &self.installer.note);
+    const snap = self.installer.snapshot();
+    var probe = false;
+    if (std.json.parseFromSlice(StatusPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true })) |parsed| {
+        probe = parsed.value.probe;
+        parsed.deinit();
+    } else |_| {}
+    const blocked: install_mod.Blocked = if (probe or self.install_target_known) installTarget(self, false).blocked else .NotChecked;
+    return install_mod.statusReply(output, &snap, self.installer.platform, blocked, &self.installer.note);
+}
+
+/// `studio.updateCancel` {}: stop a download (its files are removed), or
+/// discard a downloaded update that was not installed. Replies `{ok, phase}`.
+fn updateCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    const phase = self.installer.cancel();
+    // The open download call is answered with Cancelled.
+    if (self.install_active) {
+        self.install_active = false;
+        self.install_responder.success(self.install_bridge_id[0..self.install_bridge_id_len], "{\"ok\":false,\"error\":\"Cancelled\"}") catch {};
+        stopInstallTimer(self);
+    }
+    return std.fmt.bufPrint(output, "{{\"ok\":true,\"phase\":\"{s}\"}}", .{@tagName(phase)}) catch error.HandlerFailed;
+}
+
+const DownloadPayload = struct {
+    tag: []const u8 = "",
+};
+
+/// `studio.updateDownload` {tag}: download this platform's package of
+/// release `tag` and SHA256SUMS from the fixed GitHub release-download
+/// address, verify and unpack it. Answered when done: `{ok:true,
+/// phase:"ready", tag, asset}` or `{ok:false, error}` with error one of
+/// Busy, BadTag, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
+/// NoTempDir, Network, BadRedirect, HttpStatus, NoAsset, TooLarge,
+/// NoChecksum, ChecksumMismatch, Unpack, BadPackage, Disk, Stalled,
+/// Cancelled, OutOfMemory, Unavailable.
+fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    const rid = invocation.request.id;
+    var reply_buf: [256]u8 = undefined;
+    if (self.install_active) {
+        responder.success(rid, "{\"ok\":false,\"error\":\"Busy\"}") catch {};
+        return;
+    }
+    const parsed = std.json.parseFromSlice(DownloadPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch {
+        responder.success(rid, "{\"ok\":false,\"error\":\"BadTag\"}") catch {};
+        return;
+    };
+    defer parsed.deinit();
+    const target = installTarget(self, true);
+    if (target.blocked != .none) {
+        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        return;
+    }
+    const root = stagingRoot(self) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
+        return;
+    };
+    installWakeUp(self);
+    const gen = self.installer.start(root, parsed.value.tag, nowMs(self)) catch |err| {
+        responder.success(rid, install_mod.errorReply(&reply_buf, install_mod.errorName(err))) catch {};
+        return;
+    };
+    const rid_len = @min(rid.len, self.install_bridge_id.len);
+    @memcpy(self.install_bridge_id[0..rid_len], rid[0..rid_len]);
+    self.install_bridge_id_len = rid_len;
+    self.install_responder = responder;
+    self.install_gen = gen;
+    self.install_active = true;
+    if (!self.install_timer_running) {
+        if (self.runtime) |runtime| {
+            if (runtime.options.platform.services.startTimer(install_timer_id, install_timer_interval_ns, true)) |_| {
+                self.install_timer_running = true;
+            } else |_| {}
+        }
+    }
+}
+
+/// Answer the open download once its thread is done; abandon it if no
+/// byte arrived for `install_mod.stall_timeout_ms`. UI thread.
+fn drainInstall(self: *App) void {
+    if (!self.install_active) {
+        stopInstallTimer(self);
+        return;
+    }
+    _ = self.installer.checkStall(nowMs(self));
+    const snap = self.installer.snapshot();
+    const done = snap.gen != self.install_gen or switch (snap.phase) {
+        .ready, .failed, .cancelled, .idle => true,
+        else => false,
+    };
+    if (!done) return;
+    var buf: [256]u8 = undefined;
+    const reply = if (snap.gen != self.install_gen)
+        install_mod.errorReply(&buf, if (snap.error_name.len > 0) snap.error_name else "Cancelled")
+    else
+        install_mod.downloadReply(&buf, &snap, self.installer.platform);
+    self.install_active = false;
+    self.install_responder.success(self.install_bridge_id[0..self.install_bridge_id_len], reply) catch {};
+    stopInstallTimer(self);
+}
+
+/// `studio.updateApply` {}: install the downloaded update. Starts the
+/// embedded helper (src/updater/), answers `{ok:true, phase:"installing"}`
+/// and quits the app; the helper swaps the installation, starts the new
+/// version and rolls back if it does not come up. `{ok:false, error}`:
+/// NotReady, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
+/// NoTempDir, Helper, QuitFailed.
+fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    const rid = invocation.request.id;
+    var reply_buf: [256]u8 = undefined;
+    var staged_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const staged = self.installer.stagedPath(&staged_buf) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NotReady\"}") catch {};
+        return;
+    };
+    const target = installTarget(self, true);
+    if (target.blocked != .none) {
+        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        return;
+    }
+    const root = stagingRoot(self) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
+        return;
+    };
+    const runtime = self.runtime orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"QuitFailed\"}") catch {};
+        return;
+    };
+    self.installer.markInstalling();
+    if (install_mod.startHelper(self.io, self.env_map, root, target.root(), staged)) |err_name| {
+        self.installer.markApplyFailed(err_name);
+        responder.success(rid, install_mod.errorReply(&reply_buf, err_name)) catch {};
+        return;
+    }
+    responder.success(rid, "{\"ok\":true,\"phase\":\"installing\"}") catch {};
+    // The helper waits for this process to exit (KataGo stops on the way).
+    runtime.quitApp() catch {
+        // It keeps waiting; quitting by hand still finishes the update.
+        self.installer.markApplyFailed("QuitFailed");
+    };
+}
+
 // ------------------------------------------------------------ native menus
 
 const MenuItemSpec = struct {
@@ -1109,6 +1353,8 @@ fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
 fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
+    // The page is up: tell a waiting update helper (if it launched us).
+    install_mod.writeAck(self.io, &self.installer.note);
     const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
     const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
@@ -1121,6 +1367,20 @@ fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     if (tour.len > 0) {
         if (!jsonAppend(output, &n, ",\"tour\":")) return error.HandlerFailed;
         if (!jsonAppendString(output, &n, tour)) return error.HandlerFailed;
+    }
+    // v5: GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
+    // (selftest.js; scripts/test-updater.mjs), GOBAN_UPDATE_PROBE_TAG for a
+    // real download of that release. The download address is still built
+    // and checked by install.zig; the tag is only a tag.
+    const probe = self.env_map.get("GOBAN_UPDATE_PROBE_OUT") orelse "";
+    if (probe.len > 0) {
+        if (!jsonAppend(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, probe)) return error.HandlerFailed;
+        const probe_tag = self.env_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
+        if (install_mod.validTag(probe_tag)) {
+            if (!jsonAppend(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
+            if (!jsonAppendString(output, &n, probe_tag)) return error.HandlerFailed;
+        }
     }
     if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
@@ -1153,6 +1413,10 @@ pub fn main(init: std.process.Init) !void {
     const updater = try std.heap.page_allocator.create(update_mod.Checker);
     updater.init(init.io);
     app_state.updater = updater;
+    // Not freed at exit either: a download thread may still be finishing.
+    const installer = try std.heap.page_allocator.create(install_mod.Installer);
+    installer.init(init.io);
+    app_state.installer = installer;
     app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);
@@ -1173,6 +1437,7 @@ pub fn main(init: std.process.Init) !void {
 test {
     std.testing.refAllDecls(engine_mod);
     std.testing.refAllDecls(update_mod);
+    std.testing.refAllDecls(install_mod);
 }
 
 test "production source uses frontend assets" {

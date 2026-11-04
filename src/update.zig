@@ -203,7 +203,7 @@ fn errorReply(out: []u8, name: []const u8) []const u8 {
     return "{\"ok\":false}";
 }
 
-fn validTag(tag: []const u8) bool {
+pub fn validTag(tag: []const u8) bool {
     if (tag.len == 0 or tag.len > 64) return false;
     for (tag) |c| {
         if (!(std.ascii.isAlphanumeric(c) or c == '.' or c == '-' or c == '+' or c == '_')) return false;

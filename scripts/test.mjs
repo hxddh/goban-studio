@@ -1280,8 +1280,191 @@ await test("v4: the screenshot tour visits five screens and starts only with GOB
   }
 });
 
+/* ------------------------------------------------------------ v5 updater */
+
+await test("v5: without a native host the install API says unavailable and asks nothing", async () => {
+  assert.equal(globalThis.zero, undefined);
+  for (const call of [Host.updateStatus, () => Host.updateDownload("v9.0.0"), Host.updateCancel, Host.updateApply]) {
+    assert.deepEqual(await call(), { ok: false, error: "unavailable" });
+  }
+  const info = await U.installInfo();
+  assert.equal(info.can, false);
+  assert.equal(info.blocked, "Unsupported");
+  assert.deepEqual(await U.downloadNow("v9.0.0", { pollMs: 1 }), { ok: false, error: "Unsupported" });
+  assert.deepEqual(await U.applyNow(), { ok: false, error: "Unsupported" });
+});
+
+await test("v5: install status, download replies and error explanations", () => {
+  const s = U.interpretInstallStatus({ ok: true, phase: "downloading", tag: "v5.1.0", received: 50, total: 200, error: "", canInstall: true, blocked: "", justUpdated: false, installFailed: false });
+  assert.equal(s.phase, "downloading");
+  assert.equal(s.progress, 0.25);
+  assert.equal(s.canInstall, true);
+  assert.equal(U.interpretInstallStatus({ ok: true, phase: "downloading", received: 5, total: 0 }).progress, null, "unknown size");
+  assert.equal(U.interpretInstallStatus({ ok: true, phase: "nonsense" }).phase, "idle");
+  const ro = U.interpretInstallStatus({ ok: true, phase: "idle", canInstall: true, blocked: "ReadOnlyLocation" });
+  assert.equal(ro.canInstall, false, "a block always wins");
+  assert.equal(ro.blocked, "ReadOnlyLocation");
+  assert.equal(U.interpretInstallStatus(null).phase, "unavailable");
+  assert.equal(U.interpretInstallStatus({ ok: true, justUpdated: true }).justUpdated, true);
+
+  assert.deepEqual(U.interpretDownloadReply({ ok: true, phase: "ready", tag: "v5.1.0", asset: "GobanStudio-macOS-arm64.zip" }), { ok: true, tag: "v5.1.0" });
+  assert.deepEqual(U.interpretDownloadReply({ ok: false, error: "ChecksumMismatch" }), { ok: false, error: "ChecksumMismatch" });
+  assert.deepEqual(U.interpretDownloadReply({ ok: false, error: "unavailable" }), { ok: false, error: "Unsupported" });
+  assert.deepEqual(U.interpretDownloadReply("x"), { ok: false, error: "BadResponse" });
+
+  assert.equal(U.installStatusOf("downloading"), "downloading");
+  assert.equal(U.installStatusOf("verifying"), "downloading");
+  assert.equal(U.installStatusOf("unpacking"), "downloading");
+  assert.equal(U.installStatusOf("ready"), "ready");
+  assert.equal(U.installStatusOf("installing"), "installing");
+  assert.equal(U.installStatusOf("failed"), null);
+  assert.deepEqual(["downloading", "verifying", "unpacking"].map(U.installStepOf), ["download", "verify", "unpack"]);
+
+  // Every error the host can answer is explained in all four languages.
+  for (const code of U.INSTALL_ERRORS) {
+    const key = U.installMessageKey(code);
+    assert.ok(MESSAGES[key], `${code} → ${key}`);
+  }
+  for (const code of U.INSTALL_BLOCKED) assert.equal(U.installFallsBack(code), true, code);
+  for (const code of ["ChecksumMismatch", "NoAsset", "BadPackage"]) assert.equal(U.installFallsBack(code), true, code);
+  for (const code of ["Network", "Stalled", "Cancelled", "Disk"]) assert.equal(U.installFallsBack(code), false, `${code} can be retried`);
+  assert.equal(U.installMessageKey("ReadOnlyLocation"), "update.readOnly");
+  assert.equal(U.installMessageKey("Translocated"), "update.translocated");
+  assert.equal(U.formatBytes(512 * 1024), "512 KB");
+  assert.equal(U.formatBytes(98.04 * 1024 * 1024), "98.0 MB");
+});
+
+await test("v5: a download reports progress until the host answers", async () => {
+  const seen = [];
+  let polls = 0;
+  let finish;
+  const download = (tag) => {
+    assert.equal(tag, "v5.1.0");
+    return new Promise((resolve) => (finish = resolve));
+  };
+  const status = async () => {
+    polls++;
+    const phase = polls < 3 ? "downloading" : polls < 4 ? "verifying" : "unpacking";
+    if (polls === 5) finish({ ok: true, phase: "ready", tag: "v5.1.0", asset: "x" });
+    return { ok: true, phase, tag: "v5.1.0", received: polls * 10, total: 100, canInstall: true };
+  };
+  const sleep = () => new Promise((r) => setImmediate(r));
+  const result = await U.downloadNow("v5.1.0", { download, status, sleep, onProgress: (s) => seen.push([s.phase, s.received]) });
+  assert.deepEqual(result, { ok: true, tag: "v5.1.0" });
+  assert.deepEqual(seen.slice(0, 4), [
+    ["downloading", 10],
+    ["downloading", 20],
+    ["verifying", 30],
+    ["unpacking", 40],
+  ]);
+  const failed = await U.downloadNow("v5.1.0", { download: async () => ({ ok: false, error: "Stalled" }), status, sleep });
+  assert.deepEqual(failed, { ok: false, error: "Stalled" });
+  const threw = await U.downloadNow("v5.1.0", {
+    download: async () => {
+      throw new Error("bridge");
+    },
+    status,
+    sleep,
+  });
+  assert.deepEqual(threw, { ok: false, error: "Network" });
+  assert.deepEqual(await U.applyNow({ apply: async () => ({ ok: true, phase: "installing" }) }), { ok: true });
+  assert.deepEqual(await U.applyNow({ apply: async () => ({ ok: false, error: "ReadOnlyLocation" }) }), { ok: false, error: "ReadOnlyLocation" });
+});
+
+await test("v5: the interface goes available → downloading → ready → installing through the host", async () => {
+  const calls = [];
+  let phase = "idle";
+  const host = {
+    "studio.checkUpdate": () => ({ ok: true, latest: "v99.0.0", url: "https://github.com/hxddh/goban-studio/releases/tag/v99.0.0", notes: "New", publishedAt: "" }),
+    "studio.updateStatus": () => ({ ok: true, phase, tag: "v99.0.0", received: 3, total: 6, error: "", canInstall: true, blocked: "", justUpdated: false, installFailed: false }),
+    "studio.updateDownload": async (p) => {
+      assert.deepEqual(p, { tag: "v99.0.0" }, "the page names only the tag, never a URL");
+      phase = "downloading";
+      await new Promise((r) => setTimeout(r, 30));
+      phase = "ready";
+      return { ok: true, phase: "ready", tag: "v99.0.0", asset: "GobanStudio-macOS-arm64.zip" };
+    },
+    "studio.updateCancel": () => ({ ok: true, phase: "idle" }),
+    "studio.updateApply": () => ({ ok: true, phase: "installing" }),
+  };
+  globalThis.zero = {
+    invoke: async (command, payload) => {
+      calls.push(command);
+      if (!host[command]) throw new Error(`unknown command ${command}`);
+      return host[command](payload);
+    },
+  };
+  try {
+    const store = await import("../src/web/js/app/store.js");
+    const C = await import("../src/web/js/app/update-ctl.js");
+    store.state.settings = { autoUpdateCheck: false };
+    const found = await C.checkForUpdates({ quiet: true });
+    assert.equal(found.status, "available");
+    assert.deepEqual(found.install, { can: true, blocked: "" });
+    const pending = C.downloadUpdate();
+    assert.equal(store.state.updateCheck.status, "downloading");
+    assert.equal(store.state.updateCheck.notes, "New", "the release notes stay on screen");
+    assert.equal((await pending).status, "ready");
+    assert.equal(store.state.updateCheck.latest, "v99.0.0");
+    // Discarding the download goes back to "available".
+    await C.cancelUpdate();
+    assert.equal(store.state.updateCheck.status, "available");
+    phase = "idle";
+    await C.downloadUpdate();
+    assert.equal(store.state.updateCheck.status, "ready");
+    await C.applyUpdate();
+    assert.equal(store.state.updateCheck.status, "installing");
+    assert.ok(calls.includes("studio.updateApply"));
+
+    // A read-only installation never downloads: it explains and falls back.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", tag: "", received: 0, total: 0, error: "", canInstall: false, blocked: "ReadOnlyLocation" });
+    store.state.updateCheck = null;
+    const ro = await C.checkForUpdates({ quiet: true });
+    assert.deepEqual(ro.install, { can: false, blocked: "ReadOnlyLocation" });
+    const before = calls.filter((c) => c === "studio.updateDownload").length;
+    await C.downloadUpdate();
+    assert.equal(calls.filter((c) => c === "studio.updateDownload").length, before);
+
+    // A failed download returns to "available" with the reason.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", canInstall: true, blocked: "" });
+    host["studio.updateDownload"] = async () => ({ ok: false, error: "ChecksumMismatch" });
+    store.state.updateCheck = null;
+    await C.checkForUpdates({ quiet: true });
+    const bad = await C.downloadUpdate();
+    assert.equal(bad.status, "available");
+    assert.equal(bad.installError, "ChecksumMismatch");
+
+    // After a restart: the new version says so; a rolled-back one says that.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", canInstall: true, blocked: "", justUpdated: true });
+    const restored = await C.restoreUpdateState();
+    assert.equal(restored.justUpdated, true);
+    assert.ok(store.state.toasts.some((x) => x.message === t("update.installed", [APP_VERSION])));
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
+await test("v5: the native install commands are fixed to this repository's release downloads", () => {
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
+  assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
+  // The page's payload carries a tag and nothing else; no URL is ever read from it.
+  const payload = main.slice(main.indexOf("const DownloadPayload"), main.indexOf("fn updateDownload("));
+  assert.match(payload, /tag: \[\]const u8/);
+  assert.doesNotMatch(payload, /url|path/i);
+  // The helpers are embedded in the app, not downloaded.
+  assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
+  assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
+  for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);
 }
 console.log(`\n${count} tests passed.`);
+// Toast timers from the v5 interface test would keep Node alive for seconds.
+process.exit(0);

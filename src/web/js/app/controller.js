@@ -21,7 +21,7 @@ import { startRating } from "./rating.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
-import { autoCheckForUpdates } from "./update-ctl.js";
+import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
@@ -60,6 +60,9 @@ export function boot() {
   });
   // v4: the opt-in weekly update check (no request unless it is on and due).
   if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
+  // v5: how the last in-app update went (no request), and tell a waiting
+  // update helper that this new version is up.
+  if (hasNative()) setTimeout(() => restoreUpdateState().catch(() => {}), 600);
 }
 
 /* --------------------------------------------------------------- places */
