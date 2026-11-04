@@ -197,6 +197,7 @@ export class BoardView {
     const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
+    const wasInteractive = this.model.interactive;
     Object.assign(this.model, patch);
     // A new board size (or problem window) invalidates the keyboard cursor
     // and the hover point: they could now lie off the board.
@@ -204,7 +205,9 @@ export class BoardView {
       this.model.cursor = null;
       this.model.hover = null;
     }
-    if (patch.interactive === false) {
+    // Only when the board stops taking moves: a board that never did keeps
+    // the keyboard cursor, so it can still be read point by point (v6 a11y).
+    if (patch.interactive === false && wasInteractive) {
       this.model.hover = null;
       this.model.cursor = null;
     }

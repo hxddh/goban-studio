@@ -94,6 +94,18 @@
   --scrim: rgba(0, 0, 0, 0.5);
 }
 
+/* v6 a11y: Larger text (View menu, ⌘= / ⌘−). The same seven type tokens,
+ * one step up; weights and hierarchy unchanged. */
+:root[data-text="large"] {
+  --t-display: 600 31px/38px var(--font);
+  --t-title: 600 22px/28px var(--font);
+  --t-head: 600 17px/24px var(--font);
+  --t-body: 400 15px/22px var(--font);
+  --t-read: 400 16px/25px var(--font);
+  --t-small: 400 14px/20px var(--font);
+  --t-caption: 500 12px/16px var(--font);
+}
+
 /* ------------------------------------------------------------------ base */
 
 * { box-sizing: border-box; }
@@ -601,7 +613,7 @@ button.group-row:hover { background: var(--fill); }
 .swatch.on { color: var(--text); }
 .swatch.on i { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--text); }
 .about { display: flex; flex-direction: column; gap: 4px; }
-.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
+.shortcuts { display: grid; grid-template-columns: 10em 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
 .shortcuts dd { margin: 0; color: var(--text-2); }
 
 /* onboarding */
