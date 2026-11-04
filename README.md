@@ -5,7 +5,7 @@ play a computer opponent that is as strong as you want it to be, and review
 every game with KataGo.
 
 **Languages:** 中文 · English · 한국어 · 日本語  
-**Boards:** 9×9, 13×13, 19×19 · Japanese rules · komi and handicap up to nine stones
+**Boards:** 9×9, 13×13, 19×19 · Japanese, Chinese or Korean rules · komi and handicap up to nine stones
 
 Goban Studio is the Go application built alongside — not instead of — the
 existing Gomoku app. It deliberately uses a different bundle ID
@@ -32,8 +32,28 @@ what the signing steps actually did, not from a template. Until the
 certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
 are ad-hoc signed (macOS) and unsigned (Windows).
 
-`SHA256SUMS` is attached to every GitHub release. The v4.0.0 notes are in
-[`.github/release-notes/v4.0.0.md`](.github/release-notes/v4.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v5.0.0 notes are in
+[`.github/release-notes/v5.0.0.md`](.github/release-notes/v5.0.0.md).
+
+## v5 at a glance
+
+- **Rules** — Japanese (still the default for everyone), Chinese (area
+  scoring) or Korean, chosen per game or as your default; SGF records in
+  any of the three open and keep their ruleset.
+- **Opponents** — an optional human-style opponent (KataGo's human model,
+  downloaded only when you choose it) that plays like a person of its level,
+  and an optional stronger network for analysis and the top level.
+- **Review** — the game in three phases (points lost, mistakes, accuracy),
+  three takeaways, trends across your recent games, comments and marks on
+  any move, a variation tree, promote and delete variations; all saved in
+  the SGF.
+- **Learning** — an intermediate course (opening, joseki, shape, endgame,
+  fighting; 26 lessons) and 509 solver-proved problems.
+- **Your data** — one-click backup to a file and restore on another computer.
+- **Updates** — download, verify and install a new version from inside the
+  app (with automatic rollback); Intel Macs get their own build.
+- **Interface** — this week on Today, the course as a map, problem facts,
+  proportioned problem windows, thumbnails that follow the board.
 
 ## v4 at a glance
 
@@ -84,8 +104,9 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 - **Library** — the game in progress (“Continue”), your games with
   thumbnails, filters (won / lost / imported) and search, 20 classic games
   and 40 professional openings to replay as guess-the-move drills. SGF import
-  and export; double-clicking an `.sgf` opens it on macOS and Windows; a
-  record that declares a non-Japanese ruleset is rejected with an
+  and export; double-clicking an `.sgf` opens it on macOS and Windows; records
+  under Japanese, Chinese or Korean rules keep their ruleset, and one that
+  declares another ruleset (AGA, Ing, New Zealand…) is rejected with an
   explanation rather than silently re-scored.
 - **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
   Plain / Light wood / Ink board, coordinates, move numbers, sound, your
@@ -241,7 +262,7 @@ npm run ui-update      # rewrite tests/visual baselines after an intended change
 node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv for native-speaker review
 ```
 
-The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
+The suite covers Japanese, Chinese and Korean scoring (territory and area, seki, handicap compensation), ko and suicide, SGF round trips
 and rules rejection, every UI string in four languages (and that every key
 the interface uses exists), the solver on classic shapes and ladders,
 Benson's unconditional life, every practice problem and course lesson, the
@@ -285,7 +306,7 @@ native gates, and only then creates the tag and GitHub Release. Release
 notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v4.0.0
+gh workflow run release.yml -f tag=v5.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or

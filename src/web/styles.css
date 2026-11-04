@@ -741,3 +741,4 @@ button.group-row:hover { background: var(--fill); }
 .model-status.ready { color: var(--good); }
 .model-status.failed { color: var(--bad); }
 .model-text .progress { margin-top: 4px; }
+.sheet:focus-visible, .sheet:focus { outline: none; }
