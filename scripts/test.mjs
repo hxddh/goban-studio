@@ -1453,12 +1453,34 @@ await test("v5: the native install commands are fixed to this repository's relea
   const payload = main.slice(main.indexOf("const DownloadPayload"), main.indexOf("fn updateDownload("));
   assert.match(payload, /tag: \[\]const u8/);
   assert.doesNotMatch(payload, /url|path/i);
+  // Every asset this app can install is one the release publishes.
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+  for (const asset of ["GobanStudio-macOS-arm64.zip", "GobanStudio-macOS-x64.zip", "GobanStudio-Windows-x64.zip", "SHA256SUMS"]) {
+    assert.ok(zig.includes(`"${asset}"`) || asset === "SHA256SUMS", asset);
+    assert.ok(release.includes(asset), `release.yml publishes ${asset}`);
+  }
   // The helpers are embedded in the app, not downloaded.
   assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
   assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
   const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
   assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
   for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
+});
+
+await test("v5: both platform builds test the update helpers, and an Intel Mac build is released", () => {
+  const mac = fs.readFileSync(path.join(root, ".github/workflows/build-macos.yml"), "utf8");
+  const win = fs.readFileSync(path.join(root, ".github/workflows/build-windows.yml"), "utf8");
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+  for (const y of [mac, win]) assert.match(y, /scripts\/test-updater\.mjs/);
+  assert.match(release, /macos-15-intel/);
+  assert.match(release, /GobanStudio-macOS-x64\.dmg/);
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  assert.match(readme, /GobanStudio-macOS-x64\.dmg/);
+  assert.match(readme, /Windows on ARM/);
+  const status = { macos: Sign.normalizeStatus("macos", { mode: "adhoc" }), win: Sign.normalizeStatus("windows", {}) };
+  const table = Sign.firstLaunchTable(status.macos, status.win, status.macos);
+  assert.match(table, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg`/);
+  assert.equal(Sign.firstLaunchTable(status.macos, status.win).split("\n").length, 4, "without an Intel status the table keeps its v4 rows");
 });
 
 if (failures) {

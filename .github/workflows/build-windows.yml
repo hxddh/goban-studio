@@ -218,6 +218,26 @@ jobs:
           exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
           test -n "$exe"
           node scripts/selftest-app.mjs "$exe"
+      - name: updater end-to-end tests (swap with a locked file, rollback, no exit, read-only fallback)
+        timeout-minutes: 10
+        run: node scripts/test-updater.mjs dist/GobanStudio
+      - name: updater live download from GitHub (network; informational)
+        # Depends on github.com and on a published release, so it does not
+        # gate the build.
+        continue-on-error: true
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          asset="GobanStudio-Windows-x64.zip"
+          tag="$(gh api 'repos/hxddh/goban-studio/releases?per_page=30' \
+            --jq "[.[] | select(.draft == false and .prerelease == false) | select(any(.assets[]; .name == \"$asset\")) | select(any(.assets[]; .name == \"SHA256SUMS\"))] | .[0].tag_name // empty")"
+          if [ -z "$tag" ]; then
+            echo "::notice title=updater live test::no published release has $asset yet; skipped"
+            exit 0
+          fi
+          node scripts/test-updater.mjs dist/GobanStudio --live "$tag"
       - name: native screenshot tour
         timeout-minutes: 6
         env:
@@ -259,6 +279,10 @@ jobs:
           assert any(n.endswith("engine/windows/libcrypto-3-x64.dll") for n in names), "missing OpenSSL runtime"
           assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"
           assert not any(".WebView2/" in n or "/EBWebView/" in n for n in names), "WebView2 test profile leaked"
+          # v5: the in-app updater unpacks this archive and expects every
+          # entry under GobanStudio/ (src/install.zig safeEntryName).
+          assert all(n.startswith("GobanStudio/") and ":" not in n and "/../" not in n for n in names), "entry outside GobanStudio/"
+          assert any(n == "GobanStudio/resources/frontend/dist/index.html" for n in names), "missing index.html"
           info = z.getinfo(next(n for n in names if n.endswith("bin/goban-studio.exe")))
           assert info.external_attr >> 16 & 0o111, "exe has no execute bits"
           print(f"zip entries: {len(names)}; forward slashes; Unix modes present")

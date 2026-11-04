@@ -12,9 +12,13 @@ on:
         required: false
         default: "0.11.0"
       runner:
-        description: "macOS runner image (macos-14 is retired; macos-15 is the default)"
+        description: "macOS runner image: macos-15 (Apple Silicon) or macos-15-intel (Intel, for arch x64)"
         required: false
         default: "macos-15"
+      arch:
+        description: "CPU of the build: arm64 (Apple Silicon) or x64 (Intel; needs an Intel runner)"
+        required: false
+        default: "arm64"
   workflow_call:
     inputs:
       release_tag:
@@ -29,6 +33,12 @@ on:
         type: string
         required: false
         default: "macos-15"
+      # v5: arm64 (default) or x64. The Intel package is built and tested
+      # on an Intel runner (macos-15-intel), not cross-compiled.
+      arch:
+        type: string
+        required: false
+        default: "arm64"
     # Optional: with all five, the app is Developer ID signed and notarized;
     # without them it is ad-hoc signed (docs/signing.md). release.yml passes
     # them with `secrets: inherit`.
@@ -54,16 +64,28 @@ permissions:
 jobs:
   build:
     runs-on: ${{ inputs.runner || 'macos-15' }}
-    timeout-minutes: 80
+    timeout-minutes: 100
     outputs:
       signing: ${{ steps.status.outputs.signing }}
     env:
+      # GobanStudio-macOS-$ARCH.{zip,dmg}; artifact and status-file names
+      # keep their v4 form for arm64 and gain "-x64" for Intel.
+      ARCH: ${{ inputs.arch || 'arm64' }}
+      SUFFIX: ${{ inputs.arch == 'x64' && '-x64' || '' }}
       MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
       MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
     steps:
+      - name: runner CPU matches the requested build
+        run: |
+          set -euo pipefail
+          cpu="$(uname -m)"
+          case "$ARCH:$cpu" in
+            arm64:arm64 | x64:x86_64) echo "building $ARCH on $cpu" ;;
+            *) echo "arch $ARCH needs a matching runner (got $cpu): macos-15 for arm64, macos-15-intel for x64"; exit 1 ;;
+          esac
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
@@ -80,6 +102,9 @@ jobs:
       - name: unit tests
         run: npm test
       - name: build KataGo Eigen sidecar
+        # Built from source on the runner's own CPU (arm64, or x86_64 on the
+        # Intel runner); USE_AVX2=OFF keeps the Intel build to SSE so it runs
+        # on every Intel Mac that runs macOS 11+.
         run: |
           git clone --depth 1 --branch v1.18.1 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
           # KataGo 1.18.1 calls quick_exit, which the macOS 14 SDK's libc++
@@ -96,6 +121,8 @@ jobs:
           mkdir -p engine/macos
           cp "$RUNNER_TEMP/KataGo/cpp/build/katago" engine/macos/katago
           chmod +x engine/macos/katago
+          file engine/macos/katago
+          lipo -archs engine/macos/katago | grep -qw "$([ "$ARCH" = x64 ] && echo x86_64 || echo arm64)"
           codesign --force --sign - engine/macos/katago
       - name: KataGo smoke test
         run: |
@@ -170,7 +197,38 @@ jobs:
         run: |
           exe="$(find dist/GobanStudio.app/Contents/MacOS -type f -perm -u+x | head -n1)"
           test -n "$exe"
+          lipo -archs "$exe" | grep -qw "$([ "$ARCH" = x64 ] && echo x86_64 || echo arm64)"
           node scripts/selftest-app.mjs "$exe"
+      - name: updater end-to-end tests (swap, rollback, no exit, read-only fallback)
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          # What the app downloads and unpacks itself carries no quarantine
+          # flag, because the app does not opt in to LSFileQuarantineEnabled
+          # (src/install.zig's macOS test checks the unpacked bundle too), so
+          # Gatekeeper does not stop the ad-hoc signed new version.
+          if /usr/libexec/PlistBuddy -c 'Print :LSFileQuarantineEnabled' dist/GobanStudio.app/Contents/Info.plist >/dev/null 2>&1; then
+            echo "LSFileQuarantineEnabled is set: downloaded updates would be quarantined"
+            exit 1
+          fi
+          node scripts/test-updater.mjs dist/GobanStudio.app
+      - name: updater live download from GitHub (network; informational)
+        # Depends on github.com and on a published release that has this
+        # CPU's package, so it does not gate the build.
+        continue-on-error: true
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          asset="GobanStudio-macOS-${ARCH}.zip"
+          tag="$(gh api 'repos/hxddh/goban-studio/releases?per_page=30' \
+            --jq "[.[] | select(.draft == false and .prerelease == false) | select(any(.assets[]; .name == \"$asset\")) | select(any(.assets[]; .name == \"SHA256SUMS\"))] | .[0].tag_name // empty")"
+          if [ -z "$tag" ]; then
+            echo "::notice title=updater live test::no published release has $asset yet; skipped"
+            exit 0
+          fi
+          node scripts/test-updater.mjs dist/GobanStudio.app --live "$tag"
       - name: native screenshot tour
         timeout-minutes: 6
         run: |
@@ -183,7 +241,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: native-screenshots-macos
+          name: native-screenshots-macos${{ inputs.arch == 'x64' && '-x64' || '' }}
           path: dist/screenshots
           if-no-files-found: ignore
       - name: notarize and staple the app
@@ -197,55 +255,59 @@ jobs:
       - name: zip and dmg
         run: |
           set -euo pipefail
+          status="dist/signing-macos${SUFFIX}.json"
           if [ "${{ steps.mode.outputs.mode }}" = "developer-id" ]; then
-            node scripts/signing-notes.mjs status macos developer-id --notarized > dist/signing-macos.json
+            node scripts/signing-notes.mjs status macos developer-id --notarized > "$status"
           else
-            node scripts/signing-notes.mjs status macos adhoc > dist/signing-macos.json
+            node scripts/signing-notes.mjs status macos adhoc > "$status"
           fi
           # The README in the package says how this build was signed.
-          node scripts/signing-notes.mjs readme packaging/README-macOS.txt dist/signing-macos.json > dist/README-macOS.txt
-          ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app dist/GobanStudio-macOS-arm64.zip
-          zip -g -j dist/GobanStudio-macOS-arm64.zip dist/README-macOS.txt
+          node scripts/signing-notes.mjs readme packaging/README-macOS.txt "$status" > dist/README-macOS.txt
+          # The .zip is also what the in-app updater installs (v5): it must
+          # hold GobanStudio.app at its root.
+          ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app "dist/GobanStudio-macOS-${ARCH}.zip"
+          zip -g -j "dist/GobanStudio-macOS-${ARCH}.zip" dist/README-macOS.txt
+          unzip -Z1 "dist/GobanStudio-macOS-${ARCH}.zip" | grep -x 'GobanStudio.app/Contents/MacOS/goban-studio' > /dev/null
           mkdir -p dist/dmg
           rm -rf dist/dmg/*
           ditto dist/GobanStudio.app "dist/dmg/Goban Studio.app"
           cp dist/README-macOS.txt dist/dmg/README-macOS.txt
-          hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO dist/GobanStudio-macOS-arm64.dmg
-          bash scripts/macos-sign.sh sign-dmg dist/GobanStudio-macOS-arm64.dmg
+          hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO "dist/GobanStudio-macOS-${ARCH}.dmg"
+          bash scripts/macos-sign.sh sign-dmg "dist/GobanStudio-macOS-${ARCH}.dmg"
           ls -lh dist
       - name: notarize and staple the dmg
         if: ${{ steps.mode.outputs.mode == 'developer-id' }}
         timeout-minutes: 40
         run: |
-          bash scripts/macos-sign.sh notarize dist/GobanStudio-macOS-arm64.dmg
-          spctl -a -vv -t open --context context:primary-signature dist/GobanStudio-macOS-arm64.dmg
+          bash scripts/macos-sign.sh notarize "dist/GobanStudio-macOS-${ARCH}.dmg"
+          spctl -a -vv -t open --context context:primary-signature "dist/GobanStudio-macOS-${ARCH}.dmg"
       - name: signing status
         id: status
         run: |
-          cat dist/signing-macos.json
+          cat "dist/signing-macos${SUFFIX}.json"
           if [ "${{ steps.mode.outputs.mode }}" = "developer-id" ]; then
             echo "signing=developer-id+notarized" >> "$GITHUB_OUTPUT"
-            echo "### macOS: Developer ID signed, notarized and stapled" >> "$GITHUB_STEP_SUMMARY"
+            echo "### macOS ($ARCH): Developer ID signed, notarized and stapled" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "signing=adhoc" >> "$GITHUB_OUTPUT"
-            echo "### macOS: ad-hoc signed, NOT notarized (signing secrets not set; docs/signing.md)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### macOS ($ARCH): ad-hoc signed, NOT notarized (signing secrets not set; docs/signing.md)" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: remove signing keychain
         if: always()
         run: bash scripts/macos-sign.sh cleanup
       - uses: actions/upload-artifact@v7
         with:
-          name: GobanStudio-macOS-arm64
+          name: GobanStudio-macOS-${{ inputs.arch || 'arm64' }}
           path: |
-            dist/GobanStudio-macOS-arm64.zip
-            dist/GobanStudio-macOS-arm64.dmg
+            dist/GobanStudio-macOS-${{ inputs.arch || 'arm64' }}.zip
+            dist/GobanStudio-macOS-${{ inputs.arch || 'arm64' }}.dmg
       - uses: actions/upload-artifact@v7
         with:
-          name: signing-status-macos
-          path: dist/signing-macos.json
+          name: signing-status-macos${{ inputs.arch == 'x64' && '-x64' || '' }}
+          path: dist/signing-macos${{ inputs.arch == 'x64' && '-x64' || '' }}.json
       - name: upload to release
         if: ${{ inputs.release_tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$TAG" dist/GobanStudio-macOS-arm64.zip dist/GobanStudio-macOS-arm64.dmg --clobber
+        run: gh release upload "$TAG" "dist/GobanStudio-macOS-${ARCH}.zip" "dist/GobanStudio-macOS-${ARCH}.dmg" --clobber
