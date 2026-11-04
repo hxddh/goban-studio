@@ -48,7 +48,9 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   any move, a variation tree, promote and delete variations; all saved in
   the SGF.
 - **Learning** — an intermediate course (opening, joseki, shape, endgame,
-  fighting; 26 lessons) and 509 solver-proved problems.
+  fighting; 28 lessons, with the leaning attack and sabaki added in v6) and
+  543 solver-proved problems, 34 of them endgame problems proved by exact
+  counting (v6).
 - **Your data** — one-click backup to a file and restore on another computer.
 - **Updates** — download, verify and install a new version from inside the
   app (with automatic rollback); Intel Macs get their own build.
@@ -201,7 +203,15 @@ The course and the problems are verified, not counted:
   rather than through a point outside the problem. The 23 seki problems
   (goal `seki`) are proved to have seki as their best result and to end in
   one. Bent four in the corner is never accepted as life.
-- 509 problems: 57 capturing races (16 big eye against small eye, eye
+- Endgame problems (v6) are proved by the solver's counting mode: exact
+  minimax counting of a sealed region under Japanese counting (territory
+  and prisoners), with sente, gote and every follow-up read out, and a
+  proof that no unsettled end changes the count. A "biggest move" answer
+  and its margin, and a "how many points" value (the difference between
+  Black and White playing first), are stored only as the solver proves them.
+- 543 problems: 34 endgame problems (first-line hane and connect, sente and
+  reverse sente, double sente, the monkey jump, comparing moves, counting a
+  move), 57 capturing races (16 big eye against small eye, eye
   against no eye, outside liberties), 23 seki problems (from grade 1 up),
   19 ko problems, 19 false-eye and 23 eye-space problems, 28 classic
   textbook shapes (straight and bent three, pyramid four, bulky and crossed

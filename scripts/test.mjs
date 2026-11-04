@@ -2879,6 +2879,214 @@ await test("v6 explorer: the strings are one block in four languages", () => {
   assert.ok(csv.includes('"explorer.title"'), "run node scripts/export-strings.mjs");
 });
 
+/* ------------------------------------------------------------ v6 endgame */
+
+/** A counting puzzle on the top edge of a 19×19 board. */
+const egPuzzle = (diagram, extra = {}) => S.createPuzzle({ goal: "endgame", ask: "move", diagram, corner: "tl", ...extra });
+const egLine = (line) => line.map((m) => `${m.c === BLACK ? "B" : "W"}${m.x},${m.y}`).join(" ");
+// Both walls stop on the second line; ':' is counted territory nobody plays.
+const EG_HANE = ["X : . . . . . O", "X : : : X O : O", "X X X X X O O O", ", , , , , , , ,"];
+
+await test("v6 endgame: a first-line hane and connection is gote, worth 2 points counted both ways", () => {
+  const pz = egPuzzle(EG_HANE);
+  const d = S.deiri(pz);
+  assert.deepEqual([d.value, d.black, d.white, d.exact], [2, 5, 3, true], "Black first: 5; White first: 3");
+  // Black hanes, White blocks, Black connects: gote. White's hane is the mirror.
+  assert.equal(egLine(S.countLine(pz, BLACK)), "B5,0 W6,0 B4,0");
+  assert.equal(egLine(S.countLine(pz, WHITE)), "W4,0 B3,0 W5,0");
+  const f = S.solveFirstMoves(pz);
+  assert.deepEqual(f.correct, [{ x: 5, y: 0 }]);
+  assert.equal(f.target - f.second, 1, "blocking at home instead is one point worse");
+});
+
+await test("v6 endgame: counted points (':') give the same proof as playing them out", () => {
+  const sealed = egPuzzle(EG_HANE);
+  const open = egPuzzle(EG_HANE.map((r) => r.replace(/:/g, ".")));
+  const a = S.deiri(sealed);
+  const b = S.deiri(open);
+  assert.deepEqual([a.value, a.black, a.white], [b.value, b.black, b.white]);
+  assert.deepEqual(S.solveFirstMoves(sealed).correct, S.solveFirstMoves(open).correct);
+});
+
+await test("v6 endgame: a sente push keeps sente; blocking the opponent's sente push is reverse sente", () => {
+  const push = egPuzzle(["X : . . X . . O", "X : : : X O : O", "X X X X X O O O", ", , , , , , , ,"]);
+  assert.equal(S.deiri(push).value, 1);
+  assert.equal(egLine(S.countLine(push, BLACK)), "B5,0 W6,0", "White has to block: Black keeps sente");
+  assert.equal(egLine(S.countLine(push, WHITE)), "W5,0", "White's move there is gote");
+  const block = egPuzzle(["X . . O . . : O", "X : X O : : : O", "X X X O O O O O", ", , , , , , , ,"]);
+  assert.equal(S.deiri(block).value, 1);
+  assert.equal(egLine(S.countLine(block, BLACK)), "B2,0", "Black's block is gote");
+  assert.equal(egLine(S.countLine(block, WHITE)), "W2,0 B1,0", "White's push is sente");
+});
+
+const EG_DOUBLE = [
+  ", , , , , , ,",
+  ", X X O O O ,",
+  ", X X X O O ,",
+  ", X X O . O ,",
+  ", X X . O O ,",
+  ", X . X O O ,",
+  ", X X O O O ,",
+  ", , , , , , ,",
+];
+
+await test("v6 endgame: double sente is sente for both sides and comes before everything", () => {
+  const pz = S.createPuzzle({ goal: "endgame", ask: "value", value: 2, choices: [1, 2, 3, 4], diagram: EG_DOUBLE, at: [4, 4] });
+  assert.equal(S.deiri(pz).value, 2);
+  // Whoever plays the shared point gives atari, and the other side connects.
+  assert.equal(egLine(S.countLine(pz, BLACK)), "B7,8 W8,7");
+  assert.equal(egLine(S.countLine(pz, WHITE)), "W7,8 B6,9");
+  assert.ok(S.validate(pz).ok);
+  const sum = PROBLEMS.find((p) => p.id === "endgame-order-04");
+  const f = S.solveFirstMoves(S.createPuzzle(sum));
+  assert.equal(f.correct.length, 1);
+  assert.deepEqual(f.correct[0], { x: sum.answer[0].x + sum.at[0], y: sum.answer[0].y + sum.at[1] }, "the double sente point, before a sente push and a reverse sente block");
+});
+
+await test("v6 endgame: in a sum of two areas the sente atari comes before the bigger gote move", () => {
+  const pz = egPuzzle(["X : . . O . : O X : . . . . . O ,", "X : X X X O : O X : : : X O : O ,", "X X X X X O O O X X X X X O O O ,", ", , , , , , , , , , , , , , , , ,"]);
+  const f = S.solveFirstMoves(pz);
+  assert.deepEqual(f.correct, [{ x: 3, y: 0 }]);
+  assert.equal(egLine(S.solutionLine(pz)), "B3,0 W5,0 B13,0 W14,0 B12,0", "sente atari, White connects, then the hane and connection");
+  assert.equal(S.countAreas(pz), 2);
+});
+
+await test("v6 endgame: when play ends, enclosed and atari'd stones are dead, as a Japanese count treats them", () => {
+  // A white stone inside Black's sealed area: Black need not capture it.
+  const pz = egPuzzle(["X X X X ,", "X . O X ,", "X . . X ,", "X X X X ,", ", , , , ,"]);
+  const st = S.initialState(pz);
+  assert.equal(S.countValue(pz, st).value, 5, "4 points of territory and 1 prisoner");
+  assert.equal(S.countValue(pz, { ...st, toMove: WHITE }).value, 5, "White cannot save it");
+  assert.ok(S.validate(pz).reasons.includes("passing is as good as any move: nothing to play"));
+  // A move the model does not read (a dead stone in the opponent's area) is
+  // refused for the app instead of being played.
+  const hane = egPuzzle(EG_HANE);
+  assert.deepEqual(S.playMove(hane, S.initialState(hane), S.indexOf(hane, 6, 1)), { outside: true });
+  assert.ok(S.playMove(hane, S.initialState(hane), S.indexOf(hane, 5, 0)).next);
+});
+
+await test("v6 endgame: the monkey jump is the large knight's slide from the second-line stone", () => {
+  const p = PROBLEMS.find((x) => x.id === "endgame-monkey-01");
+  assert.equal(p.theme, "monkey-jump");
+  const pz = S.createPuzzle(p);
+  const f = S.solveFirstMoves(pz);
+  assert.equal(f.correct.length, 1);
+  // From the end of Black's second-line stones, three along the first line.
+  const m = { x: f.correct[0].x - pz.box.x0, y: f.correct[0].y - pz.box.y0 };
+  assert.deepEqual(m, p.answer[0]);
+  const rows = p.diagram.map((r) => r.replace(/\s+/g, ""));
+  const second = rows.length - 2;
+  const first = rows.length - 1;
+  assert.equal(m.y, first);
+  assert.equal(rows[second][m.x - 3], "X", "a black second-line stone a large knight's move away");
+});
+
+await test("v6 endgame: at least 30 endgame problems over grades 1–5, with their own topic and themes", async () => {
+  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
+  const eg = PROBLEMS.filter((p) => p.goal === "endgame");
+  assert.ok(eg.length >= 30, `${eg.length} endgame problems`);
+  for (const p of eg) assert.equal(p.topic, "endgame", p.id);
+  const byGrade = [1, 2, 3, 4, 5].map((g) => eg.filter((p) => grades[p.id].grade === g).length);
+  assert.ok(byGrade.every((n) => n > 0), `grades ${byGrade.join("/")}`);
+  const themes = new Set(eg.map((p) => p.theme));
+  for (const t of ["hane-connect", "monkey-jump", "double-sente", "sente-gote", "reverse-sente", "endgame-compare", "deiri"]) assert.ok(themes.has(t), t);
+  for (const p of eg.filter((x) => x.ask === "value")) assert.ok(p.choices.includes(p.value), p.id);
+  assert.ok(eg.some((p) => S.countAreas(S.createPuzzle(p)) >= 3), "some problems compare three areas");
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/app/practice.jsx"), "utf8");
+  assert.match(jsx, /export const TOPICS = \[[^\]]*"endgame"\]/);
+});
+
+await test("v6 endgame: practice plays a move question and answers a value question", async () => {
+  const esbuild = await import("esbuild");
+  const out = await esbuild.build({
+    stdin: {
+      contents: ['export * as C from "./src/web/js/app/practice-ctl.js";', 'export { state } from "./src/web/js/app/store.js";', 'export * as P from "./src/web/js/persist.js";'].join("\n"),
+      resolveDir: root,
+      loader: "js",
+    },
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    mainFields: ["module", "main"],
+    loader: { ".json": "json" },
+    write: false,
+    logLevel: "error",
+  });
+  const { C, state, P } = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  state.settings = { ...P.DEFAULT_SETTINGS };
+  state.progress = P.loadProgress();
+  // A value question: a wrong choice is marked, the right one solves it.
+  const vq = PROBLEMS.find((p) => p.id === "endgame-count-01");
+  C.openProblem(vq.id);
+  let pr = state.practice.problem;
+  assert.equal(C.goalText(pr.pz).includes("?") || C.goalText(pr.pz).includes("？"), true);
+  C.practicePlay(5, 5);
+  assert.equal(pr.history.length, 0, "a value question takes no moves");
+  const wrong = vq.choices.find((v) => v !== vq.value);
+  C.answerValue(wrong);
+  assert.equal(pr.feedback, "wrong");
+  assert.deepEqual(pr.wrongValues, [wrong]);
+  assert.equal(C.feedbackKey(pr), "practice.endgame.valueWrong");
+  C.answerValue(vq.value);
+  assert.equal(pr.status, "won");
+  assert.equal(C.feedbackKey(pr), vq.value === 1 ? "practice.endgame.valueRightOne" : "practice.endgame.valueRight");
+  assert.deepEqual(C.endgameArgs(pr), [String(vq.value)]);
+  assert.ok(pr.answer.length > 0, "the Black-first line is shown");
+  // A move question: the right move, the computer's answer, until settled.
+  const mq = PROBLEMS.find((p) => p.id === "endgame-hane-01");
+  C.openProblem(mq.id);
+  pr = state.practice.problem;
+  const at = (q) => [q.x + mq.at[0], q.y + mq.at[1]];
+  // A point the model does not read is refused, not played.
+  C.practicePlay(...at({ x: 6, y: 1 }));
+  assert.equal(pr.history.length, 0);
+  C.practicePlay(...at(mq.answer[0]));
+  for (let i = 0; i < 40 && pr.busy; i++) await sleepMs(50);
+  assert.equal(pr.status, "open");
+  assert.equal(pr.feedback, "keep", "White blocked; Black still has to connect");
+  C.practicePlay(...at({ x: 4, y: 0 }));
+  for (let i = 0; i < 40 && pr.status === "open"; i++) await sleepMs(50);
+  assert.equal(pr.status, "won");
+  assert.equal(C.feedbackKey(pr), mq.margin === 1 ? "practice.endgame.solvedOne" : "practice.endgame.solved");
+  assert.deepEqual(C.endgameArgs(pr), [String(mq.margin)]);
+});
+
+function sleepMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+await test("v6 endgame: the fighting unit teaches the leaning attack and sabaki, after the v5 lessons", () => {
+  const unit = COURSE.find((u) => u.id === "fighting");
+  const ids = unit.lessons.map((l) => l.id);
+  assert.deepEqual(ids, ["fight-cutting-stones", "fight-attack-distance", "fight-split", "fight-leaning", "fight-sabaki"]);
+  for (const id of ["fight-leaning", "fight-sabaki"]) {
+    const lesson = unit.lessons.find((l) => l.id === id);
+    const problems = lesson.steps.filter((s) => s.kind === "problem");
+    assert.ok(problems.length >= 2, `${id} has solver-proved steps`);
+    for (const s of problems) assert.ok(S.validate(S.createPuzzle(s.problem)).ok, id);
+  }
+  // The leaning stones are what make the capture work: without them it fails.
+  const lean = unit.lessons.find((l) => l.id === "fight-leaning").steps[1].problem;
+  const without = { ...lean, diagram: lean.diagram.map((r, y) => (y === 3 ? r.replace(/X O \.$/, ". O .") : r)) };
+  assert.notEqual(without.diagram[3], lean.diagram[3]);
+  assert.equal(S.status(S.createPuzzle(without), S.initialState(S.createPuzzle(without))), "lost");
+});
+
+await test("v6 endgame: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 endgame").length, 2);
+  const block = src.slice(src.indexOf("// v6 endgame"), src.indexOf("// end v6 endgame"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.includes("endgame") || ["theme.hane-connect", "theme.sente-gote", "theme.reverse-sente", "theme.double-sente", "theme.monkey-jump", "theme.deiri"].includes(k));
+  assert.ok(keys.length >= 35);
+  for (const k of keys) {
+    if (k === "phase.endgame" || k === "phaseIn.endgame") continue;
+    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
+    for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+  }
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);

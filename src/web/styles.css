@@ -668,6 +668,11 @@ button.group-row:hover { background: var(--fill); }
 .shape-chips .chip { height: 32px; padding: 0 12px; gap: 8px; font-size: 13px; }
 .chip-count { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 11px; }
 .chip.done .chip-count { color: var(--good); }
+/* v6 endgame: the values of a "how many points" question */
+.value-choices { margin: var(--s-1) 0 var(--s-2); }
+.value-choices .chip { height: 32px; padding: 0 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.value-choices .chip.off { color: var(--text-3); text-decoration: line-through; cursor: default; }
+.value-choices .chip:disabled:not(.off):not(.on) { cursor: default; }
 :root:lang(ko) body { word-break: keep-all; }
 .score-detail { display: flex; flex-direction: column; gap: 1px; }
 .score-detail i { font-style: normal; white-space: nowrap; }

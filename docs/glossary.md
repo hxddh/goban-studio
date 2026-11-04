@@ -203,6 +203,11 @@ in this table. Usage targets:
 | value as a swing ("the difference is N points") | 相差 N 目 | the difference is N points | N집 차이 | N目の差 | the course states values as the difference between Black and White playing first (出入り); it does not use miai counting |
 | defensive move inside own territory | 补棋 / 补一手 | defensive move (inside your territory) | 손질 | 手入れ | |
 | filling neutral points | 收单官 / 填单官 | filling neutral points | 공배 메우기 | ダメ詰め | |
+| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app never uses miai counting |
+| how many points is a move worth | 这一手值几目 | how many points? | 몇 집짜리일까 | 何目の手か | v6 question title |
+| monkey jump (first-line large knight's slide) | 仙鹤大伸腿 / 大伸腿 | monkey jump | 눈목자 미끄러지기 | サルスベリ | ko is descriptive (large knight's move + slide) |
+| the biggest move / which is bigger | 哪一手最大 / 比较大小 | the biggest move / which is bigger | 가장 큰 수 / 어느 쪽이 큰가 | 一番大きい手 / どちらが大きいか | v6 |
+| capture in sente / atari in sente | 提子是先手 / 先手打吃 | a capture in sente / atari in sente | 선수로 따내기 / 선수 단수 | 先手で取る / 先手のアタリ | v6 problem titles |
 
 ## Middle game
 
@@ -214,6 +219,10 @@ in this table. Usage targets:
 | cap | 镇 | cap | 모자 | ボウシ | |
 | splitting attack | 分开攻击 | splitting attack | 갈라서 공격하기 | 分断して攻める | descriptive in zh / ko / ja |
 | attack from a distance | 从远处攻击 | attack from a distance | 멀리서 공격하기 | 離れて攻める | descriptive |
+| leaning attack | 借力攻击 | leaning attack | 기대어 공격하기 | もたれ攻め | v6 lesson `fight-leaning`; zh and ko are descriptive |
+| forcing move (kikashi) | 先手便宜 | forcing move (kikashi) | 선수 활용 | 利かし | |
+| sabaki (light, flexible shape in the opponent's sphere) | 腾挪 | sabaki | 타개 | サバキ | v6 lesson `fight-sabaki` |
+| heavy / light (of a group) | 重 / 轻灵 | heavy / light | 무겁다 / 가볍다 | 重い / 軽い | |
 
 ## Advanced course (v6)
 
