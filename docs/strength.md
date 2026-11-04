@@ -471,6 +471,90 @@ rejected as too slow for a laptop CPU.
 The human-style process uses about 550 MB of memory (b18 human model plus
 b6c96), started only when a human-style game asks for its first move.
 
+## v6: your strength — the estimate
+
+Until v5 the player's level was an Elo-style number that moved by a fixed
+step after each game against the computer, judged against the level's
+*label*. Since v6 it is an estimate with an uncertainty
+(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" with a chart of
+the estimate and its band over time (`app/strength-chart.jsx`).
+
+**Units.** The estimate lives on the scale the levels were measured on:
+θ, Bradley–Terry strength in nats on 19×19, with the same EGF mapping and
+anchor as the labels (GoR(θ) = 4100 − K·e^(−θ/20), K fixed by
+`H:rank_10k` = 10 kyu at θ = 11.65). The player is N(μ, σ²) over θ.
+Opponents are the levels' **measured** θ (the tables above), not their
+rounded labels: on 19×19 `30k` is θ 0 (≈ 34 kyu), not "30 kyu".
+
+**Update.** Each rated game (against the computer, at least 12 moves, not
+a draw — unchanged from v5) is one Glicko step in natural units:
+
+- before the game, σ² grows by 0.2² (a learner gets stronger; without this
+  the estimate would freeze after a few dozen games), and by 0.1² per day
+  since the last game; σ never exceeds the prior's 2.5;
+- the expected score is E = 1 / (1 + e^(−g·(θ_board(μ) − θ_opp))), where
+  g = 1/√(1 + 3·0.5²/π²) accounts for a level's own measurement error
+  (0.5 nats, about one rank, relative to its neighbours);
+- σ'² = 1 / (1/σ² + s²g²E(1−E)) and μ' = μ + σ'²·s·g·(score − E), with s
+  the slope of θ_board at μ (1 on 19×19).
+
+**Board size.** The levels' gaps are smaller on 9×9 (the whole ladder
+spans 14.9 nats there against 23.4 on 19×19). A 9×9 game is compared on
+the 9×9 scale: the player's 19×19 θ is carried over through the levels'
+measured (θ19, θ9) pairs, joined piecewise linearly (beyond the ends, the
+overall slope 0.62). So a 9×9 win says less about 19×19 strength than a
+19×19 win, and the band narrows more slowly. 13×13 was never measured; it
+is taken halfway between the two. That is an assumption, not a result.
+
+**Opponent mode.** A game against a human-style level or the stronger
+network uses that mode's measured θ (v6 measurement below) where it
+exists, on the board it was measured on, otherwise the standard level's.
+Games against the offline engine (no KataGo) count as the standard level,
+as in v5; the offline engine is not calibrated.
+
+**Handicap.** As in v5, two or more stones make the level weaker by one
+rank per stone on 19×19 (2.5 ranks on 13×13 and 5 on 9×9, the ratios
+`suggestHandicap` uses); a single stone and komi are ignored. This is the
+conventional value of a stone, not something measured here.
+
+**Prior.** The rank chosen at onboarding or in Settings, ± 2.5 nats (about
+4 ranks around 15 kyu, 6 around 30 kyu). Changing the rank in Settings
+restarts the estimate, as it restarted the v5 rating.
+
+**What "±" means.** The label shows the rank nearest the GoR of μ and the
+half-width of μ ± σ in ranks, rounded, at least 1: the estimate is in that
+range about two times in three, *given the ladder's scale*. It does not
+include the anchor's own error (see Limitations: every label could move by
+a few ranks together), so it says how sure the app is about you relative
+to its levels. With σ ≈ 0.65 nats after 15–20 games on 19×19, that is
+"±1" at most kyu ranks; on 9×9 alone it stays at about ±2.
+
+**Game performance is not used.** The per-game report measures points
+lost per move and accuracy, and it is tempting to let them nudge the
+estimate. They are left out because nothing here calibrates them: the
+post-game analysis uses 32–48 visits of b6c96 and is noisy on single moves;
+how many points a player loses depends strongly on the opponent (the
+beginner's-move levels leave big mistakes unpunished and give big gifts)
+and on the board size; and there is no measurement relating a human's
+loss per move to rank on this scale. A nudge from an uncalibrated signal
+would bias the estimate in a way results cannot correct. Results against
+measured opponents are the only evidence the estimate uses.
+
+**Recommended opponent.** Today's suggested game and the New game sheet
+suggest the level the player is expected to score closest to 50% against,
+in the mode that level would play in (human-style when that is on), on
+19×19; the quick 9×9 game gets its own suggestion on the 9×9 scale.
+Handicap suggestions are unchanged (`suggestHandicap`, from the rank of
+the estimate).
+
+**Old data.** A v2–v5 rating (`{ r, games, history }`) is migrated on
+start: μ is the old rating, σ what that many fair games would leave from
+the prior, and every old history point keeps its time and value and gets
+the band of its game count. `progress.rating.r` (the GoR of μ) and
+`history[].r` keep their meaning, so the week summary and the trends
+view read old and new data alike. Rank labels round to the nearest rank
+since v6 (v5 rounded a rating towards the weaker rank).
+
 ## Limitations
 
 - **The anchor is a model, not people.** No human played these games. The

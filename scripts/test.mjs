@@ -2297,6 +2297,154 @@ await test("v5: the packaged self-test checks the downloads only when the workfl
   assert.match(main, /GOBAN_MODELS_DIR/);
 });
 
+const SE = await import("../src/web/js/app/strength.js");
+
+await test("v6 strength: one rated game is a Glicko step against the level's measured strength", () => {
+  // θ ↔ GoR uses the ladder's own anchor: rank_10k (θ 11.65) is 10 kyu.
+  assert.equal(Math.round(SE.thetaToGoR(11.65)), 1100);
+  assert.equal(Math.round(SE.thetaToGoR(SE.MEASURED.standard["2d"][19])), 2429);
+  for (const g of [-1500, 0, 1100, 2400]) assert.ok(Math.abs(SE.thetaToGoR(SE.gorToTheta(g)) - g) < 1e-6);
+  // By hand: prior N(mu, 2.5²), +0.2² before the game, against L:10k on 19×19.
+  const est = SE.startEstimate(12, 0);
+  const opp = SE.MEASURED.standard["10k"][19];
+  assert.equal(SE.levelTheta("10k"), opp);
+  const v0 = Math.min(SE.SIGMA0 ** 2, SE.SIGMA0 ** 2 + SE.SIGMA_GAME ** 2);
+  const g = 1 / Math.sqrt(1 + (3 * SE.SIGMA_LEVEL ** 2) / Math.PI ** 2);
+  const e = 1 / (1 + Math.exp(-g * (est.mu - opp)));
+  const v = 1 / (1 / v0 + g * g * e * (1 - e));
+  const won = SE.rateGame(est, { level: "10k", won: true, at: 0 });
+  assert.ok(Math.abs(won.mu - (est.mu + v * g * (1 - e))) < 2e-3, `${won.mu}`);
+  assert.ok(Math.abs(won.sigma - Math.sqrt(v)) < 2e-3);
+  const lost = SE.rateGame(est, { level: "10k", won: false, at: 0 });
+  assert.ok(Math.abs(lost.mu - (est.mu - v * g * e)) < 2e-3);
+  // Beating a stronger level moves you more than beating a weaker one.
+  assert.ok(SE.rateGame(est, { level: "5k", won: true, at: 0 }).mu - est.mu > SE.rateGame(est, { level: "15k", won: true, at: 0 }).mu - est.mu);
+  // The stored shape: v6 fields plus the GoR `r` every v5 reader uses.
+  assert.deepEqual(Object.keys(won).sort(), ["at", "games", "history", "mu", "r", "sigma", "v"]);
+  assert.equal(won.r, Math.round(SE.thetaToGoR(won.mu)));
+  const h = won.history[won.history.length - 1];
+  assert.ok(h.lo < h.r && h.r < h.hi);
+  // Handicap: given stones make the level weaker, given away stronger.
+  assert.ok(SE.levelTheta("10k", { handicap: 3 }) < opp && SE.levelTheta("10k", { handicap: -3 }) > opp);
+  assert.equal(SE.levelTheta("10k", { handicap: 1 }), opp, "one stone is not a handicap");
+  // A board size maps through the levels' measured 19×19 ↔ 9×9 pairs.
+  for (const s of STRENGTHS) assert.ok(Math.abs(SE.onBoard(SE.MEASURED.standard[s.id][19], 9) - SE.MEASURED.standard[s.id][9]) < 1e-9, s.id);
+  for (const t19 of [-8, 0, 3.3, 12, 20, 30]) for (const size of [9, 13]) assert.ok(Math.abs(SE.fromBoard(SE.onBoard(t19, size), size) - t19) < 1e-6, `${t19} ${size}`);
+});
+
+await test("v6 strength: the uncertainty shrinks with games, less on 9×9, and grows with time away", () => {
+  const play = (size, n) => {
+    let est = SE.startEstimate(15, 0);
+    const sig = [est.sigma];
+    for (let i = 0; i < n; i++) {
+      est = SE.rateGame(est, { level: "15k", size, won: i % 2 === 0, at: 0 });
+      sig.push(est.sigma);
+    }
+    return { est, sig };
+  };
+  const big = play(19, 60);
+  for (let i = 1; i < 15; i++) assert.ok(big.sig[i] < big.sig[i - 1], `game ${i}`);
+  // It settles (per-game spread keeps it from reaching zero), near one rank.
+  assert.ok(Math.abs(big.sig[60] - big.sig[50]) < 0.01);
+  assert.ok(big.sig[60] > 0.4 && big.sig[60] < 0.9, `${big.sig[60]}`);
+  const now = SE.estimateNow(big.est, 0);
+  assert.equal(now.pm, 1);
+  assert.equal(now.games, 60);
+  const small = play(9, 60);
+  assert.ok(small.sig[60] > big.sig[60], "a 9×9 game says less about 19×19 strength");
+  // Time away widens the band, never beyond the prior.
+  const later = SE.estimateNow(big.est, 90 * 86400000);
+  assert.ok(later.sigma > now.sigma && later.pm >= now.pm);
+  assert.ok(SE.sigmaAt(big.est, 1e13) <= SE.SIGMA0 + 1e-9);
+  // Even results against a level converge to that level's strength.
+  assert.ok(Math.abs(big.est.mu - SE.MEASURED.standard["15k"][19]) < 1, `${big.est.mu}`);
+  // History is kept, bounded.
+  assert.equal(big.est.history.length, 61);
+  let long = SE.startEstimate(15, 0);
+  for (let i = 0; i < 230; i++) long = SE.rateGame(long, { level: "15k", won: i % 2 === 0, at: i });
+  assert.equal(long.history.length, 200);
+  assert.equal(long.games, 230);
+});
+
+await test("v6 strength: v5 ratings and their history migrate to an estimate with a band", () => {
+  const old = { r: 1200, games: 3, history: [{ at: 10, r: 900 }, { at: 20, r: 1000 }, { at: 30, r: 1100 }, { at: 40, r: 1200 }] };
+  const est = SE.migrateEstimate(old, 50);
+  assert.equal(est.v, 6);
+  assert.equal(est.r, 1200);
+  assert.equal(est.games, 3);
+  assert.equal(est.at, 40);
+  assert.deepEqual(est.history.map((h) => [h.at, h.r]), old.history.map((h) => [h.at, h.r]));
+  for (const h of est.history) assert.ok(h.lo < h.r && h.r < h.hi);
+  // Older points (fewer games) carry wider bands.
+  const width = (h) => SE.gorToTheta(h.hi) - SE.gorToTheta(h.lo);
+  for (let i = 1; i < est.history.length; i++) assert.ok(width(est.history[i]) < width(est.history[i - 1]));
+  assert.ok(est.sigma < SE.SIGMA0);
+  // Idempotent; v6 passes through; junk becomes null.
+  assert.equal(SE.migrateEstimate(est), est);
+  assert.equal(SE.migrateEstimate(null), null);
+  assert.equal(SE.migrateEstimate({ r: "x" }), null);
+  // A v5 rating without history still gets one point.
+  assert.equal(SE.migrateEstimate({ r: 800, games: 0 }, 5).history.length, 1);
+  // Through storage: v4/v5 progress keeps its rating, and it migrates.
+  for (const k of Object.values(KEYS)) removeKey(k);
+  writeJSON(KEYS.progress, { problems: {}, rating: old });
+  migrate();
+  const p = loadProgress();
+  const m = SE.migrateEstimate(p.rating);
+  assert.equal(m.r, 1200);
+  // The migrated estimate keeps updating.
+  const next = SE.rateGame(m, { level: "10k", won: true, at: 60 });
+  assert.equal(next.games, 4);
+  assert.equal(next.history.length, 5);
+  for (const k of Object.values(KEYS)) removeKey(k);
+  // The app migrates at boot and rates with the new model.
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
+  assert.match(ctl, /migrateEstimate\(state\.progress\.rating\)/);
+  const play = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
+  assert.match(play, /rateGame\(prev, \{ level: g\.strength, mode, size: g\.game\.size, handicap, won \}\)/);
+});
+
+await test("v6 strength: the recommended opponent is the level you are expected to play evenly", () => {
+  // At a level's measured strength, that level is the suggestion, on both boards.
+  for (const s of STRENGTHS) {
+    const at = { mu: SE.MEASURED.standard[s.id][19] };
+    assert.equal(SE.recommendStrength(at), s.id, s.id);
+    assert.equal(SE.recommendStrength(at, { size: 9 }), s.id, `9×9 ${s.id}`);
+  }
+  // Between two levels: the nearer by expected score.
+  const mid = (SE.MEASURED.standard["10k"][19] + SE.MEASURED.standard["5k"][19]) / 2;
+  assert.equal(SE.recommendStrength({ mu: mid - 0.3 }), "10k");
+  assert.equal(SE.recommendStrength({ mu: mid + 0.3 }), "5k");
+  // A prior of 12 kyu (the 10k level's label) suggests that level.
+  assert.equal(SE.recommendStrength(SE.startEstimate(12)), "10k");
+  // Winning streaks move the suggestion up.
+  let est = SE.startEstimate(18, 0);
+  assert.equal(SE.recommendStrength(est), "15k");
+  for (let i = 0; i < 8; i++) est = SE.rateGame(est, { level: SE.recommendStrength(est), won: true, at: i });
+  assert.ok(STRENGTHS.findIndex((s) => s.id === SE.recommendStrength(est)) > STRENGTHS.findIndex((s) => s.id === "15k"));
+  // The mode each level would be played in is taken into account.
+  for (const s of STRENGTHS) {
+    const mode = SE.MEASURED.human[s.id] ? "human" : "standard";
+    assert.ok(Number.isFinite(SE.levelTheta(s.id, { mode, size: 19 })) && Number.isFinite(SE.levelTheta(s.id, { mode, size: 9 })));
+  }
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
+  assert.match(ctl, /recommendStrength\(est, \{ size: 19, modeOf \}\)/);
+  assert.match(ctl, /recommendStrength\(est, \{ size: 9, modeOf \}\)/);
+});
+
+await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const block = src.slice(src.indexOf("// v6 strength"));
+  for (const k of ["strength.label", "strength.about"]) {
+    assert.ok(block.includes(`"${k}"`), k);
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+  }
+  for (const lang of LANG_IDS) assert.ok(MESSAGES["strength.label"][lang].includes("±{1}"), lang);
+  const chart = fs.readFileSync(path.join(root, "src/web/js/app/strength-chart.jsx"), "utf8");
+  assert.doesNotMatch(chart, /#[0-9a-fA-F]{3,6}\b/, "no literal colours");
+  for (const tok of ["--text-2", "--text-3", "--text"]) assert.ok(chart.includes(`var(${tok})`), tok);
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);

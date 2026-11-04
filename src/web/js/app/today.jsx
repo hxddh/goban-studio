@@ -10,7 +10,8 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
-import { rankLabel, ratingLabel } from "./play.jsx";
+import { rankLabel } from "./play.jsx";
+import { StrengthChart, estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { weekSummary } from "./week.js";
@@ -20,23 +21,6 @@ function greeting() {
   return t(h < 5 ? "today.night" : h < 12 ? "today.morning" : h < 18 ? "today.afternoon" : "today.evening");
 }
 
-function Sparkline({ history }) {
-  const pts = (history || []).slice(-30);
-  if (pts.length < 2) return null;
-  const W = 160;
-  const H = 32;
-  const min = Math.min(...pts.map((p) => p.r)) - 20;
-  const max = Math.max(...pts.map((p) => p.r)) + 20;
-  const x = (i) => (i / (pts.length - 1)) * W;
-  const y = (r) => H - ((r - min) / (max - min || 1)) * H;
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.r).toFixed(1)}`).join("");
-  return (
-    <svg class="spark" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t("today.progressLabel")}>
-      <path d={d} />
-      <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1].r)} r="2.5" />
-    </svg>
-  );
-}
 
 export function DailyDots({ daily }) {
   return (
@@ -188,10 +172,10 @@ export function TodayView() {
         <section class="section level enter-up">
           <div class="level-text">
             <span class="eyebrow">{t("today.level")}</span>
-            <strong>{r ? ratingLabel(r.r) : "—"}</strong>
+            <strong title={t("strength.about")}>{r ? estimateLabel(r) : "—"}</strong>
             <span class="fine">{r?.games ? t("today.levelGames", [r.games]) : t("today.levelStart")}</span>
           </div>
-          {r && <Sparkline history={r.history} />}
+          {r && <StrengthChart est={r} />}
         </section>
         )}
 

@@ -11,10 +11,11 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
-import { confirmAction, openSheet, remember, resultText, setSetting, strengthForRating, syncMenus, teachingOn } from "./ctl-core.js";
+import { confirmAction, openSheet, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { rankToRating, startRating, updateRating, ratingToRank } from "./rating.js";
+import { ratingToRank } from "./rating.js";
+import { rateGame, recommendStrength, startEstimate } from "./strength.js";
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
 import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 
@@ -129,15 +130,20 @@ function gameOver(g = state.game) {
 export function recommendedGame() {
   const p = state.progress;
   const s = state.settings;
-  const r = p.rating?.r ?? rankToRating(s.playerRank ?? 30);
-  const rank = ratingToRank(r);
-  const strength = s.autoStrength ? strengthForRating(r) : s.strength;
+  // v6: the level you are expected to score closest to even against, from
+  // the strength estimate and the levels' measured strengths (strength.js).
+  const est = p.rating?.mu != null ? p.rating : startEstimate(s.playerRank ?? 30);
+  const rank = ratingToRank(est.r);
+  const modeOf = (st) => Engine.opponentMode(st);
+  const strength = s.autoStrength ? recommendStrength(est, { size: 19, modeOf }) : s.strength;
   // The standard board, always; strength and handicap close the gap. A
-  // 9×9 game is offered beside it as the quick option.
+  // 9×9 game is offered beside it as the quick option (its own level: the
+  // small board compresses the ladder).
   const size = 19;
   const handicap = Engine.suggestHandicap(rank, strength, size);
   const weak = topWeaknesses(p.weakness, 1)[0] || null;
-  const quick = { size: 9, strength, handicap: Engine.suggestHandicap(rank, strength, 9) };
+  const quickStrength = s.autoStrength ? recommendStrength(est, { size: 9, modeOf }) : s.strength;
+  const quick = { size: 9, strength: quickStrength, handicap: Engine.suggestHandicap(rank, quickStrength, 9) };
   return { size, strength, handicap, rank, weak, quick };
 }
 
@@ -614,10 +620,12 @@ function finishGame() {
   let rated = null;
   if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
     const p = state.progress;
-    const prev = p.rating || startRating(state.settings.playerRank ?? 30);
-    const opp = rankToRating(Engine.strengthById(g.strength).rank);
+    const prev = p.rating || startEstimate(state.settings.playerRank ?? 30);
     const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
-    p.rating = updateRating(prev, { opponentRating: opp, handicap, won });
+    // v6: against the level as it played (human-style or stronger network
+    // have their own measured strength; the offline engine counts as standard).
+    const mode = g.opponentMode === "human" || g.opponentMode === "strong" ? g.opponentMode : "standard";
+    p.rating = rateGame(prev, { level: g.strength, mode, size: g.game.size, handicap, won });
     g.ratingDelta = p.rating.r - prev.r;
     g.rated = false;
     rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };

@@ -7,7 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { weekStart, weekSummary } from "../src/web/js/app/week.js";
-import { rankToRating, ratingToRank, updateRating, startRating, expected } from "../src/web/js/app/rating.js";
+import { rankToRating, ratingToRank } from "../src/web/js/app/rating.js";
+import { expectedScore, levelTheta, migrateEstimate, rateGame, startEstimate } from "../src/web/js/app/strength.js";
 import { newClock, tick, moveMade, formatClock } from "../src/web/js/app/clock.js";
 import { ataris, lossSource, classifyMistake, settled, complexity, addWeakness, topWeaknesses } from "../src/web/js/app/insight.js";
 import { attributeLoss } from "../src/web/js/app/insight.js";
@@ -58,24 +59,28 @@ await test("ranks and ratings map both ways on the EGF scale", () => {
   assert.equal(ratingToRank(2150), 0);
   assert.equal(ratingToRank(1450), 7);
   assert.equal(ratingToRank(-5000), 30);
-  assert.ok(Math.abs(expected(1000, 1000) - 0.5) < 1e-9);
+  // v6: an equal opponent is an even game.
+  assert.ok(Math.abs(expectedScore(5, 5) - 0.5) < 1e-9);
 });
 
 await test("winning raises the rating, losing lowers it, and early games move it more", () => {
-  const r0 = startRating(15);
-  const won = updateRating(r0, { opponentRating: rankToRating(15), won: true });
-  const lost = updateRating(r0, { opponentRating: rankToRating(15), won: false });
+  // v6: the strength estimate (strength.js) replaces the v5 Elo update.
+  const r0 = startEstimate(12, 0);
+  const won = rateGame(r0, { level: "10k", won: true, at: 0 });
+  const lost = rateGame(r0, { level: "10k", won: false, at: 0 });
   assert.ok(won.r > r0.r && lost.r < r0.r);
   assert.equal(won.games, 1);
-  let r = { r: 1000, games: 30, history: [] };
-  const late = updateRating(r, { opponentRating: 1000, won: true });
-  const early = updateRating({ r: 1000, games: 0, history: [] }, { opponentRating: 1000, won: true });
+  const late = rateGame(migrateEstimate({ r: 1000, games: 30, history: [] }, 0), { level: "10k", won: true, at: 0 });
+  const early = rateGame(migrateEstimate({ r: 1000, games: 0, history: [] }, 0), { level: "10k", won: true, at: 0 });
   assert.ok(early.r - 1000 > late.r - 1000);
   // Handicap makes the opponent effectively weaker: a win is worth less.
-  const withHc = updateRating({ r: 1000, games: 10, history: [] }, { opponentRating: 1000, handicap: 4, won: true });
-  const even = updateRating({ r: 1000, games: 10, history: [] }, { opponentRating: 1000, won: true });
+  const base = migrateEstimate({ r: 1000, games: 10, history: [] }, 0);
+  const withHc = rateGame(base, { level: "10k", handicap: 4, won: true, at: 0 });
+  const even = rateGame(base, { level: "10k", won: true, at: 0 });
   assert.ok(withHc.r < even.r);
+  assert.ok(levelTheta("10k", { handicap: 4 }) < levelTheta("10k"));
   assert.equal(won.history.length, 2);
+  assert.equal(rankToRating(12), 900);
 });
 
 await test("per-move clock flags after 30 seconds and resets after a move", () => {
