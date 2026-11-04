@@ -493,6 +493,8 @@ export function ReviewView() {
   const node = game.current;
   const marks = [];
   if (r.guess?.last === "wrong" && r.guess.wrongAt) marks.push({ ...r.guess.wrongAt, type: "cross", tone: "bad" });
+  // Marks recorded on this move (SGF TR/SQ/CR/MA/LB).
+  if (!r.variation) for (const mk of node.marks || []) marks.push({ x: mk.x, y: mk.y, type: mk.type, label: mk.text });
   const focusKm = r.focus != null ? r.keyMoves.find((k) => k.index === r.focus) : null;
   if (focusKm?.source && r.variation) for (const p of focusKm.source.points) marks.push({ ...p, type: "area", tone: "bad" });
   if (r.variation) {
@@ -823,6 +825,9 @@ function Variations() {
           <button type="button" class="link" onClick={C.backToMainLine}>
             {t("review.backToMain")}
           </button>
+          <button type="button" class="link" onClick={() => C.promoteVariation()}>
+            {t("edit.promote")}
+          </button>
           <button type="button" class="link danger" onClick={C.deleteVariation}>
             {t("review.deleteVariation")}
           </button>
@@ -888,7 +893,10 @@ function ReviewPanel() {
               <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
             )}
           </section>
+          <GameSummary />
           <Variations />
+          <TreeView />
+          <EditSection />
         </>
       )}
 
@@ -910,6 +918,134 @@ function ReviewPanel() {
         </Button>
       </div>
     </aside>
+  );
+}
+
+/** The game in three phases, and three things to remember. */
+function GameSummary() {
+  const r = state.review;
+  const sm = r.summary;
+  if (!sm || sm.confidence === "none" || !sm.phases?.length) return null;
+  const me = sm.humanColor === WHITE ? "white" : sm.humanColor === BLACK ? "black" : null;
+  const cols = me ? [me] : ["black", "white"];
+  const fmt = (v) => (v == null ? "—" : formatPoints(Math.round(v * 2) / 2));
+  return (
+    <section class="game-summary">
+      <h2 class="slot-title">{t("gameSummary.title")}</h2>
+      <table class="phase-table">
+        <thead>
+          <tr>
+            <th />
+            {cols.map((c) => (
+              <th>{me ? t("gameSummary.pointsLost") : <Stone color={c === "black" ? BLACK : WHITE} size={10} />}</th>
+            ))}
+            {me && <th>{t("gameSummary.mistakes")}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {sm.phases.map((ph) =>
+            ph.from > ph.to ? null : (
+              <tr>
+                <th title={t("gameSummary.phaseMoves", [ph.from, ph.to])}>{t("phase." + ph.id)}</th>
+                {cols.map((c) => (
+                  <td>{fmt(ph.players[c].loss)}</td>
+                ))}
+                {me && <td>{ph.players[me].mistakes + ph.players[me].blunders || "—"}</td>}
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+      {sm.takeaways?.length > 0 && (
+        <ol class="takeaways">
+          {sm.takeaways.filter((tk) => tk.kind !== "estimate").slice(0, 3).map((tk) => (
+            <li class={tk.tone}>
+              {tk.index != null ? (
+                <button type="button" class="link" onClick={() => C.reviewGoto(tk.index)}>
+                  {storyText(tk)}
+                </button>
+              ) : (
+                storyText(tk)
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** The variation tree: every branch of the record, the current move ringed. */
+function TreeView() {
+  const lay = C.treeLayout();
+  const box = useRef(null);
+  useEffect(() => {
+    const el = box.current?.querySelector(".tree-node.cur");
+    el?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  });
+  if (!lay || lay.height <= 1) return null;
+  const S = 14;
+  const pad = 8;
+  const w = lay.width * S + pad * 2;
+  const h = lay.height * S + pad * 2;
+  const X = (x) => pad + x * S;
+  const Y = (y) => pad + y * S;
+  return (
+    <section class="tree-view">
+      <h2 class="slot-title">{t("edit.tree")}</h2>
+      <div class="tree-scroll" ref={box}>
+        <svg width={w} height={h} role="img" aria-label={t("edit.tree")}>
+          {lay.edges.map((e) => (
+            <polyline class={`tree-edge ${e.isMain ? "main" : ""}`} points={e.points.map(([x, y]) => `${X(x)},${Y(y)}`).join(" ")} />
+          ))}
+          {lay.nodes.map((n) => (
+            <circle
+              class={`tree-node ${n.color > 0 ? "b" : n.color < 0 ? "w" : "root"} ${n.isCurrent ? "cur" : ""} ${n.hasComment ? "note" : ""}`}
+              cx={X(n.x)}
+              cy={Y(n.y)}
+              r={n.isCurrent ? 5 : 4}
+              onClick={() => C.gotoNode(n.node)}
+            >
+              <title>{n.x}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+/** Comment on the current move, and the marking tools. */
+function EditSection() {
+  const r = state.review;
+  const node = r.game.current;
+  const kinds = ["triangle", "square", "circle", "cross", "label"];
+  const glyph = { triangle: "△", square: "□", circle: "○", cross: "×", label: "A" };
+  return (
+    <section class="edit-section">
+      <h2 class="slot-title">{t("edit.comment")}</h2>
+      <textarea
+        class="comment-box"
+        rows="3"
+        key={node.id}
+        placeholder={t("edit.commentPlaceholder")}
+        value={node.comment || ""}
+        onInput={(e) => C.setComment(e.currentTarget.value)}
+      />
+      <div class="mark-tools" role="toolbar" aria-label={t("edit.marks")}>
+        {kinds.map((k) => (
+          <button type="button" class={`mark-btn ${r.markTool === k ? "on" : ""}`} aria-pressed={r.markTool === k} title={t("edit.mark." + k)} onClick={() => C.setMarkTool(r.markTool === k ? null : k)}>
+            {glyph[k]}
+          </button>
+        ))}
+        {(node.marks || []).length > 0 && (
+          <button type="button" class="link" onClick={() => C.clearMarks()}>
+            {t("edit.clearMarks")}
+          </button>
+        )}
+      </div>
+      {r.edits?.target === null && <p class="fine">{t("edit.notSaved")}</p>}
+    </section>
   );
 }
 
