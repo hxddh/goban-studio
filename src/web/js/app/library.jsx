@@ -8,10 +8,12 @@ import * as C from "./controller.js";
 import { ReviewView, rankLabel } from "./play.jsx";
 import { Button, Icon, MoreMenu, Segmented, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { ExplorerEntries, ExplorerView } from "./explorer.jsx";
 
 export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
   const L = state.library;
+  if (L.explorer) return <ExplorerView />;
   return (
     <>
     <Toolbar>
@@ -34,12 +36,14 @@ export function LibraryView() {
           { value: "mine", label: t("library.mine") },
           { value: "classics", label: t("library.classics") },
           { value: "openings", label: t("library.openings") },
+          { value: "explorer", label: t("explorer.tab") },
         ]}
       />
       </div>
       {L.tab === "mine" && <MyGames />}
       {L.tab === "classics" && <Classics />}
       {L.tab === "openings" && <Openings />}
+      {L.tab === "explorer" && <ExplorerEntries />}
     </div>
     </>
   );

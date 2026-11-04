@@ -27,6 +27,8 @@ import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { dropReport, restoreReport } from "./report-ctl.js";
 
+import { closeExplorer } from "./explorer-ctl.js";
+
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
 export * from "./review-ctl.js";
@@ -34,6 +36,8 @@ export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
 export * from "./report-ctl.js";
+
+export * from "./explorer-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -93,6 +97,8 @@ export function goSpace(space) {
       dropReview();
       return update();
     }
+    // v6 explorer: Library again closes the explorer.
+    if (space === "library" && state.library.explorer) return closeExplorer();
     return;
   }
   remember();

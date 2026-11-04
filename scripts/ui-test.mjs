@@ -347,6 +347,47 @@ await check("all four languages render every place without overflow or missing s
   }
 });
 
+await check("v6 explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
+  const page = await fresh();
+  await onboard(page, 1);
+  await page.keyboard.press("Control+4");
+  await page.click(".tabs-row .segmented button >> nth=3");
+  await page.click('.collection-row[data-explorer="whole"]');
+  await page.waitForSelector(".explorer-panel");
+  const start = await page.locator(".explorer-row").count();
+  assert(start > 0, "no candidates on the empty board");
+  // The star point (Q16) is a book move: its continuations are listed and
+  // marked on the board in the accent.
+  await clickPoint(page, 15, 3);
+  await page.waitForFunction(() => window.__state.explorer?.game.moveNumber === 1);
+  const after = await page.evaluate(() => ({
+    rows: document.querySelectorAll(".explorer-row").length,
+    inBook: document.querySelectorAll('.explorer-row[data-in-book="1"]').length,
+    marks: window.__board.model.marks.filter((m) => m.type === "book").length,
+    text: document.querySelector(".explorer-panel").innerText,
+  }));
+  assert(after.rows > 0 && after.inBook > 0, `no book continuations after Q16: ${JSON.stringify(after)}`);
+  assert(after.marks > 0, "no candidate marks on the board");
+  assert(after.text.includes("In the book"), "the panel does not say the position is in the book");
+  // A first-line move is out of the book; the preview has no KataGo.
+  await clickPoint(page, 0, 0);
+  await page.waitForFunction(() => document.querySelector(".explorer-panel").innerText.includes("Out of the book"));
+  assert((await page.textContent(".explorer-panel")).includes("desktop app"), "the preview does not explain the missing analysis");
+  // Back through the line, then the corner tree.
+  await page.click(".explorer-layer .review-nav .icon-btn >> nth=1");
+  await page.waitForFunction(() => window.__state.explorer?.game.moveNumber === 1);
+  await page.click(".explorer-panel .segmented button >> nth=1");
+  await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
+  await clickPoint(page, 15, 3);
+  await page.waitForFunction(() => document.querySelectorAll('.explorer-row[data-in-book="1"]').length > 0);
+  const primaries = await page.evaluate(() => [...document.querySelectorAll(".btn.primary")].filter((el) => el.offsetParent !== null).length);
+  assert(primaries === 1, `${primaries} primary buttons`);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".explorer-panel", { state: "detached" });
+  assert(page.errors.length === 0, page.errors.join("; "));
+  await page.close();
+});
+
 /* --------------------------------------------------------- v6 a11y */
 
 // The in-page audit (scripts/a11y-audit.js): names, ids, references,

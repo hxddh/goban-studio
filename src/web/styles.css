@@ -798,3 +798,26 @@ button.group-row:hover { background: var(--fill); }
 .report-practise { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .report-practise p { font: var(--t-read); color: var(--text-2); max-width: 520px; }
 .report-practise .actions { flex: none; flex-direction: row-reverse; }
+
+/* v6 explorer */
+.explorer-panel .segmented { display: flex; align-self: stretch; }
+.explorer-panel .segmented button { flex: 1; }
+.explorer-status { display: flex; flex-direction: column; gap: var(--s-2); }
+.explorer-status .slot-title { margin-bottom: 0; }
+.explorer-line { font: var(--t-body); color: var(--text-2); }
+.explorer-out { font-weight: 500; color: var(--text); }
+.explorer-verdict { font: var(--t-body); color: var(--text); }
+.explorer-verdict.tag-mistake { color: var(--bad); }
+.explorer-cands { min-height: 0; overflow: auto; }
+.explorer-list { margin: 0; padding: 0; list-style: none; }
+.explorer-row { min-height: 44px; cursor: pointer; }
+.explorer-row:hover { background: var(--fill); }
+.explorer-letter { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 500 12px/1 var(--font); background: var(--accent); color: var(--surface); }
+.explorer-row[data-in-book="0"] .explorer-letter { background: none; color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.explorer-row.tag-mistake .explorer-letter { background: none; color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad); }
+.explorer-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.explorer-main strong { font: 500 13px/18px var(--font); font-variant-numeric: tabular-nums; }
+.explorer-num { display: flex; flex-direction: column; align-items: flex-end; font: var(--t-body); font-variant-numeric: tabular-nums; }
+.explorer-about summary { cursor: pointer; font: var(--t-small); color: var(--text-2); }
+.explorer-about p { margin-top: var(--s-2); }
+.page > .explorer-help { margin: calc(var(--s-2) * -1) auto var(--s-3); }

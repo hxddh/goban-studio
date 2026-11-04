@@ -190,6 +190,9 @@ function onKeyDown(e) {
     }
     if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
     if (C.reportVisible()) return C.closeReport();
+
+    // v6 explorer: Esc goes back to the Library list.
+    if (state.space === "library" && state.library.explorer) return C.closeExplorer();
     if (state.settings.focus) return C.toggleFocus();
     return;
   }
@@ -258,6 +261,14 @@ function onKeyDown(e) {
     }
     if (e.key === "Home") return C.reviewGoto(0);
     if (e.key === "End") return C.reviewGoto(Infinity);
+  }
+  // v6 explorer: ← / → step through the line, Home goes back to the start.
+  if (!reviewing && state.space === "library" && state.library.explorer) {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      return C.explorerStep(e.key === "ArrowLeft" ? -1 : 1);
+    }
+    if (e.key === "Home") return C.explorerReset();
   }
   // ← in a live game steps back into review of that game.
   if (!reviewing && state.space === "play" && e.key === "ArrowLeft" && !e.target.closest("canvas") && state.game?.game.mainLine().length > 1) {

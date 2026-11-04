@@ -261,6 +261,22 @@ in this table. Usage targets:
 | main line (of a record) | 主线 | main line | 본선 | 本線 | v5; ja 本譜 means the game as played, which a promoted variation is not |
 | variation tree | 变化树 | variation tree | 변화도 | 変化図 | v5 |
 
+## Opening explorer (v6)
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| opening explorer | 布局与定式探索 | opening explorer | 포석·정석 탐색 | 布石・定石エクスプローラー | v6 `explorer.title` |
+| book (the precomputed openings and joseki) | 棋谱库 / 布局库 | book / opening book | 책 / 포석 책 | 定石集 / 布石集 | v6: "in / out of the book" |
+| tenuki (play elsewhere) | 脱先 | tenuki | 손빼기 | 手抜き | v6 `explorer.elsewhere` |
+| playable (a move within a few points) | 可下 | playable | 둘 만함 | 打てる手 | v6 tag, within 4 points of the best move |
+| standard (whole-board book move) | 常见下法 | standard | 표준 | 定番 | v6 tag for the whole-board tree; the corner tree says joseki |
+| two star points (nirensei) | 二连星 | two star points | 이연성 | 二連星 | |
+| sanrensei (three star points) | 三连星 | sanrensei | 삼연성 | 三連星 | |
+| Chinese opening | 中国流 | Chinese opening | 중국류 | 中国流 | |
+| diagonal star points | 对角星 | diagonal star points | 대각선 화점 | 対角の星 | |
+| facing / staggered 3-4 points | 向小目 / 错小目 | two 3-4 points (facing / staggered) | 향소목 / 엇갈린 소목 | 向かい小目 / 互い違いの小目 | |
+| one-space high approach (short form) | 一间高挂 | one-space high approach | 한 칸 높은 걸침 | 一間高ガカリ | v6 short form of the approach row above |
+
 ## Decisions on doubtful terms
 
 - **Bulky five** — zh 刀把五, ja **刀五**, ko **뭉친 오궁**, en bulky five.
