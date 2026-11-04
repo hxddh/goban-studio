@@ -11,6 +11,7 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
+import { moveText } from "../a11y.js";
 import { confirmAction, openSheet, remember, resultText, setSetting, strengthForRating, syncMenus, teachingOn } from "./ctl-core.js";
 import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { newClock, tick, moveMade } from "./clock.js";
@@ -236,7 +237,7 @@ function playOnGame(x, y, { human = false } = {}) {
     g.captureFx = { color, n: captured, at: performance.now() };
   } else Audio.stone(false);
   g.clock = moveMade(g.clock, color);
-  announce(t("a11y.move", [t(color === BLACK ? "common.black" : "common.white"), coordLabel(x, y, g.game.size)]) + (captured ? " · " + t("a11y.captured", [captured]) : ""));
+  announce(moveText({ color, x, y, captured, size: g.game.size, computer: !human && g.opponent === "ai" }));
   afterMove({ human });
   return true;
 }
@@ -450,7 +451,7 @@ export function requestPass() {
       g.game.pass();
       g.clock = moveMade(g.clock, color);
       Audio.pass();
-      announce(t("common.pass"));
+      announce(moveText({ color, pass: true }));
       afterMove({ human: true });
     },
   });

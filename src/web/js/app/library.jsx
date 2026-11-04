@@ -143,6 +143,7 @@ function MyGames() {
                 </button>
                 <MoreMenu
                   id={"rec-" + g.id}
+                  label={t("a11y.moreFor", [recordTitle(g)])}
                   items={[
                     {
                       icon: "edit",

@@ -347,6 +347,243 @@ await check("all four languages render every place without overflow or missing s
   }
 });
 
+/* --------------------------------------------------------- v6 a11y */
+
+// The in-page audit (scripts/a11y-audit.js): names, ids, references,
+// pointer-only controls, unnamed images, landmarks, contrast.
+const AUDIT = fs.readFileSync(path.join(root, "scripts/a11y-audit.js"), "utf8");
+async function audit(page, where) {
+  const found = await page.evaluate(`(${AUDIT})()`);
+  assert(!found.length, `${where}: ${found.map((f) => `${f.kind} ${f.el}`).join("; ")}`);
+}
+/** Keep every announcement the app's live region makes (window.__heard). */
+async function listen(page) {
+  await page.evaluate(() => {
+    window.__heard = [];
+    const el = document.querySelector(".app > [aria-live]:not(.toasts)");
+    new MutationObserver(() => el.textContent && window.__heard.push(el.textContent)).observe(el, { childList: true, characterData: true, subtree: true });
+  });
+}
+/** What the app's live region and the board's own live region say. */
+async function spoken(page) {
+  await page.waitForTimeout(50);
+  return page.evaluate(() => ({
+    app: document.querySelector(".app > [aria-live]:not(.toasts)")?.textContent || "",
+    board: (document.querySelector(".board-frame [aria-live]")?.textContent || "").replace(/\u200b/g, ""),
+  }));
+}
+/** Wait (up to 2 s) until a live region says what `ok` wants; fail with what it said. */
+async function hear(page, region, ok, what) {
+  let last = "";
+  for (let i = 0; i < 40; i++) {
+    last = (await spoken(page))[region];
+    if (typeof ok === "string" ? last === ok : ok(last)) return last;
+  }
+  throw new Error(`${what}: heard "${last}"`);
+}
+/** Focus the board on screen once the page has registered it (a new view registers after its first paint). */
+async function focusBoard(page) {
+  await page.waitForFunction(() => {
+    const c = document.querySelector("canvas.board");
+    return !!(c && window.__board && window.__board.canvas === c && window.__board.geom);
+  });
+  await page.focus("canvas.board");
+}
+async function newTwoPlayer9(page) {
+  await page.keyboard.press("Control+n");
+  await page.click(".preset >> nth=2");
+  await page.click(".sheet .segmented button >> nth=1");
+  await page.click(".sheet-foot .btn.primary");
+  await page.waitForFunction(() => window.__board?.model.size === 9);
+}
+
+for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
+  await check(`v6 a11y: every place passes the audit (${locale}, ${scheme})`, async () => {
+    const page = await fresh(locale);
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto(origin + "/");
+    await page.waitForSelector(".ob-card");
+    await audit(page, "onboarding");
+    await page.click(".ob-card .btn.primary");
+    await page.click(".choice >> nth=1");
+    await page.waitForSelector("canvas.board, .page");
+    const names = ["today", "play", "practice", "library"];
+    for (const k of ["1", "2", "3", "4"]) {
+      await page.keyboard.press("Control+" + k);
+      await page.waitForTimeout(60);
+      await audit(page, names[Number(k) - 1]);
+    }
+    for (const [keys, what] of [["Control+n", "new game"], ["Control+,", "settings"], ["Control+/", "shortcuts"]]) {
+      await page.keyboard.press(keys);
+      await page.waitForSelector(".sheet");
+      await audit(page, what);
+      await page.keyboard.press("Escape");
+      await page.waitForSelector(".sheet", { state: "detached" });
+    }
+    // A saved game in the library, with its row menu open.
+    await newTwoPlayer9(page);
+    for (const [x, y] of [[2, 2], [6, 6]]) await clickPoint(page, x, y);
+    await page.keyboard.press("Control+s");
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".game-row");
+    await audit(page, "library with a game");
+    await page.click(".game-item .icon-btn");
+    await audit(page, "library row menu");
+    await page.keyboard.press("Escape");
+    await page.click(".tabs-row .segmented button >> nth=1");
+    await page.click(".collection-row >> nth=0");
+    await page.waitForSelector(".review-layer .chart");
+    await audit(page, "review");
+    await page.keyboard.press("Control+3");
+    await page.click(".lesson-row >> nth=0");
+    await page.waitForSelector(".steps");
+    await audit(page, "lesson");
+    await page.keyboard.press("Control+3");
+    await page.click(".topic-card >> nth=0");
+    await audit(page, "topic");
+    await page.click(".problem-card >> nth=0");
+    await audit(page, "problem");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+}
+
+await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
+  const page = await fresh();
+  await onboard(page, 1);
+  const missing = [];
+  const stops = async (where) => {
+    await page.evaluate(() => document.querySelector(".sb-item")?.focus());
+    const seen = new Set();
+    for (let i = 0; i < 80; i++) {
+      await page.keyboard.press("Tab");
+      const r = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const cs = getComputedStyle(el);
+        const ring = (cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0) || cs.boxShadow !== "none";
+        return { id: `${el.tagName}.${el.className} ${el.getAttribute("aria-label") || el.textContent.trim().slice(0, 24)}`, ring };
+      });
+      if (!r || seen.has(r.id)) break;
+      seen.add(r.id);
+      if (!r.ring) missing.push(`${where}: ${r.id}`);
+    }
+    return seen.size;
+  };
+  let total = 0;
+  for (const k of ["1", "2", "3", "4"]) {
+    await page.keyboard.press("Control+" + k);
+    await page.waitForTimeout(60);
+    total += await stops("place " + k);
+  }
+  await page.keyboard.press("Control+4");
+  await page.click(".tabs-row .segmented button >> nth=1");
+  await page.click(".collection-row >> nth=0");
+  await page.waitForSelector(".review-layer .chart");
+  total += await stops("review");
+  assert(!missing.length, missing.join("; "));
+  await page.close();
+  return `${total} stops`;
+});
+
+for (const locale of ["en-US", "zh-CN"]) {
+  await check(`v6 a11y: the board speaks — moves, points, last move, turn, rows (${locale})`, async () => {
+    const page = await fresh(locale);
+    await onboard(page, 1);
+    const L = await page.evaluate(() => window.__state.settings.lang);
+    const want = {
+      en: { b: "Black E6", w: "White D6", point: "E6, black, 3 liberties", last: "Last move: White D6", turn: "Black to play", row: "Row 6: black E; white D", undo: "Move taken back" },
+      zh: { b: "黑 E6", w: "白 D6", point: "E6，黑子，3 口气", last: "最后一手：白 D6", turn: "轮到黑下", row: "第 6 行：黑子 E；白子 D", undo: "已悔棋" },
+    }[L];
+    await newTwoPlayer9(page);
+    await focusBoard(page);
+    await page.keyboard.press("ArrowUp");
+    await hear(page, "board", (s) => s.startsWith("E6"), "the cursor point");
+    await page.keyboard.press("Enter");
+    await hear(page, "app", want.b, "placed stone");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    await hear(page, "app", want.w, "second stone");
+    const keys = [["ArrowRight", null], ["i", want.point], ["m", want.last], ["t", want.turn], ["r", want.row]];
+    for (const [key, text] of keys) {
+      await page.keyboard.press(key);
+      if (text) await hear(page, "board", text, `key ${key}`);
+    }
+    await page.keyboard.press("b");
+    await hear(page, "board", (s) => s.includes(want.row), "the board summary");
+    await page.keyboard.press("Control+z");
+    await hear(page, "app", (s) => s.startsWith(want.undo), "undo");
+    // Review: stepping through the moves speaks each one.
+    await page.keyboard.press("Enter"); // White D6 again (M left the cursor there)
+    await hear(page, "app", want.w, "replayed stone");
+    await page.keyboard.press("Control+Shift+R");
+    await page.waitForSelector(".review-layer");
+    await focusBoard(page);
+    await page.keyboard.press(",");
+    await hear(page, "app", (s) => s.includes(want.b), "review: back a move");
+    await page.keyboard.press(".");
+    await hear(page, "app", (s) => s.includes(want.w), "review: forward a move");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+}
+
+await check("v6 a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
+  const page = await fresh();
+  await onboard(page, 1);
+  await page.keyboard.press("Control+3");
+  await page.click(".topic-card >> nth=0");
+  await page.click(".problem-card >> nth=0");
+  const goal = await page.evaluate(() => document.querySelector(".goal").textContent.trim());
+  await hear(page, "app", (s) => s.includes(goal), "the problem's goal");
+  await focusBoard(page);
+  await page.keyboard.press("t");
+  await hear(page, "board", goal, "T");
+  const right = await page.evaluate(() => {
+    const P = window.__state.practice.problem;
+    return window.__solver.solveFirstMoves(P.pz).correct[0];
+  });
+  await listen(page);
+  await clickPoint(page, right.x, right.y);
+  await page.waitForFunction(() => window.__state.practice.problem.status !== "open" || window.__state.practice.problem.feedback === "keep", null, { timeout: 4000 });
+  await page.waitForTimeout(150);
+  const heard = await page.evaluate(() => window.__heard);
+  const verdict = await page.evaluate(() => document.querySelector(".feedback")?.textContent.trim());
+  assert(/^Black [A-T]\d+/.test(heard[0] || ""), `the move was not spoken: ${heard.join(" | ")}`);
+  assert(heard.some((h) => h.includes(verdict)), `the verdict "${verdict}" was not spoken: ${heard.join(" | ")}`);
+  await page.keyboard.press("Control+3");
+  await page.click(".lesson-row >> nth=0");
+  await page.waitForSelector(".steps");
+  await hear(page, "app", (s) => s.includes("Step 1 of"), "the lesson step");
+  await page.close();
+});
+
+await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc", async () => {
+  const page = await fresh();
+  await onboard(page, 1);
+  await page.keyboard.press("Control+4");
+  await page.focus(".tabs-row .segmented button[aria-checked=true]");
+  await page.keyboard.press("ArrowRight");
+  assert((await page.evaluate(() => window.__state.library.tab)) === "classics", "→ did not choose the next segment");
+  assert(await page.evaluate(() => document.activeElement.getAttribute("aria-checked") === "true"), "focus did not follow the choice");
+  await page.keyboard.press("Control+2");
+  await page.focus(".panel .menu-wrap .icon-btn");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".menu [role=menuitem]");
+  await page.waitForFunction(() => document.activeElement?.getAttribute("role") === "menuitem", null, { timeout: 2000 }); // the menu takes focus
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".menu", { state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.matches(".menu-wrap .icon-btn"), null, { timeout: 2000 }); // Esc gives it back to the button
+  // Larger text: one step up the type scale, and back.
+  const body = (px) => page.waitForFunction((px) => getComputedStyle(document.body).fontSize === px, px, { timeout: 2000 });
+  await body("13px");
+  await page.keyboard.press("Control+Equal");
+  await body("15px");
+  await page.keyboard.press("Control+Minus");
+  await body("13px");
+  await page.close();
+});
+
 /* ------------------------------------------------------------ visuals */
 
 for (const vp of [

@@ -17,6 +17,8 @@ import { PlayView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryView } from "./library.jsx";
 import { Sheets } from "./sheets.jsx";
+import { useAnnouncements } from "./announcer.js";
+import { installKeys, textSizeKeys } from "./a11y-keys.js";
 
 function Toasts() {
   return (
@@ -36,6 +38,7 @@ function App() {
     document.documentElement.lang = s.settings?.lang === "zh" ? "zh-CN" : s.settings?.lang || "en";
     document.title = "Goban Studio";
   });
+  useAnnouncements(); // v6 a11y: review moves, problems, lessons
   if (!s.ready) return null;
   const focus = isFocus();
   const reviewKey = s.review ? "review-" + s.review.source : "";
@@ -91,6 +94,7 @@ const COMMANDS = {
   "view.numbers": () => C.setSetting("numbers", !state.settings.numbers),
   "view.eval": () => C.setSetting("showEval", !state.settings.showEval),
   "view.live": () => C.toggleLive(),
+  "view.largeText": () => C.setSetting("largeText", !state.settings.largeText),
   "go.today": () => C.goSpace("today"),
   "go.play": () => C.goSpace("play"),
   "go.practice": () => C.goSpace("practice"),
@@ -132,6 +136,8 @@ function menuSpec() {
         { label: t("settings.moveNumbers"), command: "view.numbers", checked: !!s.numbers },
         { label: t("settings.showEval"), command: "view.eval", checked: !!s.showEval },
         { label: t("settings.liveAnalysis"), command: "view.live", checked: !!s.liveAnalysis },
+        { separator: true },
+        { label: t("a11y.largeText"), command: "view.largeText", checked: !!s.largeText },
       ],
     },
     {
@@ -185,6 +191,7 @@ function onKeyDown(e) {
   }
   if (state.sheet?.kind === "onboarding") return;
   if (mod && !e.altKey) {
+    if (textSizeKeys(e)) return;
     const map = { n: "file.new", ",": "app.settings", "/": "help.shortcuts", "?": "help.shortcuts", o: "file.import", "[": "go.back", "]": "go.forward" };
     if (!e.shiftKey && map[k]) {
       e.preventDefault();
@@ -282,6 +289,7 @@ export function start() {
   window.__solver = S;
   render(<App />, document.getElementById("root"));
   document.addEventListener("keydown", onKeyDown);
+  installKeys();
   // Mouse back/forward buttons move through history.
   window.addEventListener("mouseup", (e) => {
     if (e.button === 3) C.back();

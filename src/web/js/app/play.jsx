@@ -1027,6 +1027,7 @@ function EditSection() {
       <h2 class="slot-title">{t("edit.comment")}</h2>
       <textarea
         class="comment-box"
+        aria-label={t("edit.comment")}
         rows="3"
         key={node.id}
         placeholder={t("edit.commentPlaceholder")}

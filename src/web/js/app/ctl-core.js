@@ -20,6 +20,7 @@ export function applyAppearance() {
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
   root.dataset.board = s.board || "plain";
+  root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
 }
 
 export function setSetting(key, value) {
@@ -29,12 +30,12 @@ export function setSetting(key, value) {
   saveSettings(state.settings);
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
-  if (key === "appearance") applyAppearance();
+  if (key === "appearance" || key === "largeText") applyAppearance();
   if (key === "board") {
     Audio.setMaterial?.(value);
     applyAppearance();
   }
-  if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval") syncMenus();
+  if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 
 let menuSync = () => {};

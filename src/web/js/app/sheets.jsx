@@ -12,6 +12,7 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
+import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 
 export function Sheets() {
   const sheet = state.sheet;
@@ -589,19 +590,29 @@ function ShortcutsSheet() {
     ["Tab · ↑↓←→ · Space", t("shortcuts.board")],
     ["Esc", t("shortcuts.close")],
     [`${MOD}/`, t("shortcuts.title")],
+    ...a11yKeyRows(MOD),
+  ];
+  const groups = [
+    [null, rows],
+    [t("a11y.keysTitle"), boardKeyRows()],
   ];
   return (
     <Modal title={t("shortcuts.title")}>
-      <dl class="shortcuts">
-        {rows.map(([k, v]) => (
-          <>
-            <dt>
-              <kbd>{k}</kbd>
-            </dt>
-            <dd>{v}</dd>
-          </>
-        ))}
-      </dl>
+      {groups.map(([head, list]) => (
+        <section class="settings-group">
+          {head && <h3>{head}</h3>}
+          <dl class="shortcuts">
+            {list.map(([k, v]) => (
+              <>
+                <dt>
+                  <kbd>{k}</kbd>
+                </dt>
+                <dd>{v}</dd>
+              </>
+            ))}
+          </dl>
+        </section>
+      ))}
     </Modal>
   );
 }
