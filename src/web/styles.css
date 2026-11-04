@@ -728,3 +728,4 @@ button.group-row:hover { background: var(--fill); }
 .update-block { display: flex; flex-direction: column; gap: var(--s-2); }
 .update-progress { display: flex; align-items: center; gap: var(--s-3); }
 .update-progress .progress { flex: 1; }
+.units-heading { margin: var(--s-4) 0 var(--s-1); font: var(--t-caption); color: var(--text-3); letter-spacing: 0.02em; }

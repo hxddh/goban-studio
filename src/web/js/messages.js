@@ -690,6 +690,7 @@ export const MESSAGES = {
   "shape.second-line-seven": m("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
 
   // v5 ui
+  "course.intermediate": m("进阶", "Intermediate", "중급", "中級"),
   "tip.opening.1": m("开局先占角：角上最容易围空，星位和小目都是好点。", "Start in the corners: they are the easiest place to make territory. The 4-4 and 3-4 points are good first moves.", "포석은 귀부터: 귀가 집을 짓기 가장 쉽습니다. 화점과 소목이 좋은 첫 수입니다.", "布石はまず隅から。隅は地を作りやすく、星と小目がよい第一手です。"),
   "tip.opening.2": m("占完角，再沿边拆开或守角；中腹最后再说。", "After the corners, approach, enclose or extend along the sides; the centre comes last.", "귀를 차지한 뒤에는 걸치거나 굳히고 변으로 벌립니다. 중앙은 마지막입니다.", "隅を打ったら、カカリ・シマリ・辺への開きへ。中央は最後です。"),
   "tip.opening.3": m("对方逼近时先看自己的棋是否安全，再找大场。", "When the opponent comes close, check your own groups are safe before taking the next big point.", "상대가 다가오면 내 돌이 안전한지 먼저 살핀 뒤 큰 자리를 찾으세요.", "相手が近づいてきたら、まず自分の石の安全を確かめてから大場を探しましょう。"),

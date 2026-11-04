@@ -153,7 +153,10 @@ function CourseMap({ next }) {
         const all = done === unit.lessons.length;
         const state_ = all ? "done" : ui === current ? "now" : done > 0 ? "some" : "todo";
         const expanded = shown === ui;
+        const firstMid = unit.level === "intermediate" && C.COURSE[ui - 1]?.level !== "intermediate";
         return (
+          <>
+          {firstMid && <li class="units-heading">{t("course.intermediate")}</li>}
           <li class={`unit ${state_} ${expanded ? "open" : ""}`}>
             <button type="button" class="unit-head" aria-expanded={expanded} onClick={() => setOpen(expanded ? -1 : ui)}>
               <span class="unit-no">{all ? <Icon name="check" size={13} /> : ui + 1}</span>
@@ -186,6 +189,7 @@ function CourseMap({ next }) {
               </ul>
             )}
           </li>
+          </>
         );
       })}
     </ol>

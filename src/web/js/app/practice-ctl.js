@@ -30,8 +30,21 @@ export function allLessons() {
   return out;
 }
 
+/**
+ * The next lesson. Someone who already plays (onboarding "I play regularly",
+ * or a level of about 15 kyu or stronger) starts at the intermediate course;
+ * the basics stay open from the course map.
+ */
 export function nextLesson() {
-  return allLessons().find(({ lesson }) => !state.progress.lessons[lesson.id]?.done) || null;
+  const all = allLessons();
+  const open = ({ lesson }) => !state.progress.lessons[lesson.id]?.done;
+  const rank = state.settings.playerRank ?? 30;
+  const experienced = state.settings.experience === "player" || rank <= 15;
+  if (experienced) {
+    const mid = all.find((x) => x.unit.level === "intermediate" && open(x));
+    if (mid) return mid;
+  }
+  return all.find(open) || null;
 }
 
 /** The unit that teaches a topic, for weakness-driven recommendations. */
