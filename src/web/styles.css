@@ -764,3 +764,4 @@ button.group-row:hover { background: var(--fill); }
 .explorer-num { display: flex; flex-direction: column; align-items: flex-end; font: var(--t-body); font-variant-numeric: tabular-nums; }
 .explorer-about summary { cursor: pointer; font: var(--t-small); color: var(--text-2); }
 .explorer-about p { margin-top: var(--s-2); }
+.page > .explorer-help { margin: calc(var(--s-2) * -1) auto var(--s-3); }

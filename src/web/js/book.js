@@ -285,8 +285,8 @@ export function tagOf(loss, inBook = true) {
 }
 
 /**
- * The continuations of a book node, best first: every book move (each one
- * with its own evaluated position) and KataGo's other candidates. Each:
+ * The continuations of a book node: every book move (each one with its own
+ * evaluated position), then KataGo's other candidates, each group best first. Each:
  * { move: "xy", x, y, inBook, visits, winrate, score, loss, tag, node }.
  * `loss` is in points for the player to move, against the best of the
  * evaluated replies and KataGo's first choice.
@@ -315,7 +315,9 @@ export function continuations(node, map = (mv) => decodeMove(mv)) {
     const loss = Math.max(0, best - s * c.score);
     out.push({ move: c.move, ...map(c.move), inBook: false, visits: c.visits, winrate: c.winrate, score: c.score, loss, tag: tagOf(loss, false), node: null });
   }
-  out.sort((a, b) => a.loss - b.loss || b.visits - a.visits);
+  // Book moves first (they have their own evaluated positions), then
+  // KataGo's other candidates; each group best first.
+  out.sort((a, b) => b.inBook - a.inBook || a.loss - b.loss || b.visits - a.visits);
   return out;
 }
 

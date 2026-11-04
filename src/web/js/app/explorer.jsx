@@ -193,7 +193,7 @@ export function ExplorerEntries() {
   const b = X.theBook();
   return (
     <>
-      <p class="muted section-sub">{t("explorer.help")}</p>
+      <p class="muted section-sub explorer-help">{t("explorer.help")}</p>
       <ul class="group collection">
         {X.EXPLORER_MODES.map((mode) => (
           <li>

@@ -347,7 +347,8 @@ const engine = startKataGo();
 const book = {
   format: BOOK_FORMAT,
   engine: "KataGo",
-  network: arg("network-name", path.basename(MODEL).replace(/\.(txt|bin)\.gz$/, "")),
+  // The shipped network is engine/model/model.txt.gz, the public b6c96 net.
+  network: arg("network-name", MODEL === path.join(root, "engine", "model", "model.txt.gz") ? "b6c96 (engine/model)" : path.basename(MODEL).replace(/\.(txt|bin)\.gz$/, "")),
   visits: VISITS,
   rules: RULES,
   komi: KOMI,

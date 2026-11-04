@@ -2391,7 +2391,12 @@ await test("v6 explorer: lookup gives continuations with point losses and tags",
     assert.ok(c.loss >= 0 && Number.isFinite(c.score) && c.winrate >= 0 && c.winrate <= 1);
     assert.equal(c.tag, Book.tagOf(c.loss, c.inBook));
   }
-  for (let i = 1; i < hit.continuations.length; i++) assert.ok(hit.continuations[i].loss >= hit.continuations[i - 1].loss);
+  // Book moves first, then KataGo's other candidates, each group best first.
+  const primary = hit.continuations.filter((c) => !c.image);
+  for (let i = 1; i < primary.length; i++) {
+    const [a, b] = [primary[i - 1], primary[i]];
+    assert.ok(a.inBook > b.inBook || (a.inBook === b.inBook && b.loss >= a.loss), `order at ${i}`);
+  }
   assert.equal(Book.tagOf(0), "joseki");
   assert.equal(Book.tagOf(Book.JOSEKI_LOSS), "joseki");
   assert.equal(Book.tagOf(0, false), "good");
