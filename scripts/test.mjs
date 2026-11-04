@@ -3294,6 +3294,12 @@ await test("v6 strength: strings in one block, four languages; the chart uses de
   for (const tok of ["--text-2", "--text-3", "--text"]) assert.ok(chart.includes(`var(${tok})`), tok);
 });
 
+// v7: each area's tests live in scripts/tests/*.mjs (in name order).
+for (const f of fs.readdirSync(path.join(root, "scripts/tests")).filter((n) => n.endsWith(".mjs")).sort()) {
+  const mod = await import("./tests/" + f);
+  await mod.default({ test, assert, root });
+}
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);
