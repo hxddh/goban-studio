@@ -2432,6 +2432,33 @@ await test("v6 strength: the recommended opponent is the level you are expected 
   assert.match(ctl, /recommendStrength\(est, \{ size: 9, modeOf \}\)/);
 });
 
+await test("v6 strength: the calibration fit can hold the measured ladder and place new players in its frame", () => {
+  const rnd = mulberry32(7);
+  const truth = { "L:a": 0, "L:b": 3, "L:c": 9, "HL:x": 4.2, "HL:y": 8 };
+  const games = [];
+  const pairs = [["HL:x", "L:a"], ["HL:x", "L:b"], ["HL:x", "L:c"], ["HL:y", "L:b"], ["HL:y", "L:c"], ["HL:x", "HL:y"]];
+  for (const [p, q] of pairs) {
+    for (let k = 0; k < 600; k++) {
+      const [black, white] = k % 2 ? [p, q] : [q, p];
+      const pr = 1 / (1 + Math.exp(-(truth[black] - truth[white])));
+      games.push({ black, white, winner: rnd() < pr ? "B" : "W", plies: 60, reason: "passes" });
+    }
+  }
+  const fixed = { "L:a": 0, "L:b": 3, "L:c": 9 };
+  const fit = fitBT(games, Object.keys(truth), { fixed });
+  for (const p of Object.keys(fixed)) assert.equal(fit.theta[p], fixed[p], p);
+  for (const p of ["HL:x", "HL:y"]) assert.ok(Math.abs(fit.theta[p] - truth[p]) < 0.25, `${p} ${fit.theta[p]}`);
+  // A clean sweep against a far-away fixed player stays finite.
+  const sweep = Array.from({ length: 20 }, (_, k) => ({ black: k % 2 ? "HL:z" : "L:c", white: k % 2 ? "L:c" : "HL:z", winner: k % 2 ? "B" : "W" }));
+  const fz = fitBT(sweep, ["L:c", "HL:z"], { fixed: { "L:c": 9 } });
+  assert.ok(Number.isFinite(fz.theta["HL:z"]) && fz.theta["HL:z"] > 9);
+  // With a map, rows get GoR in the v4 frame and the held players have no spread.
+  const r = analyse(games, { boot: 10, fixed, gorMap: SE.thetaToGoR });
+  const row = (p) => r.rows.find((x) => x.player === p);
+  assert.equal(row("L:b").lo, 3);
+  assert.equal(Math.round(row("L:c").gor), Math.round(SE.thetaToGoR(9)));
+});
+
 await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {
   const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
   const block = src.slice(src.indexOf("// v6 strength"));
