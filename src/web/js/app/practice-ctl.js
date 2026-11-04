@@ -68,8 +68,11 @@ export function tightView(size, points) {
   if (y0 <= 2) y0 = 0;
   if (x1 >= size - 3) x1 = size - 1;
   if (y1 >= size - 3) y1 = size - 1;
-  const span = Math.max(x1 - x0, y1 - y0, 7);
-  const grow = (a0, a1) => {
+  // Not square any more: each side at least 5 lines, and neither side more
+  // than about 1.7× the other (the frame takes the window's proportion).
+  const longest = Math.max(x1 - x0, y1 - y0, 5);
+  const minSpan = Math.max(5, Math.ceil(longest / 1.7));
+  const grow = (a0, a1, span) => {
     while (a1 - a0 < span) {
       if (a0 > 0 && (a1 >= size - 1 || a0 > size - 1 - a1)) a0--;
       else if (a1 < size - 1) a1++;
@@ -77,8 +80,8 @@ export function tightView(size, points) {
     }
     return [a0, a1];
   };
-  [x0, x1] = grow(Math.max(0, x0), Math.min(size - 1, x1));
-  [y0, y1] = grow(Math.max(0, y0), Math.min(size - 1, y1));
+  [x0, x1] = grow(Math.max(0, x0), Math.min(size - 1, x1), Math.max(minSpan, x1 - x0));
+  [y0, y1] = grow(Math.max(0, y0), Math.min(size - 1, y1), Math.max(minSpan, y1 - y0));
   if (x0 === 0 && y0 === 0 && x1 === size - 1 && y1 === size - 1) return null;
   return { x0, y0, x1, y1 };
 }

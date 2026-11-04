@@ -2,7 +2,7 @@
  * Small shared pieces: icons, buttons, segmented controls, the board.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BoardView } from "../board.js";
+import { BoardView, frameAspect } from "../board.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
@@ -190,7 +190,7 @@ export function Board({ model, onPlay, onHover, label }) {
   };
   return (
     <div class="board-area">
-    <div class="board-frame">
+    <div class="board-frame" style={{ "--aspect": frameAspect(model) }}>
       <canvas
         ref={canvas}
         class="board"

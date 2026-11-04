@@ -552,6 +552,11 @@ export const MESSAGES = {
   "shape.second-line-seven": m("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
 
   // v5 ui
+  "practice.difficulty": m("难度", "Difficulty", "난이도", "難易度"),
+  "practice.record": m("记录", "Your record", "기록", "記録"),
+  "practice.recordNew": m("第一次做", "First try", "처음 풉니다", "初挑戦"),
+  "practice.recordSolved": m("已解出 · 尝试 {0} 次", "Solved · {0} tries", "해결 · {0}번 시도", "正解済み · {0} 回"),
+  "practice.recordTried": m("尝试 {0} 次，还没解出", "{0} tries, not solved yet", "{0}번 시도, 아직 못 풂", "{0} 回挑戦、まだ未正解"),
   "week.title": m("本周", "This week", "이번 주", "今週"),
   "week.games": m("盘对局", "games", "대국", "局"),
   "week.problems": m("道题解出", "problems solved", "문제 해결", "問 正解"),

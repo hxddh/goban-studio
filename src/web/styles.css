@@ -290,7 +290,7 @@ select, .text-input {
 .stage { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: var(--s-3); padding: var(--s-5); }
 .board-area { flex: 1; width: 100%; min-height: 0; container-type: size; display: grid; place-items: center; }
 .board-frame {
-  position: relative; width: min(100cqw, 100cqh); max-width: 1120px; aspect-ratio: 1;
+  position: relative; width: min(100cqw, calc(100cqh * var(--aspect, 1))); max-width: 1120px; aspect-ratio: var(--aspect, 1);
   border-radius: 4px; overflow: hidden; background: var(--board); box-shadow: var(--shadow-board);
   transition: box-shadow var(--dur-3) var(--ease-out);
 }
@@ -665,3 +665,19 @@ button.group-row:hover { background: var(--fill); }
 .week-grid strong.up { color: var(--good); }
 .week-grid strong.down { color: var(--bad); }
 .week-grid span { font: var(--t-small); color: var(--text-3); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); margin: 0; padding-top: var(--s-3); border-top: 1px solid var(--line); font: var(--t-small); }
+.facts dt { color: var(--text-3); }
+.facts dd { margin: 0; display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
+.facts .link { font-size: 12px; }
+
+/* v5: the course as a map */
+.units.map { gap: var(--s-2); }
+.units.map .unit { padding: 0; }
+.units.map .unit-head { width: 100%; align-items: center; padding: var(--s-3) var(--s-4); border: 0; background: none; cursor: pointer; text-align: left; color: inherit; border-radius: var(--r-2); }
+.units.map .unit-head:hover { background: var(--fill); }
+.units.map .unit-head > .icon { color: var(--text-3); }
+.units.map .lesson-list { margin: 0 var(--s-4) var(--s-3) 52px; }
+.unit-progress { display: flex; align-items: center; gap: var(--s-2); width: 140px; flex: none; }
+.unit.done .unit-no { background: var(--good-soft); color: var(--good); }
+.unit.now .unit-no { background: var(--text); color: var(--on-primary); }
+.unit.todo .unit-text h3 { color: var(--text-2); }
