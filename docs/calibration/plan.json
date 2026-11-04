@@ -1,0 +1,15 @@
+{
+  "note": "v7 stage 1: 9x9 screen of candidate human-style settings for the 5k and 1k slots (docs/strength.md, v7)",
+  "runs": [
+    {
+      "id": "v7-screen9",
+      "size": 9,
+      "games": 12,
+      "pairs": "CH:s12k24-L:10k,CH:s12k24-L:5k,CH:s12k24-L:1k,CH:s12k24-HL:10k,CH:s12k24-HL:5k,CH:s10k8-L:10k,CH:s10k8-L:5k,CH:s10k8-L:1k,CH:s10k8-HL:10k,CH:s10k8-HL:5k,CH:s10k16-L:10k,CH:s10k16-L:5k,CH:s10k16-L:1k,CH:s10k16-HL:10k,CH:s10k16-HL:5k,CH:s10k24-L:10k,CH:s10k24-L:5k,CH:s10k24-L:1k,CH:s10k24-HL:10k,CH:s10k24-HL:5k,CH:s7k8-L:10k,CH:s7k8-L:5k,CH:s7k8-L:1k,CH:s7k8-HL:10k,CH:s7k8-HL:5k,CH:s7k12-L:10k,CH:s7k12-L:5k,CH:s7k12-L:1k,CH:s7k12-HL:10k,CH:s7k12-HL:5k,CH:s7k24b5-L:10k,CH:s7k24b5-L:5k,CH:s7k24b5-L:1k,CH:s7k24b5-HL:10k,CH:s7k24b5-HL:5k,CH:s5k24-L:5k,CH:s5k24-L:1k,CH:s5k24-L:2d,CH:s5k24-HL:5k,CH:s5k24-HL:1k,CH:s4k32-L:5k,CH:s4k32-L:1k,CH:s4k32-L:2d,CH:s4k32-HL:5k,CH:s4k32-HL:1k",
+      "shards": 8,
+      "workers": 4,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    }
+  ]
+}
