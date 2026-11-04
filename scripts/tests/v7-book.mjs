@@ -42,8 +42,8 @@ export default async function ({ test, assert, root }) {
   await test("v7 book: deeper and broader than v6", () => {
     const whole = book.trees.whole;
     const corner = book.trees.corner;
-    assert.ok(whole.nodes.length >= 1000, `whole ${whole.nodes.length}`);
-    assert.ok(corner.nodes.length >= 1400, `corner ${corner.nodes.length}`);
+    assert.ok(whole.nodes.length >= 2000, `whole ${whole.nodes.length}`);
+    assert.ok(corner.nodes.length >= 1600, `corner ${corner.nodes.length}`);
     const deepest = (t) => Math.max(...t.nodes.map((n) => n.depth));
     assert.ok(deepest(whole) >= 10, `whole depth ${deepest(whole)}`);
     assert.ok(deepest(corner) >= 14, `corner depth ${deepest(corner)}`);
