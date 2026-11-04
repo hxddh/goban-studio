@@ -2297,6 +2297,73 @@ await test("v5: the packaged self-test checks the downloads only when the workfl
   assert.match(main, /GOBAN_MODELS_DIR/);
 });
 
+/* ------------------------------------------------------------ v6 advanced */
+
+await test("v6 advanced: the advanced units follow the intermediate ones and keep every earlier lesson id", () => {
+  const levels = COURSE.map((u) => u.level || "beginner");
+  const order = ["beginner", "intermediate", "advanced"];
+  for (let i = 1; i < levels.length; i++) assert.ok(order.indexOf(levels[i]) >= order.indexOf(levels[i - 1]), `unit ${COURSE[i].id} out of order`);
+  const adv = COURSE.filter((u) => u.level === "advanced");
+  assert.ok(adv.length >= 4 && adv.length <= 6, `${adv.length} advanced units`);
+  const lessons = adv.flatMap((u) => u.lessons);
+  assert.ok(lessons.length >= 15 && lessons.length <= 20, `${lessons.length} advanced lessons`);
+  for (const l of lessons) assert.match(l.id, /^adv-/);
+  // The beginner and intermediate lessons are unchanged and come first.
+  const before = COURSE.filter((u) => u.level !== "advanced").flatMap((u) => u.lessons.map((l) => l.id));
+  for (const id of ["stones-board", "game-dead", "opening-corner-points", "fight-split"]) assert.ok(before.includes(id), id);
+  const all = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
+  assert.deepEqual(all.slice(0, before.length), before);
+  // Every advanced problem step proves under validate() (check-course does too).
+  for (const l of lessons)
+    for (const st of l.steps)
+      if (st.kind === "problem") {
+        const v = S.validate(S.createPuzzle(st.problem));
+        assert.ok(v.ok, `${l.id}: ${v.reasons.join("; ")}`);
+        if (st.problem.ko === "ok") assert.equal(v.result, "ko", l.id);
+        if (st.problem.goal === "seki") assert.equal(v.result, "seki", l.id);
+      }
+});
+
+await test("v6 advanced: the next lesson sends players of about 5 kyu and stronger to the advanced course", async () => {
+  const { pickNextLesson, ADVANCED_RANK } = await import("../src/web/js/app/course-path.js");
+  assert.equal(ADVANCED_RANK, 5);
+  const all = [];
+  for (const unit of COURSE) for (const lesson of unit.lessons) all.push({ unit, lesson });
+  const firstOf = (level) => all.find((x) => (x.unit.level || "beginner") === level).lesson.id;
+  const none = () => false;
+  const next = (done, who) => pickNextLesson(all, (id) => done.has(id), who)?.lesson.id;
+  // A new player starts at the beginning; a 10 kyu player at the intermediate course.
+  assert.equal(next(new Set(), { experience: "new", playerRank: 30 }), firstOf("beginner"));
+  assert.equal(next(new Set(), { experience: "player", playerRank: 10 }), firstOf("intermediate"));
+  // 5 kyu, 3 kyu and 2 dan who skipped the intermediate course go to the advanced one.
+  for (const playerRank of [5, 3, -1]) assert.equal(pickNextLesson(all, none, { experience: "player", playerRank }).lesson.id, firstOf("advanced"), `rank ${playerRank}`);
+  // The rating from games counts as the estimate: a 10 kyu self-assessment rated 4 kyu.
+  assert.equal(next(new Set(), { experience: "player", playerRank: 10, rating: 1700 }), firstOf("advanced"));
+  // ... and a 5 kyu self-assessment whose games say 9 kyu stays in the intermediate course.
+  assert.equal(next(new Set(), { experience: "player", playerRank: 5, rating: 1200 }), firstOf("intermediate"));
+  // Part way through the intermediate course: finish it first.
+  const mids = all.filter((x) => x.unit.level === "intermediate").map((x) => x.lesson.id);
+  assert.equal(next(new Set(mids.slice(0, 2)), { experience: "player", playerRank: 4 }), mids[2]);
+  // Finished it: on to the advanced course, even with beginner lessons left open.
+  assert.equal(next(new Set(mids), { experience: "player", playerRank: 4 }), firstOf("advanced"));
+  // A 10 kyu player who finished the intermediate course is not pushed past the basics.
+  assert.equal(next(new Set(mids), { experience: "player", playerRank: 10 }), firstOf("beginner"));
+  // Everything done: nothing next.
+  assert.equal(pickNextLesson(all, () => true, { playerRank: 1 }), null);
+});
+
+await test("v6 advanced: the strings are one block in four languages and the course map shows the level", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 advanced\n").length, 2, "one v6 advanced block");
+  const block = src.slice(src.indexOf("// v6 advanced"));
+  assert.ok(block.includes('"course.advanced"'));
+  for (const lang of LANG_IDS) assert.ok(MESSAGES["course.advanced"][lang].trim(), lang);
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/app/practice.jsx"), "utf8");
+  assert.match(jsx, /course\.advanced/);
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/practice-ctl.js"), "utf8");
+  assert.match(ctl, /pickNextLesson\(allLessons\(\)/);
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);

@@ -215,6 +215,24 @@ in this table. Usage targets:
 | splitting attack | 分开攻击 | splitting attack | 갈라서 공격하기 | 分断して攻める | descriptive in zh / ko / ja |
 | attack from a distance | 从远处攻击 | attack from a distance | 멀리서 공격하기 | 離れて攻める | descriptive |
 
+## Advanced course (v6)
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| advanced (course level) | 高级 | Advanced | 고급 | 上級 | v6 `course.advanced`, the course map heading |
+| whole-board judgement | 全局判断 | whole-board judgement | 전체 판단 | 大局観 | v6 unit `adv-judgement`; ko 대세관 is also used |
+| drive toward your thickness | 往厚势上赶 | drive it toward your thickness | 두터움 쪽으로 몰기 | 厚みに追い込む | descriptive |
+| keep away from thickness | 远离厚势 | keep away from thickness | 두터움에서 떨어지기 | 厚みに近づかない | proverb ja 厚みに近寄るな; the course says it plainly |
+| reduction / reduce | 侵消 / 消 | reduction / reduce | 삭감 | 消し / 消す | v6 unit `adv-invasion` |
+| shoulder hit | 肩冲 | shoulder hit | 어깨짚기 | カタツキ | |
+| cap | 镇 | cap | 모자 | ボウシ | as in the middle-game table |
+| make a ko (problem goal) | 打成劫 | make a ko | 패로 만들기 (흑선 패) | コウにする（黒先コウ） | |
+| live in seki | 做成双活 | live in seki | 빅으로 살다 | セキで生きる | as in the race table |
+| under the stones | 倒脱靴 | under the stones | 석하 | 石の下 | v6 lesson `adv-tesuji-under-stones`; see review list |
+| tesuji in combination | 组合手筋 | tesuji in combination | 맥의 조합 | 手筋の組み合わせ | descriptive |
+| sacrifice (stones) | 弃子 | sacrifice / give away | 사석 (버리기) | 捨て石 | ko 사석 also means dead stones at counting; the lessons say 돌을 버리다 |
+| an extension that also attacks | 拆兼逼 | an extension that is also an attack | 벌림이자 공격 | 開きであり攻め | descriptive |
+
 ## Review and analysis
 
 | Concept | zh | en | ko | ja | Notes |
@@ -339,3 +357,10 @@ The items I am least sure about:
 11. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
    **二一路** and ko **2·1의 급소** (also written 2의 1) follow the same pattern,
    but a native reviewer should confirm them.
+12. v6 advanced course (model-written, not reviewed by a native speaker):
+   ko **석하** for under the stones (석하의 맥 is also seen; a Korean
+   reviewer should confirm 석하 is current usage); zh **倒脱靴** is the
+   usual name of the shape where two (or four) stones are given up, which is
+   what both lessons show; ko **어깨짚기** / ja **カタツキ** for the shoulder
+   hit; ja **大局観** and ko **전체 판단** for whole-board judgement; zh
+   **拆兼逼**; ko **고급** / ja **上級** as the level name.

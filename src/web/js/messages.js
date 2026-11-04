@@ -802,4 +802,7 @@ export const MESSAGES = {
   "models.error.SizeMismatch": m("服务器上的文件大小与预期不符，未使用。", "The file on the server is not the expected size and was not used.", "서버의 파일 크기가 예상과 달라 사용하지 않았습니다.", "サーバー上のファイルのサイズが想定と違うため、使用しませんでした。"),
   "models.error.Corrupt": m("已安装的文件不完整。请删除后重新下载。", "The installed file is incomplete. Remove it and download it again.", "설치된 파일이 불완전합니다. 삭제한 뒤 다시 받으세요.", "インストール済みのファイルが不完全です。削除してダウンロードし直してください。"),
   "models.error.generic": m("下载失败（{0}）。", "The download failed ({0}).", "다운로드에 실패했습니다 ({0}).", "ダウンロードに失敗しました（{0}）。"),
+
+  // v6 advanced
+  "course.advanced": m("高级", "Advanced", "고급", "上級"),
 };

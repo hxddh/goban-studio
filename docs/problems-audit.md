@@ -280,3 +280,105 @@ number of each family and never reuse a removed id.
   teacher; a few labels (for instance `eye-space` for a live problem whose
   answer blocks a hane rather than widening the space) are approximate.
 - The review was done by a language model, not a strong human player.
+
+# v6: Advanced course
+
+v6 adds an advanced course for players around 5 kyu to 1 dan
+(`src/web/js/content/course-advanced.js`, units with `level: "advanced"`,
+after the intermediate units): 5 units, 15 lessons, 46 steps (21 problem,
+11 place, 14 read). No earlier lesson changed; the course is now 18 units,
+80 lessons and 288 steps.
+
+## Standard of proof
+
+- **Tactics are problem steps.** Every tactical claim is a solver problem,
+  checked by `scripts/check-course.mjs` like every other lesson problem
+  (real-board rules, sealed life and death, one to three correct first
+  moves, a winning answer line, under two seconds). For the advanced units
+  the check also runs the full `validate()` of the problem bank: the start
+  is not already decided, a `ko: "ok"` step must be a ko (no unconditional
+  answer exists, a ko does), and a `goal: "seki"` step must end in a
+  position `sekiInfo()` calls seki, with no independent life from the
+  start. The slowest advanced problem takes about 0.1 s.
+- **Strategy is stated as a principle.** Place steps on a 19×19 board
+  (which side is bigger, attacking toward your thickness, keeping away from
+  the opponent's, where to invade, the shoulder hit, the extension that also
+  attacks) say "usually", give the reason, and accept every point the
+  principle points to (a block of points, not one move). The positions were
+  built so that the principle is the deciding factor: every corner is
+  already settled, and the other stones are far away. None of them claims
+  what an engine would play.
+- **Text that describes a problem matches its answer line.** Each problem's
+  answer line (`node scripts/check-course.mjs --lines`) was replayed, and the
+  text only names the techniques that line actually contains (a throw-in
+  that White captures, a later snapback, a connection that dies, a play on
+  the point where two black stones were captured).
+
+## What was included
+
+| unit | lessons | proved by the solver |
+| --- | --- | --- |
+| Whole-board judgement | which side is bigger; drive it toward your thickness; keep away from the opponent's thickness | a stone next to a wall is captured, for either colour |
+| Invasion and reduction | where to invade; the 3-3 invasion; reducing with a shoulder hit | the invader's corner lives with one move |
+| Advanced life and death | dead, ko or alive; life and death with a ko; seki in the corner | a five-point corner shape dies; one more point down the side makes it a ko; a second shape dies without ko and becomes a ko with one more point; a corner lives by ko; two corner sekis |
+| Tesuji in combination | throw-in and snapback; throw-in and connect and die; under the stones; practice | two throw-in → snapback, two throw-in → connect and die, two under-the-stones, three mixed |
+| Middle-game strategy | attack to gain; sacrifice to take sente | two captures that need a sacrifice on the way |
+
+The corner shapes were found by enumerating second-line corner groups
+(eye space along both edges, ends standing or blocked by a hane) and
+proving each one dead, ko or alive with the attacker to play and no outside
+liberties. The tesuji positions were found by exhaustive search over the
+first two lines of a corner or a side (every first- and second-line point
+empty, black or white, a black wall on the third line), keeping positions
+with a single correct first move whose answer line contains the
+combination; they were then mirrored into different corners.
+
+## What was left out, and why
+
+- **The L group (by name).** One of the corner families behaves exactly as
+  the L group is said to (dead; ko with one more point; alive with two), and
+  that progression is the first life-and-death lesson. I could not confirm
+  that its diagram is the textbook L group, so the lesson does not use the
+  name. The same holds for the J group and the comb shape.
+- **Carpenter's square.** As in v5: I could not pin down its exact diagram,
+  and its known result (ko, depending on outside liberties) is exactly the
+  kind of claim a wrong reconstruction would get wrong.
+- **Outside liberties changing a result.** Tried on the L-like shapes: one
+  outside liberty left both the dead and the ko shape as they were, so there
+  was no clean "with a liberty it lives" pair to show.
+- **A sealed 3-3 invasion fight.** Corner regions large enough for a real
+  3-3 sequence were either decided from the start or too slow to prove (over
+  30 s), so the 3-3 lesson teaches the point and the decision in words and
+  proves only the small corner life that follows an invasion.
+- **Room for an invasion on the side.** A one-stone invader between two
+  walls on the first two lines was dead at every width tried (3 to 7), so a
+  "this much room lives, this much dies" pair could not be built that way.
+- **Net, then ladder.** Searches from the bank's net and ladder problems
+  found long ladders but no line where a net leads into a ladder; the course
+  keeps the net and the ladder as the intermediate lessons have them.
+- **Direction of approach** ("approach from the wider side", "pincer from
+  the side of your enclosure"). The common principles point in different
+  directions in ordinary positions, and choosing between them needs a strong
+  engine, so no place step relies on them.
+- **Whole-board counting and "which move is bigger" in points.** The
+  judgement lessons compare sides by what a move does (extends and stops an
+  extension), not by a number of points: no number could be backed without a
+  strong engine.
+
+## Next lesson
+
+`nextLesson()` (`pickNextLesson()` in `src/web/js/app/course-path.js`) sends
+a player whose estimated level (the rating from their games, or the level
+they gave) is 5 kyu or stronger to the advanced course when they have
+finished the intermediate course or never started it. A strong player part
+way through the intermediate course finishes it first. Weaker players are
+not moved past the basics. The daily five is unchanged: it looks only at
+the beginner units.
+
+## Remaining limits
+
+- The tesuji positions are small edge positions, like the problem bank's:
+  a key chain on the first two lines and a wall.
+- The strategic steps are a model's reading of standard principles, not a
+  strong player's review. Each one names the reason and accepts a range of
+  points, but a strong player should still review the positions.
