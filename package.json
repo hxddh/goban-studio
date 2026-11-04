@@ -1,6 +1,6 @@
 {
   "name": "goban-studio",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "private": true,
   "type": "module",
   "description": "Goban Studio \u2014 learn, play and review Go (\u56f4\u68cb \u00b7 \ubc14\ub451 \u00b7 \u56f2\u7881) on macOS and Windows.",

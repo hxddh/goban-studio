@@ -10,7 +10,8 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
-import { DailyDots } from "./today.jsx";
+import { DailyDots, FocusRow } from "./today.jsx";
+import { CollectionPage, YourCollections } from "./collections.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
@@ -22,6 +23,7 @@ export function PracticeView() {
   if (v === "topic") return <TopicPage />;
   if (v === "mistake") return <MistakeView />;
   if (v === "dailyDone") return <DailyDone />;
+  if (v === "collection") return <CollectionPage />;
   return <PracticeHome />;
 }
 
@@ -33,6 +35,8 @@ function PracticeHome() {
   const daily = C.todaysDaily();
   const finished = daily && daily.index >= daily.items.length;
   const pct = lessons.length ? (doneLessons / lessons.length) * 100 : 0;
+  const plan = C.trainingFocus();
+  const focusTopics = new Set(plan.items.map((f) => f.topic).filter(Boolean));
   return (
     <>
       <Toolbar />
@@ -69,7 +73,7 @@ function PracticeHome() {
             </span>
             <span class="gr-text">
               <strong>{finished ? t("practice.dailyFinished") : t("practice.dailyTitle")}</strong>
-              <span>{finished ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : t("practice.dailyHelp")}</span>
+              <span>{finished ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : plan.items.length ? t("plan.daily", [plan.items.map((f) => f.name).join(" · ")]) : t("practice.dailyHelp")}</span>
             </span>
             <DailyDots daily={daily} />
             {!finished && (
@@ -78,6 +82,24 @@ function PracticeHome() {
               </Button>
             )}
           </li>
+          {plan.items.length === 1 && <FocusRow f={plan.items[0]} compact />}
+          {plan.items.length > 1 && (
+            <li class="group-row plan-row" data-focus={plan.items.map((f) => f.key).join(" ")}>
+              <span class="gr-icon">
+                <Icon name="target" size={18} />
+              </span>
+              <span class="gr-text">
+                <strong>{t("plan.title")}</strong>
+                <span class="plan-links">
+                  {plan.items.map((f) => (
+                    <button type="button" class="link" title={f.why} onClick={() => C.openFocusProblems(f)}>
+                      {f.name}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            </li>
+          )}
         </ul>
 
         <section class="section">
@@ -95,8 +117,11 @@ function PracticeHome() {
               if (!list.length) return null;
               const solved = list.filter((x) => p.problems[x.id]?.solved).length;
               return (
-                <button type="button" class="topic-card" onClick={() => C.openTopic(topic)}>
-                  <strong>{t("topic." + topic)}</strong>
+                <button type="button" class={`topic-card ${focusTopics.has(topic) ? "focus" : ""}`} onClick={() => C.openTopic(topic)}>
+                  <strong>
+                    {t("topic." + topic)}
+                    {focusTopics.has(topic) && <span class="plan-mark">{t("plan.mark")}</span>}
+                  </strong>
                   <span class="muted">{t("topic." + topic + ".desc")}</span>
                   <span class="topic-foot">
                     <span class="mini-progress">
@@ -131,6 +156,8 @@ function PracticeHome() {
             </div>
           </section>
         )}
+
+        <YourCollections />
       </div>
     </>
   );
@@ -499,11 +526,14 @@ function ProblemView() {
   const P = pr.problem;
   const def = P.def;
   const daily = pr.daily;
-  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
+  // v7: a problem from your own collection is browsed in that collection.
+  const own = def.collection ? C.getCollection(def.collection) : null;
+  const list = own ? own.problems : state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
   const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
-  if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
+  if (!daily && own) crumbs.push({ label: own.name, onClick: () => C.openCollection(own.id) });
+  else if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
     <Toolbar crumbs={crumbs} title={daily ? t("practice.daily") : C.tx(def.title)} sub={daily ? t("practice.dailyOf", [daily.index + 1, daily.items.length]) : t("practice.ofN", [n, list.length])} />

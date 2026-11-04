@@ -296,15 +296,22 @@ await test("SGF import accepts pass, setup, comments and four-digit dates", () =
   assert.equal(line[3].move.color, WHITE);
 });
 
-await test("SGF columns skip I on import and export", () => {
-  const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[jd];W[qd])");
+await test("SGF columns are a..s with the i (FF[4]); pre-v7 Goban Studio records are read without it", () => {
+  // Standard: i is the ninth column, j the tenth, s the nineteenth.
+  const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[id];W[jd];B[sd])");
   const line = game.mainLine();
-  assert.equal(line[1].move.x, 8);
+  assert.deepEqual([line[1].move.x, line[2].move.x, line[3].move.x], [8, 9, 18]);
   assert.equal(line[1].move.y, 3);
-  assert.equal(line[2].move.x, 15);
   const sgf = game.toSGF();
-  assert.match(sgf, /;B\[jd\]/);
-  assert.match(sgf, /;W\[qd\]/);
+  assert.match(sgf, /;B\[id\];W\[jd\];B\[sd\]/);
+  // Written by Goban Studio 6 or earlier: a..h, j..t.
+  const old = loadSGF("(;GM[1]FF[4]AP[Goban Studio:6.0.0]SZ[19];B[jd];W[td])").game.mainLine();
+  assert.deepEqual([old[1].move.x, old[2].move.x], [8, 18]);
+  // Read back under the new rule, a re-saved old record keeps its moves.
+  const again = loadSGF(loadSGF("(;GM[1]FF[4]AP[Goban Studio:5.1.0]SZ[19];B[jd];W[td])").game.toSGF()).game.mainLine();
+  assert.deepEqual([again[1].move.x, again[2].move.x], [8, 18]);
+  // Every bundled classic now loads without an illegal move.
+  for (const c of CLASSICS) assert.deepEqual(loadSGF(c.sgf).warnings, [], c.id);
 });
 
 /* ------------------------------------------------------------ v5 rules */
@@ -1696,7 +1703,7 @@ await test("v5: SGF comments and markup survive a round trip on every node", () 
   g.play(6, 6);
   const sgf = g.toSGF();
   assert.match(sgf, /TR\[ee\]/);
-  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ji:B][ai:x:y\\]]"), sgf);
+  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ii:B][ai:x:y\\]]"), sgf);
   const back = loadSGF(sgf).game;
   assert.equal(back.root.comment, g.root.comment);
   assert.deepEqual(back.root.marks, [{ x: 4, y: 4, type: "triangle" }]);

@@ -79,7 +79,14 @@ function a11yAudit({ minContrast = 3 } = {}) {
   }
   // Contrast (docs/design.md §10): no text below 3:1 against what is behind
   // it (tertiary text is the floor; body and secondary text sit well above).
+  // Computed colours come as rgb()/rgba(), or as color(srgb r g b / a) with
+  // 0–1 channels when the stylesheet mixes them (color-mix, e.g. hover).
   const rgba = (s) => {
+    const srgb = s.match(/color\(srgb\s+([^)]+)\)/);
+    if (srgb) {
+      const p = srgb[1].split(/[ /]+/).filter(Boolean).map(Number);
+      return [p[0] * 255, p[1] * 255, p[2] * 255, p.length > 3 ? p[3] : 1];
+    }
     const m = s.match(/rgba?\(([^)]+)\)/);
     if (!m) return null;
     const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);

@@ -28,12 +28,17 @@ import { openMistakeDrill } from "./practice-ctl.js";
  * Analyse every position of the main line. Returns an array aligned with
  * game.mainLine(); null when cancelled. Falls back to the offline estimate
  * per position when KataGo is not there.
+ *
+ * v7: every search is one background-lane job of the scheduler (engine.js),
+ * so the computer's move and what the player looks at always go first;
+ * `signal` (AbortSignal) cancels the pass, and a search still queued then
+ * never runs.
  */
-export async function analyzeLine(game, { visits = 40, token = { cancelled: false }, onProgress, onPoint, existing = null } = {}) {
+export async function analyzeLine(game, { visits = 40, signal = null, lane = "background", onProgress, onPoint, existing = null } = {}) {
   const line = game.mainLine();
   const points = new Array(line.length).fill(null);
   for (let i = 0; i < line.length; i++) {
-    if (token.cancelled) return null;
+    if (signal?.aborted) return null;
     // v5: positions already analysed (after an edit of the main line) are kept.
     if (existing?.[i]) {
       points[i] = existing[i];
@@ -42,10 +47,12 @@ export async function analyzeLine(game, { visits = 40, token = { cancelled: fals
     }
     let p = null;
     try {
-      p = await Engine.analyzeNode(game, line[i], visits);
+      p = await Engine.analyzeNode(game, line[i], visits, { signal, lane });
     } catch (_) {
       p = null;
     }
+    // A cancelled search is not an answer: never store an estimate for it.
+    if (signal?.aborted) return null;
     if (!p) p = Engine.estimateNode(game, line[i]);
     points[i] = p;
     onPoint?.(i, p);
@@ -74,22 +81,23 @@ async function refineKeyMoves(review) {
   const line = review.game.mainLine();
   const todo = review.keyMoves.filter((km) => !review.refined[km.index] && line[km.index]).slice(0, 3);
   if (!todo.length) return;
-  // This pass owns the token it started with: a main-line change cancels
+  // This pass owns the signal it started with: a main-line change cancels
   // it (results are stored by main-line index) and hands out a new one.
-  const token = review.token;
+  const signal = review.ctl.signal;
   review.refining = true;
   update();
   const size = review.game.size;
   const visits = size === 19 ? 120 : size === 13 ? 160 : 200;
   for (const km of todo) {
-    if (token.cancelled) break;
+    if (signal.aborted) break;
     let a = null;
     try {
-      a = await Engine.analyzeNode(review.game, line[km.index], visits);
+      // Part of the whole-game pass: background lane.
+      a = await Engine.analyzeNode(review.game, line[km.index], visits, { signal, lane: "background" });
     } catch (_) {
       a = null;
     }
-    if (token.cancelled) return;
+    if (signal.aborted) return;
     if (a) {
       review.refined[km.index] = a;
       review.keyMoves = keyMovesOf(review);
@@ -97,15 +105,20 @@ async function refineKeyMoves(review) {
       update();
     }
   }
-  if (token.cancelled) return;
+  if (signal.aborted) return;
   review.refining = false;
   update();
+}
+
+/** v7: stop every search a review started (leaving it, or a new pass). */
+function stopReviewWork(r) {
+  r?.ctl?.abort();
 }
 
 /* ------------------------------------------------------------- open */
 
 export function openReview(game, meta = {}) {
-  if (state.review?.token) state.review.token.cancelled = true;
+  stopReviewWork(state.review);
   stopLive();
   if (!isRestoring()) remember();
   const line = game.mainLine();
@@ -126,7 +139,8 @@ export function openReview(game, meta = {}) {
     live: null,
     hover: null,
     guess: meta.guess ? { color: meta.guessColor ?? null, right: 0, tries: 0, last: null } : null,
-    token: { cancelled: false },
+    // v7: the review owns its searches; leaving it aborts this (scheduler.js).
+    ctl: new AbortController(),
     // v4: deeper analyses after the top mistakes (index → analysis), and
     // whether that pass is running. See refineKeyMoves.
     refined: {},
@@ -160,7 +174,7 @@ export function closeReview() {
   const r = state.review;
   if (r) saveEdits(r);
   if (canGoBack() && back()) return;
-  if (r?.token) r.token.cancelled = true;
+  stopReviewWork(r);
   stopLive();
   dropReview(r);
   const target = r?.meta?.back;
@@ -174,7 +188,7 @@ export function closeReview() {
 export function dropReview(r = state.review) {
   if (!r) return;
   saveEdits(r);
-  if (r.token) r.token.cancelled = true;
+  stopReviewWork(r);
   stopLive();
   if (r.source === "current" && state.game) {
     const line = state.game.game.mainLine();
@@ -187,29 +201,47 @@ export function dropReview(r = state.review) {
 
 async function analyzeReview(review, { existing = null } = {}) {
   const game = review.game;
-  const token = review.token;
+  const signal = review.ctl.signal;
   review.analyzing = true;
   update();
   const size = game.size;
   const visits = size === 19 ? 40 : size === 13 ? 56 : 80;
-  const points = await analyzeLine(game, {
-    visits,
-    token,
-    existing,
-    onPoint: (i, p) => {
-      review.points[i] = p;
-      review.engine = p.source;
-    },
-    onProgress: (k, n) => {
-      review.analyzed = k;
-      if (k % 4 === 0 || k === n) {
-        review.keyMoves = keyMovesOf(review);
-        if (k % 16 === 0 || k === n) refreshSummary(review);
-        update();
-      }
-    },
+  // v7: a background job of the scheduler, owned by this review (and
+  // listed in Settings, where it can be stopped).
+  const job = Engine.sched.startJob({
+    kind: "review",
+    signal,
+    title: () => t("sched.job.review"),
+    run: (job) =>
+      analyzeLine(game, {
+        visits,
+        signal: job.signal,
+        existing,
+        onPoint: (i, p) => {
+          review.points[i] = p;
+          review.engine = p.source;
+        },
+        onProgress: (k, n) => {
+          review.analyzed = k;
+          job.setProgress(k / n);
+          if (k % 4 === 0 || k === n) {
+            review.keyMoves = keyMovesOf(review);
+            if (k % 16 === 0 || k === n) refreshSummary(review);
+            update();
+          }
+        },
+      }),
   });
-  if (!points || token.cancelled) return;
+  const points = await job.promise;
+  if (signal.aborted) return;
+  if (!points) {
+    // Stopped from Settings: keep what is there.
+    review.analyzing = false;
+    review.keyMoves = keyMovesOf(review);
+    refreshSummary(review);
+    update();
+    return;
+  }
   review.analyzing = false;
   review.keyMoves = keyMovesOf(review);
   refreshSummary(review);
@@ -422,8 +454,8 @@ function realign(r, before) {
   // Passes in flight write by main-line index: stop them (whole-game and
   // refinement alike) and start over with what is known.
   const wasRefining = r.refining;
-  r.token.cancelled = true;
-  r.token = { cancelled: false };
+  stopReviewWork(r);
+  r.ctl = new AbortController();
   r.refining = false;
   if (r.analyzing || (hadAny && !r.guess && r.points.some((p) => !p))) analyzeReview(r, { existing: r.points.slice() });
   else if (wasRefining) refineKeyMoves(r);
@@ -765,7 +797,7 @@ export function playFromHere() {
   }
   game.current.result = null;
   if (game.current.phase !== "playing") game.current.phase = "playing";
-  if (r.token) r.token.cancelled = true;
+  stopReviewWork(r);
   stopLive();
   if (state.game) state.game.gen++;
   remember();
