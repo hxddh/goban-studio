@@ -35,6 +35,27 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 `SHA256SUMS` is attached to every GitHub release. The v5.0.0 notes are in
 [`.github/release-notes/v5.0.0.md`](.github/release-notes/v5.0.0.md).
 
+## v6 at a glance
+
+- **Interface** — the review panel in three tabs (analysis, summary,
+  notes), records that open on their key moment, Settings as a two-pane
+  window, quiet empty states, problem windows at a natural stone size.
+- **A report for every game** — result, the three phases, three key
+  moments as small boards, *Practise this game* (your worst mistakes become
+  drills), and an image export.
+- **Strength** — STRENGTH_PLACEHOLDER
+- **Learning** — an advanced course for about 5 kyu to 1 dan (5 units, 15
+  lessons: whole-board judgement, invasion and reduction, advanced life and
+  death, combined tesuji, middle-game strategy); the leaning attack and
+  sabaki lessons; 34 endgame problems proved by exact counting. 18 units, 82
+  lessons and 543 problems in all.
+- **Opening explorer** — a KataGo book of whole-board openings and corner
+  joseki (1,400 positions, offline), with live analysis past the book on
+  the desktop; review says where a game left the book.
+- **Accessibility** — the board can be played with a screen reader and the
+  keyboard (spoken moves, point and group reading, region summaries), and a
+  larger-text option.
+
 ## v5 at a glance
 
 - **Rules** — Japanese (still the default for everyone), Chinese (area
@@ -48,9 +69,7 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   any move, a variation tree, promote and delete variations; all saved in
   the SGF.
 - **Learning** — an intermediate course (opening, joseki, shape, endgame,
-  fighting; 28 lessons, with the leaning attack and sabaki added in v6) and
-  543 solver-proved problems, 34 of them endgame problems proved by exact
-  counting (v6).
+  fighting; 26 lessons) and 509 solver-proved problems.
 - **Your data** — one-click backup to a file and restore on another computer.
 - **Updates** — download, verify and install a new version from inside the
   app (with automatic rollback); Intel Macs get their own build.
@@ -101,7 +120,7 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   fighting) and, since v6, an advanced course for players around 5 kyu to
   1 dan (whole-board judgement, invasion and reduction, life and death with
   ko and seki, tesuji in combination, middle-game strategy; 5 units, 15
-  lessons), 18 units and 80 lessons in all, in multi-step lessons with
+  lessons), 18 units and 82 lessons in all, in multi-step lessons with
   explanation, placement exercises and live problems; problem
   collections by topic, and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
