@@ -241,6 +241,9 @@ function MoveStrip() {
   return (
     <section class="moves" aria-label={t("play.moveList")}>
       <h2 class="slot-title">{t("play.moveList")}</h2>
+      {line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13 && (
+        <p class="quiet-note opening-tip">{t("tip.opening" + (Math.floor(line.length / 4) + 1))}</p>
+      )}
       {line.length === 0 ? (
         <p class="moves-empty">{t("play.noMoves")}</p>
       ) : (

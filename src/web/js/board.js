@@ -82,7 +82,7 @@ const ACCENT = "#34529A";
 const GOOD = "#2E7D4F";
 const BAD = "#B3402C";
 const PLACE_MS = 140;
-const FADE_MS = 200;
+const FADE_MS = 260;
 
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
@@ -460,8 +460,13 @@ export class BoardView {
     // Fading captured stones.
     for (const f of this.fading) {
       if (!inWin(f.x, f.y)) continue;
+      // Captured stones lift off and drift a little towards the capturer's lid.
       const t = Math.min(1, (now - f.start) / FADE_MS);
-      this.stone(ctx, f.x, f.y, f.c, theme, { alpha: 1 - t, scale: 1 - t * 0.12 });
+      const e = t * t;
+      ctx.save();
+      ctx.translate(cell * 0.12 * e, (f.c === BLACK ? 1 : -1) * cell * 0.18 * e);
+      this.stone(ctx, f.x, f.y, f.c, theme, { alpha: 1 - t, scale: 1 - t * 0.18, shadow: t < 0.4 });
+      ctx.restore();
     }
 
     // Stones.

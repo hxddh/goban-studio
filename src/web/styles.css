@@ -686,3 +686,4 @@ button.group-row:hover { background: var(--fill); }
 :root[data-board="ink"] { --thumb-board: #2d2e2c; --thumb-line: rgba(232, 228, 218, 0.35); }
 :root[data-board="ink"] .empty-board line, :root[data-board="ink"] .mini-grid line { stroke: rgba(232, 228, 218, 0.45); }
 :root[data-board="ink"] .empty-board circle { fill: rgba(232, 228, 218, 0.6); }
+.opening-tip { font: var(--t-small); margin-bottom: var(--s-2); }
