@@ -6,15 +6,9 @@
 import { t } from "../i18n.js";
 import * as C from "./controller.js";
 import { Button } from "./parts.jsx";
+import { ratingChangeText } from "./report-draw.js";
 
-const rankText = (rank) => (rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]));
-
-/** The words for a record's rating change, or "". Exported for the tests. */
-export function ratingChangeText(rt) {
-  if (!rt?.before || !rt?.after) return "";
-  if (rt.before.rank === rt.after.rank) return t("sched.report.ratingSame", [rankText(rt.after.rank), rt.after.pm]);
-  return t("sched.report.rating", [rankText(rt.before.rank), rankText(rt.after.rank), rt.after.pm]);
-}
+export { ratingChangeText };
 
 export function RatingChange() {
   const text = ratingChangeText(C.reportRating());

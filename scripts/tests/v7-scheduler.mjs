@@ -153,9 +153,14 @@ export default async function ({ test, assert, root }) {
   const requests = [];
   const pending = new Map();
   let delay = 15;
-  const info = (size, visits) => {
+  // Black's 11th and 21st moves of a 19×19 game each lose 6 points (so a
+  // finished game has two drills); the best move is always A1 (empty).
+  const info = (size, visits, moves = "") => {
     const n = size * size;
-    return `info move pass visits ${visits} winrate 0.5 scoreLead 0.5 order 0 pv pass ownership ` + Array(n).fill("0").join(" ");
+    const k = moves.trim() ? moves.trim().split(/\s+/).length / 2 : 0;
+    const lead = size === 19 ? 0.5 - (k >= 11 ? 6 : 0) - (k >= 21 ? 6 : 0) : 0.5;
+    const wr = 1 / (1 + Math.exp(-lead / 8));
+    return `info move A1 visits ${visits} winrate ${wr} scoreLead ${lead} order 0 pv A1 ownership ` + Array(n).fill("0").join(" ");
   };
   globalThis.zero = {
     on: () => () => {},
@@ -170,7 +175,7 @@ export default async function ({ test, assert, root }) {
         return new Promise((resolve) => {
           const timer = setTimeout(() => {
             pending.delete(payload.id);
-            resolve({ ok: true, id: payload.id, play: "pass", info: info(payload.size, payload.visits) });
+            resolve({ ok: true, id: payload.id, play: "pass", info: info(payload.size, payload.visits, payload.moves || "") });
           }, delay);
           pending.set(payload.id, (v) => {
             clearTimeout(timer);
@@ -258,6 +263,46 @@ export default async function ({ test, assert, root }) {
     assert.equal(state.report.status, "done");
     assert.match(Status.ratingChangeText(Report.reportRating()), /^Strength ≈ \d+ kyu/);
     Report.closeReport();
+  });
+
+  await test("v7 scheduler: when a new game cuts the summary short, the background report fills in what it would have, once", async () => {
+    await until(() => Engine.sched.listJobs({ all: true }).length === 0, 8000, "idle");
+    const drillsOf = (id) => state.progress.mistakes.filter((m) => m.gameKey === id).map((m) => m.id).sort();
+    const trendOf = (id) => state.progress.games.find((r) => r.id === id);
+
+    // Interrupted: a new game starts while the summary is still running.
+    const g1 = finishRatedGame(40);
+    const id1 = g1.recordId;
+    assert.equal(trendOf(id1)?.phases ?? null, null, "no analysis in the trend record yet");
+    await until(() => requests.filter((r) => r.visits === 32).length >= 1, 4000, "summary started");
+    Play.newGame({ size: 19, color: BLACK, strength: "30k" });
+    assert.notEqual(g1.summary?.status, "done");
+    await until(() => Report.reportJob(id1), 3000, "background report");
+    await Report.reportJob(id1).promise;
+    const t1 = trendOf(id1);
+    assert.ok(t1.phases, "per-phase losses filled in by the report");
+    assert.equal(t1.confidence, "high");
+    assert.ok(t1.themeLoss && typeof t1.themeLoss === "object", "the plan's themeLoss");
+    assert.deepEqual(drillsOf(id1), [`${id1}-11`, `${id1}-21`].sort(), "the two costliest mistakes as drills, summary ids");
+    assert.equal(Lib.getGame(id1).learned, true);
+
+    // Only once: making the report again adds nothing.
+    const weak = JSON.stringify(state.progress.weakness);
+    Lib.patchGame(id1, { report: null });
+    await Report.queueReport(id1).promise;
+    assert.deepEqual(drillsOf(id1), [`${id1}-11`, `${id1}-21`].sort());
+    assert.equal(JSON.stringify(state.progress.weakness), weak, "weaknesses not counted twice");
+
+    // Not interrupted: the summary does it, and the report then does not again.
+    const g2 = finishRatedGame(40);
+    const id2 = g2.recordId;
+    await until(() => g2.summary?.status === "done", 8000, "summary done");
+    assert.equal(Lib.getGame(id2).learned, true, "the summary marked it");
+    const weak2 = JSON.stringify(state.progress.weakness);
+    await until(() => Lib.getGame(id2).report, 8000, "report");
+    assert.deepEqual(drillsOf(id2), [`${id2}-11`, `${id2}-21`].sort());
+    assert.equal(JSON.stringify(state.progress.weakness), weak2);
+    assert.ok(trendOf(id2).phases);
   });
 
   await test("v7 scheduler: rating change text, before → after with the ± of the new estimate", () => {

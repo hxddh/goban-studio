@@ -29,7 +29,7 @@ import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, 
 import { state, update, toast } from "./store.js";
 import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
 import { analyzeLine, openReview, reviewGoto } from "./review-ctl.js";
-import { reviewCurrentGame, saveToLibrary } from "./play-ctl.js";
+import { learnFromGame, reviewCurrentGame, saveToLibrary } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
 import { REPORT_VERSION, buildReport, reportDrills, reportFits } from "./report-model.js";
 
@@ -260,6 +260,11 @@ async function analyse(recordId, game, humanColor, job) {
   // Store it with the game unless the record changed meanwhile.
   const now = recordOf(recordId);
   if (now && reportFits(model, now.game)) Lib.patchGame(recordId, { report: model });
+  // v7: a rated game whose post-game summary a new game cancelled: fill in
+  // what the summary would have (trend record, weaknesses, drills), once.
+  if (now?.rec.rating && humanColor != null && !now.rec.learned && points.every((p) => p?.source === "katago")) {
+    learnFromGame({ game, points, humanColor, recordId });
+  }
   return model;
 }
 
@@ -411,7 +416,7 @@ export async function exportReportImage() {
   const rec = Lib.getGame(r.recordId);
   const day = new Date(rec?.updatedAt || Date.now()).toISOString().slice(0, 10);
   const filename = `goban-studio-report-${day}.png`;
-  const blob = await renderReportPNG(r.model, { date: rec?.updatedAt || r.model.at });
+  const blob = await renderReportPNG(r.model, { date: rec?.updatedAt || r.model.at, rating: reportRating() });
   if (!blob) return toast(t("report.exportFailed"), "warn");
   if (hasNative() && hasFileDialogs()) {
     const path = await saveFileDialog({ title: t("report.exportImage"), defaultName: filename });
