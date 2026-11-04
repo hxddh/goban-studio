@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../tests/fixtures/problems");
 
-export default async function ({ check, assert, fresh, onboard, clickPoint }) {
+export default async function ({ check, assert, fresh, onboard, clickPoint, audit }) {
   await check("v7 problems: import SGF problems, practise one, rename, export and delete the collection", async () => {
     const page = await fresh();
     await onboard(page, 1);
@@ -31,6 +31,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     const cards = await page.$$(".collection-page .problem-card");
     assert(cards.length === 6, `cards: ${cards.length}`);
     assert((await page.$$(".btn.primary")).length === 1, "one primary action");
+    if (audit) await audit(page, "collection page");
 
     // The first problem opens in the ordinary problem view and is solved there.
     await page.click(".collection-page .problem-card >> nth=0");
@@ -77,6 +78,27 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.waitForFunction(() => !document.querySelector(".collection-item"));
     const left = await page.evaluate((id) => ({ c: JSON.parse(localStorage.getItem("goban-studio.collections.v1")).collections.length, p: window.__state.progress.problems[id] }), p.id);
     assert(left.c === 0 && !left.p, `deleted with its progress: ${JSON.stringify(left)}`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
+  await check("v7 problems: the collection page in Korean, dark, larger text passes the audit", async () => {
+    const page = await fresh("ko-KR");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await onboard(page, 1);
+    await page.keyboard.press("Control+Equal");
+    await page.keyboard.press("Control+3");
+    await page.waitForSelector(".collections-section");
+    if (audit) await audit(page, "practice home with the collections section");
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(".collections-actions .btn >> nth=0")]);
+    await chooser.setFiles([path.join(fixtures, "collection.sgf")]);
+    await page.waitForSelector(".collection-page", { timeout: 60000 });
+    if (audit) await audit(page, "collection page (ko, dark, larger text)");
+    const bad = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      clipped: [...document.querySelectorAll(".btn")].filter((el) => el.offsetParent && el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent),
+    }));
+    assert(!bad.overflow && !bad.clipped.length, JSON.stringify(bad));
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
