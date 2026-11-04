@@ -12,7 +12,8 @@ import { ataris, lossSource, classifyMistake, settled, complexity, addWeakness, 
 import { attributeLoss } from "../src/web/js/app/insight.js";
 import { describe, narrate, simulate, storyText } from "../src/web/js/app/story.js";
 import { describeMistakes, summaryOf } from "../src/web/js/app/explain.js";
-import { Game } from "../src/web/js/rules.js";
+import { BLACK, WHITE, Game, MARK_KINDS } from "../src/web/js/rules.js";
+import { PHASES, gameRecord, phaseBoundaries, phaseThresholds, recordAnalysis, settledShare, summarizeGame, themeCounts, trends } from "../src/web/js/app/summary.js";
 import { setLang } from "../src/web/js/i18n.js";
 import { MESSAGES } from "../src/web/js/messages.js";
 
@@ -451,6 +452,333 @@ await test("story text is complete in all four languages", () => {
   const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
   const block = src.slice(src.indexOf("// v4 review"), src.indexOf("// end v4 review"));
   for (const k of Object.keys(MESSAGES).filter((k) => k.startsWith("story.") || k.startsWith("lossKind."))) assert.ok(block.includes(`"${k}"`), k);
+});
+
+/* ------------------------------------------------------------------ v5 */
+
+/**
+ * A 13×13 game of 80 moves with no captures (Black fills the top rows,
+ * White the bottom), and an analysis where each listed move loses the given
+ * points. Phases on 13×13 by move number: opening 1–20, endgame from 76.
+ */
+function v5Review({ losses = {}, source = "katago", settledFrom = null, humanColor = BLACK } = {}) {
+  const size = 13;
+  const game = new Game({ size, komi: 6.5 });
+  const bl = [];
+  const wh = [];
+  for (let y = 0; y < 6; y++) for (let x = 0; x < size; x++) bl.push([x, y]);
+  for (let y = 12; y > 6; y--) for (let x = 0; x < size; x++) wh.push([x, y]);
+  for (let i = 0; i < 40; i++) {
+    assert.ok(game.play(...bl[i]).ok);
+    assert.ok(game.play(...wh[i]).ok);
+  }
+  const line = game.mainLine();
+  const lead = [0];
+  for (let i = 1; i < line.length; i++) {
+    const loss = losses[i] || 0;
+    lead[i] = lead[i - 1] + (line[i].move.color === BLACK ? -loss : loss);
+  }
+  const points = line.map((n, i) => {
+    let ownership = null;
+    if (settledFrom != null) {
+      ownership = new Float32Array(size * size);
+      const firm = i >= settledFrom ? 0.8 : 0.3;
+      for (let k = 0; k < ownership.length; k++) ownership[k] = k < firm * ownership.length ? 0.95 : 0.1;
+    }
+    const best = { x: 6, y: 6 };
+    return source === "katago"
+      ? { source, winrate: 0.5, scoreLead: lead[i], best, pv: [best], moves: [{ ...best, visits: 20, scoreLead: lead[i] }], ownership }
+      : { source, winrate: 0.5, scoreLead: lead[i], best: null, pv: [], ownership: null };
+  });
+  return { game, points, meta: { humanColor }, keyMoves: [] };
+}
+
+await test("v5: phase boundaries scale with the board and follow KataGo's ownership when there is one", () => {
+  assert.deepEqual(phaseThresholds(19), { openingEnd: 43, endgameStart: 162 });
+  assert.deepEqual(phaseThresholds(13), { openingEnd: 20, endgameStart: 76 });
+  assert.deepEqual(phaseThresholds(9), { openingEnd: 10, endgameStart: 36 });
+  const plain = v5Review();
+  const b = phaseBoundaries(13, plain.points, plain.points.length);
+  assert.deepEqual([b.opening, b.middle, b.endgame, b.method], [[1, 20], [21, 75], [76, 80], "moves"]);
+  const owned = v5Review({ settledFrom: 60 });
+  const o = phaseBoundaries(13, owned.points, owned.points.length);
+  assert.deepEqual([o.middle, o.endgame, o.method], [[21, 59], [60, 80], "ownership"]);
+  const never = v5Review({ settledFrom: 999 });
+  const nv = phaseBoundaries(13, never.points, never.points.length);
+  assert.equal(nv.endgame[0] > nv.endgame[1], true, "a game that never settled has no endgame");
+  // A short game is all opening.
+  const short = phaseBoundaries(19, [], 12);
+  assert.deepEqual(short.opening, [1, 11]);
+  assert.ok(short.middle[0] > short.middle[1] && short.endgame[0] > short.endgame[1]);
+  assert.equal(settledShare(null), null);
+});
+
+await test("v5: summarizeGame counts losses, mistakes, blunders and accuracy per phase and player", () => {
+  const review = v5Review({ losses: { 5: 3, 25: 8, 79: 2.5, 30: 4 } });
+  const s = summarizeGame(review);
+  assert.equal(s.confidence, "high");
+  assert.equal(s.source, "katago");
+  assert.equal(s.moves, 80);
+  const [op, mid, end] = s.phases;
+  assert.deepEqual([op.id, op.from, op.to, mid.from, mid.to, end.from, end.to], ["opening", 1, 20, 21, 75, 76, 80]);
+  assert.deepEqual([op.players.black.loss, op.players.black.mistakes, op.players.black.blunders], [3, 1, 0]);
+  assert.deepEqual([mid.players.black.loss, mid.players.black.mistakes, mid.players.black.blunders], [8, 0, 1]);
+  assert.deepEqual([end.players.black.loss, end.players.black.mistakes], [2.5, 1]);
+  assert.deepEqual([mid.players.white.loss, mid.players.white.mistakes], [4, 1]);
+  assert.equal(mid.players.black.worst.index, 25);
+  assert.equal(mid.players.black.worst.coord, "N13");
+  assert.equal(op.players.black.moves, 10);
+  assert.equal(op.players.black.measured, 10);
+  assert.equal(op.players.black.accuracy, 0.9);
+  const tot = s.players.black;
+  assert.deepEqual([tot.moves, tot.loss, tot.mistakes, tot.blunders], [40, 13.5, 2, 1]);
+  assert.equal(tot.accuracy, 0.925);
+  assert.equal(tot.basis.candidates, 0, "the played moves were not KataGo's candidates here");
+  // Three takeaways for the player (Black): where the points went, the
+  // costliest move, and the steady opening.
+  assert.deepEqual(s.takeaways.map((t) => t.kind), ["phase", "worst", "steady"]);
+  assert.equal(s.takeaways[0].key, "gameSummary.take.worstPhase");
+  assert.deepEqual(s.takeaways[0].params.slice(0, 3), [{ key: "phaseIn.middle" }, "8", 59]);
+  assert.equal(s.takeaways[1].index, 25);
+  assert.equal(s.takeaways[2].phase, "opening");
+  // Without a player's colour both sides are described, with *Of keys.
+  const both = summarizeGame({ ...review, meta: {} });
+  assert.ok(both.takeaways.length === 3 && both.takeaways.every((t) => /Of$/.test(t.key)));
+});
+
+await test("v5: accuracy reads the candidate list when the played move is one of KataGo's candidates", () => {
+  const review = v5Review({ losses: { 3: 3 } });
+  const mv = review.game.mainLine()[3].move;
+  // KataGo saw the played move as only half a point worse than its best.
+  review.points[2].moves = [{ x: 6, y: 6, visits: 30, scoreLead: 0 }, { x: mv.x, y: mv.y, visits: 12, scoreLead: -0.5 }];
+  const s = summarizeGame(review);
+  assert.equal(s.players.black.basis.candidates, 1);
+  assert.equal(s.players.black.accuracy, 1, "within a point by the candidate list");
+  assert.equal(s.players.black.mistakes, 1, "the loss itself still comes from the lead change");
+});
+
+await test("v5: summarizeGame degrades with the offline estimate and with no analysis", () => {
+  const s = summarizeGame(v5Review({ losses: { 25: 8, 27: 5 }, source: "estimate" }));
+  assert.equal(s.confidence, "low");
+  assert.equal(s.players.black.accuracy, null, "accuracy is not claimed from an estimate");
+  assert.equal(s.players.black.loss, 13);
+  assert.deepEqual(s.takeaways.map((t) => t.kind), ["phase", "worst", "estimate"]);
+  assert.equal(s.takeaways[2].key, "gameSummary.estimate");
+  const none = v5Review();
+  const empty = summarizeGame({ ...none, points: none.points.map(() => null) });
+  assert.equal(empty.confidence, "none");
+  assert.deepEqual(empty.takeaways, []);
+  assert.equal(empty.players.black.moves, 40);
+  assert.equal(empty.players.black.measured, 0);
+  // A partly analysed KataGo review is low confidence until it is done.
+  const part = v5Review();
+  part.points = part.points.map((p, i) => (i < 40 ? p : null));
+  assert.equal(summarizeGame(part).confidence, "low");
+  // A clean game says so.
+  assert.deepEqual(summarizeGame(v5Review()).takeaways.map((t) => t.kind).slice(0, 2), ["clean", "steady"]);
+  // Key-mistake themes become a takeaway.
+  const th = v5Review({ losses: { 25: 3 } });
+  th.keyMoves = [{ theme: "ladder", move: { color: BLACK } }, { theme: "ladder", move: { color: BLACK } }];
+  const ts = summarizeGame(th);
+  const theme = ts.takeaways.find((t) => t.kind === "theme");
+  assert.ok(theme && theme.topic === "capture" && theme.params[1] === 2);
+  assert.deepEqual(ts.themes, { ladder: 2 });
+});
+
+await test("v5: takeaways and summary strings read in all four languages, in one v5 block", () => {
+  const entries = [];
+  for (const r of [v5Review({ losses: { 5: 3, 25: 8, 79: 2.5, 9: 7 } }), v5Review({ losses: { 25: 3 } }), v5Review({ losses: { 25: 8 }, source: "estimate" }), v5Review()]) {
+    for (const hc of [BLACK, null]) {
+      const rv = { ...r, meta: { humanColor: hc }, keyMoves: [{ theme: "cut", move: { color: BLACK } }] };
+      entries.push(...summarizeGame(rv).takeaways);
+    }
+  }
+  const kinds = new Set(entries.map((e) => e.key));
+  for (const k of ["gameSummary.take.worstPhase", "gameSummary.take.worstMove", "gameSummary.take.blunders", "gameSummary.take.theme", "gameSummary.take.steady", "gameSummary.take.clean", "gameSummary.estimate", "gameSummary.take.worstPhaseOf", "gameSummary.take.cleanOf"]) assert.ok(kinds.has(k), k);
+  for (const lang of ["zh", "en", "ko", "ja"]) {
+    setLang(lang);
+    for (const e of entries) {
+      const s = storyText(e);
+      assert.ok(s && !/\{\d\}/.test(s) && !/\b(gameSummary|phase|phaseIn|theme)\.[a-z]/.test(s), `${lang} ${e.key}: ${s}`);
+    }
+  }
+  setLang("en");
+  const first = summarizeGame(v5Review({ losses: { 5: 3, 25: 8, 79: 2.5 } })).takeaways;
+  assert.equal(storyText(first[0]), "Most of your points went in the middle game: about 8 points (59% of the total).");
+  assert.equal(storyText(first[1]), "Your costliest move was move 25 (N13): about 8 points.");
+  setLang("ja");
+  assert.equal(storyText(first[0]), "損の多くは中盤でした。約8目（全体の59%）です。");
+  setLang("en");
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const block = src.slice(src.indexOf("// v5 review"), src.indexOf("// end v5 review"));
+  const v5 = Object.keys(MESSAGES).filter((k) => /^(gameSummary|trend|edit|phase|phaseIn)\./.test(k));
+  assert.ok(v5.length >= 50);
+  for (const k of v5) assert.ok(block.includes(`"${k}"`), k);
+  for (const p of PHASES) assert.ok(MESSAGES["phase." + p] && MESSAGES["phaseIn." + p]);
+  for (const kind of MARK_KINDS) assert.ok(MESSAGES["edit.mark." + kind], kind);
+});
+
+await test("v5: a rated game becomes a compact record, and trends compare the earlier and recent games", () => {
+  const review = v5Review({ losses: { 5: 3, 25: 8, 79: 2.5 } });
+  const s = summarizeGame(review);
+  const rec = gameRecord({ id: "abc", game: review.game, color: BLACK, opponent: "15k", won: false, rating: { before: 1000, after: 980, delta: -20 }, summary: s, themes: { ladder: 1 }, at: Date.UTC(2026, 10, 1) });
+  assert.equal(rec.id, "abc");
+  assert.equal(rec.size, 13);
+  assert.equal(rec.rules, "japanese");
+  assert.equal(rec.moves, 80);
+  assert.equal(rec.confidence, "high");
+  assert.deepEqual(rec.phases.middle, { loss: 8, mistakes: 0, blunders: 1, moves: 28, accuracy: Math.round((27 / 28) * 1000) / 1000 });
+  // Written at the end of the game, completed by the analysis.
+  const bare = gameRecord({ id: "x", game: review.game, color: WHITE, won: true });
+  assert.equal(bare.phases, null);
+  assert.equal(bare.confidence, null);
+  assert.deepEqual(Object.keys(recordAnalysis(s, WHITE, { cut: 1 })).sort(), ["confidence", "phases", "themes"]);
+  assert.deepEqual(themeCounts([{ theme: "cut", move: { color: 1 } }, { theme: "cut", move: { color: -1 } }, { theme: null, move: { color: 1 } }], 1), { cut: 1 });
+
+  // Six analysed games, newest first: the recent three lose less in the
+  // middle game and stopped running into ladders, but started getting cut.
+  const mk = (i, mid, themes, rating) => ({ id: "g" + i, at: 1000 + i, size: 9, color: 1, won: i % 2 === 0, phases: { opening: { loss: 2 }, middle: { loss: mid, mistakes: 2, blunders: 1 }, endgame: { loss: 3, mistakes: 1 } }, confidence: "high", themes, rating });
+  const progress = {
+    games: [
+      mk(6, 8, { cut: 1 }, { before: 1060, after: 1080, delta: 20 }),
+      mk(5, 7, { cut: 1 }, { before: 1050, after: 1060, delta: 10 }),
+      mk(4, 9, { cut: 1 }, { before: 1040, after: 1050, delta: 10 }),
+      mk(3, 20, { ladder: 2 }, { before: 1030, after: 1040, delta: 10 }),
+      mk(2, 22, { ladder: 2 }, { before: 1010, after: 1030, delta: 20 }),
+      mk(1, 18, { ladder: 2 }, { before: 1000, after: 1010, delta: 10 }),
+      { id: "u", at: 900, size: 19, color: -1, won: false, phases: null }, // never analysed
+    ],
+  };
+  const tr = trends(progress, { n: 10 });
+  assert.equal(tr.games, 7);
+  assert.equal(tr.analysed, 6);
+  assert.deepEqual(tr.record, { won: 3, lost: 4, other: 0 });
+  assert.equal(tr.avgLoss.middle, 14);
+  assert.equal(tr.avgLoss.opening, 2);
+  assert.equal(tr.avgLoss.total, 19);
+  assert.equal(tr.avgMistakes, 3);
+  assert.equal(tr.avgBlunders, 1);
+  assert.deepEqual(tr.phaseTrend.middle, { earlier: 20, recent: 8, direction: "better" });
+  assert.equal(tr.phaseTrend.opening.direction, "same");
+  assert.equal(tr.phaseTrend.total.direction, "better");
+  const ladder = tr.themes.find((t) => t.theme === "ladder");
+  const cut = tr.themes.find((t) => t.theme === "cut");
+  assert.deepEqual([ladder.count, ladder.direction, ladder.topic], [6, "better", "capture"]);
+  assert.deepEqual([cut.count, cut.direction, cut.topic], [3, "worse", "connect"]);
+  assert.equal(tr.themes[0].theme, "ladder", "most common first");
+  assert.deepEqual(tr.rating, { from: 1000, to: 1080, delta: 80, games: 6 });
+  // A narrower window, and too few games for a direction.
+  const two = trends(progress, { n: 2 });
+  assert.equal(two.analysed, 2);
+  assert.equal(two.phaseTrend.middle.direction, null);
+  // No records: rating falls back to the rating history.
+  const empty = trends({ games: [], rating: { r: 1100, history: [{ at: 1, r: 1000 }, { at: 2, r: 1050 }, { at: 3, r: 1100 }] } });
+  assert.equal(empty.games, 0);
+  assert.equal(empty.avgLoss.total, null);
+  assert.deepEqual(empty.rating, { from: 1000, to: 1100, delta: 100, games: 2 });
+  assert.equal(trends(null).games, 0);
+});
+
+/** The review controller, bundled with its store and the library so they share one state. */
+async function loadControllers() {
+  const esbuild = await import("esbuild");
+  const out = await esbuild.build({
+    stdin: {
+      contents: [
+        'export * as R from "./src/web/js/app/review-ctl.js";',
+        'export { state } from "./src/web/js/app/store.js";',
+        'export * as Lib from "./src/web/js/library.js";',
+        'export * as P from "./src/web/js/persist.js";',
+        'export { loadSGF } from "./src/web/js/sgf.js";',
+      ].join("\n"),
+      resolveDir: root,
+      loader: "js",
+    },
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    mainFields: ["module", "main"],
+    loader: { ".json": "json" },
+    write: false,
+    logLevel: "error",
+  });
+  return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+}
+
+const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+await test("v5: the review controller edits comments, marks and variations and saves them to the library", async () => {
+  const { R, state, Lib, P, loadSGF } = await loadControllers();
+  state.settings = { ...P.DEFAULT_SETTINGS, liveAnalysis: false };
+  state.progress = P.loadProgress();
+  const base = v5Review({ losses: { 25: 8 } });
+  const rec = Lib.saveGame(base.game, { name: "v5 test", opponent: "ai", humanColor: BLACK });
+  const { game } = loadSGF(rec.sgf);
+  R.openReview(game, { source: "record", recordId: rec.id, humanColor: BLACK, points: base.points, startAt: 10 });
+  const r = state.review;
+  assert.equal(r.edits.target, "record");
+  assert.equal(r.summary.confidence, "high");
+  assert.equal(R.reviewSummary(), r.summary);
+  assert.equal(r.summary.phases[1].players.black.blunders, 1);
+
+  // Comment and marks on the move on the board, saved to the record.
+  assert.equal(R.setComment("Too slow here"), true);
+  assert.equal(R.setComment("Too slow here"), false, "no change, no edit");
+  R.toggleMark("triangle");
+  assert.equal(r.markTool, "triangle");
+  R.reviewPlay(6, 6);
+  assert.equal(r.game.current.children.length, 1, "with the tool, a click marks instead of playing");
+  assert.deepEqual(r.game.current.marks, [{ x: 6, y: 6, type: "triangle" }]);
+  R.toggleMark("label", 7, 7);
+  R.toggleMark("triangle");
+  assert.equal(r.markTool, null);
+  assert.equal(r.edits.dirty, true);
+  assert.equal(R.saveEdits(), true);
+  let saved = loadSGF(Lib.getGame(rec.id).sgf).game.mainLine()[10];
+  assert.equal(saved.comment, "Too slow here");
+  assert.deepEqual(saved.marks.map((m) => m.type), ["triangle", "label"]);
+  assert.equal(Lib.getGame(rec.id).name, "v5 test", "the record keeps its name and facts");
+  assert.equal(Lib.getGame(rec.id).humanColor, BLACK);
+
+  // A variation, promoted to the main line: analyses follow their positions.
+  R.reviewGoto(30);
+  const oldLine = r.game.mainLine();
+  R.reviewPlay(6, 6); // a new move 31 for Black
+  const branch = r.game.current;
+  assert.equal(R.onMainLine(), false);
+  const tree = R.treeLayout();
+  assert.ok(tree.nodes.some((n) => n.node === branch && n.y === 1 && n.isCurrent));
+  assert.equal(R.promoteVariation(), true);
+  assert.equal(r.game.mainLine()[31], branch);
+  assert.equal(r.points.length, 32);
+  assert.equal(r.points[30], base.points[30], "the analysis of an unchanged position is kept");
+  // The new position is analysed (offline here: the estimate).
+  for (let k = 0; k < 200 && r.analyzing; k++) await sleep(5);
+  assert.equal(r.analyzing, false);
+  assert.equal(r.points[31]?.source, "estimate");
+  assert.equal(r.summary.moves, 31);
+  assert.equal(r.summary.confidence, "low", "partly estimated");
+  R.saveEdits();
+  saved = loadSGF(Lib.getGame(rec.id).sgf).game;
+  assert.equal(saved.mainLine().length, 32);
+  assert.equal(saved.mainLine()[30].children.length, 2, "the old main line is kept as a variation");
+
+  // Delete the old line (now a variation); the main line is untouched.
+  const oldNext = oldLine[31];
+  assert.equal(R.deleteBranch(oldNext), true);
+  assert.equal(r.game.mainLine()[30].children.length, 1);
+  assert.equal(R.deleteBranch(r.game.root), false);
+  // deleteVariation() from inside a variation goes back to the branch point.
+  R.reviewGoto(5);
+  R.reviewPlay(12, 5);
+  R.reviewPlay(12, 4);
+  R.deleteVariation();
+  assert.equal(r.game.current, r.game.mainLine()[5]);
+  assert.equal(r.game.mainLine()[5].children.length, 1);
+  R.dropReview();
+  saved = loadSGF(Lib.getGame(rec.id).sgf).game;
+  assert.equal(saved.mainLine()[30].children.length, 1, "leaving the review saved the last edits");
+  assert.equal(typeof R.gameTrends().games, "number");
 });
 
 await test("every key the v3 views use is in the string table", () => {

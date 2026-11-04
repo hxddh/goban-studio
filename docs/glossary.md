@@ -167,6 +167,15 @@ in this table. Usage targets:
 | balance / position evaluation | 形势 | balance | 형세 | 形勢 | |
 | ownership / territory estimate | 形势判断 | territory estimate | 형세 판단 | 形勢判断 | |
 | teaching game mode | 指导棋 | teaching mode | 지도 모드 | 指導碁モード | |
+| opening (phase of a game) | 布局 | opening | 포석 | 布石 | v5 `phase.opening`: the same term as the whole-board opening above |
+| middle game | 中盘 | middle game | 중반 | 中盤 | v5 `phase.middle` |
+| endgame (yose) | 官子 | endgame | 끝내기 | ヨセ | v5 `phase.endgame` |
+| blunder (a move losing > 6 points) | 大失误 | blunder | 큰 실수 | 大悪手 | v5; "mistake" (> 2 points) keeps 失误 / 실수 / 悪手 |
+| accuracy (moves within 1 point of the best) | 准确率 | accuracy | 정확도 | 正確さ | v5 summary |
+| comment (on a move, SGF C[]) | 注释 | comment | 코멘트 | コメント | v5 |
+| mark (triangle, square, circle, cross, letter) | 标记（三角、方块、圆圈、叉、字母） | mark (triangle, square, circle, cross, letter) | 표시 (세모, 네모, 동그라미, 가위표, 글자) | マーク（三角、四角、丸、バツ、文字） | v5 SGF markup |
+| main line (of a record) | 主线 | main line | 본선 | 本線 | v5; ja 本譜 means the game as played, which a promoted variation is not |
+| variation tree | 变化树 | variation tree | 변화도 | 変化図 | v5 |
 
 ## Decisions on doubtful terms
 
@@ -240,3 +249,8 @@ The items I am least sure about:
    (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
    for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
    collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.
+9. v5: ko **본선** / ja **本線** for the main line of a record (Go software
+   varies; ko 주 변화 / ja 本譜 are possible), ko **변화도** / ja **変化図**
+   for the variation tree, ja **大悪手** and ko **큰 실수** for blunder, and
+   ja **正確さ** for accuracy (一致率 is used for "agrees with the AI", which
+   is a different measure).

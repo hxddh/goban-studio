@@ -205,6 +205,9 @@ export class Game {
       result: fields.result || null,
       comment: fields.comment || "",
       marks: fields.marks || [],
+      // v5: SGF properties this app does not interpret, kept for the round
+      // trip ({ KEY: [raw values] }), or null.
+      extra: fields.extra || null,
     };
   }
 
@@ -387,6 +390,84 @@ export class Game {
     this.root.comment = String(text || "");
   }
 
+  /* ------------------------------------------------ v5: node editing */
+
+  /** Set (or clear, with "") the comment of a node (object or id). */
+  setComment(node, text) {
+    const n = typeof node === "object" ? node : this.nodeById(node);
+    if (!n) return false;
+    n.comment = String(text ?? "").replace(/\r\n?/g, "\n");
+    return true;
+  }
+
+  /**
+   * Toggle a mark at (x, y) on a node. `kind` is one of MARK_KINDS. One mark
+   * per point: the same kind again removes it, another kind replaces it.
+   * A label without `text` gets the next free letter (A, B, C … then 1, 2 …).
+   * Returns the mark now at the point, or null when it was removed.
+   */
+  toggleMark(node, x, y, kind, text = null) {
+    const n = typeof node === "object" ? node : this.nodeById(node);
+    if (!n || !MARK_KINDS.includes(kind)) return null;
+    if (!(x >= 0 && y >= 0 && x < this.size && y < this.size)) return null;
+    const marks = n.marks || [];
+    const at = marks.find((m) => m.x === x && m.y === y);
+    const rest = marks.filter((m) => m !== at);
+    if (at && at.type === kind && (kind !== "label" || text == null || at.text === String(text))) {
+      n.marks = rest;
+      return null;
+    }
+    const mark = { x, y, type: kind };
+    if (kind === "label") mark.text = text != null && String(text) !== "" ? String(text) : nextLabel(rest);
+    n.marks = [...rest, mark];
+    return mark;
+  }
+
+  /**
+   * Remove a node and everything below it. The root cannot be deleted. When
+   * the cursor was inside the removed subtree it moves to the parent.
+   * Deleting a first child makes the next variation the main line there.
+   * Returns the parent, or null.
+   */
+  deleteNode(node) {
+    const n = typeof node === "object" ? node : this.nodeById(node);
+    if (!n || !n.parent) return null;
+    const parent = n.parent;
+    let inside = false;
+    for (let c = this.current; c; c = c.parent) if (c === n) inside = true;
+    parent.children = parent.children.filter((c) => c !== n);
+    if (inside) this.current = parent;
+    return parent;
+  }
+
+  /**
+   * Make the line through `node` the main line: at every branch point on its
+   * path from the root, its branch becomes the first child. The other
+   * variations keep their relative order. Returns true when anything moved.
+   */
+  promoteVariation(node) {
+    const n = typeof node === "object" ? node : this.nodeById(node);
+    if (!n) return false;
+    let changed = false;
+    for (let c = n; c.parent; c = c.parent) {
+      const kids = c.parent.children;
+      const i = kids.indexOf(c);
+      if (i > 0) {
+        kids.splice(i, 1);
+        kids.unshift(c);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  /** Is `node` on the main line? */
+  isMainLine(node) {
+    if (!node) return false;
+    for (let c = node; c.parent; c = c.parent) if (c.parent.children[0] !== c) return false;
+    return true;
+  }
+
   setResult(result) {
     this.current.result = result || null;
     if (result) this.current.phase = "ended";
@@ -481,6 +562,7 @@ export class Game {
     while (terminal.children.length) terminal = terminal.children[0];
     const result = this.current.result || terminal.result;
     if (result) head += "RE[" + esc(result) + "]";
+    if (this.event) head += "EV[" + esc(this.event) + "]";
     if (root.comment) head += "C[" + esc(root.comment) + "]";
     const ab = [];
     const aw = [];
@@ -493,6 +575,9 @@ export class Game {
     }
     if (ab.length) head += "AB[" + ab.join("][") + "]";
     if (aw.length) head += "AW[" + aw.join("][") + "]";
+    // Who moves first from a set-up position (handicap or problem).
+    if (ab.length || aw.length) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
+    head += marksText(root.marks, sgfCoord, esc) + extraText(root.extra, esc);
     head += "\n";
     const nodeText = (n) => {
       if (!n.move) return "";
@@ -500,6 +585,7 @@ export class Game {
       const v = n.move.pass ? "" : sgfCoord(n.move.x, n.move.y);
       let s = ";" + c + "[" + v + "]";
       if (n.comment) s += "C[" + esc(n.comment) + "]";
+      s += marksText(n.marks, sgfCoord, esc) + extraText(n.extra, esc);
       return s;
     };
     const walk = (n) => {
@@ -514,6 +600,133 @@ export class Game {
     if (!body) body = ";";
     return head + body + ")\n";
   }
+}
+
+/* ------------------------------------------------------ v5: markup */
+
+/** Board marks a node can carry, as stored in node.marks[].type. */
+export const MARK_KINDS = ["triangle", "square", "circle", "cross", "label"];
+/** SGF property for each mark kind. */
+export const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
+
+function nextLabel(marks) {
+  const used = new Set(marks.filter((m) => m.type === "label").map((m) => m.text));
+  for (const ch of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") if (!used.has(ch)) return ch;
+  for (let i = 1; ; i++) if (!used.has(String(i))) return String(i);
+}
+
+function marksText(marks, sgfCoord, esc) {
+  if (!marks?.length) return "";
+  let s = "";
+  for (const kind of MARK_KINDS) {
+    const list = marks.filter((m) => m.type === kind);
+    if (!list.length) continue;
+    const vals = list.map((m) => sgfCoord(m.x, m.y) + (kind === "label" ? ":" + esc(m.text ?? "") : ""));
+    s += MARK_PROPS[kind] + "[" + vals.join("][") + "]";
+  }
+  return s;
+}
+
+function extraText(extra, esc) {
+  if (!extra) return "";
+  let s = "";
+  for (const [key, values] of Object.entries(extra)) {
+    if (!/^[A-Z]+$/.test(key) || !Array.isArray(values)) continue;
+    s += key + (values.length ? values.map((v) => "[" + esc(v) + "]").join("") : "[]");
+  }
+  return s;
+}
+
+/**
+ * v5: layout of the whole game tree for a variation mini-map.
+ *
+ *   x  depth (0 = root, so a move's x is its move number in its line)
+ *   y  row (0 = main line); each variation takes the first row below its
+ *      parent's row that is free along its whole length, with one empty
+ *      cell before and after it (so two lines in a row never look joined).
+ *
+ * Branches hanging off later moves are placed first, so a branch from an
+ * earlier move goes below them and no edge runs through a node. Edges from
+ * one parent may share its column (a trunk). Returns
+ *   { nodes: [{ x, y, id, node, isMain, onPath, isCurrent, hasComment,
+ *               hasMarks, color, pass }],
+ *     edges: [{ from: {x, y}, to: {x, y}, points: [[x, y], …], isMain }],
+ *     width, height, current: {x, y} | null }
+ * `points` is the polyline to draw: one step along a row, or down the
+ * parent's column to the row above the child and then one diagonal step.
+ */
+export function treeLayout(game) {
+  const root = game.root;
+  const onPath = new Set();
+  for (let c = game.current; c; c = c.parent) onPath.add(c);
+  // occupied[row] = Map x → owner: "node", or the parent whose edge runs there.
+  const occupied = [];
+  const ownerAt = (row, x) => occupied[row]?.get(x);
+  const isFree = (row, x) => ownerAt(row, x) === undefined;
+  const take = (row, x, owner = "node") => (occupied[row] ||= new Map()).set(x, owner);
+  const nodes = [];
+  const edges = [];
+  const pos = new Map();
+  let width = 0;
+  let height = 0;
+
+  const chainLength = (n) => {
+    let k = 0;
+    for (let c = n; c; c = c.children[0]) k++;
+    return k;
+  };
+
+  // Iterative over the first-child chain, recursive only per variation.
+  const placeChain = (start, x0, row, main) => {
+    const chain = [];
+    let x = x0;
+    for (let n = start; n; n = n.children[0], x++) {
+      take(row, x);
+      const item = {
+        x,
+        y: row,
+        id: n.id,
+        node: n,
+        isMain: main,
+        onPath: onPath.has(n),
+        isCurrent: n === game.current,
+        hasComment: !!n.comment,
+        hasMarks: !!n.marks?.length,
+        color: n.move ? n.move.color : 0,
+        pass: !!n.move?.pass,
+      };
+      nodes.push(item);
+      pos.set(n, item);
+      if (n !== start) edges.push({ from: { x: x - 1, y: row }, to: { x, y: row }, points: [[x - 1, row], [x, row]], isMain: main });
+      chain.push(n);
+      width = Math.max(width, x + 1);
+      height = Math.max(height, row + 1);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const px = x0 + i;
+      for (const child of chain[i].children.slice(1)) {
+        const len = chainLength(child);
+        let r = row + 1;
+        for (;;) {
+          let ok = true;
+          for (let k = 0; k <= len + 1 && ok; k++) if (!isFree(r, px + k)) ok = false;
+          for (let q = row + 1; q < r && ok; q++) if (!isFree(q, px) && ownerAt(q, px) !== chain[i]) ok = false;
+          if (ok) break;
+          r++;
+        }
+        for (let q = row + 1; q < r; q++) take(q, px, chain[i]); // the edge's vertical run
+        const points = [[px, row]];
+        if (r > row + 1) points.push([px, r - 1]);
+        points.push([px + 1, r]);
+        edges.push({ from: { x: px, y: row }, to: { x: px + 1, y: r }, points, isMain: false });
+        placeChain(child, px + 1, r, false);
+      }
+    }
+  };
+
+  placeChain(root, 0, 0, true);
+  const cur = pos.get(game.current);
+  return { nodes, edges, width, height, current: cur ? { x: cur.x, y: cur.y } : null };
 }
 
 export function formatPoints(v) {
