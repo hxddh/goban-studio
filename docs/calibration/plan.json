@@ -1,0 +1,26 @@
+{
+  "note": "v7 stage 3: human-style 5k candidates (rank_7k, search style, 24 visits, with beginner moves) on 19x19 against the standard 10k, 5k, 1k; 9x9 cross-check (docs/strength.md, v7)",
+  "runs": [
+    {
+      "id": "v7-19b",
+      "size": 19,
+      "games": 16,
+      "pairs": "CH:s7k24b8-L:10k,CH:s7k24b8-L:5k,CH:s7k24b8-L:1k,CH:s7k24b15-L:10k,CH:s7k24b15-L:5k,CH:s7k24b15-L:1k,CH:s7k24b25-L:10k,CH:s7k24b25-L:5k,CH:s7k24b25-L:1k",
+      "shards": 12,
+      "workers": 4,
+      "scoreVisits": 200,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    },
+    {
+      "id": "v7-9b",
+      "size": 9,
+      "games": 12,
+      "pairs": "CH:s7k24b8-L:10k,CH:s7k24b8-L:5k,CH:s7k24b8-L:1k,CH:s7k24b8-HL:10k,CH:s7k24b15-L:10k,CH:s7k24b15-L:5k,CH:s7k24b15-L:1k,CH:s7k24b15-HL:10k,CH:s7k24b25-L:10k,CH:s7k24b25-L:5k,CH:s7k24b25-L:1k,CH:s7k24b25-HL:10k",
+      "shards": 2,
+      "workers": 4,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    }
+  ]
+}
