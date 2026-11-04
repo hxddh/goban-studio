@@ -7,65 +7,25 @@ import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
 
-const PATHS = {
-  today: '<rect x="3" y="4" width="14" height="13" rx="2.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/><circle cx="10" cy="12.5" r="1.6"/>',
-  forward: '<path d="M8.5 4.5L14 10l-5.5 5.5"/>',
-  branch: '<circle cx="6" cy="4.5" r="1.6"/><circle cx="6" cy="15.5" r="1.6"/><circle cx="14" cy="8" r="1.6"/><path d="M6 6.1v7.8M14 9.6c0 3-8 2-8 4.3"/>',
-  sparkle: '<path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/>',
-  clock: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>',
-  play: '<rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M7.7 3v14M12.3 3v14M3 7.7h14M3 12.3h14"/>',
-  practice: '<path d="M3.5 5.2c2.2-1 4.4-1 6.5.4 2.1-1.4 4.3-1.4 6.5-.4v10c-2.2-1-4.4-1-6.5.4-2.1-1.4-4.3-1.4-6.5-.4z"/><path d="M10 5.6v10"/>',
-  library: '<rect x="3.5" y="3" width="4" height="14" rx="1"/><rect x="8.5" y="3" width="4" height="14" rx="1"/><path d="M14 4.2l3.2.8-2.6 12-3.1-.8"/>',
-  gear: '<circle cx="10" cy="10" r="2.6"/><path d="M10 2.6v2M10 15.4v2M2.6 10h2M15.4 10h2M4.8 4.8l1.4 1.4M13.8 13.8l1.4 1.4M15.2 4.8l-1.4 1.4M6.2 13.8l-1.4 1.4"/>',
-  keyboard: '<rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M5.5 8h1M9.5 8h1M13.5 8h1M5.5 11h1M8 12.2h4M13.5 11h1"/>',
-  plus: '<path d="M10 4.5v11M4.5 10h11"/>',
-  undo: '<path d="M7 5L3.8 8.2 7 11.4"/><path d="M4.2 8.2H12a4 4 0 0 1 0 8H8.5"/>',
-  pass: '<path d="M3.5 10h12"/><path d="M12 6.5l3.5 3.5-3.5 3.5"/>',
-  more: '<circle cx="5" cy="10" r="1.2"/><circle cx="10" cy="10" r="1.2"/><circle cx="15" cy="10" r="1.2"/>',
-  first: '<path d="M5 4.5v11M15 5.5l-6 4.5 6 4.5z"/>',
-  prev: '<path d="M12.5 4.5L7 10l5.5 5.5"/>',
-  next: '<path d="M7.5 4.5L13 10l-5.5 5.5"/>',
-  last: '<path d="M15 4.5v11M5 5.5l6 4.5-6 4.5z"/>',
-  back: '<path d="M11.5 4.5L6 10l5.5 5.5"/>',
-  check: '<path d="M4.5 10.5l3.5 3.5 7.5-8"/>',
-  close: '<path d="M5 5l10 10M15 5L5 15"/>',
-  eye: '<path d="M2.5 10s2.8-5 7.5-5 7.5 5 7.5 5-2.8 5-7.5 5-7.5-5-7.5-5z"/><circle cx="10" cy="10" r="2"/>',
-  target: '<circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="2.5"/>',
-  bulb: '<path d="M7.5 15.5h5M8 17.5h4"/><path d="M7.6 13.5c-1.6-1-2.6-2.6-2.6-4.4a5 5 0 0 1 10 0c0 1.8-1 3.4-2.6 4.4"/>',
-  flag: '<path d="M5 17.5V3"/><path d="M5 3.5h9l-1.6 3.2L14 10H5z"/>',
-  save: '<path d="M4 4h9.5L16 6.5V16H4z"/><path d="M7 4v4h6V4M7 16v-5h6v5"/>',
-  download: '<path d="M10 3.5v9"/><path d="M6.5 9l3.5 3.5L13.5 9"/><path d="M4 16h12"/>',
-  upload: '<path d="M10 13V4"/><path d="M6.5 7.5L10 4l3.5 3.5"/><path d="M4 16h12"/>',
-  trash: '<path d="M4.5 6h11"/><path d="M8 6V4h4v2"/><path d="M6 6l.7 10h6.6L14 6"/>',
-  edit: '<path d="M4 16l1-4L13 4l3 3-8 8z"/>',
-  focus: '<path d="M3.5 7.5V3.5h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4"/>',
-  chart: '<path d="M3 16.5h14"/><path d="M4.5 13l3.5-4 3 2.5 4.5-6"/>',
-  replay: '<path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5v3h3"/>',
-  search: '<circle cx="9" cy="9" r="5"/><path d="M13 13l3.5 3.5"/>',
-  down: '<path d="M5 7.5l5 5 5-5"/>',
-  resume: '<path d="M7 4.5l8 5.5-8 5.5z"/>',
-  flame: '<path d="M10 17c-3 0-5-2-5-4.8 0-3.2 3-4.6 3-8.2 2.6 1.4 4 3.4 4 5.6.8-.6 1.3-1.5 1.4-2.6 1.4 1.4 1.6 3 1.6 5.2C15 15 13 17 10 17z"/>',
-};
-
 export function Icon({ name, size = 18 }) {
   return (
-    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICONS[name] || PATHS[name] || ICONS.more || PATHS.more }} />
+    <svg class="icon" viewBox="0 0 20 20" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICONS[name] || ICONS.more }} />
   );
 }
 
 export function Button({ kind = "secondary", icon, children, onClick, disabled, title, size, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`btn ${kind} ${size || ""} ${cls}`} onClick={onClick} disabled={disabled} title={title} aria-label={title || undefined} {...rest}>
-      {icon && <Icon name={icon} size={size === "sm" ? 15 : 17} />}
+      {icon && <Icon name={icon} size={16} />}
       {children && <span>{children}</span>}
     </button>
   );
 }
 
-export function IconButton({ icon, label, onClick, disabled, active, class: cls = "", ...rest }) {
+export function IconButton({ icon, label, onClick, disabled, active, size = 18, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`icon-btn ${active ? "on" : ""} ${cls}`} onClick={onClick} disabled={disabled} title={label} aria-label={label} aria-pressed={active === undefined ? undefined : !!active} {...rest}>
-      <Icon name={icon} />
+      <Icon name={icon} size={size} />
     </button>
   );
 }
@@ -229,6 +189,7 @@ export function Board({ model, onPlay, onHover, label }) {
     setCursorLabelState(`${letters[c.x]}${size - c.y}${v ? " · " + t(v > 0 ? "common.black" : "common.white") : ""}`);
   };
   return (
+    <div class="board-area">
     <div class="board-frame">
       <canvas
         ref={canvas}
@@ -248,6 +209,7 @@ export function Board({ model, onPlay, onHover, label }) {
       <span class="sr-only" aria-live="polite">
         {cursorLabel}
       </span>
+    </div>
     </div>
   );
 }

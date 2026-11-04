@@ -9,7 +9,6 @@ components; their licence texts sit beside this file.
   Preact 10.29.8 — MIT — Preact-MIT.txt
   Moka v2.1 9×9 network and player — MIT — Moka-MIT.txt
   KataGo 1.18.1 and the b6c96 network — MIT — KataGo-MIT.txt
-  Inter typeface — SIL Open Font License 1.1 — Inter-OFL.txt
 
 The SGF opening positions are from the public-domain Go game collection at
 https://homepages.cwi.nl/~aeb/go/games/ and the historical records are

@@ -99,6 +99,8 @@ export function locationNow() {
     practice: {
       view: p.view,
       topic: p.topic,
+      theme: p.theme || null,
+      shape: p.shape || null,
       lessonId: p.lesson?.lesson?.id || null,
       lessonIndex: p.lesson?.index ?? null,
       problemId: p.problem?.def?.id || null,

@@ -3,7 +3,7 @@
  * position on the board, free variations, explanations of key mistakes, and
  * turning a mistake into a drill.
  */
-import { BLACK, Game, influenceMap } from "../rules.js";
+import { Game, influenceMap } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import { markClassic, markOpening, addMistake } from "../persist.js";
@@ -11,7 +11,7 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { state, update, toast } from "./store.js";
 import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
-import { classifyMistake, lossSource } from "./insight.js";
+import { describeMistakes, lossesOf } from "./explain.js";
 import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
 
@@ -42,49 +42,46 @@ export async function analyzeLine(game, { visits = 40, token = { cancelled: fals
   return points;
 }
 
-/** Score lost by each main-line move, from the mover's point of view. */
-export function lossesOf(game, points) {
-  const line = game.mainLine();
-  const out = [];
-  for (let i = 1; i < line.length; i++) {
-    const a = points[i - 1];
-    const b = points[i];
-    const move = line[i].move;
-    if (!a || !b || !move) continue;
-    const delta = b.scoreLead - a.scoreLead;
-    const loss = move.color === BLACK ? -delta : delta;
-    out.push({ index: i, node: line[i], move, loss, best: a.best, pv: a.pv, before: line[i - 1] });
-  }
-  return out;
+// lossesOf / describeMistakes live in explain.js (pure, tested in Node).
+export { lossesOf, describeMistakes };
+
+/** Key mistakes of a review, using its refined analyses when there are any. */
+function keyMovesOf(review) {
+  return describeMistakes(review.game, review.points, review.meta.humanColor ?? null, 3, review.refined).top;
 }
 
 /**
- * The costliest moves (of `color`, or of both), explained: where the loss
- * came from, which pattern it looks like, and which moves would have been
- * fine (to grade a drill later).
+ * v4: one deeper KataGo search of the position after each of the top three
+ * mistakes (never more), for a sharper refutation line and ownership. Runs
+ * after the whole-game pass; skipped without KataGo. Results are kept in
+ * `review.refined[index]` and the key mistakes are explained again.
  */
-export function describeMistakes(game, points, color = null, n = 3) {
-  const all = lossesOf(game, points);
-  const top = all
-    .filter((m) => m.loss >= 2 && !m.move.pass && (color == null || m.move.color === color))
-    .sort((a, b) => b.loss - a.loss)
-    .slice(0, n)
-    .sort((a, b) => a.index - b.index)
-    .map((m) => {
-      const a = points[m.index - 1];
-      const b = points[m.index];
-      const signMap = m.before.board.signMap;
-      const source = lossSource(signMap, a?.ownership, b?.ownership, m.move.color);
-      // The line that punishes the mistake: the engine's best reply after it.
-      const punish = b?.pv || [];
-      const theme = classifyMistake({ signMapBefore: signMap, move: m.move, pv: punish, source, mover: m.move.color });
-      const bestLead = a?.moves?.[0]?.scoreLead;
-      const accept = (a?.moves || [])
-        .filter((c) => !c.pass && (c.visits || 0) > 0 && Number.isFinite(c.scoreLead) && m.move.color * (bestLead - c.scoreLead) <= 1.5)
-        .map((c) => ({ x: c.x, y: c.y }));
-      return { ...m, source, theme, accept: accept.length ? accept : m.best && !m.best.pass ? [{ x: m.best.x, y: m.best.y }] : [] };
-    });
-  return { all, top };
+async function refineKeyMoves(review) {
+  if (!state.engine.available || review.engine !== "katago" || review.refining) return;
+  const line = review.game.mainLine();
+  const todo = review.keyMoves.filter((km) => !review.refined[km.index] && line[km.index]).slice(0, 3);
+  if (!todo.length) return;
+  review.refining = true;
+  update();
+  const size = review.game.size;
+  const visits = size === 19 ? 120 : size === 13 ? 160 : 200;
+  for (const km of todo) {
+    if (review.token.cancelled) break;
+    let a = null;
+    try {
+      a = await Engine.analyzeNode(review.game, line[km.index], visits);
+    } catch (_) {
+      a = null;
+    }
+    if (review.token.cancelled) break;
+    if (a) {
+      review.refined[km.index] = a;
+      review.keyMoves = keyMovesOf(review);
+      update();
+    }
+  }
+  review.refining = false;
+  update();
 }
 
 /* ------------------------------------------------------------- open */
@@ -112,8 +109,12 @@ export function openReview(game, meta = {}) {
     hover: null,
     guess: meta.guess ? { color: meta.guessColor ?? null, right: 0, tries: 0, last: null } : null,
     token: { cancelled: false },
+    // v4: deeper analyses after the top mistakes (index → analysis), and
+    // whether that pass is running. See refineKeyMoves.
+    refined: {},
+    refining: false,
   };
-  if (meta.points) review.keyMoves = describeMistakes(game, review.points, meta.humanColor ?? null).top;
+  if (meta.points) review.keyMoves = keyMovesOf(review);
   update((s) => {
     s.review = review;
     s.space = meta.space || "play";
@@ -121,6 +122,7 @@ export function openReview(game, meta = {}) {
     s.menu = null;
   });
   if (!meta.guess && !meta.points) analyzeReview(review);
+  else if (!meta.guess) refineKeyMoves(review);
   startLive();
 }
 
@@ -167,16 +169,17 @@ async function analyzeReview(review) {
     onProgress: (k, n) => {
       review.analyzed = k;
       if (k % 4 === 0 || k === n) {
-        review.keyMoves = describeMistakes(game, review.points, review.meta.humanColor ?? null).top;
+        review.keyMoves = keyMovesOf(review);
         update();
       }
     },
   });
   if (!points) return;
   review.analyzing = false;
-  review.keyMoves = describeMistakes(game, review.points, review.meta.humanColor ?? null).top;
+  review.keyMoves = keyMovesOf(review);
   if (review.source === "current" && state.game?.game === game) state.game.analysis = review.points;
   update();
+  refineKeyMoves(review);
 }
 
 /* ------------------------------------------------------- navigation */
@@ -385,11 +388,43 @@ export function showVariation(km, kind) {
   startLive();
 }
 
+/**
+ * v4: play a key mistake's story up to `step` (0-based) on the board.
+ * `line` is "better" or "played" (km.story[line]). Sets r.variation to
+ * { kind: line, index, moves, story: true, step }; moves are the story's
+ * moves 0..step in the {x, y, c, n} shape the board draws.
+ */
+export function showStory(km, line, step = 0) {
+  const r = state.review;
+  const steps = km?.story?.[line];
+  if (!r || !steps?.length) return;
+  const upto = Math.max(0, Math.min(steps.length - 1, step));
+  r.game.goto(r.game.mainLine()[km.index - 1].id);
+  const moves = steps
+    .slice(0, upto + 1)
+    .map((s) => (s.move.pass ? null : { x: s.move.x, y: s.move.y, c: s.color, n: s.n }))
+    .filter(Boolean);
+  r.variation = { kind: line, index: km.index, moves, story: true, step: upto };
+  r.focus = km.index;
+  update();
+  startLive();
+}
+
+/** Step through the story on the board: delta +1 / −1 from the shown step. */
+export function storyStep(delta) {
+  const r = state.review;
+  const v = r?.variation;
+  if (!v?.story) return;
+  const km = r.keyMoves.find((k) => k.index === v.index);
+  if (km) showStory(km, v.kind, v.step + delta);
+}
+
 export function focusMistake(km) {
   const r = state.review;
   if (!r) return;
   r.focus = km.index;
-  showVariation(km, "played");
+  if (km.story?.played?.length) showStory(km, "played", 0);
+  else showVariation(km, "played");
 }
 
 /** Turn a key mistake into a drill and start it. */

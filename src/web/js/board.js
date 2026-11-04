@@ -14,41 +14,59 @@
  * playable without a pointer.
  */
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
-import { THEME_COLORS, loadMaterials, stoneVariant, surfaceFor } from "./materials.js";
+import { loadMaterials, stoneVariant, surfaceFor } from "./materials.js";
 
+/**
+ * v4 materials (docs/design.md §5): a calm plain board by default, a wood
+ * board whose grain is a whisper (the kaya texture at 25 %), and an ink
+ * board for dark rooms. Line colours are ink at ~70 %, never pure black.
+ */
 export const MATERIALS = {
-  kaya: null,
-  katsura: null,
+  plain: {
+    base: "#E4CB9A",
+    vignette: "rgba(70, 44, 12, 0.07)",
+    line: "rgba(40, 27, 12, 0.72)",
+    edge: "rgba(40, 27, 12, 0.85)",
+    star: "rgba(40, 27, 12, 0.85)",
+    text: "rgba(74, 52, 26, 0.6)",
+    shadow: "rgba(46, 28, 8, 0.3)",
+  },
   wood: {
-    surface: ["#e9cd9d", "#dfba84", "#d2a970"],
-    grain: "rgba(120, 78, 35, 0.045)",
-    line: "rgba(52, 33, 15, 0.82)",
-    edge: "rgba(52, 33, 15, 0.95)",
-    star: "#3a2410",
-    text: "rgba(70, 45, 20, 0.62)",
-    shadow: "rgba(45, 25, 5, 0.32)",
+    base: "#E2C795",
+    texture: "kaya",
+    textureAlpha: 0.25,
+    vignette: "rgba(70, 44, 12, 0.07)",
+    line: "rgba(40, 27, 12, 0.74)",
+    edge: "rgba(40, 27, 12, 0.86)",
+    star: "rgba(40, 27, 12, 0.86)",
+    text: "rgba(74, 52, 26, 0.62)",
+    shadow: "rgba(46, 28, 8, 0.3)",
   },
-  paper: {
-    surface: ["#faf6ec", "#f4eddc", "#ece2cb"],
-    grain: "rgba(120, 100, 60, 0.035)",
-    line: "rgba(70, 58, 42, 0.72)",
-    edge: "rgba(70, 58, 42, 0.9)",
-    star: "#4a3c2c",
-    text: "rgba(80, 66, 48, 0.6)",
-    shadow: "rgba(60, 50, 30, 0.22)",
-  },
-  slate: {
-    surface: ["#2c3832", "#26312b", "#1f2924"],
-    grain: "rgba(255, 255, 255, 0.025)",
-    line: "rgba(190, 214, 200, 0.42)",
-    edge: "rgba(190, 214, 200, 0.6)",
-    star: "rgba(205, 228, 214, 0.75)",
-    text: "rgba(200, 222, 208, 0.55)",
-    shadow: "rgba(0, 0, 0, 0.45)",
+  ink: {
+    base: "#2D2E2C",
+    vignette: "rgba(0, 0, 0, 0.22)",
+    line: "rgba(232, 228, 218, 0.34)",
+    edge: "rgba(232, 228, 218, 0.52)",
+    star: "rgba(232, 228, 218, 0.62)",
+    text: "rgba(232, 228, 218, 0.46)",
+    shadow: "rgba(0, 0, 0, 0.5)",
   },
 };
 
+/** v3 names still found in saved settings or callers. */
+const MATERIAL_V3 = { kaya: "plain", katsura: "wood", paper: "plain", slate: "ink" };
+
+export function materialName(name) {
+  return MATERIALS[name] ? name : MATERIAL_V3[name] || "plain";
+}
+
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
+
 const DPR_LIMIT = 2;
+/** docs/design.md §4: the accent marks attention; good/bad are signals. */
+const ACCENT = "#34529A";
+const GOOD = "#2E7D4F";
+const BAD = "#B3402C";
 const PLACE_MS = 140;
 const FADE_MS = 200;
 
@@ -81,7 +99,7 @@ export class BoardView {
       variation: null,
       moveNumbers: null,
       showCoords: true,
-      material: "wood",
+      material: "plain",
       view: null,
       hover: null,
       hoverColor: BLACK,
@@ -115,12 +133,9 @@ export class BoardView {
     this.resize();
   }
 
-  /** Colours for the current surface: tuned per texture when available. */
+  /** Colours for the current material. */
   theme() {
-    const name = this.model.material === "wood" ? "kaya" : this.model.material;
-    const base = MATERIALS[name] || MATERIALS[name === "kaya" || name === "katsura" ? "wood" : "paper"] || MATERIALS.wood;
-    const tuned = THEME_COLORS[name];
-    return tuned ? { ...base, ...tuned, line: tuned.line, edge: tuned.edge, star: tuned.star, text: tuned.text, shadow: tuned.shadow } : base;
+    return MATERIALS[materialName(this.model.material)];
   }
 
   destroy() {
@@ -128,11 +143,23 @@ export class BoardView {
     cancelAnimationFrame(this.raf);
   }
 
+  /** Board text follows the interface font (per language, docs/design.md §2). */
+  readFont() {
+    this.font = (typeof getComputedStyle === "function" && getComputedStyle(this.canvas).getPropertyValue("--font").trim()) || FONT;
+  }
+
   setModel(patch) {
+    this.readFont();
     const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
     Object.assign(this.model, patch);
+    // A new board size (or problem window) invalidates the keyboard cursor
+    // and the hover point: they could now lie off the board.
+    if (this.model.size !== prevSize) {
+      this.model.cursor = null;
+      this.model.hover = null;
+    }
     if (patch.interactive === false) {
       this.model.hover = null;
       this.model.cursor = null;
@@ -217,8 +244,16 @@ export class BoardView {
     const shortest = Math.max(1, Math.min(w, h));
     // Margin in cells: room for coordinates outside the grid, or a quiet
     // border when they are hidden. Clamped so a hidden board stays positive.
-    const marginCells = this.model.showCoords ? 1.25 : 0.8;
-    const cell = Math.max(0.001, shortest / (span + marginCells * 2));
+    // On a small board the cells are large; the coordinate margin is capped
+    // in pixels so the letters stay close to the grid.
+    // Margin = min(wantCells × cell, half a stone + a fixed band): on large
+    // cells the band (coordinates or a quiet edge) no longer grows with them.
+    const wantCells = this.model.showCoords ? 1.25 : 0.8;
+    const band = this.model.showCoords ? 34 : 14;
+    const cellA = shortest / (span + wantCells * 2);
+    const cellB = (shortest - band * 2) / (span + 1);
+    const cell = Math.max(0.001, cellA, cellB);
+    const marginCells = Math.min(wantCells, 0.5 + band / cell);
     const gridW = cell * cols;
     const gridH = cell * rows;
     const ox = (w - gridW) / 2 - win.x0 * cell;
@@ -265,7 +300,8 @@ export class BoardView {
   /** Keyboard: move the cursor inside the visible window. */
   moveCursor(dx, dy) {
     const win = this.window();
-    const c = this.model.cursor || { x: Math.round((win.x0 + win.x1) / 2), y: Math.round((win.y0 + win.y1) / 2) };
+    const inside = (p) => p && p.x >= win.x0 && p.x <= win.x1 && p.y >= win.y0 && p.y <= win.y1;
+    const c = (inside(this.model.cursor) && this.model.cursor) || { x: Math.round((win.x0 + win.x1) / 2), y: Math.round((win.y0 + win.y1) / 2) };
     this.model.cursor = {
       x: Math.max(win.x0, Math.min(win.x1, c.x + dx)),
       y: Math.max(win.y0, Math.min(win.y1, c.y + dy)),
@@ -275,49 +311,40 @@ export class BoardView {
     return this.model.cursor;
   }
 
+  /** The board surface, cached per size and material. */
   grain(theme, w, h) {
-    const surface = this.mats ? surfaceFor(this.mats, this.model.material) : null;
-    const key = `${this.model.material}:${w}x${h}:${this.dpr}:${surface ? "tex" : "proc"}`;
+    const tex = theme.texture && this.mats ? surfaceFor(this.mats, theme.texture) : null;
+    const key = `${materialName(this.model.material)}:${w}x${h}:${this.dpr}:${tex ? "tex" : "flat"}`;
     if (this.grainCache?.key === key) return this.grainCache.canvas;
     const c = document.createElement("canvas");
     c.width = Math.round(w * this.dpr);
     c.height = Math.round(h * this.dpr);
     const g = c.getContext("2d");
     g.scale(this.dpr, this.dpr);
-    if (surface) {
-      // The texture covers the board (cropped to a square from its centre).
-      g.imageSmoothingQuality = "high";
-      const side = Math.min(surface.naturalWidth || surface.width, surface.naturalHeight || surface.height);
-      g.drawImage(surface, 0, 0, side, side, 0, 0, w, h);
-      this.grainCache = { key, canvas: c };
-      return c;
-    }
-    const bg = g.createLinearGradient(0, 0, w * 0.35, h);
-    bg.addColorStop(0, theme.surface[0]);
-    bg.addColorStop(0.55, theme.surface[1]);
-    bg.addColorStop(1, theme.surface[2]);
-    g.fillStyle = bg;
+    g.fillStyle = theme.base;
     g.fillRect(0, 0, w, h);
-    // A quiet, deterministic grain: long soft strokes, never a texture
-    // that competes with the stones.
-    g.strokeStyle = theme.grain;
-    for (let i = 0; i < 70; i++) {
-      const y = hash(i, 7) * h;
-      const amp = 2 + hash(i, 11) * 6;
-      g.lineWidth = 0.6 + hash(i, 3) * 1.8;
-      g.beginPath();
-      for (let x = 0; x <= w; x += 24) {
-        const yy = y + Math.sin(x / (80 + hash(i, 5) * 120) + i) * amp;
-        if (x === 0) g.moveTo(x, yy);
-        else g.lineTo(x, yy);
-      }
-      g.stroke();
+    if (tex) {
+      // The grain is a whisper: the texture at a quarter strength.
+      g.save();
+      g.globalAlpha = theme.textureAlpha;
+      g.imageSmoothingQuality = "high";
+      const side = Math.min(tex.naturalWidth || tex.width, tex.naturalHeight || tex.height);
+      g.drawImage(tex, 0, 0, side, side, 0, 0, w, h);
+      g.restore();
     }
+    // A barely-there falloff from the centre, so the surface is not dead flat.
+    const r = Math.hypot(w, h) / 2;
+    const v = g.createRadialGradient(w / 2, h / 2, r * 0.35, w / 2, h / 2, r);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(1, theme.vignette);
+    g.fillStyle = v;
+    g.fillRect(0, 0, w, h);
     this.grainCache = { key, canvas: c };
     return c;
   }
 
   draw() {
+    if (!this.font) this.readFont();
     const ctx = this.ctx;
     const g = this.geometry();
     this.geom = g;
@@ -332,62 +359,62 @@ export class BoardView {
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(this.grain(theme, w, h), 0, 0, w, h);
 
-    // Grid. Lines on an open side of a zoomed window run off by half a cell.
+    // Grid. Whole device pixels, snapped so lines never blur; the frame is
+    // 1.6× the inner lines. Lines on an open side of a zoomed window run off
+    // by half a cell.
+    const dpr = this.dpr;
+    const lineDev = Math.max(1, Math.round(cell * dpr * 0.02));
+    const edgeDev = Math.max(lineDev + 1, Math.round(lineDev * 1.6));
+    const snap = (v, wDev) => {
+      const off = (wDev % 2) / 2;
+      return (Math.round(v * dpr - off) + off) / dpr;
+    };
     const ext = (open) => (open ? cell * 0.6 : 0);
     const left = px(win.x0) - ext(win.x0 > 0);
     const right = px(win.x1) + ext(win.x1 < size - 1);
     const top = py(win.y0) - ext(win.y0 > 0);
     const bottom = py(win.y1) + ext(win.y1 < size - 1);
+    const isEdgeX = (x) => (x === 0 && win.x0 === 0) || (x === size - 1 && win.x1 === size - 1);
+    const isEdgeY = (y) => (y === 0 && win.y0 === 0) || (y === size - 1 && win.y1 === size - 1);
+    const stroke = (edge) => {
+      const wDev = edge ? edgeDev : lineDev;
+      ctx.strokeStyle = edge ? theme.edge : theme.line;
+      ctx.lineWidth = wDev / dpr;
+      ctx.beginPath();
+      for (let x = win.x0; x <= win.x1; x++) {
+        if (isEdgeX(x) !== edge) continue;
+        const sx = snap(px(x), wDev);
+        ctx.moveTo(sx, top);
+        ctx.lineTo(sx, bottom);
+      }
+      for (let y = win.y0; y <= win.y1; y++) {
+        if (isEdgeY(y) !== edge) continue;
+        const sy = snap(py(y), wDev);
+        ctx.moveTo(left, sy);
+        ctx.lineTo(right, sy);
+      }
+      ctx.stroke();
+    };
+    ctx.lineCap = "square";
+    stroke(false);
+    stroke(true);
     ctx.lineCap = "butt";
-    ctx.strokeStyle = theme.line;
-    ctx.lineWidth = Math.max(0.75, cell * 0.028);
-    ctx.beginPath();
-    for (let x = win.x0; x <= win.x1; x++) {
-      ctx.moveTo(px(x), top);
-      ctx.lineTo(px(x), bottom);
-    }
-    for (let y = win.y0; y <= win.y1; y++) {
-      ctx.moveTo(left, py(y));
-      ctx.lineTo(right, py(y));
-    }
-    ctx.stroke();
-    // The board's own edges are slightly heavier.
-    ctx.strokeStyle = theme.edge;
-    ctx.lineWidth = Math.max(1.1, cell * 0.045);
-    ctx.beginPath();
-    if (win.x0 === 0) {
-      ctx.moveTo(px(0), top);
-      ctx.lineTo(px(0), bottom);
-    }
-    if (win.x1 === size - 1) {
-      ctx.moveTo(px(size - 1), top);
-      ctx.lineTo(px(size - 1), bottom);
-    }
-    if (win.y0 === 0) {
-      ctx.moveTo(left, py(0));
-      ctx.lineTo(right, py(0));
-    }
-    if (win.y1 === size - 1) {
-      ctx.moveTo(left, py(size - 1));
-      ctx.lineTo(right, py(size - 1));
-    }
-    ctx.stroke();
 
     ctx.fillStyle = theme.star;
     for (const [x, y] of starPoints(size)) {
       if (x < win.x0 || x > win.x1 || y < win.y0 || y > win.y1) continue;
       ctx.beginPath();
-      ctx.arc(px(x), py(y), Math.max(1.6, cell * 0.085), 0, Math.PI * 2);
+      ctx.arc(snap(px(x), lineDev), snap(py(y), lineDev), Math.max(1.5, cell * 0.065), 0, Math.PI * 2);
       ctx.fill();
     }
 
     if (m.showCoords) {
       ctx.fillStyle = theme.text;
-      const fs = Math.max(9, Math.min(13, cell * 0.36));
-      ctx.font = `500 ${fs}px "Inter Var", -apple-system, system-ui, sans-serif`;
+      const fs = Math.max(10, Math.min(13, cell * 0.3));
+      ctx.font = `500 ${fs}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const gap = cell * 0.78;
+      const gap = Math.min(cell * 0.8, cell * 0.5 + 18);
       for (let x = win.x0; x <= win.x1; x++) {
         ctx.fillText(LETTERS[x], px(x), py(win.y1) + gap + ext(win.y1 < size - 1) * 0.6);
       }
@@ -478,7 +505,7 @@ export class BoardView {
       const j = this.jitter(last.x, last.y);
       ctx.fillStyle = c === BLACK ? "rgba(255,250,240,0.9)" : "rgba(30,26,22,0.85)";
       ctx.beginPath();
-      ctx.arc(px(last.x) + j.dx, py(last.y) + j.dy, cell * 0.11, 0, Math.PI * 2);
+      ctx.arc(px(last.x) + j.dx, py(last.y) + j.dy, cell * 0.1, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -490,7 +517,7 @@ export class BoardView {
     // Two-click placement: the pending stone, with a ring.
     if (m.ghost && inWin(m.ghost.x, m.ghost.y)) {
       this.stone(ctx, m.ghost.x, m.ghost.y, m.ghost.color, theme, { alpha: 0.6, shadow: false, jitter: false });
-      ctx.strokeStyle = "rgba(196, 112, 50, 0.95)";
+      ctx.strokeStyle = ACCENT;
       ctx.lineWidth = Math.max(1.5, cell * 0.06);
       ctx.beginPath();
       ctx.arc(px(m.ghost.x), py(m.ghost.y), cell * 0.56, 0, Math.PI * 2);
@@ -513,7 +540,7 @@ export class BoardView {
     // Keyboard cursor.
     if (m.cursor && inWin(m.cursor.x, m.cursor.y)) {
       const r = cell * 0.5;
-      ctx.strokeStyle = "rgba(196, 112, 50, 0.95)";
+      ctx.strokeStyle = ACCENT;
       ctx.lineWidth = Math.max(1.5, cell * 0.07);
       ctx.beginPath();
       ctx.roundRect(px(m.cursor.x) - r, py(m.cursor.y) - r, r * 2, r * 2, r * 0.3);
@@ -525,7 +552,7 @@ export class BoardView {
 
   jitter(x, y) {
     const cell = this.geom?.cell || 1;
-    return { dx: (hash(x, y) - 0.5) * cell * 0.05, dy: (hash(y + 31, x + 17) - 0.5) * cell * 0.05 };
+    return { dx: (hash(x, y) - 0.5) * cell * 0.03, dy: (hash(y + 31, x + 17) - 0.5) * cell * 0.03 };
   }
 
   stone(ctx, x, y, color, theme, { alpha = 1, scale = 1, shadow = true, jitter = true } = {}) {
@@ -537,18 +564,22 @@ export class BoardView {
     ctx.save();
     ctx.globalAlpha = alpha;
     if (shadow) {
-      const sh = ctx.createRadialGradient(cx + r * 0.12, cy + r * 0.2, r * 0.6, cx + r * 0.12, cy + r * 0.2, r * 1.12);
+      // A short, soft contact shadow: the stone sits on the board.
+      const sx = cx + r * 0.04;
+      const sy = cy + r * 0.09;
+      const sh = ctx.createRadialGradient(sx, sy, r * 0.82, sx, sy, r * 1.08);
       sh.addColorStop(0, theme.shadow);
       sh.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sh;
       ctx.beginPath();
-      ctx.arc(cx + r * 0.12, cy + r * 0.2, r * 1.12, 0, Math.PI * 2);
+      ctx.arc(sx, sy, r * 1.08, 0, Math.PI * 2);
       ctx.fill();
     }
     const sprite = this.sprite(x, y, color);
     if (sprite) {
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
+      this.rim(ctx, cx, cy, r, color);
       ctx.restore();
       return;
     }
@@ -566,12 +597,23 @@ export class BoardView {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+    this.rim(ctx, cx, cy, r, color);
     if (color === WHITE) {
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.lineWidth = 0.75;
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /** On the ink board a black stone needs a hairline rim to read. */
+  rim(ctx, cx, cy, r, color) {
+    if (color !== BLACK || materialName(this.model.material) !== "ink") return;
+    ctx.strokeStyle = "rgba(235, 230, 220, 0.32)";
+    ctx.lineWidth = Math.max(0.75, r * 0.04);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   /** Pre-rendered stone: shell/slate variants, or flat high-contrast discs. */
@@ -588,7 +630,7 @@ export class BoardView {
     const g = this.geom;
     const j = this.jitter(x, y);
     ctx.fillStyle = color;
-    ctx.font = `600 ${Math.max(8, fs)}px "Inter Var", -apple-system, system-ui, sans-serif`;
+    ctx.font = `600 ${Math.max(8, fs)}px ${this.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, g.ox + x * g.cell + j.dx, g.oy + y * g.cell + j.dy + 0.5);
@@ -602,7 +644,7 @@ export class BoardView {
     const cy = g.oy + mark.y * g.cell + j.dy;
     const r = g.cell * 0.27;
     const tone =
-      mark.tone === "good" ? "#3f8a5a" : mark.tone === "bad" ? "#c0452f" : mark.tone === "accent" ? "#c27234" : stoneColor === BLACK ? "#f4efe4" : stoneColor === WHITE ? "#2a241c" : theme.star;
+      mark.tone === "good" ? GOOD : mark.tone === "bad" ? BAD : mark.tone === "accent" ? ACCENT : stoneColor === BLACK ? "#f4efe4" : stoneColor === WHITE ? "#2a241c" : theme.star;
     ctx.strokeStyle = tone;
     ctx.fillStyle = tone;
     ctx.lineWidth = Math.max(1.4, g.cell * 0.07);
@@ -616,7 +658,7 @@ export class BoardView {
       ctx.fill();
       if (mark.label) {
         ctx.fillStyle = "#fff";
-        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px "Inter Var", -apple-system, system-ui, sans-serif`;
+        ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px ${this.font}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(mark.label, cx, cy + 0.5);
@@ -653,11 +695,11 @@ export class BoardView {
     } else if (mark.type === "label") {
       if (!stoneColor) {
         // Clear the grid under a letter so it reads.
-        ctx.fillStyle = (MATERIALS[this.model.material] || MATERIALS.wood || {}).surface?.[1] || "#e0c08a";
+        ctx.fillStyle = theme.base;
         ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
         ctx.fillStyle = tone;
       }
-      ctx.font = `600 ${g.cell * 0.46}px "Inter Var", -apple-system, system-ui, sans-serif`;
+      ctx.font = `600 ${g.cell * 0.46}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(mark.label || "", cx, cy + 0.5);

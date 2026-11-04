@@ -9,7 +9,10 @@ Goban Studio for macOS
 
      xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app
 
-3. The app is offline; it needs no account and makes no network request.
+3. The app works offline and needs no account. It makes no network
+   request unless you choose Check for updates, or turn on the weekly
+   update check in Settings (off by default); either asks GitHub for the
+   latest version and sends nothing about you or your games.
 
 SGF files
 ---------

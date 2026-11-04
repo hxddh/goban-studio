@@ -2,7 +2,7 @@
  * Assemble frontend/dist from src/web.
  *
  * One script, not a hand-copied list: the packaged page, styles, bundle,
- * fonts and icon are copied here. `npm run build` must run first.
+ * assets and icon are copied here (v4 uses system fonts). `npm run build` must run first.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -14,16 +14,12 @@ const dist = path.join(root, "frontend/dist");
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, "js"), { recursive: true });
-fs.mkdirSync(path.join(dist, "fonts"), { recursive: true });
 
 for (const f of ["index.html", "styles.css"]) {
   fs.copyFileSync(path.join(src, f), path.join(dist, f));
 }
 for (const f of ["bundle.js"]) {
   fs.copyFileSync(path.join(src, "js", f), path.join(dist, "js", f));
-}
-for (const f of fs.readdirSync(path.join(src, "fonts"))) {
-  fs.copyFileSync(path.join(src, "fonts", f), path.join(dist, "fonts", f));
 }
 if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
@@ -57,7 +53,6 @@ const licenseSources = [
   [path.join(root, "node_modules", "@sabaki", "go-board", "LICENSE"), "sabaki-go-board-MIT.txt"],
   [path.join(root, "node_modules", "preact", "LICENSE"), "Preact-MIT.txt"],
   [path.join(src, "moka", "LICENSE"), "Moka-MIT.txt"],
-  [path.join(src, "fonts", "Inter-OFL.txt"), "Inter-OFL.txt"],
   [path.join(root, "engine", "model", "LICENSE-KataGo.txt"), "KataGo-MIT.txt"],
   [path.join(src, "licenses", "README.txt"), "README.txt"],
   [path.join(src, "moka", "THIRD_PARTY_NOTICES.md"), "Moka-THIRD_PARTY_NOTICES.md"],

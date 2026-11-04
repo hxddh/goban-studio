@@ -20,12 +20,14 @@ import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, set
 import { startRating } from "./rating.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, openLesson, openMistakeDrill, openProblem, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { autoCheckForUpdates } from "./update-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
 export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
+export * from "./update-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -56,6 +58,8 @@ export function boot() {
     maybeComputerMove();
     ponder();
   });
+  // v4: the opt-in weekly update check (no request unless it is on and due).
+  if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
 }
 
 /* --------------------------------------------------------------- places */
@@ -99,7 +103,8 @@ function restore(loc) {
     if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
-    else if (p.view === "topic" && p.topic) openTopic(p.topic);
+    else if (p.view === "topic" && p.shape) openShape(p.shape);
+    else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
     else practiceHome();
   }
   const rv = loc.review;
@@ -253,7 +258,7 @@ export function finishOnboarding(choice, rank = null) {
     const first = allLessons()[0];
     if (first) openLesson(first.lesson.id, 0);
   } else if (choice === "rules") {
-    newGame({ size: 9, opponent: "ai", color: BLACK, strength });
+    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: Engine.suggestHandicap(next.playerRank, strength, 19) });
   } else {
     newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
   }

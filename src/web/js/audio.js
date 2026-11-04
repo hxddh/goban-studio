@@ -31,8 +31,14 @@ const FILES = {
   end: ["game-end"],
 };
 
+/**
+ * Levels relative to the stone (docs/design.md §9): captures −6 dB, the
+ * result −3 dB, everything that is not the board −4.5 dB.
+ */
+export const LEVEL = { stone: 1, capture: 0.5, result: 0.71, ui: 0.6 };
+
 /** Surfaces that take the softer placement set. */
-const SOFT = new Set(["paper", "slate"]);
+const SOFT = new Set(["paper", "slate", "ink"]);
 
 const buffers = {};
 const last = {};
@@ -195,19 +201,19 @@ export function capture(count = 1, delay = 0) {
   if (!context()) return;
   const n = Math.max(1, count | 0);
   const key = n === 1 ? "capture1" : n <= 3 ? "capture2" : "capture3";
-  if (!play(key, { delay, detune: 0.04 })) {
+  if (!play(key, { delay, detune: 0.04, gain: LEVEL.capture })) {
     tone(190, 0.09, 0.12, "triangle", delay);
     tone(120, 0.12, 0.06, "sine", delay);
   }
 }
 
 export function pass() {
-  if (!play("pass", { detune: 0.02 })) tone(220, 0.08, 0.05, "sine");
+  if (!play("pass", { detune: 0.02, gain: LEVEL.ui })) tone(220, 0.08, 0.05, "sine");
 }
 
 /** A correct answer: two warm rising notes. */
 export function correct() {
-  if (!play("correct", { detune: 0 })) {
+  if (!play("correct", { detune: 0, gain: LEVEL.ui })) {
     tone(523, 0.14, 0.06, "sine");
     tone(698, 0.2, 0.05, "sine", 0.11);
   }
@@ -215,7 +221,7 @@ export function correct() {
 
 /** A wrong answer: a soft low note. */
 export function wrong() {
-  if (!play("wrong", { detune: 0 })) {
+  if (!play("wrong", { detune: 0, gain: LEVEL.ui })) {
     tone(196, 0.16, 0.05, "sine");
     tone(185, 0.2, 0.04, "sine", 0.12);
   }
@@ -223,11 +229,11 @@ export function wrong() {
 
 /** The game is over (neutral). */
 export function gameEnd() {
-  if (!play("end", { detune: 0 })) win();
+  if (!play("end", { detune: 0, gain: LEVEL.result })) win();
 }
 
 export function win() {
-  if (play("end", { detune: 0 })) return;
+  if (play("end", { detune: 0, gain: LEVEL.result })) return;
   tone(523, 0.14, 0.06, "sine");
   tone(659, 0.18, 0.05, "sine", 0.09);
   tone(784, 0.24, 0.04, "sine", 0.19);
