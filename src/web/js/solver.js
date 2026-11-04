@@ -119,7 +119,7 @@ export const WHITE = -1;
 
 const PASS = -1;
 /** Every problem goal; "seki" is a defence goal (see createPuzzle). */
-export const GOALS = ["capture", "save", "kill", "live", "seki"];
+export const GOALS = ["capture", "save", "kill", "live", "seki", "endgame"];
 const DEFAULT_ESCAPE = 4;
 const DEFAULT_PUSHES = 2;
 
@@ -141,6 +141,7 @@ export function parseDiagram(rows) {
   const stones = [];
   const keys = [];
   const region = [];
+  const counted = [];
   let hasOutside = false;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -150,10 +151,11 @@ export function parseDiagram(rows) {
       if (ch === "x" || ch === "o") keys.push({ x, y });
       if (ch === ".") region.push({ x, y });
       if (ch === ",") hasOutside = true;
-      if (!"XOxo.,".includes(ch)) throw new Error(`bad diagram character '${ch}'`);
+      if (ch === ":") counted.push({ x, y });
+      if (!"XOxo.,:".includes(ch)) throw new Error(`bad diagram character '${ch}'`);
     }
   }
-  return { w, h, stones, keys, region, hasOutside };
+  return { w, h, stones, keys, region, counted, hasOutside };
 }
 
 /**
@@ -200,6 +202,8 @@ export function createPuzzle(problem) {
   const shift = (p) => ({ ...p, x: p.x + x0, y: p.y + y0 });
   const stones = d.stones.map(shift);
   const keys = d.keys.map(shift);
+  if (problem.goal === "endgame") return countingPuzzle(problem, { size, d, x0, y0, stones, keys, shift });
+  if (d.counted.length) throw new Error("':' (counted, not played) is for endgame problems only");
   if (!keys.length) throw new Error("a problem needs at least one key stone");
   const keyColor = stones.find((s) => s.x === keys[0].x && s.y === keys[0].y).c;
   for (const k of keys) {
@@ -243,6 +247,43 @@ export function createPuzzle(problem) {
     pushes: problem.pushes ?? DEFAULT_PUSHES,
     maxDepth: problem.maxDepth || (lifeGoal ? lifeDepth(region?.length || 10, replay ? innerStones(problem.diagram) : 0, replay) : (problem.escape || DEFAULT_ESCAPE) >= 4 ? 60 : 30),
     view,
+  };
+}
+
+/**
+ * An endgame (counting) puzzle; see the counting section at the end. Black
+ * is the learner and moves first; there are no key stones.
+ */
+function countingPuzzle(problem, { size, d, x0, y0, stones, keys, shift }) {
+  if (keys.length) throw new Error("an endgame problem has no key stones");
+  if (!d.hasOutside) throw new Error("an endgame problem needs a sealed region (',' outside it)");
+  if (problem.toMove !== undefined && problem.toMove !== BLACK) throw new Error("Black moves first in an endgame problem");
+  if (!["move", "value"].includes(problem.ask)) throw new Error(`unknown ask ${problem.ask}`);
+  return {
+    id: problem.id,
+    size,
+    stones,
+    keys: [],
+    keyColor: 0,
+    attacker: 0,
+    userColor: BLACK,
+    toMove: BLACK,
+    goal: "endgame",
+    counting: true,
+    ask: problem.ask,
+    answer: problem.answer,
+    margin: problem.margin,
+    value: problem.value,
+    choices: problem.choices,
+    lifeGoal: false,
+    sekiGoal: false,
+    replay: true,
+    region: d.region.map(shift),
+    counted: d.counted.map(shift),
+    koOk: false,
+    box: { x0, y0, x1: x0 + d.w - 1, y1: y0 + d.h - 1 },
+    maxDepth: 0,
+    view: viewFor(size, x0, y0, d.w, d.h),
   };
 }
 
@@ -902,6 +943,7 @@ export function pointOf(pz, i) {
  * the list loses.
  */
 export function solveFirstMoves(pz, budget = 600000) {
+  if (pz.counting) return countSolveFirstMoves(pz);
   const st = initialState(pz);
   const keyIdx = keyIndices(pz);
   const moves = candidates(pz, st, keyIdx);
@@ -923,6 +965,7 @@ export function solveFirstMoves(pz, budget = 600000) {
  * "loss". Independent of the problem's `ko` option.
  */
 export function outcome(pz, st) {
+  if (pz.counting) return countStatus(pz, st) === "lost" ? "loss" : "win";
   if (userWins(pz, st, undefined, false).win) return "win";
   if (userWins(pz, st, undefined, true).win) return "ko";
   return "loss";
@@ -937,6 +980,7 @@ export function outcome(pz, st) {
  * show.
  */
 export function reply(pz, st) {
+  if (pz.counting) return countReply(pz, st);
   const keyIdx = keyIndices(pz);
   if (terminal(pz, st, keyIdx)) return null;
   const moves = candidates(pz, st, keyIdx);
@@ -975,6 +1019,7 @@ export function reply(pz, st) {
  * right move is met by the most stubborn defence before the problem ends.
  */
 export function status(pz, st) {
+  if (pz.counting) return countStatus(pz, st);
   const keyIdx = keyIndices(pz);
   const term = terminal(pz, st, keyIdx);
   const attackGoal = pz.userColor === pz.attacker;
@@ -993,6 +1038,7 @@ export function status(pz, st) {
 
 /** A best line for the learner from the start, for "show answer". */
 export function solutionLine(pz, limit = 24) {
+  if (pz.counting) return countSolutionLine(pz);
   let st = initialState(pz);
   const line = [];
   const keyIdx = keyIndices(pz);
@@ -1041,6 +1087,7 @@ export function solutionLine(pz, limit = 24) {
  * score and a 1–5 grade; the grades are calibrated in the test suite.
  */
 export function difficulty(pz) {
+  if (pz.counting) return countDifficulty(pz);
   const first = solveFirstMoves(pz);
   const line = solutionLine(pz);
   const userMoves = line.filter((m) => m.c === pz.userColor).length;
@@ -1073,6 +1120,7 @@ function everyChainBreathes(pz, board) {
  * ends in a won position.
  */
 export function validate(pz, { maxCorrect = 3, first = null, line = null } = {}) {
+  if (pz.counting) return countValidate(pz, { maxCorrect, line });
   const reasons = [];
   const st0 = initialState(pz);
   if (!everyChainBreathes(pz, st0.board)) reasons.push("a chain in the diagram has no liberties");
@@ -1126,6 +1174,7 @@ export { PASS };
 
 /** The learner's winning moves from `st` (learner to move). For hints. */
 export function winningMoves(pz, st) {
+  if (pz.counting) return countWinningMoves(pz, st);
   const keyIdx = keyIndices(pz);
   const out = [];
   for (const m of candidates(pz, st, keyIdx)) {
@@ -1280,4 +1329,809 @@ export function signMap(pz, st) {
   const rows = [];
   for (let y = 0; y < pz.size; y++) rows.push(Array.from(st.board.subarray(y * pz.size, (y + 1) * pz.size)));
   return rows;
+}
+
+/* -------------------------------------------------------------- counting */
+
+/**
+ * Counting mode (v6): endgame problems, `goal: "endgame"`.
+ *
+ * The solver proves an endgame answer by exact minimax counting of the
+ * local position under Japanese counting: the score is territory plus
+ * prisoners, Black's minus White's. The problem's region is its '.' points
+ * (plus the points of any stone that is captured). It must be sealed: no
+ * '.' point touches a ',' point, and every stone of the diagram belongs to
+ * a chain with a liberty on a ',' point, so the walls can never be captured
+ * and the search is finite. Several sealed areas in one diagram form one
+ * sum game, so "which move is biggest" is answered by the same search, with
+ * sente, gote and the value of every follow-up counted exactly.
+ *
+ * The model:
+ *
+ *   - Black and White alternate; either may pass (tenuki: the rest of the
+ *     board is settled). Two passes in a row end the play. Captures, no
+ *     suicide, simple ko (neither side has ko threats) and positional
+ *     superko along the line being read. A result that depends on a
+ *     superko cut is inexact, and the problem check rejects it.
+ *   - A player never plays into an empty area that stones of one colour
+ *     alone enclose, unless the stone touches a chain (of either colour)
+ *     with one or two liberties. In a sealed area that small an invading
+ *     stone is dead, and under Japanese counting it only hands over a
+ *     prisoner; filling your own sealed area only loses territory. The
+ *     exception keeps captures, ataris and shortage of liberties in play.
+ *   - When play ends, a chain in atari is removed as dead (a prisoner for
+ *     the other side), as a Japanese count treats it: its owner chose not
+ *     to save it. If chains of both colours are in atari, or taking a
+ *     single stone would leave the capturing stone in atari (an open ko),
+ *     the end is unsettled and the result inexact.
+ *   - Territory is an empty area enclosed by one colour alone; an area that
+ *     touches both colours is neutral (dame).
+ *
+ * A value is Black's future score from a position: the prisoners still to
+ * be taken plus the territory at the end. Two questions are asked:
+ *
+ *   ask: "move"   Black, to play, must find the move with the best count.
+ *                 `answer` lists the correct first moves in diagram
+ *                 coordinates and `margin` the points the best move gains
+ *                 over the best other choice (passing included); the check
+ *                 proves both.
+ *   ask: "value"  How many points is the local move worth? `value` is the
+ *                 deiri count: Black's result when Black plays first minus
+ *                 Black's result when White plays first, each followed by
+ *                 best play. `choices` are the values the app offers.
+ */
+
+/** Points of the play area: the region plus every capturable stone. */
+function countingArea(pz) {
+  if (pz._area) return pz._area;
+  const c = context(pz.size);
+  const st = initialState(pz);
+  const region = new Set(pz.region.map((p) => p.y * pz.size + p.x));
+  const counted = new Set(pz.counted.map((p) => p.y * pz.size + p.x));
+  const fixed = new Set();
+  for (const s of pz.stones) {
+    const i = s.y * pz.size + s.x;
+    if (fixed.has(i)) continue;
+    const ch = chain(c, st.board, i);
+    // A liberty on a point nobody plays: this chain can never be captured.
+    if (ch.libs.some((l) => !region.has(l))) for (const p of ch.stones) fixed.add(p);
+  }
+  // area: counted at the end; play: where stones may be played.
+  const area = new Uint8Array(c.n);
+  const playable = new Uint8Array(c.n);
+  for (const i of region) area[i] = playable[i] = 1;
+  for (const i of counted) area[i] = 1;
+  for (const s of pz.stones) {
+    const i = s.y * pz.size + s.x;
+    if (!fixed.has(i)) area[i] = playable[i] = 1;
+  }
+  pz._area = area;
+  pz._areaList = [];
+  pz._playList = [];
+  for (let i = 0; i < c.n; i++) {
+    if (area[i]) pz._areaList.push(i);
+    if (playable[i]) pz._playList.push(i);
+  }
+  pz._fixed = fixed;
+  pz._playable = playable;
+  return area;
+}
+
+/**
+ * Empty areas of the play area: for every empty point the id of its area,
+ * and for each area its size and border mask (1 Black, 2 White, 4 a point
+ * outside the play area).
+ */
+function emptyAreas(pz, board, points = null) {
+  const c = context(pz.size);
+  const area = countingArea(pz);
+  points = points || pz._areaList;
+  // One buffer per puzzle: a caller is done with it before the next call.
+  if (!pz._areaId) pz._areaId = new Int32Array(c.n);
+  const id = pz._areaId;
+  for (const i of points) id[i] = -1;
+  const masks = [];
+  const sizes = [];
+  for (const i of points) {
+    if (board[i] !== 0 || id[i] >= 0) continue;
+    const k = masks.length;
+    let mask = 0;
+    let n = 0;
+    const stack = [i];
+    id[i] = k;
+    while (stack.length) {
+      const p = stack.pop();
+      n++;
+      for (const q of c.nbr[p]) {
+        const v = board[q];
+        if (v === BLACK) mask |= 1;
+        else if (v === WHITE) mask |= 2;
+        else if (!area[q]) mask |= 4;
+        else if (id[q] < 0) {
+          id[q] = k;
+          stack.push(q);
+        }
+      }
+    }
+    masks.push(mask);
+    sizes.push(n);
+  }
+  return { id, masks, sizes };
+}
+
+/**
+ * Count a finished position. Dead stones come off first, as prisoners:
+ *
+ *   1. enclosed: a chain whose own area (the empty points and stones of its
+ *      colour it reaches inside the play area) touches no wall of its
+ *      colour and no point outside the problem, so the other colour alone
+ *      surrounds it in a space too small to live in;
+ *   2. in atari: a chain with one liberty inside the play area that the
+ *      other colour may play (not closed to it): its owner chose not to
+ *      save it, and taking it is final (the taker's point stays closed to
+ *      the owner, so a ko cannot be retaken).
+ *
+ * If two chains of different colours, both in atari, touch, the fight is
+ * still on (whoever moves takes), and the end is unsettled. Then territory
+ * is counted: an empty area enclosed by one colour alone. Returns
+ * { score, unsettled }, `score` being Black's territory and prisoners
+ * minus White's.
+ */
+function countFinal(pz, board, points = null, closed = []) {
+  const c = context(pz.size);
+  const area = countingArea(pz);
+  points = points || pz._areaList;
+  let b = board;
+  let prisoners = 0;
+  let unsettled = false;
+  const dead = [];
+  const colours = new Set();
+  const seen = new Uint8Array(c.n);
+  const reach = new Uint8Array(c.n);
+  for (const i of points) {
+    if (!b[i] || seen[i]) continue;
+    const color = b[i];
+    // Rule 1: flood the chain's own area.
+    let alive = false;
+    const stones = [];
+    const stack = [i];
+    for (const p of points) reach[p] = 0;
+    reach[i] = 1;
+    while (stack.length) {
+      const p = stack.pop();
+      if (b[p] === color) stones.push(p);
+      for (const q of c.nbr[p]) {
+        if (reach[q]) continue;
+        if (!area[q]) {
+          if (b[q] === color || b[q] === 0) alive = true;
+          continue;
+        }
+        if (b[q] === -color) continue;
+        reach[q] = 1;
+        stack.push(q);
+      }
+    }
+    for (const p of stones) seen[p] = 1;
+    if (!alive) {
+      dead.push({ color, stones, lib: -1 });
+      colours.add(color);
+      continue;
+    }
+    // Rule 2: every chain of this colour in the area, one at a time.
+    for (const p of stones) {
+      if (seen[p] === 2) continue;
+      const ch = chain(c, b, p);
+      for (const q of ch.stones) seen[q] = 2;
+      if (ch.libs.length !== 1 || !area[ch.libs[0]]) continue;
+      if (closed.includes(ch.libs[0] * 2 + (color === BLACK ? 1 : 0))) continue;
+      dead.push({ color, stones: ch.stones, lib: ch.libs[0] });
+      colours.add(color);
+    }
+  }
+  if (colours.size > 1) {
+    // Dead chains of both colours: two chains in atari that touch are a
+    // fight still on (whoever moves captures), not dead stones.
+    const owner = new Map();
+    for (const d of dead) if (d.lib >= 0) for (const p of d.stones) owner.set(p, d.color);
+    for (const d of dead) if (d.lib >= 0) for (const p of d.stones) for (const q of c.nbr[p]) if (owner.get(q) === -d.color) unsettled = true;
+  }
+  if (dead.length) {
+    b = b.slice();
+    for (const d of dead) {
+      for (const p of d.stones) b[p] = 0;
+      prisoners += d.color === WHITE ? d.stones.length : -d.stones.length;
+    }
+  }
+  const { masks, sizes } = emptyAreas(pz, b, points);
+  let terr = 0;
+  for (let k = 0; k < masks.length; k++) {
+    if (masks[k] === 1) terr += sizes[k];
+    else if (masks[k] === 2) terr -= sizes[k];
+  }
+  return { score: terr + prisoners, unsettled };
+}
+
+/**
+ * The moves the counting model allows from `st` (see the header above),
+ * each with its next state and the prisoners it takes (Black's minus
+ * White's). Pass is not included. A counting state carries `closed`: the
+ * points where a stone has been captured, each closed to that colour
+ * (encoded i * 2, plus 1 for White).
+ */
+function countingCandidates(pz, st) {
+  const out = [];
+  for (const p of countingPoints(pz, st)) {
+    const m = countingPlay(pz, st, p.i);
+    if (m) out.push(m);
+  }
+  return out;
+}
+
+/**
+ * The points the model allows from `st` before the move is played (a
+ * suicide is found by countingPlay()), each with an ordering score: a
+ * capture first, then contact with the opponent's stones.
+ */
+function countingPoints(pz, st, points = null) {
+  const c = context(pz.size);
+  const board = st.board;
+  points = points || pz._areaList;
+  const areas = emptyAreas(pz, board, points);
+  const closed = st.closed || [];
+  const me = st.toMove;
+  const code = me === BLACK ? 0 : 1;
+  const out = [];
+  for (const i of points) {
+    if (board[i] !== 0 || i === st.ko) continue;
+    if (closed.length && closed.includes(i * 2 + code)) continue;
+    let captures = 0;
+    let order = 0;
+    let shortOwn = false;
+    for (const q of c.nbr[i]) {
+      const v = board[q];
+      if (v === -me) {
+        order += 3;
+        const ch = chain(c, board, q);
+        if (ch.libs.length === 1) captures += ch.stones.length;
+      } else if (v === me) {
+        order += 1;
+        if (!shortOwn && chain(c, board, q).libs.length <= 2) shortOwn = true;
+      }
+    }
+    const mask = areas.masks[areas.id[i]];
+    const owner = mask === 1 ? BLACK : mask === 2 ? WHITE : 0;
+    // Inside your own enclosed area: only to save a short chain.
+    if (owner === me && !shortOwn) continue;
+    // Inside the opponent's enclosed area, or on a counted point: only a
+    // capture.
+    if ((!pz._playable[i] || owner === -me) && !captures) continue;
+    out.push({ i, order: order + captures * 10 });
+  }
+  return out;
+}
+
+/** Play a point countingPoints() allowed: { i, next, gain } or null (suicide). */
+function countingPlay(pz, st, i) {
+  const next = play(pz, st, i);
+  if (!next) return null;
+  const closed = st.closed || [];
+  next.closed = closed;
+  if (next.captured) {
+    const add = [];
+    const them = st.toMove === BLACK ? 1 : 0;
+    for (const p of pz._areaList) if (st.board[p] === -st.toMove && next.board[p] === 0) add.push(p * 2 + them);
+    next.closed = [...closed, ...add].sort((x, y) => x - y);
+  }
+  const gain = (next.captured || 0) * (st.toMove === BLACK ? 1 : -1);
+  // Prisoners taken since the start (Black's minus White's), for the app.
+  next.taken = (st.taken || 0) + gain;
+  return { i, next, gain };
+}
+
+/**
+ * Passing after a pass ends the play, which is not allowed while the end
+ * would be unsettled and a move is left: the play goes on, as a
+ * confirmation would.
+ */
+function passAllowed(pz, st, moves) {
+  if (st.passes !== 1 || !moves.length) return true;
+  return !countFinal(pz, st.board, null, st.closed || []).unsettled;
+}
+
+/** A pass that keeps the closed points. */
+function countPass(pz, st) {
+  const next = play(pz, st, PASS);
+  next.closed = st.closed || [];
+  next.taken = st.taken || 0;
+  return next;
+}
+
+/**
+ * The local games. The play area falls into separate sealed areas, and a
+ * move in one never changes another, so each area is read once as a graph
+ * of local positions (its stones and closed points), with each colour's
+ * moves from it, the prisoners they take and the ko they leave, and its
+ * own final count. The search then runs over tuples of local positions,
+ * which is what makes a sum of several areas cheap to read.
+ */
+function countGraph(pz) {
+  if (pz._graph) return pz._graph;
+  const c = context(pz.size);
+  countingArea(pz);
+  const areaOf = new Int32Array(c.n).fill(-1);
+  const areas = [];
+  for (const i of pz._areaList) {
+    if (areaOf[i] >= 0) continue;
+    const pts = [];
+    const stack = [i];
+    areaOf[i] = areas.length;
+    while (stack.length) {
+      const p = stack.pop();
+      pts.push(p);
+      for (const q of c.nbr[p]) {
+        if (pz._area[q] && areaOf[q] < 0) {
+          areaOf[q] = areas.length;
+          stack.push(q);
+        }
+      }
+    }
+    pts.sort((x, y) => x - y);
+    areas.push(pts);
+  }
+  const base = initialState(pz).board;
+  pz._graph = { areas, areaOf, base, locals: areas.map(() => ({ ids: new Map(), nodes: [] })) };
+  return pz._graph;
+}
+
+/** The id of area a's local position on `board` with `closed`. */
+function localNode(pz, G, a, board, closed) {
+  const pts = G.areas[a];
+  let key = "";
+  for (const i of pts) key += board[i] === BLACK ? "x" : board[i] === WHITE ? "o" : ".";
+  const mine = closed.filter((v) => G.areaOf[v >> 1] === a);
+  if (mine.length) key += "|" + mine.join(",");
+  const L = G.locals[a];
+  let id = L.ids.get(key);
+  if (id !== undefined) return id;
+  const b = G.base.slice();
+  for (const i of pts) b[i] = board[i];
+  id = L.nodes.length;
+  L.nodes.push({ board: b, closed: mine, opts: [null, null], final: null });
+  L.ids.set(key, id);
+  return id;
+}
+
+/** Moves of `color` from a local position, best guesses first. */
+function localOptions(pz, G, a, id, color) {
+  const node = G.locals[a].nodes[id];
+  const k = color === BLACK ? 0 : 1;
+  if (node.opts[k]) return node.opts[k];
+  const st = { board: node.board, toMove: color, ko: -1, passes: 0, h1: 0, h2: 0, closed: node.closed };
+  const out = [];
+  for (const p of countingPoints(pz, st, G.areas[a])) {
+    const m = countingPlay(pz, st, p.i);
+    if (!m) continue;
+    out.push({ i: p.i, a, child: localNode(pz, G, a, m.next.board, m.next.closed), gain: m.gain, ko: m.next.ko, order: p.order });
+  }
+  out.sort((x, y) => y.order - x.order);
+  node.opts[k] = out;
+  return out;
+}
+
+function localFinal(pz, G, a, id) {
+  const node = G.locals[a].nodes[id];
+  if (!node.final) node.final = countFinal(pz, node.board, G.areas[a], node.closed);
+  return node.final;
+}
+
+/**
+ * The search. `bias` says how an unsettled end is scored: 0 by the removal
+ * rules above (the best guess), +1 or -1 as a win or a loss for Black far
+ * larger than any count. Minimax is monotone in the end scores, so when the
+ * two extremes give the same value, no unsettled end can change it: that is
+ * how a value is proved exact (see countExact()).
+ */
+const UNSETTLED = 1000;
+
+class CountSearch {
+  constructor(pz, bias = 0) {
+    this.pz = pz;
+    this.G = countGraph(pz);
+    if (!pz._countMemo) pz._countMemo = new Map();
+    if (!pz._countMemo.has(bias)) pz._countMemo.set(bias, new Map());
+    // key -> [lo, hi]: the value is known to lie in lo..hi.
+    this.tt = pz._countMemo.get(bias);
+    this.bias = bias;
+    this.nodes = 0;
+    // No count can reach this: every point and every prisoner, twice over.
+    this.bound = 2 * pz._areaList.length + 4;
+  }
+
+  /** The search state of a full position: local ids, side, passes, ko. */
+  of(st) {
+    const G = this.G;
+    const ids = G.areas.map((_, a) => localNode(this.pz, G, a, st.board, st.closed || []));
+    return { ids, toMove: st.toMove, passes: Math.min(2, st.passes || 0), ko: st.ko ?? -1 };
+  }
+
+  final(s) {
+    let score = 0;
+    let unsettled = false;
+    s.ids.forEach((id, a) => {
+      const f = localFinal(this.pz, this.G, a, id);
+      score += f.score;
+      if (f.unsettled) unsettled = true;
+    });
+    return { score, unsettled };
+  }
+
+  /** Does Black's future score from s reach at least g? */
+  ge(s, g) {
+    const k = `${s.ids.join(",")}:${s.toMove}:${s.passes}:${s.ko}`;
+    let e = this.tt.get(k);
+    if (e) {
+      if (e[0] >= g) return true;
+      if (e[1] < g) return false;
+    } else {
+      e = [-Infinity, Infinity];
+      this.tt.set(k, e);
+    }
+    this.nodes++;
+    if (s.passes >= 2) {
+      const f = this.final(s);
+      if (f.unsettled) this.pz._sawUnsettled = true;
+      const v = f.unsettled && this.bias ? this.bias * UNSETTLED : f.score;
+      e[0] = e[1] = v;
+      return v >= g;
+    }
+    const max = s.toMove === BLACK;
+    const opts = [];
+    s.ids.forEach((id, a) => {
+      for (const o of localOptions(this.pz, this.G, a, id, s.toMove)) if (o.i !== s.ko) opts.push(o);
+    });
+    opts.sort((x, y) => y.order - x.order);
+    // Ending the play while it is unsettled is allowed only when no move is
+    // left (passAllowed()). Otherwise passing is read after the contact
+    // moves.
+    const hold = s.passes === 1 && opts.length > 0 && this.final(s).unsettled;
+    if (!hold) {
+      const at = opts.findIndex((o) => o.order < 3);
+      opts.splice(at < 0 ? opts.length : at, 0, null);
+    }
+    for (const o of opts) {
+      let next;
+      let gain = 0;
+      if (o === null) next = { ids: s.ids, toMove: -s.toMove, passes: s.passes + 1, ko: -1 };
+      else {
+        const ids = s.ids.slice();
+        ids[o.a] = o.child;
+        next = { ids, toMove: -s.toMove, passes: 0, ko: o.ko };
+        gain = o.gain;
+      }
+      const r = this.ge(next, g - gain);
+      if (max && r) {
+        e[0] = Math.max(e[0], g);
+        return true;
+      }
+      if (!max && !r) {
+        e[1] = Math.min(e[1], g - 1);
+        return false;
+      }
+    }
+    if (max) e[1] = Math.min(e[1], g - 1);
+    else e[0] = Math.max(e[0], g);
+    return !max;
+  }
+
+  /**
+   * Black's future score from a full position: null-window tests stepping
+   * from `guess` (MTD(f)), then by bisection once the value is bracketed.
+   */
+  run(st, guess = 0) {
+    const s = this.of(st);
+    if (this.bias) {
+      if (this.ge(s, this.bound + 1)) return { value: UNSETTLED, nodes: this.nodes };
+      if (!this.ge(s, -this.bound)) return { value: -UNSETTLED, nodes: this.nodes };
+    }
+    let lo = -this.bound;
+    let hi = this.bound;
+    let g = Math.max(lo, Math.min(hi, guess));
+    // Invariant: lo <= value <= hi.
+    while (lo < hi) {
+      if (this.ge(s, g)) lo = g;
+      else hi = g - 1;
+      const e = this.tt.get(`${s.ids.join(",")}:${s.toMove}:${s.passes}:${s.ko}`);
+      if (e) {
+        lo = Math.max(lo, e[0]);
+        hi = Math.min(hi, e[1]);
+      }
+      if (lo >= hi) break;
+      g = g <= lo ? lo + 1 : g > hi ? hi : Math.floor((lo + hi + 1) / 2);
+      if (g === lo) g = lo + 1;
+    }
+    return { value: lo, nodes: this.nodes };
+  }
+}
+
+/** Black's best future score from `st` (counting puzzles). */
+export function countValue(pz, st, bias = 0) {
+  return new CountSearch(pz, bias).run(st);
+}
+
+/**
+ * Is Black's value from `st` independent of how unsettled ends are scored?
+ * Returns { value, exact }.
+ */
+export function countExact(pz, st) {
+  const r = countValue(pz, st);
+  // No unsettled end was ever read: nothing to prove.
+  if (!pz._sawUnsettled) return { ...r, exact: true };
+  const hi = countValue(pz, st, 1).value;
+  const lo = countValue(pz, st, -1).value;
+  return { value: r.value, exact: hi === lo && lo === r.value, nodes: r.nodes };
+}
+
+/**
+ * Every choice from `st`: the moves the model allows and the pass, each
+ * with the score it leads to (Black's, the move's own prisoners included).
+ */
+export function countMoves(pz, st, { prove = false } = {}) {
+  const out = [];
+  const s = new CountSearch(pz);
+  let exact = true;
+  const cands = countingCandidates(pz, st);
+  // The position's own value is the first guess for every choice.
+  const v = st.passes >= 2 ? 0 : s.run(st).value;
+  if (passAllowed(pz, st, cands)) {
+    const pass = countPass(pz, st);
+    out.push({ i: PASS, pass: true, next: pass, value: s.run(pass, v).value });
+  }
+  for (const m of cands) out.push({ i: m.i, ...pointOf(pz, m.i), next: m.next, value: s.run(m.next, v - m.gain).value + m.gain });
+  if (prove) exact = out.every((m) => countExact(pz, m.next).exact);
+  return { moves: out, exact, nodes: s.nodes };
+}
+
+/**
+ * The deiri count of a position: Black's result with Black to play minus
+ * Black's result with White to play.
+ */
+export function deiri(pz, st = initialState(pz)) {
+  const b = countExact(pz, { ...st, toMove: BLACK, passes: 0, ko: -1 });
+  const w = countExact(pz, { ...st, toMove: WHITE, passes: 0, ko: -1 });
+  return { value: b.value - w.value, black: b.value, white: w.value, exact: b.exact && w.exact };
+}
+
+/** The learner's target: the best result from the start. */
+function countTarget(pz) {
+  if (pz._target === undefined) pz._target = countValue(pz, initialState(pz)).value;
+  return pz._target;
+}
+
+/** Is score a better than b for the learner? */
+const better = (pz, a, b) => (pz.userColor === BLACK ? a > b : a < b);
+
+/** Distance from the last move, so replies stay where the play is. */
+function near(pz, i, last) {
+  if (last === undefined || last === null || last < 0) return 0;
+  const a = pointOf(pz, i);
+  const b = pointOf(pz, last);
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+/**
+ * The best choices for the side to move, best first. Among equal choices
+ * the learner's side prefers a move to a pass (the line is shown to the
+ * end); the other side answers next to the last move if that is as good,
+ * else passes (it plays elsewhere rather than fill a neutral point). Then
+ * moves near the last move come first.
+ */
+function countBest(pz, st, learner = st.toMove === pz.userColor) {
+  const { moves } = countMoves(pz, st);
+  const max = st.toMove === BLACK;
+  let best = moves[0].value;
+  for (const m of moves) if (max ? m.value > best : m.value < best) best = m.value;
+  const top = moves.filter((m) => m.value === best);
+  const touching = (m) => {
+    if (m.pass || st.last === undefined || st.last === null || st.last < 0) return false;
+    const a = pointOf(pz, m.i);
+    const b = pointOf(pz, st.last);
+    return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
+  };
+  const rank = (m) => (learner ? (m.pass ? 1 : 0) : touching(m) ? 0 : m.pass ? 1 : 2);
+  top.sort((a, b) => rank(a) - rank(b) || near(pz, a.i, st.last) - near(pz, b.i, st.last) || a.i - b.i);
+  return { best, top, moves };
+}
+
+function countSolveFirstMoves(pz) {
+  const st = initialState(pz);
+  const { moves, exact, nodes } = countMoves(pz, st, { prove: true });
+  const target = countTarget(pz);
+  const correct = moves.filter((m) => !m.pass && m.value === target).map((m) => ({ x: m.x, y: m.y }));
+  let second = null;
+  for (const m of moves) if (m.value !== target && (second === null || better(pz, m.value, second))) second = m.value;
+  return { correct, tried: moves.length - 1, nodes, exact, target, second, passValue: moves[0].value };
+}
+
+function countReply(pz, st) {
+  if (st.passes >= 2) return null;
+  const { best, top } = countBest(pz, st);
+  const wrong = better(pz, countTarget(pz), best + (st.taken || 0));
+  const m = top[0];
+  if (m.pass) return { pass: true, refutes: wrong };
+  return { x: m.x, y: m.y, refutes: wrong };
+}
+
+/**
+ * Where the learner stands (see status()). A position's value counts only
+ * what is still to come, so the prisoners taken so far are added to it.
+ */
+function countStatus(pz, st) {
+  const target = countTarget(pz);
+  const taken = st.taken || 0;
+  const v = countValue(pz, st).value + taken;
+  if (better(pz, target, v)) return "lost";
+  if (st.toMove !== pz.userColor) return st.passes >= 2 ? "won" : "open";
+  // Settled: passing now loses nothing.
+  if (!passAllowed(pz, st, countingCandidates(pz, st))) return "open";
+  const pass = countValue(pz, countPass(pz, st)).value + taken;
+  return better(pz, target, pass) ? "open" : "won";
+}
+
+function countWinningMoves(pz, st) {
+  const { best, top } = countBest(pz, st);
+  if (better(pz, countTarget(pz), best + (st.taken || 0))) return [];
+  return top.filter((m) => !m.pass).map((m) => ({ x: m.x, y: m.y }));
+}
+
+function countSolutionLine(pz, limit = 30) {
+  let st = initialState(pz);
+  const line = [];
+  for (let n = 0; n < limit && st.passes < 2; n++) {
+    if (st.toMove === pz.userColor && countStatus(pz, st) === "won") break;
+    const m = countBest(pz, st).top[0];
+    if (!m.pass) line.push({ x: m.x, y: m.y, c: st.toMove });
+    else if (st.toMove === pz.userColor) break;
+    st = m.next;
+  }
+  return line;
+}
+
+/**
+ * A best line with `toMove` playing first, played until both sides pass;
+ * passes are left out. For a value question: Black first, White first.
+ */
+export function countLine(pz, toMove = BLACK, limit = 30) {
+  let st = { ...initialState(pz), toMove };
+  const line = [];
+  for (let n = 0; n < limit && st.passes < 2; n++) {
+    const m = countBest(pz, st, true).top[0];
+    if (!m.pass) line.push({ x: m.x, y: m.y, c: st.toMove });
+    st = m.next;
+  }
+  return line;
+}
+
+/**
+ * Play a move for the app (any puzzle). For a counting puzzle it follows
+ * the model: the closed points are kept, and a legal move the model does
+ * not read (filling your own settled area, or a dead stone in the
+ * opponent's) comes back as { outside: true } instead of a position.
+ * Returns { next }, { outside: true } or null (an illegal move).
+ */
+export function playMove(pz, st, i) {
+  if (!pz.counting) {
+    const next = play(pz, st, i);
+    return next ? { next } : null;
+  }
+  if (i === PASS) return { next: countPass(pz, st) };
+  if (countingPoints(pz, st).some((p) => p.i === i)) {
+    const m = countingPlay(pz, st, i);
+    return m ? { next: m.next } : null;
+  }
+  return play(pz, st, i) ? { outside: true } : null;
+}
+
+/** The number of separate sealed areas (local games) in a problem. */
+export function countAreas(pz) {
+  const c = context(pz.size);
+  countingArea(pz);
+  const seen = new Uint8Array(c.n);
+  let n = 0;
+  for (const i of pz._areaList) {
+    if (seen[i]) continue;
+    n++;
+    const stack = [i];
+    seen[i] = 1;
+    while (stack.length) {
+      const p = stack.pop();
+      for (const q of c.nbr[p]) {
+        if (pz._area[q] && !seen[q]) {
+          seen[q] = 1;
+          stack.push(q);
+        }
+      }
+    }
+  }
+  return n;
+}
+
+/**
+ * Difficulty of a counting problem, on the same scale as difficulty():
+ * moves to find, tempting wrong moves, separate areas to compare, how
+ * close the best other choice is, and the size of the proof. A value
+ * question grows with the value and the length of both lines.
+ */
+function countDifficulty(pz) {
+  const first = countSolveFirstMoves(pz);
+  const line = countSolutionLine(pz);
+  const userMoves = line.filter((m) => m.c === pz.userColor).length;
+  const wrong = Math.max(0, first.tried - first.correct.length);
+  const margin = first.second === null ? 0 : Math.abs(first.target - first.second);
+  const areas = countAreas(pz);
+  let score;
+  if (pz.ask === "value") {
+    const dv = deiri(pz);
+    const lines = countLine(pz, BLACK).length + countLine(pz, WHITE).length;
+    score = 3 + Math.log2(1 + Math.abs(dv.value)) * 0.9 + lines * 0.45 + Math.log2(1 + first.nodes) * 0.12;
+  } else {
+    score = 2.4 + userMoves * 0.75 + Math.log2(1 + wrong) * 0.5 + (areas - 1) * 0.9 + (margin <= 1 ? 1.2 : margin <= 2 ? 0.6 : 0) + Math.log2(1 + first.nodes) * 0.12 - (first.correct.length - 1) * 0.8;
+  }
+  let grade = 1;
+  if (score >= 6) grade = 2;
+  if (score >= 9) grade = 3;
+  if (score >= 12) grade = 4;
+  if (score >= 15) grade = 5;
+  return { score: Math.round(score * 10) / 10, grade, userMoves, correct: first.correct, nodes: first.nodes, exact: first.exact, line, margin };
+}
+
+/**
+ * Prove a counting problem (see the header of this section): the region is
+ * sealed and every stone belongs to a safe wall, every search is exact, the
+ * best move beats passing, there are one to `maxCorrect` correct first
+ * moves, the stored `answer`, `margin`, `value` and `choices` match the
+ * proof, and the solution line is legal and keeps the best count.
+ */
+function countValidate(pz, { maxCorrect = 3, line = null } = {}) {
+  const reasons = [];
+  const c = context(pz.size);
+  const st0 = initialState(pz);
+  if (!everyChainBreathes(pz, st0.board)) reasons.push("a chain in the diagram has no liberties");
+  countingArea(pz);
+  for (const i of pz._areaList) {
+    if (st0.board[i] === 0 && c.nbr[i].some((q) => !pz._area[q] && st0.board[q] === 0)) reasons.push(`point ${JSON.stringify(pointOf(pz, i))} touches a point outside the problem`);
+  }
+  const first = countSolveFirstMoves(pz);
+  if (!first.exact) reasons.push("the counting search is not exact (an unsettled end changes the count)");
+  if (!better(pz, first.target, first.passValue)) reasons.push("passing is as good as any move: nothing to play");
+  if (first.correct.length < 1) reasons.push("no correct first move");
+  if (first.correct.length > maxCorrect) reasons.push(`${first.correct.length} correct first moves (max ${maxCorrect})`);
+  const local = (p) => `${p.x - pz.box.x0},${p.y - pz.box.y0}`;
+  if (pz.ask === "move") {
+    const want = (pz.answer || []).map((p) => `${p.x},${p.y}`).sort().join(" ");
+    const have = first.correct.map(local).sort().join(" ");
+    if (want !== have) reasons.push(`answer ${want || "(none)"} differs from the proved correct moves ${have}`);
+    const margin = first.second === null ? null : Math.abs(first.target - first.second);
+    if (pz.margin !== margin) reasons.push(`margin ${pz.margin} differs from the proved margin ${margin}`);
+  } else if (pz.ask === "value") {
+    const dv = deiri(pz);
+    if (!dv.exact) reasons.push("the deiri count is not exact");
+    if (pz.value !== dv.value) reasons.push(`value ${pz.value} differs from the proved deiri ${dv.value}`);
+    const ch = pz.choices || [];
+    if (ch.length < 3 || ch.length > 4 || new Set(ch).size !== ch.length) reasons.push("a value question needs three or four different choices");
+    if (!ch.includes(dv.value)) reasons.push("the choices do not include the value");
+  } else reasons.push(`unknown ask ${pz.ask}`);
+  line = line || countSolutionLine(pz);
+  let st = st0;
+  for (const m of line) {
+    if (st.toMove !== m.c) st = countPass(pz, st);
+    const next = countingCandidates(pz, st).find((n) => n.i === indexOf(pz, m.x, m.y))?.next;
+    if (!next) {
+      reasons.push("the solution line contains an illegal move");
+      break;
+    }
+    st = next;
+  }
+  if (st.toMove !== pz.userColor) st = countPass(pz, st);
+  if (countStatus(pz, st) !== "won") reasons.push("the solution line does not end with the best count");
+  return { ok: !reasons.length, reasons, result: "win", first, line };
 }

@@ -5933,5 +5933,379 @@
         "y": 17
       }
     ]
+  },
+  "endgame-hane-01": {
+    "grade": 2,
+    "score": 7.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 5,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-hane-02": {
+    "grade": 2,
+    "score": 7.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-hane-03": {
+    "grade": 2,
+    "score": 7.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 11
+      }
+    ]
+  },
+  "endgame-sente-01": {
+    "grade": 2,
+    "score": 6.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 5
+      }
+    ]
+  },
+  "endgame-sente-02": {
+    "grade": 2,
+    "score": 6.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 8,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-sente-03": {
+    "grade": 1,
+    "score": 5.7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 4,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-sente-04": {
+    "grade": 1,
+    "score": 4.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 5
+      }
+    ]
+  },
+  "endgame-reverse-01": {
+    "grade": 2,
+    "score": 6.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-reverse-02": {
+    "grade": 2,
+    "score": 6.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 12
+      }
+    ]
+  },
+  "endgame-reverse-03": {
+    "grade": 2,
+    "score": 6.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 14,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-reverse-04": {
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 14
+      }
+    ]
+  },
+  "endgame-monkey-01": {
+    "grade": 3,
+    "score": 9,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 6,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-monkey-03": {
+    "grade": 3,
+    "score": 9,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 0,
+        "y": 3
+      }
+    ]
+  },
+  "endgame-double-01": {
+    "grade": 1,
+    "score": 5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 9
+      }
+    ]
+  },
+  "endgame-count-01": {
+    "grade": 3,
+    "score": 8.3,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 9
+      }
+    ]
+  },
+  "endgame-count-02": {
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-count-03": {
+    "grade": 1,
+    "score": 6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 5
+      }
+    ]
+  },
+  "endgame-count-04": {
+    "grade": 2,
+    "score": 6.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 5,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-count-05": {
+    "grade": 2,
+    "score": 7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 3,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-count-06": {
+    "grade": 5,
+    "score": 12.1,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 7,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-count-07": {
+    "grade": 2,
+    "score": 6.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 14
+      }
+    ]
+  },
+  "endgame-count-08": {
+    "grade": 4,
+    "score": 10.5,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 17,
+        "y": 11
+      }
+    ]
+  },
+  "endgame-count-09": {
+    "grade": 5,
+    "score": 11.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 8,
+        "y": 17
+      }
+    ]
+  },
+  "endgame-count-10": {
+    "grade": 2,
+    "score": 7,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 3,
+        "y": 11
+      }
+    ]
+  },
+  "endgame-order-01": {
+    "grade": 4,
+    "score": 9.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 3,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-order-02": {
+    "grade": 4,
+    "score": 9.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 18,
+        "y": 7
+      }
+    ]
+  },
+  "endgame-order-03": {
+    "grade": 4,
+    "score": 9.7,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 0,
+        "y": 11
+      }
+    ]
+  },
+  "endgame-order-04": {
+    "grade": 4,
+    "score": 10,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 3,
+        "y": 8
+      }
+    ]
+  },
+  "endgame-order-05": {
+    "grade": 4,
+    "score": 9.1,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 15,
+        "y": 10
+      }
+    ]
+  },
+  "endgame-order-06": {
+    "grade": 5,
+    "score": 11.4,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 3,
+        "y": 10
+      }
+    ]
+  },
+  "endgame-biggest-01": {
+    "grade": 4,
+    "score": 9.3,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 13,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-biggest-02": {
+    "grade": 4,
+    "score": 9.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 5,
+        "y": 0
+      }
+    ]
+  },
+  "endgame-biggest-03": {
+    "grade": 5,
+    "score": 12,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 13,
+        "y": 18
+      }
+    ]
+  },
+  "endgame-biggest-04": {
+    "grade": 5,
+    "score": 13,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 4,
+        "y": 0
+      }
+    ]
   }
 }
