@@ -19,27 +19,29 @@ import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 /**
  * Strength ladder, calibrated by self-play and against KataGo's human SL
  * model (docs/strength.md, scripts/calibrate-strength.mjs). IDs are stable
- * (saved settings and games refer to them); `rank` is the measured 19×19
- * label (kyu > 0, 0 = 1 dan, -1 = 2 dan), shown as "≈".
+ * (saved settings and games refer to them) even where the measured label
+ * differs; `rank` is the measured 19×19 label (kyu > 0, 0 = 1 dan,
+ * -1 = 2 dan …), shown as "≈". The weakest level measured below the
+ * scale's floor (≈34 kyu, extrapolated) and is shown as 30 kyu.
  *
  *   visits   KataGo's search budget
  *   maxLoss  choose only among candidates within this many points of the best
  *   temp     how widely to sample those candidates (0 = always the best)
  *   slip     chance of taking a searched candidate outside the window
  *   blunder  chance of a beginner's move instead (see beginnerMove): the
- *            lever for every level below ≈ 6 kyu, since even KataGo's worst
+ *            lever for every level below ≈ 2 kyu, since even KataGo's worst
  *            candidates are moves a strong network finds plausible
  *   local    offline fallback level (ai.js) when KataGo is unavailable
  */
 export const STRENGTHS = [
   { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1 },
-  { id: "25k", rank: 25, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1 },
-  { id: "20k", rank: 20, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.9, local: 2 },
-  { id: "15k", rank: 15, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3 },
-  { id: "10k", rank: 10, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4 },
-  { id: "5k", rank: 6, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0, local: 5 },
+  { id: "25k", rank: 29, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1 },
+  { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2 },
+  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3 },
+  { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4 },
+  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5 },
   { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5 },
-  { id: "2d", rank: -2, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5 },
+  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5 },
 ];
 
 export function strengthById(id) {

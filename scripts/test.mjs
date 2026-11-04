@@ -740,8 +740,8 @@ await test("the strength ladder keeps strong levels exact and weak levels inside
   assert.deepEqual(pickCandidate(analysis, WHITE, { ...strengthById("2d"), temp: 0 }), { x: 3, y: 15 });
   assert.equal(new Set(STRENGTHS.map((s) => s.id)).size, STRENGTHS.length);
   // One stone per rank of the level's calibrated label.
-  assert.equal(suggestHandicap(25, "15k", 19), 9);
-  assert.equal(suggestHandicap(15, "10k", 19), 5);
+  assert.equal(suggestHandicap(25, "15k", 19), 7);
+  assert.equal(suggestHandicap(15, "10k", 19), 3);
   assert.equal(suggestHandicap(10, "10k", 19), 0);
   assert.equal(suggestHandicap(null, "10k", 19), 0);
 });
