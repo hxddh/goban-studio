@@ -16,6 +16,7 @@
  *          node scripts/calibrate-strength.mjs play ... --size 19 --pairs "L:10k-L:5k,L:5k-H:rank_5k" \
  *            --human-model b18c384nbt-humanv0.bin.gz
  *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [--size 19] [--anchor rank_10k] [--boot 1000]
+ *            [--fixed]   (v6: hold the L: ladder at its v4 measurement; needs --size 9 or 19)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
  * Players:
@@ -46,6 +47,7 @@ import { fileURLToPath } from "node:url";
 import { BLACK, WHITE, Game, coordLabel } from "../src/web/js/rules.js";
 import { STRENGTHS, humanMoveFromAnalysis, humanRequest, moveFromAnalysis } from "../src/web/js/engine.js";
 import { parseVertex, toAnalysis } from "../src/web/js/katago.js";
+import { MEASURED, thetaToGoR } from "../src/web/js/app/strength.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -489,16 +491,24 @@ function solve(A, b) {
  * Newton–Raphson on the log-likelihood with a weak Gaussian prior
  * (σ = `sigma` nats around the mean) so a clean sweep stays finite.
  * Returns θ in natural-log units, centred so that θ[ref] = 0.
+ *
+ * v6: `fixed` (player → θ) holds some players at known strengths (the v4
+ * ladder) and fits only the others, in that frame; the prior is then
+ * centred on the fixed players' mean and no recentring is done.
  */
-export function fitBT(games, players, { ref = players[0], sigma = 6 } = {}) {
+export function fitBT(games, players, { ref = players[0], sigma = 6, fixed = null } = {}) {
   const idx = new Map(players.map((p, i) => [p, i]));
   const n = players.length + 1; // + η
   let x = new Array(n).fill(0);
-  for (let it = 0; it < 50; it++) {
+  const held = fixed ? players.map((p, i) => [i, fixed[p]]).filter(([, v]) => Number.isFinite(v)) : [];
+  const m0 = held.length ? held.reduce((s, [, v]) => s + v, 0) / held.length : 0;
+  if (held.length) for (let i = 0; i < n - 1; i++) x[i] = m0;
+  for (const [i, v] of held) x[i] = v;
+  for (let it = 0; it < 200; it++) {
     const g = new Array(n).fill(0);
     const H = Array.from({ length: n }, () => new Array(n).fill(0));
     for (let i = 0; i < n - 1; i++) {
-      g[i] -= x[i] / (sigma * sigma);
+      g[i] -= (x[i] - m0) / (sigma * sigma);
       H[i][i] -= 1 / (sigma * sigma);
     }
     g[n - 1] -= x[n - 1] / 4;
@@ -520,14 +530,20 @@ export function fitBT(games, players, { ref = players[0], sigma = 6 } = {}) {
         for (const [j, cj] of coef) H[i][j] -= ci * cj * v;
       }
     }
+    for (const [i] of held) {
+      for (let j = 0; j < n; j++) H[i][j] = H[j][i] = 0;
+      H[i][i] = -1;
+      g[i] = 0;
+    }
     const step = solve(
       H.map((r) => r.map((v) => -v)),
       g,
     );
-    x = x.map((v, i) => v + step[i]);
+    // v6: damped (a held ladder can start the others far from the optimum).
+    x = x.map((v, i) => v + (held.length ? Math.max(-2, Math.min(2, step[i])) : step[i]));
     if (Math.max(...step.map(Math.abs)) < 1e-9) break;
   }
-  const r = x[idx.get(ref)];
+  const r = held.length ? 0 : x[idx.get(ref)];
   const theta = Object.fromEntries(players.map((p, i) => [p, x[i] - r]));
   return { theta, eta: x[n - 1] };
 }
@@ -568,24 +584,26 @@ function playerOrder(players) {
   });
 }
 
-export function analyse(games, { boot = 1000, seed = 1, anchors: use = null } = {}) {
+export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fixed = null, gorMap = null } = {}) {
   const players = playerOrder([...new Set(games.flatMap((g) => [g.black, g.white]))]);
   const ref = players[0];
   const anchors = players
     .filter((p) => p.startsWith("H:") && (!use || use.includes(p.slice(2))))
     .map((p) => ({ player: p, gor: profileGoR(p.slice(2)) }));
-  const fit = fitBT(games, players, { ref });
+  const fit = fitBT(games, players, { ref, fixed });
   // Report weakest to strongest (pairs read "weaker vs stronger").
   players.sort((a, b) => fit.theta[a] - fit.theta[b]);
-  const am = anchorMap(fit.theta, anchors);
+  // v6: with the ladder held fixed, its known θ → GoR map replaces the anchors.
+  const mapOf = (theta) => (gorMap ? { map: gorMap, points: [] } : anchorMap(theta, anchors));
+  const am = mapOf(fit.theta);
   const rnd = mulberry32(seed);
   const samples = Object.fromEntries(players.map((p) => [p, []]));
   const gorSamples = Object.fromEntries(players.map((p) => [p, []]));
   for (let b = 0; b < boot; b++) {
     const res = games.map(() => games[Math.floor(rnd() * games.length)]);
-    const f = fitBT(res, players, { ref });
+    const f = fitBT(res, players, { ref, fixed });
     for (const p of players) samples[p].push(f.theta[p]);
-    const m = anchorMap(f.theta, anchors);
+    const m = mapOf(f.theta);
     if (m) for (const p of players) gorSamples[p].push(m.map(f.theta[p]));
   }
   const rows = players.map((p) => {
@@ -725,12 +743,22 @@ async function main() {
       const keep = new Set(String(a.only).split(","));
       games = games.filter((g) => keep.has(g.black) && keep.has(g.white));
     }
+    // v6: --fixed holds the shipped ladder (L:) at its v4 measurement
+    // (strength.js MEASURED.standard, for --size 9 or 19) and places only
+    // the other players; on 19×19 their GoR comes from the v4 anchor map.
+    const anchors = a.anchor ? String(a.anchor).split(",") : null;
+    const opt = { boot: Number(a.boot || 1000), anchors };
+    if (a.fixed) {
+      const size = Number(a.size);
+      if (size !== 9 && size !== 19) throw new Error("--fixed needs --size 9 or 19");
+      opt.fixed = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
+      if (size === 19) opt.gorMap = thetaToGoR;
+    }
     if (a.json) {
-      console.log(JSON.stringify(analyse(games, { boot: Number(a.boot || 1000), anchors: a.anchor ? String(a.anchor).split(",") : null }), null, 1));
+      console.log(JSON.stringify(analyse(games, opt), null, 1));
       return;
     }
-    const anchors = a.anchor ? String(a.anchor).split(",") : null;
-    console.log(report(analyse(games, { boot: Number(a.boot || 1000), anchors }), { markdown: !!a.markdown }));
+    console.log(report(analyse(games, opt), { markdown: !!a.markdown }));
   } else {
     console.error("usage: calibrate-strength.mjs play|fit … (see the header of this file)");
     process.exitCode = 2;

@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from "preact/hooks";
 import { initialModels } from "../models.js";
+import { t } from "../i18n.js";
 
 const listeners = new Set();
 let scheduled = false;
@@ -25,6 +26,7 @@ export const state = {
   announce: "",
   game: null,
   review: null,
+  report: null, // v6 report page (app/report-ctl.js)
   practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   library: { tab: "mine", kind: "all", query: "" },
   models: initialModels(), // v5 optional downloads (app/models-ctl.js)
@@ -64,10 +66,26 @@ export function toast(message, tone = "info", ms = 2600) {
   }, ms);
 }
 
-/** Screen-reader announcement (aria-live). */
-export function announce(text) {
+/**
+ * Screen-reader announcement (aria-live). The region is cleared first so the
+ * same words are spoken again; announcements made within the same moment
+ * are spoken together, in order (`first` puts one ahead: a move before the
+ * verdict on it). v6 a11y.
+ */
+let pending = [];
+let flushing = 0;
+export function announce(text, { first = false } = {}) {
+  if (!text) return;
+  if (first) pending.unshift(text);
+  else pending.push(text);
+  if (flushing) return;
   update((s) => {
     s.announce = "";
   });
-  setTimeout(() => update({ announce: text }), 30);
+  flushing = setTimeout(() => {
+    flushing = 0;
+    const words = pending.join(t("a11y.sentence"));
+    pending = [];
+    update({ announce: words });
+  }, 30);
 }

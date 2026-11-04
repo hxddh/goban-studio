@@ -6,6 +6,8 @@ import { BoardView, frameAspect } from "../board.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
+import { boardName } from "../a11y.js";
+import { boardKey } from "./announcer.js";
 
 export function Icon({ name, size = 18 }) {
   return (
@@ -104,6 +106,7 @@ export function MoreMenu({ id, items, label }) {
       list[(i - 1 + list.length) % list.length]?.focus();
     } else if (e.key === "Escape") {
       e.stopPropagation();
+      ref.current.querySelector(".icon-btn")?.focus();
       update({ menu: null });
     }
   };
@@ -122,6 +125,9 @@ export function MoreMenu({ id, items, label }) {
                 class={it.danger ? "danger" : ""}
                 disabled={it.disabled}
                 onClick={() => {
+                  // Focus goes back to the menu button, so a sheet the item
+                  // opens returns it there when it closes (v6 a11y).
+                  ref.current?.querySelector(".icon-btn")?.focus();
                   update({ menu: null });
                   it.onClick();
                 }}
@@ -165,28 +171,18 @@ export function Board({ model, onPlay, onHover, label }) {
     view.current?.setModel({ ...model, flatStones: !!state.settings?.flatStones });
     window.__board = view.current;
   });
+  // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
+  // the reading keys work on every board, playable or not.
+  const [spoken, setSpoken] = useState("");
   const onKey = (e) => {
     const bv = view.current;
-    if (!bv || !bv.model.interactive) return;
-    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    if (d && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      e.preventDefault();
-      e.stopPropagation();
-      bv.moveCursor(d[0], d[1]);
-      setCursorLabel(bv.model.cursor);
-    } else if ((e.key === "Enter" || e.key === " ") && bv.model.cursor) {
-      e.preventDefault();
-      e.stopPropagation();
-      handlers.current.onPlay?.(bv.model.cursor.x, bv.model.cursor.y);
-    }
-  };
-  const [cursorLabel, setCursorLabelState] = useState("");
-  const setCursorLabel = (c) => {
-    if (!c) return;
-    const size = view.current.model.size;
-    const letters = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
-    const v = view.current.model.board?.[c.y]?.[c.x];
-    setCursorLabelState(`${letters[c.x]}${size - c.y}${v ? " · " + t(v > 0 ? "common.black" : "common.white") : ""}`);
+    const said = boardKey(e, bv);
+    if (said === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (said === "play") handlers.current.onPlay?.(bv.model.cursor.x, bv.model.cursor.y);
+    // A trailing zero-width space makes the same words speak again.
+    else if (said) setSpoken((prev) => (prev === said ? said + "\u200b" : said));
   };
   return (
     <div class="board-area">
@@ -196,8 +192,8 @@ export function Board({ model, onPlay, onHover, label }) {
         class="board"
         tabIndex={0}
         role="application"
-        aria-roledescription={t("a11y.board")}
-        aria-label={label || t("a11y.boardHelp")}
+        aria-label={label || boardName(model.size || 19)}
+        aria-describedby="board-keys"
         onKeyDown={onKey}
         onBlur={() => {
           if (view.current) {
@@ -206,8 +202,11 @@ export function Board({ model, onPlay, onHover, label }) {
           }
         }}
       />
-      <span class="sr-only" aria-live="polite">
-        {cursorLabel}
+      <span class="sr-only" aria-live="polite" aria-atomic="true">
+        {spoken}
+      </span>
+      <span class="sr-only" id="board-keys">
+        {t("a11y.keysHelp")}
       </span>
     </div>
     </div>
@@ -271,6 +270,12 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
     const a = from.current;
     const b = value;
     if (a === b) return;
+    // Reduced motion (§8): the final number at once (v6 a11y).
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(b);
+      from.current = b;
+      return;
+    }
     let raf = 0;
     const tick = (now) => {
       const k = Math.min(1, (now - t0) / 600);

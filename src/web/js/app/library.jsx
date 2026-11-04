@@ -8,10 +8,12 @@ import * as C from "./controller.js";
 import { ReviewView, rankLabel } from "./play.jsx";
 import { Button, Icon, MoreMenu, Segmented, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { ExplorerEntries, ExplorerView } from "./explorer.jsx";
 
 export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
   const L = state.library;
+  if (L.explorer) return <ExplorerView />;
   return (
     <>
     <Toolbar>
@@ -34,12 +36,14 @@ export function LibraryView() {
           { value: "mine", label: t("library.mine") },
           { value: "classics", label: t("library.classics") },
           { value: "openings", label: t("library.openings") },
+          { value: "explorer", label: t("explorer.tab") },
         ]}
       />
       </div>
       {L.tab === "mine" && <MyGames />}
       {L.tab === "classics" && <Classics />}
       {L.tab === "openings" && <Openings />}
+      {L.tab === "explorer" && <ExplorerEntries />}
     </div>
     </>
   );
@@ -143,12 +147,14 @@ function MyGames() {
                 </button>
                 <MoreMenu
                   id={"rec-" + g.id}
+                  label={t("a11y.moreFor", [recordTitle(g)])}
                   items={[
                     {
                       icon: "edit",
                       label: t("library.rename"),
                       onClick: () => C.openSheet("rename", { id: g.id, name: g.name || recordTitle(g) }),
                     },
+                    ...(C.hasReport(g) ? [{ icon: "chart", label: t("report.title"), onClick: () => C.openReport(g.id, { space: "library" }) }] : []),
                     { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportRecord(g.id) },
                     "-",
                     { icon: "trash", label: t("common.delete"), danger: true, onClick: () => C.deleteRecord(g.id) },

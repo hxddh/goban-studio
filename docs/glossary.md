@@ -203,6 +203,11 @@ in this table. Usage targets:
 | value as a swing ("the difference is N points") | 相差 N 目 | the difference is N points | N집 차이 | N目の差 | the course states values as the difference between Black and White playing first (出入り); it does not use miai counting |
 | defensive move inside own territory | 补棋 / 补一手 | defensive move (inside your territory) | 손질 | 手入れ | |
 | filling neutral points | 收单官 / 填单官 | filling neutral points | 공배 메우기 | ダメ詰め | |
+| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app never uses miai counting |
+| how many points is a move worth | 这一手值几目 | how many points? | 몇 집짜리일까 | 何目の手か | v6 question title |
+| monkey jump (first-line large knight's slide) | 仙鹤大伸腿 / 大伸腿 | monkey jump | 눈목자 미끄러지기 | サルスベリ | ko is descriptive (large knight's move + slide) |
+| the biggest move / which is bigger | 哪一手最大 / 比较大小 | the biggest move / which is bigger | 가장 큰 수 / 어느 쪽이 큰가 | 一番大きい手 / どちらが大きいか | v6 |
+| capture in sente / atari in sente | 提子是先手 / 先手打吃 | a capture in sente / atari in sente | 선수로 따내기 / 선수 단수 | 先手で取る / 先手のアタリ | v6 problem titles |
 
 ## Middle game
 
@@ -214,6 +219,28 @@ in this table. Usage targets:
 | cap | 镇 | cap | 모자 | ボウシ | |
 | splitting attack | 分开攻击 | splitting attack | 갈라서 공격하기 | 分断して攻める | descriptive in zh / ko / ja |
 | attack from a distance | 从远处攻击 | attack from a distance | 멀리서 공격하기 | 離れて攻める | descriptive |
+| leaning attack | 借力攻击 | leaning attack | 기대어 공격하기 | もたれ攻め | v6 lesson `fight-leaning`; zh and ko are descriptive |
+| forcing move (kikashi) | 先手便宜 | forcing move (kikashi) | 선수 활용 | 利かし | |
+| sabaki (light, flexible shape in the opponent's sphere) | 腾挪 | sabaki | 타개 | サバキ | v6 lesson `fight-sabaki` |
+| heavy / light (of a group) | 重 / 轻灵 | heavy / light | 무겁다 / 가볍다 | 重い / 軽い | |
+
+## Advanced course (v6)
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| advanced (course level) | 高级 | Advanced | 고급 | 上級 | v6 `course.advanced`, the course map heading |
+| whole-board judgement | 全局判断 | whole-board judgement | 전체 판단 | 大局観 | v6 unit `adv-judgement`; ko 대세관 is also used |
+| drive toward your thickness | 往厚势上赶 | drive it toward your thickness | 두터움 쪽으로 몰기 | 厚みに追い込む | descriptive |
+| keep away from thickness | 远离厚势 | keep away from thickness | 두터움에서 떨어지기 | 厚みに近づかない | proverb ja 厚みに近寄るな; the course says it plainly |
+| reduction / reduce | 侵消 / 消 | reduction / reduce | 삭감 | 消し / 消す | v6 unit `adv-invasion` |
+| shoulder hit | 肩冲 | shoulder hit | 어깨짚기 | カタツキ | |
+| cap | 镇 | cap | 모자 | ボウシ | as in the middle-game table |
+| make a ko (problem goal) | 打成劫 | make a ko | 패로 만들기 (흑선 패) | コウにする（黒先コウ） | |
+| live in seki | 做成双活 | live in seki | 빅으로 살다 | セキで生きる | as in the race table |
+| under the stones | 倒脱靴 | under the stones | 석하 | 石の下 | v6 lesson `adv-tesuji-under-stones`; see review list |
+| tesuji in combination | 组合手筋 | tesuji in combination | 맥의 조합 | 手筋の組み合わせ | descriptive |
+| sacrifice (stones) | 弃子 | sacrifice / give away | 사석 (버리기) | 捨て石 | ko 사석 also means dead stones at counting; the lessons say 돌을 버리다 |
+| an extension that also attacks | 拆兼逼 | an extension that is also an attack | 벌림이자 공격 | 開きであり攻め | descriptive |
 
 ## Review and analysis
 
@@ -242,6 +269,22 @@ in this table. Usage targets:
 | mark (triangle, square, circle, cross, letter) | 标记（三角、方块、圆圈、叉、字母） | mark (triangle, square, circle, cross, letter) | 표시 (세모, 네모, 동그라미, 가위표, 글자) | マーク（三角、四角、丸、バツ、文字） | v5 SGF markup |
 | main line (of a record) | 主线 | main line | 본선 | 本線 | v5; ja 本譜 means the game as played, which a promoted variation is not |
 | variation tree | 变化树 | variation tree | 변화도 | 変化図 | v5 |
+
+## Opening explorer (v6)
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| opening explorer | 布局与定式探索 | opening explorer | 포석·정석 탐색 | 布石・定石エクスプローラー | v6 `explorer.title` |
+| book (the precomputed openings and joseki) | 棋谱库 / 布局库 | book / opening book | 책 / 포석 책 | 定石集 / 布石集 | v6: "in / out of the book" |
+| tenuki (play elsewhere) | 脱先 | tenuki | 손빼기 | 手抜き | v6 `explorer.elsewhere` |
+| playable (a move within a few points) | 可下 | playable | 둘 만함 | 打てる手 | v6 tag, within 4 points of the best move |
+| standard (whole-board book move) | 常见下法 | standard | 표준 | 定番 | v6 tag for the whole-board tree; the corner tree says joseki |
+| two star points (nirensei) | 二连星 | two star points | 이연성 | 二連星 | |
+| sanrensei (three star points) | 三连星 | sanrensei | 삼연성 | 三連星 | |
+| Chinese opening | 中国流 | Chinese opening | 중국류 | 中国流 | |
+| diagonal star points | 对角星 | diagonal star points | 대각선 화점 | 対角の星 | |
+| facing / staggered 3-4 points | 向小目 / 错小目 | two 3-4 points (facing / staggered) | 향소목 / 엇갈린 소목 | 向かい小目 / 互い違いの小目 | |
+| one-space high approach (short form) | 一间高挂 | one-space high approach | 한 칸 높은 걸침 | 一間高ガカリ | v6 short form of the approach row above |
 
 ## Decisions on doubtful terms
 
@@ -339,3 +382,10 @@ The items I am least sure about:
 11. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
    **二一路** and ko **2·1의 급소** (also written 2의 1) follow the same pattern,
    but a native reviewer should confirm them.
+12. v6 advanced course (model-written, not reviewed by a native speaker):
+   ko **석하** for under the stones (석하의 맥 is also seen; a Korean
+   reviewer should confirm 석하 is current usage); zh **倒脱靴** is the
+   usual name of the shape where two (or four) stones are given up, which is
+   what both lessons show; ko **어깨짚기** / ja **カタツキ** for the shoulder
+   hit; ja **大局観** and ko **전체 판단** for whole-board judgement; zh
+   **拆兼逼**; ko **고급** / ja **上級** as the level name.

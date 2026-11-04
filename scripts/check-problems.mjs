@@ -19,6 +19,14 @@
  * symmetries (and colour swap); no theme makes up more than 40% of any grade;
  * the whole check stays within its time budget and no single problem is slow.
  *
+ * Endgame problems (v6, goal "endgame", topic "endgame") are proved by the
+ * solver's counting mode instead: the region is sealed, every count is exact
+ * (no unsettled end can change it), the best move beats passing, there are
+ * one to three correct first moves, and the stored `answer` and `margin`
+ * (a "move" question) or `value` and `choices` (a "value" question, the
+ * deiri count) match the proof. Only endgame problems have the endgame
+ * topic, goal and themes.
+ *
  * Exits non-zero on any failure; on success prints the per-topic and
  * per-theme counts, the grade histogram and the slowest problems.
  */
@@ -28,7 +36,9 @@ import { PROBLEMS, SHAPES, THEMES } from "../src/web/js/content/problems.js";
 import { GOALS as SOLVER_GOALS, createPuzzle, outsideReach, parseDiagram, validate } from "../src/web/js/solver.js";
 import { GRADES_FILE, gradeProblem } from "./grade-problems.mjs";
 
-const TOPICS = new Set(["capture", "escape", "connect", "life", "kill", "race", "technique"]);
+const TOPICS = new Set(["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"]);
+// v6: the themes of endgame problems (and of no other).
+const ENDGAME_THEMES = new Set(["hane-connect", "sente-gote", "reverse-sente", "double-sente", "monkey-jump", "endgame-compare", "deiri"]);
 const GOALS = new Set(SOLVER_GOALS);
 const LANGS = ["zh", "en", "ko", "ja"];
 const MAX_CORRECT = 3;
@@ -39,13 +49,18 @@ const MAX_THEME_SHARE = 0.4;
 const failures = [];
 const fail = (id, msg) => failures.push(`${id}: ${msg}`);
 
-/** Stones on the full board, coloured relative to the key stones. */
+/**
+ * Stones on the full board, coloured relative to the key stones. An endgame
+ * problem has no key stones and Black always plays first, so its stones keep
+ * their colours (and are told apart from every other kind of problem).
+ */
 function boardStones(problem) {
   const pz = createPuzzle(problem);
   const keySet = new Set(pz.keys.map((k) => `${k.x},${k.y}`));
+  const colour = (s) => (pz.counting ? (s.c > 0 ? "B" : "W") : s.c === pz.keyColor ? "k" : "a");
   return {
     size: pz.size,
-    stones: pz.stones.map((s) => ({ x: s.x, y: s.y, c: s.c === pz.keyColor ? "k" : "a", key: keySet.has(`${s.x},${s.y}`) })),
+    stones: pz.stones.map((s) => ({ x: s.x, y: s.y, c: colour(s), key: keySet.has(`${s.x},${s.y}`) })),
   };
 }
 
@@ -128,6 +143,9 @@ for (const p of PROBLEMS) {
   if (!themeIds.has(p.theme)) fail(id, `theme ${p.theme} is not in THEMES`);
   if ((p.ko === "ok") !== (p.theme === "ko")) fail(id, 'theme "ko" and ko: "ok" go together (a ko problem is one whose best result is a ko)');
   if ((p.goal === "seki") !== (p.theme === "seki")) fail(id, 'theme "seki" and goal: "seki" go together (a seki problem is one whose best result is seki)');
+  if ((p.goal === "endgame") !== (p.topic === "endgame")) fail(id, 'topic "endgame" and goal: "endgame" go together');
+  if ((p.goal === "endgame") !== ENDGAME_THEMES.has(p.theme)) fail(id, `theme ${p.theme} does not fit goal ${p.goal}`);
+  if (p.goal === "endgame" && (p.ask === "value") !== (p.theme === "deiri")) fail(id, 'theme "deiri" and ask: "value" go together');
   if (p.shape !== undefined && !shapeIds.has(p.shape)) fail(id, `shape ${p.shape} is not in SHAPES`);
   for (const field of ["title", "hint"]) {
     for (const lang of LANGS) {

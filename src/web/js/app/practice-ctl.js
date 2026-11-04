@@ -14,6 +14,7 @@ import GRADES from "../content/problem-grades.json";
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { pickNextLesson } from "./course-path.js";
 
 export const PROBLEMS = ProblemContent.PROBLEMS;
 export const THEMES = ProblemContent.THEMES || [];
@@ -33,18 +34,18 @@ export function allLessons() {
 /**
  * The next lesson. Someone who already plays (onboarding "I play regularly",
  * or a level of about 15 kyu or stronger) starts at the intermediate course;
- * the basics stay open from the course map.
+ * the basics stay open from the course map. A player whose estimated level
+ * (the rating from their games, or the level they gave) is about 5 kyu or
+ * stronger goes on to the advanced course once the intermediate course is
+ * finished, or straight away if they never started it; one who is part way
+ * through the intermediate course finishes it first.
  */
 export function nextLesson() {
-  const all = allLessons();
-  const open = ({ lesson }) => !state.progress.lessons[lesson.id]?.done;
-  const rank = state.settings.playerRank ?? 30;
-  const experienced = state.settings.experience === "player" || rank <= 15;
-  if (experienced) {
-    const mid = all.find((x) => x.unit.level === "intermediate" && open(x));
-    if (mid) return mid;
-  }
-  return all.find(open) || null;
+  return pickNextLesson(allLessons(), (id) => !!state.progress.lessons[id]?.done, {
+    experience: state.settings.experience,
+    playerRank: state.settings.playerRank,
+    rating: state.progress.rating?.r,
+  });
 }
 
 /** The unit that teaches a topic, for weakness-driven recommendations. */
@@ -130,7 +131,7 @@ export function problemView(pz) {
 }
 
 function problemState(pz) {
-  return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null };
+  return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null };
 }
 
 export function openLesson(lessonId, stepIndex = null) {
@@ -354,11 +355,18 @@ export function practicePlay(x, y) {
   const P = currentProblem();
   if (!P || P.busy || P.status !== "open" || P.answer) return;
   const pz = P.pz;
-  const next = S.play(pz, P.st, S.indexOf(pz, x, y));
-  if (!next) {
+  // A "how many points" question is answered with the choices, not a move.
+  if (pz.counting && pz.ask === "value") return;
+  const moved = S.playMove(pz, P.st, S.indexOf(pz, x, y));
+  if (!moved) {
     toast(t("error.illegal"), "warn");
     return;
   }
+  if (moved.outside) {
+    toast(t("practice.endgame.settled"), "warn");
+    return;
+  }
+  const next = moved.next;
   P.history.push(P.st);
   P.st = next;
   P.last = { x, y };
@@ -376,7 +384,7 @@ function respond(P) {
   if (r && r.refutes) {
     setTimeout(() => {
       if (!r.pass) {
-        const after = S.play(pz, P.st, S.indexOf(pz, r.x, r.y));
+        const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
         if (after) {
           P.history.push(P.st);
           P.st = after;
@@ -395,7 +403,7 @@ function respond(P) {
   }
   setTimeout(() => {
     if (!r.pass) {
-      const after = S.play(pz, P.st, S.indexOf(pz, r.x, r.y));
+      const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
       if (after) {
         P.history.push(P.st);
         P.st = after;
@@ -403,7 +411,7 @@ function respond(P) {
         Audio.stone(false);
       }
     } else {
-      const after = S.play(pz, P.st, S.PASS);
+      const after = S.playMove(pz, P.st, S.PASS).next;
       P.history.push(P.st);
       P.st = after;
     }
@@ -471,12 +479,46 @@ function endResult(P) {
  */
 export function feedbackKey(P) {
   if (!P) return null;
+  if (P.pz?.counting && P.feedback === "solved") return (P.pz.ask === "value" ? "practice.endgame.valueRight" : "practice.endgame.solved") + (endgameArgs(P)[0] === "1" ? "One" : "");
+  if (P.pz?.counting && P.feedback === "wrong") return P.pz.ask === "value" ? "practice.endgame.valueWrong" : "practice.endgame.wrong";
   if (P.feedback === "solved") return P.result === "seki" ? "practice.solvedSeki" : "practice.solved";
   if (P.feedback === "ko") return "practice.onlyKo";
   // The position resets by itself after a wrong move, so the message says so
   // instead of pointing at buttons.
   if (P.feedback === "wrong") return P.result === "seki" && P.pz.userColor === P.pz.attacker ? "practice.onlySeki" : "practice.resetting";
   return null;
+}
+
+/**
+ * The numbers an endgame problem's feedback names: the value of a "how many
+ * points" question, or how many points the best move gains over the best
+ * other choice.
+ */
+export function endgameArgs(P) {
+  const pz = P?.pz;
+  if (!pz?.counting) return [];
+  return [String(pz.ask === "value" ? pz.value : pz.margin)];
+}
+
+/**
+ * Answer a "how many points" question. A wrong value stays marked and the
+ * learner can choose again; the attempt counts as missed.
+ */
+export function answerValue(v) {
+  const P = currentProblem();
+  if (!P || !P.pz.counting || P.pz.ask !== "value" || P.status === "won" || P.answer) return;
+  P.chosen = v;
+  if (v === P.pz.value) {
+    P.answer = S.countLine(P.pz, BLACK).map((m, i) => ({ ...m, n: i + 1 }));
+    finishProblem(P);
+    return;
+  }
+  P.feedback = "wrong";
+  P.wrongValues = [...(P.wrongValues || []), v];
+  Audio.wrong?.();
+  recordAttempt(P, false);
+  announce(t(feedbackKey(P)));
+  update();
 }
 
 function finishProblem(P) {
@@ -486,7 +528,7 @@ function finishProblem(P) {
   P.busy = false;
   Audio.correct ? Audio.correct() : Audio.win();
   recordAttempt(P, true);
-  announce(t(feedbackKey(P)));
+  announce(t(feedbackKey(P), endgameArgs(P)));
   update();
   if (state.practice.view === "lesson" && state.practice.lesson?.cur === P) scheduleAutoContinue();
 }
@@ -529,11 +571,16 @@ export function problemHint() {
   update();
 }
 
+/** The two lines a "how many points" answer compares (Black first, White first). */
+export function valueLines(pz) {
+  return { black: S.countLine(pz, BLACK), white: S.countLine(pz, -BLACK) };
+}
+
 export function showAnswer() {
   const P = currentProblem();
   if (!P) return;
   P.used = true;
-  const line = S.solutionLine(P.pz);
+  const line = P.pz.counting && P.pz.ask === "value" ? S.countLine(P.pz, BLACK) : S.solutionLine(P.pz);
   Object.assign(P, problemState(P.pz), { used: true, recorded: P.recorded });
   P.answer = line.map((m, i) => ({ ...m, n: i + 1 }));
   P.status = "answer";
@@ -602,6 +649,7 @@ function placePlay(x, y) {
 
 export function goalText(pz) {
   const color = t(pz.userColor === BLACK ? "common.black" : "common.white");
+  if (pz.counting) return t(pz.ask === "value" ? "goal.endgameValue" : "goal.endgame", [color]);
   return t("goal." + pz.goal, [color]);
 }
 

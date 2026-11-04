@@ -35,6 +35,29 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 `SHA256SUMS` is attached to every GitHub release. The v5.0.0 notes are in
 [`.github/release-notes/v5.0.0.md`](.github/release-notes/v5.0.0.md).
 
+## v6 at a glance
+
+- **Interface** — the review panel in three tabs (analysis, summary,
+  notes), records that open on their key moment, Settings as a two-pane
+  window, quiet empty states, problem windows at a natural stone size.
+- **A report for every game** — result, the three phases, three key
+  moments as small boards, *Practise this game* (your worst mistakes become
+  drills), and an image export.
+- **Strength** — your level as an estimate with an uncertainty
+  ("≈ 12 kyu (±1)") and its curve over time; the human-style levels
+  measured again in 426 games.
+- **Learning** — an advanced course for about 5 kyu to 1 dan (5 units, 15
+  lessons: whole-board judgement, invasion and reduction, advanced life and
+  death, combined tesuji, middle-game strategy); the leaning attack and
+  sabaki lessons; 34 endgame problems proved by exact counting. 18 units, 82
+  lessons and 543 problems in all.
+- **Opening explorer** — a KataGo book of whole-board openings and corner
+  joseki (1,400 positions, offline), with live analysis past the book on
+  the desktop; review says where a game left the book.
+- **Accessibility** — the board can be played with a screen reader and the
+  keyboard (spoken moves, point and group reading, region summaries), and a
+  larger-text option.
+
 ## v5 at a glance
 
 - **Rules** — Japanese (still the default for everyone), Chinese (area
@@ -96,8 +119,11 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   “play from here” are one click away.
 - **Practice** — a course that starts from zero and goes on to intermediate
   play (opening principles, basic joseki, shape, endgame, middle-game
-  fighting), in units of multi-step lessons with explanation, placement
-  exercises and live problems; problem
+  fighting) and, since v6, an advanced course for players around 5 kyu to
+  1 dan (whole-board judgement, invasion and reduction, life and death with
+  ko and seki, tesuji in combination, middle-game strategy; 5 units, 15
+  lessons), 18 units and 82 lessons in all, in multi-step lessons with
+  explanation, placement exercises and live problems; problem
   collections by topic, and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
   refutation on the board, a right move with the most stubborn defence.
@@ -177,7 +203,9 @@ The course and the problems are verified, not counted:
   `problem-grades.json` must match a fresh measurement (solution length,
   proof size and number of tempting wrong moves).
 - `scripts/check-course.mjs` checks every lesson in four languages and proves
-  every lesson problem the same way.
+  every lesson problem the same way; advanced problems also pass the full
+  `validate()` of the problem bank (a ko step must really be a ko, a seki
+  step a real seki).
 - Every problem is proved under real-board rules: a captured point can be
   played again (retake, throw back in, fill an eye), and the key stones of a
   life or kill problem must be sealed in, so they can never live through a
@@ -196,7 +224,15 @@ The course and the problems are verified, not counted:
   rather than through a point outside the problem. The 23 seki problems
   (goal `seki`) are proved to have seki as their best result and to end in
   one. Bent four in the corner is never accepted as life.
-- 509 problems: 57 capturing races (16 big eye against small eye, eye
+- Endgame problems (v6) are proved by the solver's counting mode: exact
+  minimax counting of a sealed region under Japanese counting (territory
+  and prisoners), with sente, gote and every follow-up read out, and a
+  proof that no unsettled end changes the count. A "biggest move" answer
+  and its margin, and a "how many points" value (the difference between
+  Black and White playing first), are stored only as the solver proves them.
+- 543 problems: 34 endgame problems (first-line hane and connect, sente and
+  reverse sente, double sente, the monkey jump, comparing moves, counting a
+  move), 57 capturing races (16 big eye against small eye, eye
   against no eye, outside liberties), 23 seki problems (from grade 1 up),
   19 ko problems, 19 false-eye and 23 eye-space problems, 28 classic
   textbook shapes (straight and bent three, pyramid four, bulky and crossed

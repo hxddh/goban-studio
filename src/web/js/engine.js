@@ -56,6 +56,10 @@ import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
  *   strong   the top level with the stronger network: `visits` of its
  *            search (the larger network is several times slower per visit
  *            and much stronger per visit).
+ *
+ * v6: `human.rank` / `strong.rank` is that mode's own label where the v6
+ * measurement (426 games, docs/strength.md) placed it clearly away from
+ * the level's label on both boards; labelRank() picks it.
  */
 export const STRENGTHS = [
   { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1, human: { profile: "rank_20k", blunder: 0.9 } },
@@ -63,9 +67,9 @@ export const STRENGTHS = [
   { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2, human: { profile: "rank_20k", blunder: 0.35 } },
   { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3, human: { profile: "rank_20k" } },
   { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4, human: { profile: "rank_12k" } },
-  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24 } },
-  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_2k", style: "search", visits: 64 } },
-  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200 }, strong: { visits: 64 } },
+  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24, rank: 3 } },
+  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_2k", style: "search", visits: 64, rank: 0 } },
+  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200 }, strong: { visits: 64, rank: -4 } },
 ];
 
 /** Search budget of a human-style move in "raw" style (passes only). */
@@ -81,10 +85,22 @@ export function strengthById(id) {
   return STRENGTHS.find((s) => s.id === id) || STRENGTHS[1];
 }
 
-/** Display a rank: 25k → "25 级", 2d → "2 段" (via i18n keys). */
-export function rankParts(id) {
-  const s = strengthById(id);
-  return s.rank > 0 ? { n: s.rank, unit: "kyu" } : { n: 1 - s.rank, unit: "dan" };
+/**
+ * v6: the label rank a level plays at in `mode`. A human-style level or
+ * the stronger network carries its own `rank` where the v6 measurement
+ * moved it (docs/strength.md); otherwise the level's label.
+ */
+export function labelRank(idOrStrength, mode = opponentMode(idOrStrength)) {
+  const s = typeof idOrStrength === "string" ? strengthById(idOrStrength) : idOrStrength;
+  if (mode === "human" && s.human?.rank != null) return s.human.rank;
+  if (mode === "strong" && s.strong?.rank != null) return s.strong.rank;
+  return s.rank;
+}
+
+/** Display a rank: 25k → "25 级", 2d → "2 段" (via i18n keys), in the mode the level plays now. */
+export function rankParts(id, mode) {
+  const rank = labelRank(strengthById(id), mode);
+  return rank > 0 ? { n: rank, unit: "kyu" } : { n: 1 - rank, unit: "dan" };
 }
 
 /**
@@ -94,7 +110,7 @@ export function rankParts(id) {
  */
 export function suggestHandicap(playerRank, strengthId, size) {
   if (playerRank == null) return 0;
-  const diff = playerRank - strengthById(strengthId).rank;
+  const diff = playerRank - labelRank(strengthById(strengthId));
   if (diff <= 0) return 0;
   const perStone = size === 19 ? 1 : size === 13 ? 2.5 : 5;
   const stones = Math.floor(diff / perStone);

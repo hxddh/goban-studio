@@ -63,6 +63,7 @@ import * as Host from "../src/web/js/host.js";
 import { APP_VERSION } from "../src/web/js/version.js";
 import * as Sign from "./signing-notes.mjs";
 import * as Shots from "./screenshots.mjs";
+import * as A11y from "../src/web/js/a11y.js";
 import { PNG } from "pngjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -1406,6 +1407,20 @@ await test("v5: a backup carries every stored key and restores it", async () => 
   assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
 });
 
+await test("v6 ui: a tight problem window widens towards the open side", async () => {
+  const { windowOf } = await import("../src/web/js/board.js");
+  // A bottom-right corner problem on 19×19: grows up and left only.
+  assert.deepEqual(windowOf({ x0: 13, y0: 13, x1: 18, y1: 18 }, 19), { x0: 10, y0: 10, x1: 18, y1: 18 });
+  // A centred window grows on both sides.
+  const w = windowOf({ x0: 8, y0: 8, x1: 10, y1: 10 }, 19);
+  assert.equal(w.x1 - w.x0, 8);
+  assert.ok(w.x0 >= 4 && w.x1 <= 14);
+  // A wide window keeps its width; a 9×9 board never goes past its edges.
+  assert.deepEqual(windowOf({ x0: 0, y0: 14, x1: 18, y1: 18 }, 19), { x0: 0, y0: 10, x1: 18, y1: 18 });
+  assert.deepEqual(windowOf({ x0: 2, y0: 2, x1: 4, y1: 4 }, 9), { x0: 0, y0: 0, x1: 8, y1: 8 });
+  assert.deepEqual(windowOf(null, 13), { x0: 0, y0: 0, x1: 12, y1: 12 });
+});
+
 await test("v5: a restore that cannot write leaves the old data in place", async () => {
   const P = await import("../src/web/js/persist.js");
   const doc = { app: "goban-studio", format: 1, version: "5.0.0", exportedAt: "2026-11-04T00:00:00.000Z", data: { settings: { lang: "ja" }, library: { v: 2, games: [{ id: "new" }] } } };
@@ -2295,6 +2310,988 @@ await test("v5: the packaged self-test checks the downloads only when the workfl
   const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_SELFTEST_MODELS/);
   assert.match(main, /GOBAN_MODELS_DIR/);
+});
+
+/* --------------------------------------------------------------- v6 report */
+
+const R = await import("../src/web/js/app/report-model.js");
+const { addMistake } = await import("../src/web/js/persist.js");
+
+/**
+ * A 13×13 game of 80 moves with no captures (Black fills the top rows,
+ * White the bottom) and a whole-game analysis where each listed move loses
+ * the given points; the engine's best move is always the empty 7-7 point.
+ */
+function reportGame({ losses = {}, source = "katago", result = "W+R" } = {}) {
+  const size = 13;
+  const game = new Game({ size, komi: 6.5 });
+  const bl = [];
+  const wh = [];
+  for (let y = 0; y < 6; y++) for (let x = 0; x < size; x++) bl.push([x, y]);
+  for (let y = 12; y > 6; y--) for (let x = 0; x < size; x++) wh.push([x, y]);
+  for (let i = 0; i < 40; i++) {
+    assert.ok(game.play(...bl[i]).ok);
+    assert.ok(game.play(...wh[i]).ok);
+  }
+  if (result) game.setResult(result);
+  const line = game.mainLine();
+  const lead = [0];
+  for (let i = 1; i < line.length; i++) lead[i] = lead[i - 1] + (line[i].move.color === BLACK ? -(losses[i] || 0) : losses[i] || 0);
+  const best = { x: 6, y: 6 };
+  const points = line.map((n, i) =>
+    source === "katago"
+      ? { source, winrate: 0.5, scoreLead: lead[i], best, pv: [best], moves: [{ ...best, visits: 20, scoreLead: lead[i] }], ownership: null }
+      : { source, winrate: 0.5, scoreLead: lead[i], best: null, pv: [], ownership: null },
+  );
+  return { game, points };
+}
+
+await test("v6 report: the model has the result, the three phases and three key moments", () => {
+  const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 30: 4, 79: 2.5 } });
+  const m = R.buildReport({ game, points, humanColor: BLACK, at: 1 });
+  assert.equal(m.v, R.REPORT_VERSION);
+  assert.equal(m.confidence, "high");
+  assert.deepEqual([m.result, m.won, m.size, m.moves, m.rules, m.komi], ["W+R", false, 13, 80, game.rules, 6.5]);
+  assert.deepEqual(m.players, ["black"]);
+  assert.deepEqual(m.phases.map((p) => [p.id, p.from, p.to]), [["opening", 1, 20], ["middle", 21, 75], ["endgame", 76, 80]]);
+  assert.deepEqual([m.phases[1].players.black.loss, m.phases[1].players.black.blunders], [8, 1]);
+  assert.deepEqual([m.totals.black.loss, m.totals.black.mistakes, m.totals.black.blunders], [13.5, 2, 1]);
+  assert.ok(m.takeaways.length > 0 && m.takeaways.every((tk) => tk.kind !== "estimate" && tk.key));
+  // The player's three costliest moves, in game order, with the position before each.
+  assert.deepEqual(m.moments.map((mo) => mo.index), [5, 25, 79]);
+  const mo = m.moments[1];
+  assert.deepEqual([mo.color, mo.loss, mo.best], [BLACK, 8, { x: 6, y: 6 }]);
+  assert.equal(mo.thumb.length, 169);
+  assert.equal(mo.thumb, R.thumbOf(game.mainLine()[24].board.signMap));
+  assert.equal(mo.thumb[mo.played.y * 13 + mo.played.x], ".", "the move is not on the board yet");
+  // It is plain JSON (it is stored with the library record) and knows its game.
+  assert.deepEqual(JSON.parse(JSON.stringify(m)), m);
+  assert.ok(R.reportFits(m, game));
+  const longer = loadSGF(game.toSGF()).game;
+  assert.ok(R.reportFits(m, longer), "the same moves read back from SGF");
+  longer.goto(longer.mainLine().at(-1).id);
+  longer.current.result = null;
+  longer.play(6, 6, { force: true });
+  assert.equal(R.reportFits(m, longer), false, "an edited main line needs a new report");
+  assert.equal(R.reportFits({ ...m, v: 0 }, game), false);
+  // A game between two people describes both sides; a won game says so.
+  const both = R.buildReport({ game, points, humanColor: null });
+  assert.deepEqual([both.players, both.won, both.moments.length], [["black", "white"], null, 3]);
+  const won = reportGame({ result: "B+3.5" });
+  assert.equal(R.buildReport({ ...won, humanColor: BLACK }).won, true);
+  assert.equal(R.buildReport({ ...won, humanColor: WHITE }).won, false);
+});
+
+await test("v6 report: the low-confidence offline estimate shows turning points, not numbers", () => {
+  const { game, points } = reportGame({ losses: { 25: 8, 27: 5 }, source: "estimate" });
+  const m = R.buildReport({ game, points, humanColor: BLACK });
+  assert.equal(m.confidence, "low");
+  assert.equal(m.phases, null, "no per-phase numbers from an estimate");
+  assert.equal(m.totals, null);
+  assert.deepEqual(m.takeaways, []);
+  assert.deepEqual(m.moments.map((mo) => mo.index), [25, 27]);
+  for (const mo of m.moments) assert.deepEqual([mo.best, mo.loss, mo.why, mo.theme, mo.accept], [null, null, null, null, []]);
+  // Nothing to practise without KataGo's better move.
+  assert.deepEqual(R.drillMoments(m), []);
+  assert.deepEqual(R.reportDrills(m, { sgf: game.toSGF(), gameKey: "g1", existing: [] }), { add: [], have: [] });
+  // The estimate's tempo bias (the mover gains about a point each move) is not a turning point.
+  const tempo = reportGame({ source: "estimate" });
+  tempo.points.forEach((p, i) => (p.scoreLead = i % 2 ? 1.2 : -0.2));
+  assert.deepEqual(R.turningPoints(tempo.game, tempo.points, BLACK), []);
+  // No analysis at all.
+  const none = R.buildReport({ game, points: points.map(() => null), humanColor: BLACK });
+  assert.deepEqual([none.confidence, none.phases, none.moments], ["none", null, []]);
+});
+
+await test("v6 report: practising a game adds its worst mistakes as drills, never twice", () => {
+  const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 41: 1.5, 79: 2.5 } });
+  const m = R.buildReport({ game, points, humanColor: BLACK });
+  const sgf = game.toSGF();
+  // Worst first; 1.5 points is not a mistake.
+  assert.deepEqual(R.drillMoments(m).map((mo) => mo.index), [25, 5, 79]);
+  const progress = { mistakes: [] };
+  const first = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: progress.mistakes });
+  assert.deepEqual(first.add.map((d) => d.id), ["rec-1-25", "rec-1-5", "rec-1-79"]);
+  assert.deepEqual(first.have, []);
+  const d = first.add[0];
+  assert.deepEqual([d.gameKey, d.index, d.sgf, d.color, d.best, d.loss, d.size], ["rec-1", 25, sgf, BLACK, { x: 6, y: 6 }, 8, 13]);
+  assert.deepEqual(d.played, m.moments[1].played);
+  assert.ok(d.accept.some((p) => p.x === 6 && p.y === 6));
+  for (const e of first.add) addMistake(progress, e);
+  assert.equal(progress.mistakes.length, 3);
+  // Again: nothing new, the three are found.
+  const again = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: progress.mistakes });
+  assert.deepEqual(again.add, []);
+  assert.deepEqual(again.have.sort(), ["rec-1-25", "rec-1-5", "rec-1-79"]);
+  // A drill made from the review under another key is the same position.
+  const fromReview = [{ id: "game-7-25", gameKey: "game-7", index: 25, sgf }];
+  const mixed = R.reportDrills(m, { sgf, gameKey: "rec-1", existing: fromReview });
+  assert.deepEqual(mixed.add.map((x) => x.index), [5, 79]);
+  assert.deepEqual(mixed.have, ["game-7-25"]);
+  // At most three, and a clean game has none.
+  const many = reportGame({ losses: { 3: 3, 5: 4, 7: 5, 9: 6 } });
+  assert.ok(R.drillMoments(R.buildReport({ ...many, humanColor: BLACK })).length <= R.MAX_DRILLS);
+  const clean = reportGame();
+  assert.deepEqual(R.drillMoments(R.buildReport({ ...clean, humanColor: BLACK })), []);
+});
+
+await test("v6 report: the report is stored with its library record without moving it", () => {
+  Lib.clearLibrary();
+  const a = Lib.saveGame(reportGame().game, { name: "a" });
+  const b = Lib.saveGame(reportGame({ result: "B+2.5" }).game, { name: "b" });
+  const order = Lib.listGames().map((g) => g.id);
+  assert.ok(Lib.patchGame(a.id, { report: { v: 1, lineKey: "x" } }));
+  assert.deepEqual(Lib.listGames().map((g) => g.id), order);
+  assert.deepEqual(Lib.getGame(a.id).report, { v: 1, lineKey: "x" });
+  assert.equal(Lib.getGame(b.id).report, undefined);
+  // Saving the game again (review edits) keeps the report; reportFits decides if it still holds.
+  Lib.saveGame(reportGame().game, { id: a.id });
+  assert.deepEqual(Lib.getGame(a.id).report, { v: 1, lineKey: "x" });
+  assert.equal(Lib.patchGame("nope", { report: {} }), null);
+  Lib.clearLibrary();
+});
+
+await test("v6 report: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 report").length, 2);
+  const block = src.slice(src.indexOf("// v6 report"), src.indexOf("// end v6 report"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("report."));
+  assert.ok(keys.length >= 20);
+  for (const k of keys) {
+    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((x) => x[1]).sort().join();
+    for (const lang of LANG_IDS) {
+      assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+      assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+    }
+  }
+  // The result card leads to the report after a rated game; Library rows offer it.
+  const play = fs.readFileSync(path.join(root, "src/web/js/app/play.jsx"), "utf8");
+  assert.match(play, /kind="primary" icon="chart"[^>]*onClick=\{C\.openCurrentReport\}/);
+  const lib = fs.readFileSync(path.join(root, "src/web/js/app/library.jsx"), "utf8");
+  assert.match(lib, /C\.openReport\(g\.id, \{ space: "library" \}\)/);
+});
+
+await test("v6 report: a stored report no longer fits once the result changes", () => {
+  const { game, points } = reportGame({ losses: { 25: 8 }, result: null });
+  const m = R.buildReport({ game, points, humanColor: BLACK, at: 1 });
+  assert.ok(R.reportFits(m, game), "the unfinished game");
+  game.setResult("W+R");
+  assert.ok(!R.reportFits(m, game), "resigned with no new move: the old report is stale");
+  assert.ok(R.reportFits(R.buildReport({ game, points, humanColor: BLACK, at: 2 }), game));
+});
+
+/* ------------------------------------------------------------ v6 a11y */
+
+// A small 9×9 position, rows as drawn (y = 0 is row 9 at the top):
+// black D6 E6 (a group of two), white F6 in atari from black G6 and F7.
+function a11yBoard() {
+  const b = Array.from({ length: 9 }, () => new Array(9).fill(0));
+  const put = (coord, c) => {
+    const x = "ABCDEFGHJ".indexOf(coord[0]);
+    const y = 9 - Number(coord.slice(1));
+    b[y][x] = c;
+  };
+  for (const p of ["D6", "E6", "G6", "F7"]) put(p, BLACK);
+  put("F6", WHITE);
+  put("J1", WHITE);
+  return b;
+}
+
+await test("v6 a11y: points read their coordinate (no I), stone, group and liberties", () => {
+  setLang("en");
+  const b = a11yBoard();
+  assert.equal(A11y.coordName(8, 0, 9), "J9");
+  assert.equal(A11y.coordName(3, 15, 19), "D4");
+  assert.equal(A11y.pointText(b, 0, 0), "A9, empty");
+  assert.equal(A11y.pointText(b, 3, 3), "D6, black");
+  assert.equal(A11y.pointText(b, 3, 3, { detail: true }), "D6, black, group of 2, 5 liberties");
+  assert.equal(A11y.pointText(b, 5, 3, { detail: true }), "F6, white, 1 liberty, in atari");
+  assert.equal(A11y.pointText(b, 8, 8, { detail: true, last: { x: 8, y: 8, color: WHITE } }), "J1, white, last move, 2 liberties");
+  assert.equal(A11y.pointText(b, 0, 0, { marked: true }), "A9, empty, marked");
+  assert.deepEqual(A11y.groupAt(b, 4, 3).stones.length, 2);
+  assert.equal(A11y.groupAt(b, 0, 0), null);
+  setLang("zh");
+  assert.equal(A11y.pointText(b, 5, 3, { detail: true }), "F6，白子，只剩 1 口气，被打吃");
+  setLang("ja");
+  assert.equal(A11y.pointText(b, 3, 3, { detail: true }), "D6、黒石、2子のかたまり、呼吸点 5つ");
+  setLang("ko");
+  assert.equal(A11y.pointText(b, 0, 0), "A9, 빈 점");
+  setLang("en");
+});
+
+await test("v6 a11y: moves, captures, passes and the computer's move are announced", () => {
+  setLang("en");
+  assert.equal(A11y.moveText({ color: BLACK, x: 3, y: 15, size: 19 }), "Black D4");
+  assert.equal(A11y.moveText({ color: WHITE, x: 15, y: 3, size: 19, captured: 2 }), "White Q16, captures 2");
+  assert.equal(A11y.moveText({ color: WHITE, pass: true }), "White passes");
+  assert.equal(A11y.moveText({ color: WHITE, x: 15, y: 3, size: 19, computer: true }), "Computer: White Q16");
+  setLang("zh");
+  assert.equal(A11y.moveText({ color: BLACK, x: 3, y: 15, size: 19, captured: 1 }), "黑 D4，提 1 子");
+  assert.equal(A11y.moveText({ color: BLACK, pass: true }), "黑停一手");
+  setLang("ko");
+  assert.equal(A11y.moveText({ color: WHITE, x: 15, y: 3, size: 19, computer: true }), "컴퓨터: 백 Q16");
+  setLang("ja");
+  assert.equal(A11y.moveText({ color: BLACK, x: 3, y: 15, size: 19, captured: 3 }), "黒 D4、3子取る");
+  setLang("en");
+});
+
+await test("v6 a11y: review steps say the move number and, with analysis, the point loss", () => {
+  setLang("en");
+  const move = { color: BLACK, x: 3, y: 15 };
+  assert.equal(A11y.reviewMoveText({ number: 0 }), "Start of the game");
+  assert.equal(A11y.reviewMoveText({ number: 12, move, size: 19 }), "Move 12, Black D4");
+  assert.equal(A11y.reviewMoveText({ number: 12, move, size: 19, loss: 3.4 }), "Move 12, Black D4, loses about 3.5 points");
+  assert.equal(A11y.reviewMoveText({ number: 12, move, size: 19, loss: -0.6 }), "Move 12, Black D4, no loss");
+  assert.equal(A11y.reviewMoveText({ number: 7, move, size: 19, captured: 1, loss: 0.2 }), "Move 7, Black D4, captures 1, no loss");
+  setLang("zh");
+  assert.equal(A11y.reviewMoveText({ number: 12, move, size: 19, loss: 3 }), "第 12 手，黑 D4，约亏 3 目");
+  setLang("ja");
+  assert.equal(A11y.reviewMoveText({ number: 12, move, size: 19, loss: 3 }), "12手目、黒 D4、約3目の損");
+  setLang("en");
+});
+
+await test("v6 a11y: rows, columns and the whole board are read stone by stone", () => {
+  setLang("en");
+  const b = a11yBoard();
+  assert.equal(A11y.rowText(b, 3), "Row 6: black D, E, G; white F");
+  assert.equal(A11y.rowText(b, 0), "Row 9: empty");
+  assert.equal(A11y.columnText(b, 5), "Column F: black 7; white 6");
+  assert.equal(A11y.boardText(b), "Stones: black 4, white 2. Row 7: black F. Row 6: black D, E, G; white F. Row 1: white J");
+  // A problem window reads only what is on screen.
+  assert.equal(A11y.boardText(b, { view: { x0: 6, y0: 6, x1: 8, y1: 8 } }), "Stones: black 0, white 1. Row 1: white J");
+  assert.equal(A11y.boardText(Array.from({ length: 9 }, () => new Array(9).fill(0))), "The board is empty");
+  setLang("zh");
+  assert.equal(A11y.rowText(b, 3), "第 6 行：黑子 D、E、G；白子 F");
+  setLang("ko");
+  assert.equal(A11y.rowText(b, 3), "6줄: 흑돌 D, E, G; 백돌 F");
+  setLang("en");
+});
+
+await test("v6 a11y: turn, captured stones, last move and the board's name", () => {
+  setLang("en");
+  assert.equal(A11y.turnText(WHITE), "White to play");
+  assert.equal(A11y.capturesText(3, 1), "Black has captured 3, White 1");
+  assert.equal(A11y.lastMoveText(null, 19), "No moves yet");
+  assert.equal(A11y.lastMoveText({ color: BLACK, x: 15, y: 3 }, 19), "Last move: Black Q16");
+  assert.equal(A11y.lastMoveText({ color: WHITE, pass: true }, 19), "Last move: White passes");
+  assert.equal(A11y.boardName(13), "Go board, 13 by 13");
+  setLang("zh");
+  assert.equal(A11y.turnText(BLACK), "轮到黑下");
+  assert.equal(A11y.boardName(19), "19 路棋盘");
+  setLang("en");
+});
+
+await test("v6 a11y: every a11y string exists in four languages with the same placeholders", () => {
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("a11y."));
+  assert.ok(keys.length > 40, `only ${keys.length} a11y strings`);
+  const holes = (v) => [...new Set([...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]))].sort().join();
+  for (const k of keys) for (const lang of LANG_IDS) {
+    assert.ok(MESSAGES[k][lang].length, `${k} ${lang}`);
+    assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+  }
+  // The shortcuts sheet documents the board keys, in every language.
+  for (const lang of LANG_IDS) {
+    setLang(lang);
+    for (const [k, v] of [...A11y.boardKeyRows(), ...A11y.a11yKeyRows()]) assert.ok(k && v && !v.startsWith("a11y."), `${lang}: ${k}`);
+  }
+  setLang("en");
+  const app = fs.readFileSync(path.join(root, "src/web/js/app/announcer.js"), "utf8");
+  for (const key of ["i", "m", "t", "c", "r", "k", "b"]) assert.ok(app.includes(`case "${key}":`), `board key ${key}`);
+});
+
+/* ------------------------------------------------------------ v6 advanced */
+
+await test("v6 advanced: the advanced units follow the intermediate ones and keep every earlier lesson id", () => {
+  const levels = COURSE.map((u) => u.level || "beginner");
+  const order = ["beginner", "intermediate", "advanced"];
+  for (let i = 1; i < levels.length; i++) assert.ok(order.indexOf(levels[i]) >= order.indexOf(levels[i - 1]), `unit ${COURSE[i].id} out of order`);
+  const adv = COURSE.filter((u) => u.level === "advanced");
+  assert.ok(adv.length >= 4 && adv.length <= 6, `${adv.length} advanced units`);
+  const lessons = adv.flatMap((u) => u.lessons);
+  assert.ok(lessons.length >= 15 && lessons.length <= 20, `${lessons.length} advanced lessons`);
+  for (const l of lessons) assert.match(l.id, /^adv-/);
+  // The beginner and intermediate lessons are unchanged and come first.
+  const before = COURSE.filter((u) => u.level !== "advanced").flatMap((u) => u.lessons.map((l) => l.id));
+  for (const id of ["stones-board", "game-dead", "opening-corner-points", "fight-split"]) assert.ok(before.includes(id), id);
+  const all = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
+  assert.deepEqual(all.slice(0, before.length), before);
+  // Every advanced problem step proves under validate() (check-course does too).
+  for (const l of lessons)
+    for (const st of l.steps)
+      if (st.kind === "problem") {
+        const v = S.validate(S.createPuzzle(st.problem));
+        assert.ok(v.ok, `${l.id}: ${v.reasons.join("; ")}`);
+        if (st.problem.ko === "ok") assert.equal(v.result, "ko", l.id);
+        if (st.problem.goal === "seki") assert.equal(v.result, "seki", l.id);
+      }
+});
+
+await test("v6 advanced: the next lesson sends players of about 5 kyu and stronger to the advanced course", async () => {
+  const { pickNextLesson, ADVANCED_RANK } = await import("../src/web/js/app/course-path.js");
+  assert.equal(ADVANCED_RANK, 5);
+  const all = [];
+  for (const unit of COURSE) for (const lesson of unit.lessons) all.push({ unit, lesson });
+  const firstOf = (level) => all.find((x) => (x.unit.level || "beginner") === level).lesson.id;
+  const none = () => false;
+  const next = (done, who) => pickNextLesson(all, (id) => done.has(id), who)?.lesson.id;
+  // A new player starts at the beginning; a 10 kyu player at the intermediate course.
+  assert.equal(next(new Set(), { experience: "new", playerRank: 30 }), firstOf("beginner"));
+  assert.equal(next(new Set(), { experience: "player", playerRank: 10 }), firstOf("intermediate"));
+  // 5 kyu, 3 kyu and 2 dan who skipped the intermediate course go to the advanced one.
+  for (const playerRank of [5, 3, -1]) assert.equal(pickNextLesson(all, none, { experience: "player", playerRank }).lesson.id, firstOf("advanced"), `rank ${playerRank}`);
+  // The rating from games counts as the estimate: a 10 kyu self-assessment rated 4 kyu.
+  assert.equal(next(new Set(), { experience: "player", playerRank: 10, rating: 1700 }), firstOf("advanced"));
+  // ... and a 5 kyu self-assessment whose games say 9 kyu stays in the intermediate course.
+  assert.equal(next(new Set(), { experience: "player", playerRank: 5, rating: 1200 }), firstOf("intermediate"));
+  // Part way through the intermediate course: finish it first.
+  const mids = all.filter((x) => x.unit.level === "intermediate").map((x) => x.lesson.id);
+  assert.equal(next(new Set(mids.slice(0, 2)), { experience: "player", playerRank: 4 }), mids[2]);
+  // Finished it: on to the advanced course, even with beginner lessons left open.
+  assert.equal(next(new Set(mids), { experience: "player", playerRank: 4 }), firstOf("advanced"));
+  // A 10 kyu player who finished the intermediate course is not pushed past the basics.
+  assert.equal(next(new Set(mids), { experience: "player", playerRank: 10 }), firstOf("beginner"));
+  // Everything done: nothing next.
+  assert.equal(pickNextLesson(all, () => true, { playerRank: 1 }), null);
+});
+
+await test("v6 advanced: the strings are one block in four languages and the course map shows the level", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 advanced\n").length, 2, "one v6 advanced block");
+  const block = src.slice(src.indexOf("// v6 advanced"));
+  assert.ok(block.includes('"course.advanced"'));
+  for (const lang of LANG_IDS) assert.ok(MESSAGES["course.advanced"][lang].trim(), lang);
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/app/practice.jsx"), "utf8");
+  assert.match(jsx, /course\.advanced/);
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/practice-ctl.js"), "utf8");
+  assert.match(ctl, /pickNextLesson\(allLessons\(\)/);
+});
+
+/* ------------------------------------------------------- v6 explorer */
+
+const Book = await import("../src/web/js/book.js");
+const BOOK_RAW = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/book.json"), "utf8"));
+const BOOK = Book.loadBook(BOOK_RAW);
+const emptyMap = () => Array.from({ length: 19 }, () => Array(19).fill(EMPTY));
+const xy = (s) => Book.decodeMove(s);
+const gtp = (s) => ({ x: "ABCDEFGHJKLMNOPQRST".indexOf(s[0]), y: 19 - Number(s.slice(1)) });
+/** Replay GTP moves on a tree's setup: { signMap, toMove }. */
+function replay(tree, moves) {
+  let m = Book.setupSignMap(tree.tree, 19);
+  let toMove = tree.tree.toMove === "W" ? WHITE : BLACK;
+  for (const s of moves) {
+    const p = gtp(s);
+    m = Book.playOn(m, p.x, p.y, toMove);
+    toMove = -toMove;
+  }
+  return { signMap: m, toMove };
+}
+const symMap = (m, s) => {
+  const out = emptyMap();
+  for (let y = 0; y < 19; y++) for (let x = 0; x < 19; x++) if (m[y][x]) {
+    const [u, v] = Book.applySym(s, x, y);
+    out[v][u] = m[y][x];
+  }
+  return out;
+};
+
+await test("v6 explorer: the shipped book has both trees, its network and a compact size", () => {
+  assert.equal(BOOK_RAW.format, Book.BOOK_FORMAT);
+  assert.ok(BOOK_RAW.network && typeof BOOK_RAW.network === "string", "the network that made the book is recorded");
+  assert.ok(BOOK_RAW.visits > 0);
+  assert.equal(BOOK_RAW.komi, 6.5);
+  const bytes = fs.statSync(path.join(root, "src/web/js/content/book.json")).size;
+  assert.ok(bytes < 400 * 1024, `book is ${bytes} bytes`);
+  for (const id of ["whole", "corner"]) {
+    const tree = BOOK_RAW.trees[id];
+    assert.ok(tree && tree.nodes.length > 40, `${id}: ${tree?.nodes.length} records`);
+    tree.nodes.forEach((rec, i) => {
+      assert.ok(rec[0] < i, `${id} ${i}: parent after child`);
+      if (i === 0) assert.equal(rec[0], -1);
+      if (rec.length === 3) {
+        assert.ok(rec[2] < tree.nodes.length && tree.nodes[rec[2]].length === 6, `${id} ${i}: edge target`);
+        return;
+      }
+      assert.equal(rec.length, 6, `${id} ${i}: record shape`);
+      assert.ok(rec[2] >= 0 && rec[2] <= 1000 && rec[4] > 0, `${id} ${i}: values`);
+      for (const c of rec[5]) assert.ok(c.length === 4 && /^[a-s]{2}$/.test(c[0]) && c[1] >= 0, `${id} ${i}: candidate ${c}`);
+    });
+    // No position is stored twice (transpositions and symmetry share one).
+    const t = BOOK.trees[id];
+    assert.equal(t.byKey.size, t.nodes.length, `${id}: duplicate positions`);
+  }
+  // The corner setup is symmetric along the upper-right diagonal.
+  const c = BOOK.trees.corner;
+  assert.deepEqual(c.group, Book.GROUPS.corner);
+  const setup = Book.setupSignMap(c.tree);
+  assert.deepEqual(symMap(setup, 7), setup);
+  assert.equal(Book.stonesOf(setup).length, 4);
+});
+
+await test("v6 explorer: every named line is in the book and named", () => {
+  const src = fs.readFileSync(path.join(root, "scripts/make-book.mjs"), "utf8");
+  for (const id of ["whole", "corner"]) {
+    const tree = BOOK.trees[id];
+    const block = src.slice(src.indexOf(`  ${id}: [`), src.indexOf("],", src.indexOf(`  ${id}: [`)));
+    const lines = [...block.matchAll(/\{ name: (null|"([^"]+)"), moves: "([^"]+)" \}/g)];
+    assert.ok(lines.length >= 5, `${id}: ${lines.length} lines`);
+    for (const [, , name, moves] of lines) {
+      const ms = moves.split(" ");
+      for (let i = 0; i <= ms.length; i++) {
+        const { signMap, toMove } = replay(tree, ms.slice(0, i));
+        const hit = Book.lookup(tree, signMap, toMove);
+        assert.ok(hit, `${id} ${moves}: not in the book after ${i} moves`);
+        if (i === ms.length && name) assert.equal(hit.node.name, name, `${id} ${moves}`);
+      }
+      if (name) for (const lang of LANG_IDS) assert.ok(MESSAGES[`explorer.name.${id}.${name}`]?.[lang], `explorer.name.${id}.${name} ${lang}`);
+    }
+  }
+});
+
+await test("v6 explorer: lookup gives continuations with point losses and tags", () => {
+  const whole = BOOK.trees.whole;
+  const hit = Book.lookup(whole, emptyMap(), BLACK);
+  assert.ok(hit && hit.continuations.length >= 3);
+  // All four star points are book moves from the empty board.
+  for (const p of ["Q16", "D4", "D16", "Q4"].map(gtp)) {
+    const c = hit.continuations.find((k) => k.x === p.x && k.y === p.y);
+    assert.ok(c && c.inBook && c.tag === "joseki", `star point ${p.x},${p.y}: ${JSON.stringify(c && { ...c, node: null })}`);
+  }
+  for (const c of hit.continuations) {
+    assert.ok(c.loss >= 0 && Number.isFinite(c.score) && c.winrate >= 0 && c.winrate <= 1);
+    assert.equal(c.tag, Book.tagOf(c.loss, c.inBook));
+  }
+  // Book moves first, then KataGo's other candidates, each group best first.
+  const primary = hit.continuations.filter((c) => !c.image);
+  for (let i = 1; i < primary.length; i++) {
+    const [a, b] = [primary[i - 1], primary[i]];
+    assert.ok(a.inBook > b.inBook || (a.inBook === b.inBook && b.loss >= a.loss), `order at ${i}`);
+  }
+  assert.equal(Book.tagOf(0), "joseki");
+  assert.equal(Book.tagOf(Book.JOSEKI_LOSS), "joseki");
+  assert.equal(Book.tagOf(0, false), "good");
+  assert.equal(Book.tagOf(Book.JOSEKI_LOSS + 0.1), "playable");
+  assert.equal(Book.tagOf(Book.PLAYABLE_LOSS + 0.1), "mistake");
+  // A first-line move leaves the book.
+  const out = replay(whole, ["A19"]);
+  assert.equal(Book.lookup(whole, out.signMap, out.toMove), null);
+  const j = Book.judgeMove(whole, emptyMap(), BLACK, 0, 0);
+  assert.ok(j === null || j.tag !== "joseki");
+});
+
+await test("v6 explorer: whole-board positions match under all eight symmetries", () => {
+  const whole = BOOK.trees.whole;
+  const base = replay(whole, ["Q16", "D4", "Q4"]);
+  const ref = Book.lookup(whole, base.signMap, base.toMove);
+  assert.ok(ref, "two star points in the book");
+  for (let s = 0; s < 8; s++) {
+    const m = symMap(base.signMap, s);
+    const hit = Book.lookup(whole, m, base.toMove);
+    assert.ok(hit, `symmetry ${s}`);
+    assert.equal(hit.node, ref.node);
+    // Every continuation is the image of the reference continuation.
+    const want = new Set(ref.continuations.map((c) => Book.applySym(s, c.x, c.y).join(",")));
+    const got = new Set(hit.continuations.map((c) => `${c.x},${c.y}`));
+    assert.deepEqual([...got].sort(), [...want].sort(), `symmetry ${s}`);
+    for (const c of hit.continuations) assert.equal(m[c.y][c.x], EMPTY, `symmetry ${s}: continuation on a stone`);
+  }
+  // The symmetry table: each entry undoes its inverse.
+  for (let s = 0; s < 8; s++) {
+    const [a, b] = Book.applySym(s, 3, 15);
+    assert.deepEqual(Book.applySym(Book.INVERSE[s], a, b), [3, 15]);
+  }
+});
+
+await test("v6 explorer: transpositions reach the same position", () => {
+  const whole = BOOK.trees.whole;
+  const a = replay(whole, ["Q16", "D4", "Q4", "D16"]);
+  const b = replay(whole, ["Q4", "D16", "Q16", "D4"]);
+  const ha = Book.lookup(whole, a.signMap, a.toMove);
+  const hb = Book.lookup(whole, b.signMap, b.toMove);
+  assert.ok(ha && hb && ha.node === hb.node);
+  // A synthetic tree: one position by two move orders, stored once with an
+  // edge record for the second order.
+  const tree = {
+    size: 19, toMove: "B", symmetry: "none", setup: { b: [], w: [] },
+    nodes: [
+      [-1, "", 500, 0, 10, [["pd", 5, 500, 0], ["dp", 5, 500, 0]]],
+      [0, "pd", 500, 0, 10, [["dd", 9, 500, 0]]],
+      [0, "dp", 500, 0, 10, [["dd", 9, 500, 0]]],
+      [1, "dd", 500, 0, 10, [["dp", 9, 500, 0]]],
+      [2, "dd", 500, 0, 10, [["pd", 9, 500, 0]]],
+      [3, "dp", 520, 10, 10, []],
+      [4, "pd", 5],
+    ],
+  };
+  const t = Book.indexTree("t", tree);
+  const n4 = t.nodes.find((n) => n.index === 4);
+  const edge = n4.edges.find((e) => e.move === "pd");
+  assert.ok(edge && edge.node.index === 5, "the edge record links the second order");
+  const hit = Book.lookup(t, t.nodes.find((n) => n.index === 5).signMap, WHITE);
+  assert.equal(hit.node.index, 5);
+  const c = Book.lookup(t, n4.signMap, n4.toMove).continuations.find((k) => k.move === "pd");
+  assert.ok(c.inBook && c.score === 1);
+  // Under "none" a mirrored position is not the same.
+  assert.equal(Book.lookup(t, symMap(n4.signMap, 1), n4.toMove), null);
+  assert.throws(() => Book.loadBook({ format: 99 }));
+});
+
+await test("v6 explorer: corner joseki are normalised along the corner's diagonal only", () => {
+  const corner = BOOK.trees.corner;
+  // The small knight's approach from below (R14) and from the left (O17)
+  // are one position: the setup is symmetric along that diagonal.
+  const a = replay(corner, ["Q16", "R14"]);
+  const b = replay(corner, ["Q16", "O17"]);
+  const ha = Book.lookup(corner, a.signMap, a.toMove);
+  const hb = Book.lookup(corner, b.signMap, b.toMove);
+  assert.ok(ha && hb && ha.node === hb.node);
+  for (const c of hb.continuations) {
+    const [u, v] = Book.applySym(7, c.x, c.y);
+    assert.ok(ha.continuations.some((k) => k.x === u && k.y === v), "continuations mirror");
+  }
+  // The 3-3 invasion blocks from either side are the same position too.
+  const c1 = replay(corner, ["Q16", "R17", "Q17"]);
+  const c2 = replay(corner, ["Q16", "R17", "R16"]);
+  const h1 = Book.lookup(corner, c1.signMap, c1.toMove);
+  assert.ok(h1 && h1.node === Book.lookup(corner, c2.signMap, c2.toMove)?.node);
+  // The same joseki in another corner is not: the other corners hold the setup.
+  const rot = symMap(a.signMap, 1);
+  assert.equal(Book.lookup(corner, rot, a.toMove), null);
+  // The corner book's continuations include the expanded local moves.
+  assert.ok(ha.continuations.some((k) => k.inBook && k.x >= 9 && k.y <= 9));
+});
+
+await test("v6 explorer: a game's book depth counts the moves that stay in the book", () => {
+  const whole = BOOK.trees.whole;
+  const mv = (s, c) => ({ ...gtp(s), color: c });
+  assert.equal(Book.bookDepth(whole, []), 0);
+  assert.equal(Book.bookDepth(whole, [mv("Q16", BLACK), mv("D4", WHITE), mv("Q4", BLACK)]), 3);
+  assert.equal(Book.bookDepth(whole, [mv("Q16", BLACK), mv("A1", WHITE), mv("Q4", BLACK)]), 1);
+  assert.equal(Book.bookDepth(whole, [mv("A19", BLACK)]), 0);
+  assert.equal(Book.bookDepth(whole, [{ pass: true }]), 0);
+});
+
+await test("v6 explorer: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 explorer").length, 2);
+  const block = src.slice(src.indexOf("// v6 explorer"), src.indexOf("// end v6 explorer"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("explorer."));
+  assert.ok(keys.length >= 40);
+  const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
+  for (const k of keys) {
+    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 explorer block`);
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang]?.trim(), `${k} ${lang}`);
+    for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+  }
+  for (const tag of ["joseki", "standard", "good", "playable", "mistake"]) assert.ok(MESSAGES[`explorer.tag.${tag}`]);
+  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8");
+  assert.ok(csv.includes('"explorer.title"'), "run node scripts/export-strings.mjs");
+});
+
+/* ------------------------------------------------------------ v6 endgame */
+
+/** A counting puzzle on the top edge of a 19×19 board. */
+const egPuzzle = (diagram, extra = {}) => S.createPuzzle({ goal: "endgame", ask: "move", diagram, corner: "tl", ...extra });
+const egLine = (line) => line.map((m) => `${m.c === BLACK ? "B" : "W"}${m.x},${m.y}`).join(" ");
+// Both walls stop on the second line; ':' is counted territory nobody plays.
+const EG_HANE = ["X : . . . . . O", "X : : : X O : O", "X X X X X O O O", ", , , , , , , ,"];
+
+await test("v6 endgame: a first-line hane and connection is gote, worth 2 points counted both ways", () => {
+  const pz = egPuzzle(EG_HANE);
+  const d = S.deiri(pz);
+  assert.deepEqual([d.value, d.black, d.white, d.exact], [2, 5, 3, true], "Black first: 5; White first: 3");
+  // Black hanes, White blocks, Black connects: gote. White's hane is the mirror.
+  assert.equal(egLine(S.countLine(pz, BLACK)), "B5,0 W6,0 B4,0");
+  assert.equal(egLine(S.countLine(pz, WHITE)), "W4,0 B3,0 W5,0");
+  const f = S.solveFirstMoves(pz);
+  assert.deepEqual(f.correct, [{ x: 5, y: 0 }]);
+  assert.equal(f.target - f.second, 1, "blocking at home instead is one point worse");
+});
+
+await test("v6 endgame: counted points (':') give the same proof as playing them out", () => {
+  const sealed = egPuzzle(EG_HANE);
+  const open = egPuzzle(EG_HANE.map((r) => r.replace(/:/g, ".")));
+  const a = S.deiri(sealed);
+  const b = S.deiri(open);
+  assert.deepEqual([a.value, a.black, a.white], [b.value, b.black, b.white]);
+  assert.deepEqual(S.solveFirstMoves(sealed).correct, S.solveFirstMoves(open).correct);
+});
+
+await test("v6 endgame: a sente push keeps sente; blocking the opponent's sente push is reverse sente", () => {
+  const push = egPuzzle(["X : . . X . . O", "X : : : X O : O", "X X X X X O O O", ", , , , , , , ,"]);
+  assert.equal(S.deiri(push).value, 1);
+  assert.equal(egLine(S.countLine(push, BLACK)), "B5,0 W6,0", "White has to block: Black keeps sente");
+  assert.equal(egLine(S.countLine(push, WHITE)), "W5,0", "White's move there is gote");
+  const block = egPuzzle(["X . . O . . : O", "X : X O : : : O", "X X X O O O O O", ", , , , , , , ,"]);
+  assert.equal(S.deiri(block).value, 1);
+  assert.equal(egLine(S.countLine(block, BLACK)), "B2,0", "Black's block is gote");
+  assert.equal(egLine(S.countLine(block, WHITE)), "W2,0 B1,0", "White's push is sente");
+});
+
+const EG_DOUBLE = [
+  ", , , , , , ,",
+  ", X X O O O ,",
+  ", X X X O O ,",
+  ", X X O . O ,",
+  ", X X . O O ,",
+  ", X . X O O ,",
+  ", X X O O O ,",
+  ", , , , , , ,",
+];
+
+await test("v6 endgame: double sente is sente for both sides and comes before everything", () => {
+  const pz = S.createPuzzle({ goal: "endgame", ask: "value", value: 2, choices: [1, 2, 3, 4], diagram: EG_DOUBLE, at: [4, 4] });
+  assert.equal(S.deiri(pz).value, 2);
+  // Whoever plays the shared point gives atari, and the other side connects.
+  assert.equal(egLine(S.countLine(pz, BLACK)), "B7,8 W8,7");
+  assert.equal(egLine(S.countLine(pz, WHITE)), "W7,8 B6,9");
+  assert.ok(S.validate(pz).ok);
+  const sum = PROBLEMS.find((p) => p.id === "endgame-order-04");
+  const f = S.solveFirstMoves(S.createPuzzle(sum));
+  assert.equal(f.correct.length, 1);
+  assert.deepEqual(f.correct[0], { x: sum.answer[0].x + sum.at[0], y: sum.answer[0].y + sum.at[1] }, "the double sente point, before a sente push and a reverse sente block");
+});
+
+await test("v6 endgame: in a sum of two areas the sente atari comes before the bigger gote move", () => {
+  const pz = egPuzzle(["X : . . O . : O X : . . . . . O ,", "X : X X X O : O X : : : X O : O ,", "X X X X X O O O X X X X X O O O ,", ", , , , , , , , , , , , , , , , ,"]);
+  const f = S.solveFirstMoves(pz);
+  assert.deepEqual(f.correct, [{ x: 3, y: 0 }]);
+  assert.equal(egLine(S.solutionLine(pz)), "B3,0 W5,0 B13,0 W14,0 B12,0", "sente atari, White connects, then the hane and connection");
+  assert.equal(S.countAreas(pz), 2);
+});
+
+await test("v6 endgame: when play ends, enclosed and atari'd stones are dead, as a Japanese count treats them", () => {
+  // A white stone inside Black's sealed area: Black need not capture it.
+  const pz = egPuzzle(["X X X X ,", "X . O X ,", "X . . X ,", "X X X X ,", ", , , , ,"]);
+  const st = S.initialState(pz);
+  assert.equal(S.countValue(pz, st).value, 5, "4 points of territory and 1 prisoner");
+  assert.equal(S.countValue(pz, { ...st, toMove: WHITE }).value, 5, "White cannot save it");
+  assert.ok(S.validate(pz).reasons.includes("passing is as good as any move: nothing to play"));
+  // A move the model does not read (a dead stone in the opponent's area) is
+  // refused for the app instead of being played.
+  const hane = egPuzzle(EG_HANE);
+  assert.deepEqual(S.playMove(hane, S.initialState(hane), S.indexOf(hane, 6, 1)), { outside: true });
+  assert.ok(S.playMove(hane, S.initialState(hane), S.indexOf(hane, 5, 0)).next);
+});
+
+await test("v6 endgame: the monkey jump is the large knight's slide from the second-line stone", () => {
+  const p = PROBLEMS.find((x) => x.id === "endgame-monkey-01");
+  assert.equal(p.theme, "monkey-jump");
+  const pz = S.createPuzzle(p);
+  const f = S.solveFirstMoves(pz);
+  assert.equal(f.correct.length, 1);
+  // From the end of Black's second-line stones, three along the first line.
+  const m = { x: f.correct[0].x - pz.box.x0, y: f.correct[0].y - pz.box.y0 };
+  assert.deepEqual(m, p.answer[0]);
+  const rows = p.diagram.map((r) => r.replace(/\s+/g, ""));
+  const second = rows.length - 2;
+  const first = rows.length - 1;
+  assert.equal(m.y, first);
+  assert.equal(rows[second][m.x - 3], "X", "a black second-line stone a large knight's move away");
+});
+
+await test("v6 endgame: at least 30 endgame problems over grades 1–5, with their own topic and themes", async () => {
+  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
+  const eg = PROBLEMS.filter((p) => p.goal === "endgame");
+  assert.ok(eg.length >= 30, `${eg.length} endgame problems`);
+  for (const p of eg) assert.equal(p.topic, "endgame", p.id);
+  const byGrade = [1, 2, 3, 4, 5].map((g) => eg.filter((p) => grades[p.id].grade === g).length);
+  assert.ok(byGrade.every((n) => n > 0), `grades ${byGrade.join("/")}`);
+  const themes = new Set(eg.map((p) => p.theme));
+  for (const t of ["hane-connect", "monkey-jump", "double-sente", "sente-gote", "reverse-sente", "endgame-compare", "deiri"]) assert.ok(themes.has(t), t);
+  for (const p of eg.filter((x) => x.ask === "value")) assert.ok(p.choices.includes(p.value), p.id);
+  assert.ok(eg.some((p) => S.countAreas(S.createPuzzle(p)) >= 3), "some problems compare three areas");
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/app/practice.jsx"), "utf8");
+  assert.match(jsx, /export const TOPICS = \[[^\]]*"endgame"\]/);
+});
+
+await test("v6 endgame: practice plays a move question and answers a value question", async () => {
+  const esbuild = await import("esbuild");
+  const out = await esbuild.build({
+    stdin: {
+      contents: ['export * as C from "./src/web/js/app/practice-ctl.js";', 'export { state } from "./src/web/js/app/store.js";', 'export * as P from "./src/web/js/persist.js";'].join("\n"),
+      resolveDir: root,
+      loader: "js",
+    },
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    mainFields: ["module", "main"],
+    loader: { ".json": "json" },
+    write: false,
+    logLevel: "error",
+  });
+  const { C, state, P } = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  state.settings = { ...P.DEFAULT_SETTINGS };
+  state.progress = P.loadProgress();
+  // A value question: a wrong choice is marked, the right one solves it.
+  const vq = PROBLEMS.find((p) => p.id === "endgame-count-01");
+  C.openProblem(vq.id);
+  let pr = state.practice.problem;
+  assert.equal(C.goalText(pr.pz).includes("?") || C.goalText(pr.pz).includes("？"), true);
+  C.practicePlay(5, 5);
+  assert.equal(pr.history.length, 0, "a value question takes no moves");
+  const wrong = vq.choices.find((v) => v !== vq.value);
+  C.answerValue(wrong);
+  assert.equal(pr.feedback, "wrong");
+  assert.deepEqual(pr.wrongValues, [wrong]);
+  assert.equal(C.feedbackKey(pr), "practice.endgame.valueWrong");
+  C.answerValue(vq.value);
+  assert.equal(pr.status, "won");
+  assert.equal(C.feedbackKey(pr), vq.value === 1 ? "practice.endgame.valueRightOne" : "practice.endgame.valueRight");
+  assert.deepEqual(C.endgameArgs(pr), [String(vq.value)]);
+  assert.ok(pr.answer.length > 0, "the Black-first line is shown");
+  // A move question: the right move, the computer's answer, until settled.
+  const mq = PROBLEMS.find((p) => p.id === "endgame-hane-01");
+  C.openProblem(mq.id);
+  pr = state.practice.problem;
+  const at = (q) => [q.x + mq.at[0], q.y + mq.at[1]];
+  // A point the model does not read is refused, not played.
+  C.practicePlay(...at({ x: 6, y: 1 }));
+  assert.equal(pr.history.length, 0);
+  C.practicePlay(...at(mq.answer[0]));
+  for (let i = 0; i < 40 && pr.busy; i++) await sleepMs(50);
+  assert.equal(pr.status, "open");
+  assert.equal(pr.feedback, "keep", "White blocked; Black still has to connect");
+  C.practicePlay(...at({ x: 4, y: 0 }));
+  for (let i = 0; i < 40 && pr.status === "open"; i++) await sleepMs(50);
+  assert.equal(pr.status, "won");
+  assert.equal(C.feedbackKey(pr), mq.margin === 1 ? "practice.endgame.solvedOne" : "practice.endgame.solved");
+  assert.deepEqual(C.endgameArgs(pr), [String(mq.margin)]);
+});
+
+function sleepMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+await test("v6 endgame: the fighting unit teaches the leaning attack and sabaki, after the v5 lessons", () => {
+  const unit = COURSE.find((u) => u.id === "fighting");
+  const ids = unit.lessons.map((l) => l.id);
+  assert.deepEqual(ids, ["fight-cutting-stones", "fight-attack-distance", "fight-split", "fight-leaning", "fight-sabaki"]);
+  for (const id of ["fight-leaning", "fight-sabaki"]) {
+    const lesson = unit.lessons.find((l) => l.id === id);
+    const problems = lesson.steps.filter((s) => s.kind === "problem");
+    assert.ok(problems.length >= 2, `${id} has solver-proved steps`);
+    for (const s of problems) assert.ok(S.validate(S.createPuzzle(s.problem)).ok, id);
+  }
+  // The leaning stones are what make the capture work: without them it fails.
+  const lean = unit.lessons.find((l) => l.id === "fight-leaning").steps[1].problem;
+  const without = { ...lean, diagram: lean.diagram.map((r, y) => (y === 3 ? r.replace(/X O \.$/, ". O .") : r)) };
+  assert.notEqual(without.diagram[3], lean.diagram[3]);
+  assert.equal(S.status(S.createPuzzle(without), S.initialState(S.createPuzzle(without))), "lost");
+});
+
+await test("v6 endgame: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v6 endgame").length, 2);
+  const block = src.slice(src.indexOf("// v6 endgame"), src.indexOf("// end v6 endgame"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.includes("endgame") || ["theme.hane-connect", "theme.sente-gote", "theme.reverse-sente", "theme.double-sente", "theme.monkey-jump", "theme.deiri"].includes(k));
+  assert.ok(keys.length >= 35);
+  for (const k of keys) {
+    if (k === "phase.endgame" || k === "phaseIn.endgame") continue;
+    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
+    for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
+  }
+});
+
+const SE = await import("../src/web/js/app/strength.js");
+
+await test("v6 strength: one rated game is a Glicko step against the level's measured strength", () => {
+  // θ ↔ GoR uses the ladder's own anchor: rank_10k (θ 11.65) is 10 kyu.
+  assert.equal(Math.round(SE.thetaToGoR(11.65)), 1100);
+  assert.equal(Math.round(SE.thetaToGoR(SE.MEASURED.standard["2d"][19])), 2429);
+  for (const g of [-1500, 0, 1100, 2400]) assert.ok(Math.abs(SE.thetaToGoR(SE.gorToTheta(g)) - g) < 1e-6);
+  // By hand: prior N(mu, 2.5²), +0.2² before the game, against L:10k on 19×19.
+  const est = SE.startEstimate(12, 0);
+  const opp = SE.MEASURED.standard["10k"][19];
+  assert.equal(SE.levelTheta("10k"), opp);
+  const v0 = Math.min(SE.SIGMA0 ** 2, SE.SIGMA0 ** 2 + SE.SIGMA_GAME ** 2);
+  const g = 1 / Math.sqrt(1 + (3 * SE.SIGMA_LEVEL ** 2) / Math.PI ** 2);
+  const e = 1 / (1 + Math.exp(-g * (est.mu - opp)));
+  const v = 1 / (1 / v0 + g * g * e * (1 - e));
+  const won = SE.rateGame(est, { level: "10k", won: true, at: 0 });
+  assert.ok(Math.abs(won.mu - (est.mu + v * g * (1 - e))) < 2e-3, `${won.mu}`);
+  assert.ok(Math.abs(won.sigma - Math.sqrt(v)) < 2e-3);
+  const lost = SE.rateGame(est, { level: "10k", won: false, at: 0 });
+  assert.ok(Math.abs(lost.mu - (est.mu - v * g * e)) < 2e-3);
+  // Beating a stronger level moves you more than beating a weaker one.
+  assert.ok(SE.rateGame(est, { level: "5k", won: true, at: 0 }).mu - est.mu > SE.rateGame(est, { level: "15k", won: true, at: 0 }).mu - est.mu);
+  // The stored shape: v6 fields plus the GoR `r` every v5 reader uses.
+  assert.deepEqual(Object.keys(won).sort(), ["at", "games", "history", "mu", "r", "sigma", "v"]);
+  assert.equal(won.r, Math.round(SE.thetaToGoR(won.mu)));
+  const h = won.history[won.history.length - 1];
+  assert.ok(h.lo < h.r && h.r < h.hi);
+  // Handicap: given stones make the level weaker, given away stronger.
+  assert.ok(SE.levelTheta("10k", { handicap: 3 }) < opp && SE.levelTheta("10k", { handicap: -3 }) > opp);
+  assert.equal(SE.levelTheta("10k", { handicap: 1 }), opp, "one stone is not a handicap");
+  // A board size maps through the levels' measured 19×19 ↔ 9×9 pairs.
+  for (const s of STRENGTHS) assert.ok(Math.abs(SE.onBoard(SE.MEASURED.standard[s.id][19], 9) - SE.MEASURED.standard[s.id][9]) < 1e-9, s.id);
+  for (const t19 of [-8, 0, 3.3, 12, 20, 30]) for (const size of [9, 13]) assert.ok(Math.abs(SE.fromBoard(SE.onBoard(t19, size), size) - t19) < 1e-6, `${t19} ${size}`);
+});
+
+await test("v6 strength: the uncertainty shrinks with games, less on 9×9, and grows with time away", () => {
+  const play = (size, n) => {
+    let est = SE.startEstimate(15, 0);
+    const sig = [est.sigma];
+    for (let i = 0; i < n; i++) {
+      est = SE.rateGame(est, { level: "15k", size, won: i % 2 === 0, at: 0 });
+      sig.push(est.sigma);
+    }
+    return { est, sig };
+  };
+  const big = play(19, 60);
+  for (let i = 1; i < 15; i++) assert.ok(big.sig[i] < big.sig[i - 1], `game ${i}`);
+  // It settles (per-game spread keeps it from reaching zero), near one rank.
+  assert.ok(Math.abs(big.sig[60] - big.sig[50]) < 0.01);
+  assert.ok(big.sig[60] > 0.4 && big.sig[60] < 0.9, `${big.sig[60]}`);
+  const now = SE.estimateNow(big.est, 0);
+  assert.equal(now.pm, 1);
+  assert.equal(now.games, 60);
+  const small = play(9, 60);
+  assert.ok(small.sig[60] > big.sig[60], "a 9×9 game says less about 19×19 strength");
+  // Time away widens the band, never beyond the prior.
+  const later = SE.estimateNow(big.est, 90 * 86400000);
+  assert.ok(later.sigma > now.sigma && later.pm >= now.pm);
+  assert.ok(SE.sigmaAt(big.est, 1e13) <= SE.SIGMA0 + 1e-9);
+  // Even results against a level converge to that level's strength.
+  assert.ok(Math.abs(big.est.mu - SE.MEASURED.standard["15k"][19]) < 1, `${big.est.mu}`);
+  // History is kept, bounded.
+  assert.equal(big.est.history.length, 61);
+  let long = SE.startEstimate(15, 0);
+  for (let i = 0; i < 230; i++) long = SE.rateGame(long, { level: "15k", won: i % 2 === 0, at: i });
+  assert.equal(long.history.length, 200);
+  assert.equal(long.games, 230);
+});
+
+await test("v6 strength: v5 ratings and their history migrate to an estimate with a band", () => {
+  const old = { r: 1200, games: 3, history: [{ at: 10, r: 900 }, { at: 20, r: 1000 }, { at: 30, r: 1100 }, { at: 40, r: 1200 }] };
+  const est = SE.migrateEstimate(old, 50);
+  assert.equal(est.v, 6);
+  assert.equal(est.r, 1200);
+  assert.equal(est.games, 3);
+  assert.equal(est.at, 40);
+  assert.deepEqual(est.history.map((h) => [h.at, h.r]), old.history.map((h) => [h.at, h.r]));
+  for (const h of est.history) assert.ok(h.lo < h.r && h.r < h.hi);
+  // Older points (fewer games) carry wider bands.
+  const width = (h) => SE.gorToTheta(h.hi) - SE.gorToTheta(h.lo);
+  for (let i = 1; i < est.history.length; i++) assert.ok(width(est.history[i]) < width(est.history[i - 1]));
+  assert.ok(est.sigma < SE.SIGMA0);
+  // Idempotent; v6 passes through; junk becomes null.
+  assert.equal(SE.migrateEstimate(est), est);
+  assert.equal(SE.migrateEstimate(null), null);
+  assert.equal(SE.migrateEstimate({ r: "x" }), null);
+  // A v5 rating without history still gets one point.
+  assert.equal(SE.migrateEstimate({ r: 800, games: 0 }, 5).history.length, 1);
+  // Through storage: v4/v5 progress keeps its rating, and it migrates.
+  for (const k of Object.values(KEYS)) removeKey(k);
+  writeJSON(KEYS.progress, { problems: {}, rating: old });
+  migrate();
+  const p = loadProgress();
+  const m = SE.migrateEstimate(p.rating);
+  assert.equal(m.r, 1200);
+  // The migrated estimate keeps updating.
+  const next = SE.rateGame(m, { level: "10k", won: true, at: 60 });
+  assert.equal(next.games, 4);
+  assert.equal(next.history.length, 5);
+  for (const k of Object.values(KEYS)) removeKey(k);
+  // The app migrates at boot and rates with the new model.
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
+  assert.match(ctl, /migrateEstimate\(state\.progress\.rating\)/);
+  const play = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
+  assert.match(play, /rateGame\(prev, \{ level: g\.strength, mode, size: g\.game\.size, handicap, won \}\)/);
+});
+
+await test("v6 strength: the recommended opponent is the level you are expected to play evenly", () => {
+  // At a level's measured strength, that level is the suggestion, on both boards.
+  for (const s of STRENGTHS) {
+    const at = { mu: SE.MEASURED.standard[s.id][19] };
+    assert.equal(SE.recommendStrength(at), s.id, s.id);
+    assert.equal(SE.recommendStrength(at, { size: 9 }), s.id, `9×9 ${s.id}`);
+  }
+  // Between two levels: the nearer by expected score.
+  const mid = (SE.MEASURED.standard["10k"][19] + SE.MEASURED.standard["5k"][19]) / 2;
+  assert.equal(SE.recommendStrength({ mu: mid - 0.3 }), "10k");
+  assert.equal(SE.recommendStrength({ mu: mid + 0.3 }), "5k");
+  // A prior of 12 kyu (the 10k level's label) suggests that level.
+  assert.equal(SE.recommendStrength(SE.startEstimate(12)), "10k");
+  // Winning streaks move the suggestion up.
+  let est = SE.startEstimate(18, 0);
+  assert.equal(SE.recommendStrength(est), "15k");
+  for (let i = 0; i < 8; i++) est = SE.rateGame(est, { level: SE.recommendStrength(est), won: true, at: i });
+  assert.ok(STRENGTHS.findIndex((s) => s.id === SE.recommendStrength(est)) > STRENGTHS.findIndex((s) => s.id === "15k"));
+  // The mode each level would be played in is taken into account.
+  for (const s of STRENGTHS) {
+    const mode = SE.MEASURED.human[s.id] ? "human" : "standard";
+    assert.ok(Number.isFinite(SE.levelTheta(s.id, { mode, size: 19 })) && Number.isFinite(SE.levelTheta(s.id, { mode, size: 9 })));
+  }
+  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
+  assert.match(ctl, /recommendStrength\(est, \{ size: 19, modeOf \}\)/);
+  assert.match(ctl, /recommendStrength\(est, \{ size: 9, modeOf \}\)/);
+});
+
+await test("v6 strength: the calibration fit can hold the measured ladder and place new players in its frame", () => {
+  const rnd = mulberry32(7);
+  const truth = { "L:a": 0, "L:b": 3, "L:c": 9, "HL:x": 4.2, "HL:y": 8 };
+  const games = [];
+  const pairs = [["HL:x", "L:a"], ["HL:x", "L:b"], ["HL:x", "L:c"], ["HL:y", "L:b"], ["HL:y", "L:c"], ["HL:x", "HL:y"]];
+  for (const [p, q] of pairs) {
+    for (let k = 0; k < 600; k++) {
+      const [black, white] = k % 2 ? [p, q] : [q, p];
+      const pr = 1 / (1 + Math.exp(-(truth[black] - truth[white])));
+      games.push({ black, white, winner: rnd() < pr ? "B" : "W", plies: 60, reason: "passes" });
+    }
+  }
+  const fixed = { "L:a": 0, "L:b": 3, "L:c": 9 };
+  const fit = fitBT(games, Object.keys(truth), { fixed });
+  for (const p of Object.keys(fixed)) assert.equal(fit.theta[p], fixed[p], p);
+  for (const p of ["HL:x", "HL:y"]) assert.ok(Math.abs(fit.theta[p] - truth[p]) < 0.25, `${p} ${fit.theta[p]}`);
+  // A clean sweep against a far-away fixed player stays finite.
+  const sweep = Array.from({ length: 20 }, (_, k) => ({ black: k % 2 ? "HL:z" : "L:c", white: k % 2 ? "L:c" : "HL:z", winner: k % 2 ? "B" : "W" }));
+  const fz = fitBT(sweep, ["L:c", "HL:z"], { fixed: { "L:c": 9 } });
+  assert.ok(Number.isFinite(fz.theta["HL:z"]) && fz.theta["HL:z"] > 9);
+  // With a map, rows get GoR in the v4 frame and the held players have no spread.
+  const r = analyse(games, { boot: 10, fixed, gorMap: SE.thetaToGoR });
+  const row = (p) => r.rows.find((x) => x.player === p);
+  assert.equal(row("L:b").lo, 3);
+  assert.equal(Math.round(row("L:c").gor), Math.round(SE.thetaToGoR(9)));
+});
+
+await test("v6 strength: human-style and stronger-network labels follow the v6 measurement", async () => {
+  const E = await import("../src/web/js/engine.js");
+  // Moved only where both boards agreed (docs/strength.md).
+  assert.equal(E.labelRank("5k", "human"), 3);
+  assert.equal(E.labelRank("1k", "human"), 0);
+  assert.equal(E.labelRank("2d", "strong"), -4);
+  for (const id of ["30k", "25k", "20k", "15k", "10k", "2d"]) assert.equal(E.labelRank(id, "human"), strengthById(id).rank, id);
+  for (const s of STRENGTHS) assert.equal(E.labelRank(s.id, "standard"), s.rank);
+  assert.deepEqual(rankParts("5k", "human"), { n: 3, unit: "kyu" });
+  assert.deepEqual(rankParts("2d", "strong"), { n: 5, unit: "dan" });
+  assert.deepEqual(rankParts("5k", "standard"), { n: 7, unit: "kyu" });
+  // Every mode's measured strength is ordered as its labels are, on 19×19.
+  for (const mode of ["standard", "human"]) {
+    for (let i = 1; i < STRENGTHS.length; i++) {
+      const a = SE.levelTheta(STRENGTHS[i - 1].id, { mode });
+      const b = SE.levelTheta(STRENGTHS[i].id, { mode });
+      assert.ok(b > a, `${mode} ${STRENGTHS[i].id}`);
+    }
+  }
+  assert.ok(SE.levelTheta("2d", { mode: "strong" }) > SE.levelTheta("2d"));
+  assert.ok(SE.levelTheta("2d", { mode: "strong", size: 9 }) > SE.levelTheta("2d", { size: 9 }));
+});
+
+await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const block = src.slice(src.indexOf("// v6 strength"));
+  for (const k of ["strength.label", "strength.about"]) {
+    assert.ok(block.includes(`"${k}"`), k);
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+  }
+  for (const lang of LANG_IDS) assert.ok(MESSAGES["strength.label"][lang].includes("±{1}"), lang);
+  const chart = fs.readFileSync(path.join(root, "src/web/js/app/strength-chart.jsx"), "utf8");
+  assert.doesNotMatch(chart, /#[0-9a-fA-F]{3,6}\b/, "no literal colours");
+  for (const tok of ["--text-2", "--text-3", "--text"]) assert.ok(chart.includes(`var(${tok})`), tok);
 });
 
 if (failures) {

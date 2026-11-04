@@ -17,6 +17,9 @@ import { PlayView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryView } from "./library.jsx";
 import { Sheets } from "./sheets.jsx";
+import { ReportView } from "./report.jsx";
+import { useAnnouncements } from "./announcer.js";
+import { installKeys, textSizeKeys } from "./a11y-keys.js";
 
 function Toasts() {
   return (
@@ -36,18 +39,21 @@ function App() {
     document.documentElement.lang = s.settings?.lang === "zh" ? "zh-CN" : s.settings?.lang || "en";
     document.title = "Goban Studio";
   });
+  useAnnouncements(); // v6 a11y: review moves, problems, lessons
   if (!s.ready) return null;
   const focus = isFocus();
   const reviewKey = s.review ? "review-" + s.review.source : "";
+  const report = C.reportVisible();
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
-        <div class="place" key={s.space + reviewKey + (s.space === "practice" ? s.practice.view : "")}>
-          {s.space === "today" && <TodayView />}
-          {s.space === "play" && <PlayView />}
-          {s.space === "practice" && <PracticeView />}
-          {s.space === "library" && <LibraryView />}
+        <div class="place" key={s.space + reviewKey + (report ? "report" : "") + (s.space === "practice" ? s.practice.view : "")}>
+          {report && <ReportView />}
+          {!report && s.space === "today" && <TodayView />}
+          {!report && s.space === "play" && <PlayView />}
+          {!report && s.space === "practice" && <PracticeView />}
+          {!report && s.space === "library" && <LibraryView />}
         </div>
       </main>
       <Sheets />
@@ -91,6 +97,7 @@ const COMMANDS = {
   "view.numbers": () => C.setSetting("numbers", !state.settings.numbers),
   "view.eval": () => C.setSetting("showEval", !state.settings.showEval),
   "view.live": () => C.toggleLive(),
+  "view.largeText": () => C.setSetting("largeText", !state.settings.largeText),
   "go.today": () => C.goSpace("today"),
   "go.play": () => C.goSpace("play"),
   "go.practice": () => C.goSpace("practice"),
@@ -132,6 +139,8 @@ function menuSpec() {
         { label: t("settings.moveNumbers"), command: "view.numbers", checked: !!s.numbers },
         { label: t("settings.showEval"), command: "view.eval", checked: !!s.showEval },
         { label: t("settings.liveAnalysis"), command: "view.live", checked: !!s.liveAnalysis },
+        { separator: true },
+        { label: t("a11y.largeText"), command: "view.largeText", checked: !!s.largeText },
       ],
     },
     {
@@ -180,11 +189,16 @@ function onKeyDown(e) {
       return update();
     }
     if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
+    if (C.reportVisible()) return C.closeReport();
+
+    // v6 explorer: Esc goes back to the Library list.
+    if (state.space === "library" && state.library.explorer) return C.closeExplorer();
     if (state.settings.focus) return C.toggleFocus();
     return;
   }
   if (state.sheet?.kind === "onboarding") return;
   if (mod && !e.altKey) {
+    if (textSizeKeys(e)) return;
     const map = { n: "file.new", ",": "app.settings", "/": "help.shortcuts", "?": "help.shortcuts", o: "file.import", "[": "go.back", "]": "go.forward" };
     if (!e.shiftKey && map[k]) {
       e.preventDefault();
@@ -248,6 +262,14 @@ function onKeyDown(e) {
     if (e.key === "Home") return C.reviewGoto(0);
     if (e.key === "End") return C.reviewGoto(Infinity);
   }
+  // v6 explorer: ← / → step through the line, Home goes back to the start.
+  if (!reviewing && state.space === "library" && state.library.explorer) {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      return C.explorerStep(e.key === "ArrowLeft" ? -1 : 1);
+    }
+    if (e.key === "Home") return C.explorerReset();
+  }
   // ← in a live game steps back into review of that game.
   if (!reviewing && state.space === "play" && e.key === "ArrowLeft" && !e.target.closest("canvas") && state.game?.game.mainLine().length > 1) {
     e.preventDefault();
@@ -282,6 +304,7 @@ export function start() {
   window.__solver = S;
   render(<App />, document.getElementById("root"));
   document.addEventListener("keydown", onKeyDown);
+  installKeys();
   // Mouse back/forward buttons move through history.
   window.addEventListener("mouseup", (e) => {
     if (e.button === 3) C.back();

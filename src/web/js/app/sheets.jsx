@@ -10,8 +10,10 @@ import * as U from "../update.js";
 import * as Models from "../models.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
-import { rankLabel, ratingLabel } from "./play.jsx";
+import { rankLabel } from "./play.jsx";
+import { estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
+import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 
 export function Sheets() {
   const sheet = state.sheet;
@@ -249,121 +251,196 @@ function MiniGrid({ size }) {
 
 /* --------------------------------------------------------------- settings */
 
-function SettingsSheet() {
+const SETTINGS_PANES = [
+  { id: "general", icon: "gear", key: "settings.pane.general" },
+  { id: "board", icon: "grid", key: "settings.pane.board" },
+  { id: "playing", icon: "play", key: "settings.pane.playing" },
+  { id: "engine", icon: "sparkle", key: "settings.pane.engine" },
+  { id: "data", icon: "save", key: "settings.pane.data" },
+  { id: "about", icon: "info", key: "settings.pane.about" },
+];
+/** The pane last shown; remembered for the session. */
+let settingsPane = "general";
+
+/**
+ * Settings (docs/design.md §6): a source list of panes on the left, one
+ * pane at a time on the right — like the system's own settings window.
+ */
+function SettingsSheet({ pane: open }) {
   const s = state.settings;
   const set = C.setSetting;
+  const [pane, setPane] = useState(open && SETTINGS_PANES.some((p) => p.id === open) ? open : settingsPane);
+  const choose = (id) => {
+    settingsPane = id;
+    setPane(id);
+  };
   const rankOptions = [30, 25, 20, 15, 10, 5, 1, -1, -3];
   const rankText = (r) => (r == null ? t("settings.rankUnknown") : r > 0 ? t("rank.kyu", [r]) : t("rank.dan", [1 - r]));
+  const onListKey = (e) => {
+    const i = SETTINGS_PANES.findIndex((p) => p.id === pane);
+    const d = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const next = SETTINGS_PANES[(i + d + SETTINGS_PANES.length) % SETTINGS_PANES.length];
+    choose(next.id);
+    e.currentTarget.querySelector(`[data-pane="${next.id}"]`)?.focus();
+  };
   return (
-    <Modal title={t("nav.settings")} wide>
-      <section class="settings-group">
-        <h3>{t("settings.language")}</h3>
-        <div class="lang-grid" role="radiogroup" aria-label={t("settings.language")}>
-          {LANG_IDS.map((id) => (
-            <button type="button" role="radio" aria-checked={s.lang === id} class={s.lang === id ? "on" : ""} lang={id} onClick={() => set("lang", id)}>
-              {LANG_NAMES[id]}
+    <Modal title={t("nav.settings")} wide class="settings-sheet">
+      <div class="settings-split">
+        <nav class="settings-nav" aria-label={t("nav.settings")} role="tablist" aria-orientation="vertical" onKeyDown={onListKey}>
+          {SETTINGS_PANES.map((p) => (
+            <button
+              type="button"
+              role="tab"
+              data-pane={p.id}
+              aria-selected={pane === p.id}
+              tabIndex={pane === p.id ? 0 : -1}
+              class={`settings-tab ${pane === p.id ? "on" : ""}`}
+              onClick={() => choose(p.id)}
+            >
+              <Icon name={p.icon} size={16} />
+              <span>{t(p.key)}</span>
             </button>
           ))}
+        </nav>
+        <div class="settings-pane" role="tabpanel" aria-label={t(SETTINGS_PANES.find((p) => p.id === pane).key)}>
+          {pane === "general" && (
+            <>
+              <section class="settings-group">
+                <h3>{t("settings.language")}</h3>
+                <div class="lang-grid" role="radiogroup" aria-label={t("settings.language")}>
+                  {LANG_IDS.map((id) => (
+                    <button type="button" role="radio" aria-checked={s.lang === id} class={s.lang === id ? "on" : ""} lang={id} onClick={() => set("lang", id)}>
+                      {LANG_NAMES[id]}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section class="settings-group">
+                <h3>{t("settings.look")}</h3>
+                <div class="row">
+                  <span>{t("settings.appearance")}</span>
+                  <Segmented
+                    label={t("settings.appearance")}
+                    value={s.appearance}
+                    onChange={(v) => set("appearance", v)}
+                    options={[
+                      { value: "auto", label: t("settings.auto") },
+                      { value: "light", label: t("settings.light") },
+                      { value: "dark", label: t("settings.dark") },
+                    ]}
+                  />
+                </div>
+                <Switch label={t("settings.sound")} checked={s.sound} onChange={(v) => set("sound", v)} />
+                <Switch label={t("a11y.largeText")} checked={!!s.largeText} onChange={(v) => set("largeText", v)} />
+              </section>
+            </>
+          )}
+          {pane === "board" && (
+            <>
+              <section class="settings-group">
+                <h3>{t("settings.boardGroup")}</h3>
+                <div class="row">
+                  <span>{t("settings.board")}</span>
+                  <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
+                    {["plain", "wood", "ink"].map((m) => (
+                      <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
+                        <i />
+                        <span>{t("settings.material." + m)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Switch label={t("settings.flatStones")} checked={!!s.flatStones} onChange={(v) => set("flatStones", v)} />
+                <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
+                <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
+              </section>
+            </>
+          )}
+          {pane === "playing" && (
+            <>
+              <section class="settings-group">
+                <h3>{t("settings.playing")}</h3>
+                <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
+                <p class="fine">{t("settings.teachingHelp")}</p>
+                <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
+                <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
+                <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
+                <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
+                <div class="row">
+                  <span>{t("rules.default")}</span>
+                  <Segmented label={t("rules.default")} value={s.defaultRules || "japanese"} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
+                </div>
+              </section>
+              <section class="settings-group">
+                <h3>{t("settings.you")}</h3>
+                {state.progress.rating && (
+                  <div class="row">
+                    <span>{t("settings.estimated")}</span>
+                    <strong title={t("strength.about")}>{estimateLabel(state.progress.rating)}</strong>
+                  </div>
+                )}
+                <div class="row">
+                  <span>{t("settings.yourRank")}</span>
+                  <select value={s.playerRank ?? ""} onChange={(e) => C.setPlayerRank(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} aria-label={t("settings.yourRank")}>
+                    <option value="">{t("settings.rankUnknown")}</option>
+                    {rankOptions.map((r) => (
+                      <option value={r}>{rankText(r)}</option>
+                    ))}
+                  </select>
+                </div>
+                <p class="fine">{t("settings.rankHelp")}</p>
+              </section>
+            </>
+          )}
+          {pane === "engine" && <ModelsGroup />}
+          {pane === "data" && (
+            <>
+              <section class="settings-group">
+                <h3>{t("backup.title")}</h3>
+                <p class="fine">{t("backup.help")}</p>
+                <div class="actions">
+                  <Button icon="download" onClick={C.exportBackup}>
+                    {t("backup.export")}
+                  </Button>
+                  <Button kind="ghost" icon="upload" onClick={C.importBackup}>
+                    {t("backup.import")}
+                  </Button>
+                </div>
+                <div class="actions">
+                  <Button kind="danger" onClick={C.clearData}>
+                    {t("settings.clearData")}
+                  </Button>
+                </div>
+              </section>
+            </>
+          )}
+          {pane === "about" && (
+            <>
+              <section class="settings-group">
+                <h3>{t("settings.about")}</h3>
+                <p class="about">
+                  <strong>Goban Studio {APP_VERSION}</strong>
+                  <span class="muted">
+                    {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
+                  </span>
+                  <span class="fine">{t("settings.offline")}</span>
+                  <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
+                </p>
+                <UpdateRow />
+                <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />
+                <p class="fine">{t("update.autoHelp")}</p>
+                <div class="actions">
+                  <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
+                    {t("shortcuts.title")}
+                  </Button>
+                </div>
+              </section>
+            </>
+          )}
         </div>
-      </section>
-      <section class="settings-group">
-        <h3>{t("settings.look")}</h3>
-        <div class="row">
-          <span>{t("settings.appearance")}</span>
-          <Segmented
-            label={t("settings.appearance")}
-            value={s.appearance}
-            onChange={(v) => set("appearance", v)}
-            options={[
-              { value: "auto", label: t("settings.auto") },
-              { value: "light", label: t("settings.light") },
-              { value: "dark", label: t("settings.dark") },
-            ]}
-          />
-        </div>
-        <div class="row">
-          <span>{t("settings.board")}</span>
-          <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
-            {["plain", "wood", "ink"].map((m) => (
-              <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
-                <i />
-                <span>{t("settings.material." + m)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <Switch label={t("settings.flatStones")} checked={!!s.flatStones} onChange={(v) => set("flatStones", v)} />
-        <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
-        <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
-        <Switch label={t("settings.sound")} checked={s.sound} onChange={(v) => set("sound", v)} />
-      </section>
-      <section class="settings-group">
-        <h3>{t("settings.playing")}</h3>
-        <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
-        <p class="fine">{t("settings.teachingHelp")}</p>
-        <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
-        <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
-        <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
-        <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
-        <div class="row">
-          <span>{t("rules.default")}</span>
-          <Segmented label={t("rules.default")} value={s.defaultRules || "japanese"} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
-        </div>
-      </section>
-      <section class="settings-group">
-        <h3>{t("settings.you")}</h3>
-        {state.progress.rating && (
-          <div class="row">
-            <span>{t("settings.estimated")}</span>
-            <strong>{ratingLabel(state.progress.rating.r)}</strong>
-          </div>
-        )}
-        <div class="row">
-          <span>{t("settings.yourRank")}</span>
-          <select value={s.playerRank ?? ""} onChange={(e) => C.setPlayerRank(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} aria-label={t("settings.yourRank")}>
-            <option value="">{t("settings.rankUnknown")}</option>
-            {rankOptions.map((r) => (
-              <option value={r}>{rankText(r)}</option>
-            ))}
-          </select>
-        </div>
-        <p class="fine">{t("settings.rankHelp")}</p>
-      </section>
-      <ModelsGroup />
-      <section class="settings-group">
-        <h3>{t("backup.title")}</h3>
-        <p class="fine">{t("backup.help")}</p>
-        <div class="actions">
-          <Button icon="download" onClick={C.exportBackup}>
-            {t("backup.export")}
-          </Button>
-          <Button kind="ghost" icon="upload" onClick={C.importBackup}>
-            {t("backup.import")}
-          </Button>
-        </div>
-      </section>
-      <section class="settings-group">
-        <h3>{t("settings.about")}</h3>
-        <p class="about">
-          <strong>Goban Studio {APP_VERSION}</strong>
-          <span class="muted">
-            {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
-          </span>
-          <span class="fine">{t("settings.offline")}</span>
-          <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
-        </p>
-        <UpdateRow />
-        <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />
-        <p class="fine">{t("update.autoHelp")}</p>
-        <div class="actions">
-          <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
-            {t("shortcuts.title")}
-          </Button>
-          <Button kind="danger" onClick={C.clearData}>
-            {t("settings.clearData")}
-          </Button>
-        </div>
-      </section>
+      </div>
     </Modal>
   );
 }
@@ -589,19 +666,29 @@ function ShortcutsSheet() {
     ["Tab · ↑↓←→ · Space", t("shortcuts.board")],
     ["Esc", t("shortcuts.close")],
     [`${MOD}/`, t("shortcuts.title")],
+    ...a11yKeyRows(MOD),
+  ];
+  const groups = [
+    [null, rows],
+    [t("a11y.keysTitle"), boardKeyRows()],
   ];
   return (
     <Modal title={t("shortcuts.title")}>
-      <dl class="shortcuts">
-        {rows.map(([k, v]) => (
-          <>
-            <dt>
-              <kbd>{k}</kbd>
-            </dt>
-            <dd>{v}</dd>
-          </>
-        ))}
-      </dl>
+      {groups.map(([head, list]) => (
+        <section class="settings-group">
+          {head && <h3>{head}</h3>}
+          <dl class="shortcuts">
+            {list.map(([k, v]) => (
+              <>
+                <dt>
+                  <kbd>{k}</kbd>
+                </dt>
+                <dd>{v}</dd>
+              </>
+            ))}
+          </dl>
+        </section>
+      ))}
     </Modal>
   );
 }

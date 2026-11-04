@@ -12,7 +12,7 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { DailyDots } from "./today.jsx";
 
-export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique"];
+export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
 
 export function PracticeView() {
@@ -153,10 +153,10 @@ function CourseMap({ next }) {
         const all = done === unit.lessons.length;
         const state_ = all ? "done" : ui === current ? "now" : done > 0 ? "some" : "todo";
         const expanded = shown === ui;
-        const firstMid = unit.level === "intermediate" && C.COURSE[ui - 1]?.level !== "intermediate";
+        const firstOfLevel = unit.level && C.COURSE[ui - 1]?.level !== unit.level;
         return (
           <>
-          {firstMid && <li class="units-heading">{t("course.intermediate")}</li>}
+          {firstOfLevel && <li class="units-heading">{t(unit.level === "advanced" ? "course.advanced" : "course.intermediate")}</li>}
           <li class={`unit ${state_} ${expanded ? "open" : ""}`}>
             <button type="button" class="unit-head" aria-expanded={expanded} onClick={() => setOpen(expanded ? -1 : ui)}>
               <span class="unit-no">{all ? <Icon name="check" size={13} /> : ui + 1}</span>
@@ -380,7 +380,9 @@ function puzzleModel(P, extra = {}) {
 }
 
 function ProblemFeedback({ P, success }) {
-  if (P.answer) return <p class="feedback info">{t("practice.answerShown")}</p>;
+  const counting = P.pz.counting;
+  if (P.feedback === "solved" && counting) return <p class="feedback good">{t(C.feedbackKey(P), C.endgameArgs(P))}</p>;
+  if (P.answer) return <p class="feedback info">{counting && P.pz.ask === "value" ? t(P.pz.value === 1 ? "practice.endgame.valueAnswerOne" : "practice.endgame.valueAnswer", C.endgameArgs(P)) : t("practice.answerShown")}</p>;
   if (P.feedback === "solved") return <p class="feedback good">{P.result === "seki" ? t(C.feedbackKey(P)) : success || t("practice.solved")}</p>;
   if (P.feedback === "ko" || P.feedback === "wrong") return <p class="feedback bad">{t(C.feedbackKey(P))}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
@@ -389,7 +391,52 @@ function ProblemFeedback({ P, success }) {
   return null;
 }
 
+/**
+ * A "how many points" question: the values to choose from. A wrong choice
+ * stays crossed out; the right one is marked once found or shown.
+ */
+function ValueChoices({ P }) {
+  const pz = P.pz;
+  const done = P.status === "won" || !!P.answer;
+  return (
+    <div class="chips value-choices" role="group" aria-label={t("practice.endgame.choices")}>
+      {pz.choices.map((v) => {
+        const wrong = (P.wrongValues || []).includes(v);
+        const right = done && v === pz.value;
+        return (
+          <button type="button" class={`chip ${right ? "on" : ""} ${wrong ? "off" : ""}`} aria-pressed={right} disabled={done || wrong} onClick={() => C.answerValue(v)}>
+            {v === 1 ? t("practice.endgame.onePoint") : t("practice.endgame.points", [String(v)])}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProblemControls({ P, onNext, nextLabel }) {
+  const value = P.pz.counting && P.pz.ask === "value";
+  if (value) {
+    const done = P.status === "won" || !!P.answer;
+    return (
+      <div class="actions wrap">
+        {done && onNext && (
+          <Button kind="primary" onClick={onNext}>
+            {nextLabel}
+          </Button>
+        )}
+        {!done && (
+          <Button kind="ghost" icon="bulb" onClick={C.problemHint}>
+            {t("common.hint")}
+          </Button>
+        )}
+        {!done && (
+          <Button kind="ghost" onClick={C.showAnswer}>
+            {t("practice.showAnswer")}
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
     <div class="actions wrap">
       {P.status === "won" && onNext && (
@@ -472,6 +519,7 @@ function ProblemView() {
           <Stone color={P.pz.userColor} size={14} /> {C.goalText(P.pz)}
         </p>
         {P.hintAt || P.used ? <p class="note">{C.tx(def.hint)}</p> : null}
+        {P.pz.counting && P.pz.ask === "value" && <ValueChoices P={P} />}
         <ProblemFeedback P={P} />
         <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t(daily.index >= daily.items.length - 1 ? "practice.finishDaily" : "practice.nextDaily") : t("practice.nextProblem")} />
         <ProblemFacts def={def} grade={grade} />

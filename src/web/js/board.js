@@ -70,9 +70,39 @@ const bandFor = (m) => (m.showCoords ? 34 : 14);
  * Width / height of the board frame for a model: 1 for a whole board, the
  * window's own proportion (clamped) for a problem window.
  */
+/**
+ * The part of the board a problem window shows. A tight window is widened
+ * towards the open side to at least MIN_SPAN lines apart, so a corner problem
+ * keeps its surroundings and stones stay a natural size instead of filling
+ * the frame.
+ */
+const MIN_SPAN = 8;
+export function windowOf(view, size) {
+  if (!view) return { x0: 0, y0: 0, x1: size - 1, y1: size - 1 };
+  const want = Math.min(size - 1, MIN_SPAN);
+  const grow = (a, b) => {
+    a = Math.max(0, a);
+    b = Math.min(size - 1, b);
+    let need = want - (b - a);
+    while (need > 0) {
+      // Grow evenly, but never past an edge: what one side cannot take goes
+      // to the other.
+      if (a > 0 && (b >= size - 1 || (need & 1) === 0)) a--;
+      else if (b < size - 1) b++;
+      else break;
+      need--;
+    }
+    return [a, b];
+  };
+  const [x0, x1] = grow(view.x0, view.x1);
+  const [y0, y1] = grow(view.y0, view.y1);
+  return { x0, y0, x1, y1 };
+}
+
 export function frameAspect(model) {
-  const v = model?.view;
-  if (!v) return 1;
+  const v0 = model?.view;
+  if (!v0) return 1;
+  const v = windowOf(v0, model.size || 19);
   const m = model.showCoords ? 2.5 : 1.6;
   const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
   return Math.max(0.6, Math.min(1.7, r));
@@ -167,6 +197,7 @@ export class BoardView {
     const hadTerritory = !!this.model.territory;
     const prevBoard = this.model.board;
     const prevSize = this.model.size;
+    const wasInteractive = this.model.interactive;
     Object.assign(this.model, patch);
     // A new board size (or problem window) invalidates the keyboard cursor
     // and the hover point: they could now lie off the board.
@@ -174,7 +205,9 @@ export class BoardView {
       this.model.cursor = null;
       this.model.hover = null;
     }
-    if (patch.interactive === false) {
+    // Only when the board stops taking moves: a board that never did keeps
+    // the keyboard cursor, so it can still be read point by point (v6 a11y).
+    if (patch.interactive === false && wasInteractive) {
       this.model.hover = null;
       this.model.cursor = null;
     }
@@ -237,15 +270,7 @@ export class BoardView {
   }
 
   window() {
-    const size = this.model.size;
-    const v = this.model.view;
-    if (!v) return { x0: 0, y0: 0, x1: size - 1, y1: size - 1 };
-    return {
-      x0: Math.max(0, v.x0),
-      y0: Math.max(0, v.y0),
-      x1: Math.min(size - 1, v.x1),
-      y1: Math.min(size - 1, v.y1),
-    };
+    return windowOf(this.model.view, this.model.size);
   }
 
   geometry() {
@@ -680,6 +705,37 @@ export class BoardView {
       if (mark.label) {
         ctx.fillStyle = "#fff";
         ctx.font = `600 ${Math.max(8, g.cell * (String(mark.label).length > 3 ? 0.3 : 0.36))}px ${this.font}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(mark.label, cx, cy + 0.5);
+      }
+      return;
+    }
+    if (mark.type === "book") {
+      // v6 explorer: book continuations in the accent (a filled disc for
+      // book moves, a ring for KataGo's other candidates); mistakes in
+      // --bad. The letter matches the row in the panel.
+      const bad = mark.tag === "mistake";
+      const col = bad ? BAD : ACCENT;
+      const rr = g.cell * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      if (mark.inBook && !bad) {
+        ctx.globalAlpha = mark.tag === "joseki" ? 0.9 : 0.62;
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff";
+      } else {
+        ctx.fillStyle = theme.base;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.2, g.cell * 0.06);
+        ctx.strokeStyle = col;
+        ctx.stroke();
+        ctx.fillStyle = col;
+      }
+      if (mark.label) {
+        ctx.font = `600 ${Math.max(9, g.cell * 0.4)}px ${this.font}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(mark.label, cx, cy + 0.5);

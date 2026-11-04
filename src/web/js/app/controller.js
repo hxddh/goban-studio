@@ -19,12 +19,15 @@ import { OPENINGS } from "../content/openings.js";
 import { CLASSICS } from "../content/classics.js";
 import { state, update, toast } from "./store.js";
 import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, setSetting, syncMenus, tx } from "./ctl-core.js";
-import { startRating } from "./rating.js";
+import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
+import { dropReport, restoreReport } from "./report-ctl.js";
+
+import { closeExplorer } from "./explorer-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
@@ -32,6 +35,9 @@ export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
+export * from "./report-ctl.js";
+
+export * from "./explorer-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -42,8 +48,13 @@ export function boot() {
   if (!settings.lang) settings.lang = detectLang();
   state.settings = settings;
   state.progress = loadProgress();
+  // v6: a v2–v5 rating becomes an estimate with an uncertainty (strength.js).
+  if (state.progress.rating && state.progress.rating.v !== 6) {
+    state.progress.rating = migrateEstimate(state.progress.rating);
+    saveProgress(state.progress);
+  }
   if (!state.progress.rating && settings.onboarded) {
-    state.progress.rating = startRating(settings.playerRank ?? 30);
+    state.progress.rating = startEstimate(settings.playerRank ?? 30);
     saveProgress(state.progress);
   }
   setLang(settings.lang);
@@ -79,12 +90,20 @@ export const SPACES = ["today", "play", "practice", "library"];
 export function goSpace(space) {
   // Clicking the place you are in returns to its top level.
   if (space === state.space) {
+    // v6: the report page closes back to the place.
+    if (state.report && state.report.space === space) {
+      remember();
+      dropReport();
+      return update();
+    }
     if (space === "practice" && state.practice.view !== "home") return practiceHome();
     if (state.review && (state.review.meta.space || "play") === space) {
       remember();
       dropReview();
       return update();
     }
+    // v6 explorer: Library again closes the explorer.
+    if (space === "library" && state.library.explorer) return closeExplorer();
     return;
   }
   remember();
@@ -125,6 +144,8 @@ function restore(loc) {
     else if (rv.source === "opening" && rv.openingId) openOpening(rv.openingId);
     if (state.review && rv.index >= 0) reviewGoto(rv.index);
   }
+  // v6: the report page, when the entry had one open.
+  restoreReport(loc);
   update();
 }
 
@@ -135,7 +156,7 @@ export function openRecord(id) {
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", startAt: 0 });
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
@@ -148,7 +169,7 @@ export function openClassic(id) {
   try {
     const { game } = loadSGF(c.sgf);
     markClassic(state.progress, c.id);
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: 0, space: "library", back: "library" });
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moment, autoJump: c.moment == null, space: "library", back: "library" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }
@@ -199,7 +220,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
     setSetting("onboarded", true);
     update({ sheet: null });
   }
-  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", startAt: 0 });
+  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
   if (warnings.length) toast(warnings[0], "warn");
 }
 
@@ -314,9 +335,9 @@ export function finishOnboarding(choice, rank = null) {
   if (choice === "new") next.playerRank = 30;
   else if (choice === "rules") next.playerRank = 25;
   else next.playerRank = rank ?? 15;
-  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : Engine.STRENGTHS.reduce((best, st) => (Math.abs(st.rank - next.playerRank) < Math.abs(best.rank - next.playerRank) ? st : best)).id;
+  state.progress.rating = startEstimate(next.playerRank);
+  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : recommendStrength(state.progress.rating, { size: 19, modeOf: (st) => Engine.opponentMode(st) });
   next.strength = strength;
-  state.progress.rating = startRating(next.playerRank);
   saveProgress(state.progress);
   update((st) => {
     st.settings = next;
@@ -336,7 +357,7 @@ export function finishOnboarding(choice, rank = null) {
 /** Your level changed by hand in Settings: restart the rating from it. */
 export function setPlayerRank(rank) {
   setSetting("playerRank", rank);
-  state.progress.rating = startRating(rank ?? 30);
+  state.progress.rating = startEstimate(rank ?? 30);
   saveProgress(state.progress);
   update();
 }

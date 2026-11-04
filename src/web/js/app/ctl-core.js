@@ -7,7 +7,7 @@ import { saveSettings } from "../persist.js";
 import { setLang, t } from "../i18n.js";
 import { setSound } from "../audio.js";
 import * as Audio from "../audio.js";
-import { STRENGTHS } from "../engine.js";
+import { gorToTheta, recommendStrength } from "./strength.js";
 import { ratingToRank } from "./rating.js";
 import { state, update } from "./store.js";
 
@@ -20,6 +20,7 @@ export function applyAppearance() {
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
   root.dataset.board = s.board || "plain";
+  root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
 }
 
 export function setSetting(key, value) {
@@ -29,12 +30,12 @@ export function setSetting(key, value) {
   saveSettings(state.settings);
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
-  if (key === "appearance") applyAppearance();
+  if (key === "appearance" || key === "largeText") applyAppearance();
   if (key === "board") {
     Audio.setMaterial?.(value);
     applyAppearance();
   }
-  if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval") syncMenus();
+  if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 
 let menuSync = () => {};
@@ -79,10 +80,9 @@ export function teachingOn() {
   return rank >= 15;
 }
 
-/** The strength nearest a rating, for "suggested opponent". */
+/** The level nearest a rating (GoR), for "suggested opponent" (v6: by measured strength). */
 export function strengthForRating(r) {
-  const rank = ratingToRank(r);
-  return STRENGTHS.reduce((best, st) => (Math.abs(st.rank - rank) < Math.abs(best.rank - rank) ? st : best)).id;
+  return recommendStrength({ mu: gorToTheta(r) });
 }
 
 /* ------------------------------------------------------------ history */
@@ -112,6 +112,8 @@ export function locationNow() {
       daily: !!p.daily,
     },
     library: { ...state.library },
+    // v6
+    report: state.report ? { recordId: state.report.recordId, space: state.report.space } : null,
     review: r
       ? {
           source: r.source,

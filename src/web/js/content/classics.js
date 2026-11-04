@@ -30,6 +30,7 @@ export const CLASSICS = [
     "event": "",
     "date": "1846-09-11,14,15",
     "result": "B+2",
+    "moment": 127,
     "note": {
       "zh": "1846 年秀策对幻庵因硕。第 127 手的“耳赤之妙手”是围棋史上最著名的读秒名场面之一。",
       "en": "Shusaku vs Gennan Inseki, 1846. The move now called the ear-reddening move is one of the most famous acts of reading in Go history.",
@@ -360,6 +361,7 @@ export const CLASSICS = [
     "event": "Google DeepMind Challenge Match",
     "date": "2016-03-13",
     "result": "W+R",
+    "moment": 78,
     "note": {
       "zh": "2016 年人机大战第四局。李世石执白取胜，第 78 手被称为人类创造力的一手。",
       "en": "Game 4 of the 2016 DeepMind Challenge. Lee Sedol won with White; move 78 is celebrated as a creative human move.",

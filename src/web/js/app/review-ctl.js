@@ -136,6 +136,9 @@ export function openReview(game, meta = {}) {
     summary: null,
     markTool: null,
     edits: { dirty: false, savedAt: 0, target: null },
+    // v6: records open on the final position and move to the first key
+    // moment once the analysis is done, unless the player has moved.
+    autoJump: !!meta.autoJump,
   };
   review.edits.target = editTarget(review);
   if (meta.points) {
@@ -211,6 +214,16 @@ async function analyzeReview(review, { existing = null } = {}) {
   review.keyMoves = keyMovesOf(review);
   refreshSummary(review);
   if (review.source === "current" && state.game?.game === game) state.game.analysis = review.points;
+  if (review.autoJump && state.review === review) {
+    review.autoJump = false;
+    const first = review.keyMoves.reduce((a, k) => (a == null || k.index < a ? k.index : a), null);
+    const line = game.mainLine();
+    if (first != null && line[first]) {
+      game.goto(line[first].id);
+      review.focus = first;
+      startLive();
+    }
+  }
   update();
   refineKeyMoves(review);
 }
@@ -248,6 +261,7 @@ export function reviewGoto(index) {
 export function gotoNode(node) {
   const r = state.review;
   if (!r || !node) return;
+  r.autoJump = false;
   r.game.goto(node.id);
   r.variation = null;
   if (r.guess) r.guess.last = null;
