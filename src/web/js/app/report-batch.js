@@ -59,6 +59,8 @@ export function analyseAll({ ids = null } = {}) {
   return job;
 }
 
+const aborted = (signal) => new Promise((resolve) => (signal.aborted ? resolve() : signal.addEventListener("abort", () => resolve(), { once: true })));
+
 async function runBatch(me, b) {
   while (b.ids.length) {
     if (me.signal.aborted) break;
@@ -71,7 +73,9 @@ async function runBatch(me, b) {
       const tick = () => me.setProgress((b.done + (one.progress || 0)) / b.total);
       const off = Engine.sched.onChange(tick);
       try {
-        await one.promise;
+        // A report already running on its own (the game just played) is not
+        // the batch's to stop; a cancel only stops waiting for it.
+        await Promise.race([one.promise, aborted(me.signal)]);
       } finally {
         off();
       }

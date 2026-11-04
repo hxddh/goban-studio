@@ -698,7 +698,7 @@ async function summarizeAnalysis(g, recordId) {
   g.summary = { status: "analyzing", progress: 0 };
   update();
   const partial = new Array(g.game.mainLine().length).fill(null);
-  if (recordId) notePoints(recordId, partial);
+  if (recordId) notePoints(recordId, partial, g.game);
   const job = Engine.sched.startJob({
     kind: "summary",
     owner: g.owner,
@@ -726,7 +726,7 @@ async function summarizeAnalysis(g, recordId) {
     if (state.game === g) update();
     return;
   }
-  if (recordId) notePoints(recordId, points);
+  if (recordId) notePoints(recordId, points, g.game);
   if (state.game !== g) return;
   g.analysis = points;
   const mistakes = describeMistakes(g.game, points, g.humanColor);

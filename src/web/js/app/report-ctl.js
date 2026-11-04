@@ -31,20 +31,29 @@ import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
 import { analyzeLine, openReview, reviewGoto } from "./review-ctl.js";
 import { learnFromGame, reviewCurrentGame, saveToLibrary } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
-import { REPORT_VERSION, buildReport, reportDrills, reportFits } from "./report-model.js";
+import { REPORT_VERSION, buildReport, lineKey, reportDrills, reportFits } from "./report-model.js";
 
 /** recordId → the scheduler job making its report. */
 const jobs = new Map();
 /** recordId → the last analysis made for a report (kept in memory only). */
 const analyses = new Map();
-/** recordId → positions analysed so far (the post-game summary's, or a stopped report's). */
+/**
+ * recordId → positions analysed so far (the post-game summary's, or a
+ * stopped report's), with the main line they belong to ({ key, points }):
+ * a record edited since (a variation promoted in the review) no longer
+ * matches and its positions are not reused.
+ */
 const handed = new Map();
+const handedPoints = (recordId, game) => {
+  const h = handed.get(recordId);
+  return h && h.key === lineKey(game) ? h.points : null;
+};
 /** The owner of the report page's own job (cancelled when the page closes). */
 let pageOwner = null;
 
 /** v7: positions of a record analysed elsewhere (the post-game summary), for its report. */
-export function notePoints(recordId, points) {
-  if (recordId && Array.isArray(points)) handed.set(recordId, points);
+export function notePoints(recordId, points, game) {
+  if (recordId && Array.isArray(points) && game) handed.set(recordId, { key: lineKey(game), points });
 }
 
 /** The running report job of a record, if any. */
@@ -211,7 +220,7 @@ async function analyse(recordId, game, humanColor, job) {
   }
   if (g?.analysis?.length === n && g.analysis.every(Boolean)) points = g.analysis;
   // Positions analysed by the post-game summary, or by a report that was stopped.
-  const known = handed.get(recordId);
+  const known = handedPoints(recordId, game);
   if (!points && known?.length === n && known.every(Boolean)) points = known;
   // A review of this record that has finished its pass.
   const rv = state.review;
@@ -234,7 +243,7 @@ async function analyse(recordId, game, humanColor, job) {
   if (!points) {
     const size = game.size;
     const partial = existing ? existing.slice() : new Array(n).fill(null);
-    handed.set(recordId, partial);
+    handed.set(recordId, { key: lineKey(game), points: partial });
     points = await analyzeLine(game, {
       existing,
       signal: job.signal,

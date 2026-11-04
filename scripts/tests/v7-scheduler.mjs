@@ -130,6 +130,8 @@ export default async function ({ test, assert, root }) {
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
         'export { setRestorer } from "./src/web/js/app/ctl-core.js";',
+        'export { loadSGF } from "./src/web/js/sgf.js";',
+        'export { reportFits } from "./src/web/js/app/report-model.js";',
       ].join("\n"),
       resolveDir: root,
       loader: "js",
@@ -145,7 +147,7 @@ export default async function ({ test, assert, root }) {
     logLevel: "error",
   });
   const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
-  const { Play, Report, Batch, Status, Engine, Lib, P, Game, BLACK, WHITE, state } = A;
+  const { Play, Report, Batch, Status, Engine, Lib, P, Game, BLACK, WHITE, state, loadSGF, reportFits } = A;
 
   // A fake async KataGo host: every search takes `delay` ms; the log keeps
   // each request (visits tell who asked: the computer at 30 kyu uses 8, the
@@ -340,6 +342,53 @@ export default async function ({ test, assert, root }) {
     assert.ok(Lib.getGame(rec.id).report);
     assert.ok(requests.length - seen < 15, "kept the positions already analysed");
     Report.closeReport();
+    delay = 15;
+  });
+
+  await test("v7 scheduler: a stopped report's positions are not reused after the moves were edited", async () => {
+    delay = 25;
+    const rec = twoPlayerRecord(14);
+    Report.openReport(rec.id, { space: "library" });
+    const job = Report.reportJob(rec.id);
+    await until(() => job.progress > 0.3, 3000, "progress");
+    Report.closeReport();
+    await job.promise;
+    // The same number of moves, but another line (as when a variation is promoted).
+    const other = new Game({ size: 9, komi: 6.5 });
+    other.play(4, 4);
+    fill(other, 13);
+    other.setResult("B+R");
+    assert.equal(other.mainLine().length, loadSGF(rec.sgf).game.mainLine().length);
+    Lib.saveGame(other, { id: rec.id, opponent: "human", source: "game" });
+    const seen = requests.length;
+    Report.openReport(rec.id, { space: "library" });
+    await Report.reportJob(rec.id).promise;
+    assert.ok(requests.length - seen >= 14, `every position analysed again (${requests.length - seen})`);
+    assert.ok(reportFits(Lib.getGame(rec.id).report, other), "the report is of the edited moves");
+    Report.closeReport();
+    delay = 15;
+  });
+
+  await test("v7 scheduler: cancelling Analyse all does not wait for a report it did not start", async () => {
+    await until(() => Engine.sched.listJobs({ all: true }).length === 0, 8000, "idle");
+    for (const r of Lib.listGames()) Lib.deleteGame(r.id);
+    delay = 150; // the independent report takes about 2 s
+    const a = twoPlayerRecord(14, "a");
+    const b2 = twoPlayerRecord(10, "b");
+    // A report of the first game already running on its own.
+    const own = Report.queueReport(a.id);
+    await until(() => own.progress > 0, 3000, "own report");
+    const job = Batch.analyseAll({ ids: [a.id, b2.id] });
+    await until(() => state.batch?.current === a.id, 3000, "the batch reaches it");
+    const t0 = Date.now();
+    Batch.cancelBatch();
+    assert.equal(await job.promise, null);
+    assert.ok(Date.now() - t0 < 400, `the batch stopped at once (${Date.now() - t0} ms)`);
+    assert.equal(state.batch, null);
+    assert.equal(P.readJSON(Batch.BATCH_KEY, null), null);
+    assert.equal(own.signal.aborted, false, "the independent report keeps going");
+    await own.promise;
+    assert.ok(Lib.getGame(a.id).report);
     delay = 15;
   });
 
