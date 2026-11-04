@@ -14,6 +14,7 @@ import GRADES from "../content/problem-grades.json";
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { pickNextLesson } from "./course-path.js";
 
 export const PROBLEMS = ProblemContent.PROBLEMS;
 export const THEMES = ProblemContent.THEMES || [];
@@ -33,18 +34,18 @@ export function allLessons() {
 /**
  * The next lesson. Someone who already plays (onboarding "I play regularly",
  * or a level of about 15 kyu or stronger) starts at the intermediate course;
- * the basics stay open from the course map.
+ * the basics stay open from the course map. A player whose estimated level
+ * (the rating from their games, or the level they gave) is about 5 kyu or
+ * stronger goes on to the advanced course once the intermediate course is
+ * finished, or straight away if they never started it; one who is part way
+ * through the intermediate course finishes it first.
  */
 export function nextLesson() {
-  const all = allLessons();
-  const open = ({ lesson }) => !state.progress.lessons[lesson.id]?.done;
-  const rank = state.settings.playerRank ?? 30;
-  const experienced = state.settings.experience === "player" || rank <= 15;
-  if (experienced) {
-    const mid = all.find((x) => x.unit.level === "intermediate" && open(x));
-    if (mid) return mid;
-  }
-  return all.find(open) || null;
+  return pickNextLesson(allLessons(), (id) => !!state.progress.lessons[id]?.done, {
+    experience: state.settings.experience,
+    playerRank: state.settings.playerRank,
+    rating: state.progress.rating?.r,
+  });
 }
 
 /** The unit that teaches a topic, for weakness-driven recommendations. */

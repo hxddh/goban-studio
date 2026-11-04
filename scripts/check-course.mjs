@@ -1,6 +1,6 @@
 /**
- * Verify the course (src/web/js/content/course.js and the intermediate
- * units in course-intermediate.js).
+ * Verify the course (src/web/js/content/course.js, the intermediate units in
+ * course-intermediate.js and the advanced units in course-advanced.js).
  *
  *   node scripts/check-course.mjs            check everything, one-line summary
  *   node scripts/check-course.mjs --lines    also print every problem's solution line
@@ -12,19 +12,22 @@
  * key stones must not be able to reach a liberty outside the problem area
  * (see outsideReach() in solver.js). Every place step must have in-range,
  * empty accept points that are legal moves (not suicide), and no marks (the
- * app draws marks on read steps only). A unit's `level` is absent (beginner)
- * or "intermediate", and every intermediate unit comes after the beginner
- * units. Text must exist in all four languages. Exits non-zero on any
+ * app draws marks on read steps only). A unit's `level` is absent (beginner),
+ * "intermediate" or "advanced", and the levels come in that order. Advanced
+ * problem steps are also run through the solver's validate() (as the
+ * problem bank is): the start is not already decided, a `ko: "ok"` step
+ * really is a ko and a `goal: "seki"` step really ends in seki. Text must exist in all four languages. Exits non-zero on any
  * failure.
  */
 import { COURSE } from "../src/web/js/content/course.js";
-import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach } from "../src/web/js/solver.js";
+import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach, validate } from "../src/web/js/solver.js";
 
 const LANGS = ["zh", "en", "ko", "ja"];
-const MIN_UNITS = 13;
-const MIN_LESSONS = 60;
-const MIN_STEPS = 240;
-const LEVELS = [undefined, "intermediate"];
+const MIN_UNITS = 18;
+const MIN_LESSONS = 75;
+const MIN_STEPS = 280;
+const LEVELS = [undefined, "intermediate", "advanced"];
+const MIN_ADVANCED_LESSONS = 15;
 const MAX_PROBLEM_MS = 2000;
 const showLines = process.argv.includes("--lines");
 
@@ -133,7 +136,8 @@ for (const unit of COURSE) {
   checkText(uw, "title", unit.title);
   checkText(uw, "summary", unit.summary);
   if (!LEVELS.includes(unit.level)) fail(uw, `unknown level ${unit.level}`);
-  if (!unit.level && COURSE.slice(0, COURSE.indexOf(unit)).some((u) => u.level)) fail(uw, "a beginner unit comes after an intermediate unit");
+  const rank = LEVELS.indexOf(unit.level);
+  if (COURSE.slice(0, COURSE.indexOf(unit)).some((u) => LEVELS.indexOf(u.level) > rank)) fail(uw, `a ${unit.level || "beginner"} unit comes after a later level`);
   if (!Array.isArray(unit.lessons) || !unit.lessons.length) {
     fail(uw, "no lessons");
     continue;
@@ -221,6 +225,12 @@ for (const unit of COURSE) {
         }
         const first = solveFirstMoves(pz);
         if (!first.exact) fail(sw, "solveFirstMoves is not exact");
+        if (unit.level === "advanced") {
+          const v = validate(pz, { first });
+          if (!v.ok) fail(sw, `validate: ${v.reasons.join("; ")}`);
+          if (prob.ko === "ok" && v.result !== "ko") fail(sw, `ko: "ok" but the best result is ${v.result}`);
+          if (prob.goal === "seki" && v.result !== "seki") fail(sw, `goal "seki" but the result is ${v.result}`);
+        }
         if (first.correct.length < 1 || first.correct.length > 3) {
           fail(sw, `${first.correct.length} correct first moves (want 1–3): ${first.correct.map(pointLabel).join(" ")}`);
         }
@@ -270,6 +280,8 @@ for (const unit of COURSE) {
 if (units < MIN_UNITS) fail("course", `${units} units (want ≥ ${MIN_UNITS})`);
 if (lessons < MIN_LESSONS) fail("course", `${lessons} lessons (want ≥ ${MIN_LESSONS})`);
 if (steps < MIN_STEPS) fail("course", `${steps} steps (want ≥ ${MIN_STEPS})`);
+const advancedLessons = COURSE.filter((u) => u.level === "advanced").reduce((n, u) => n + u.lessons.length, 0);
+if (advancedLessons < MIN_ADVANCED_LESSONS) fail("course", `${advancedLessons} advanced lessons (want ≥ ${MIN_ADVANCED_LESSONS})`);
 
 if (showLines) console.log(lineReport.join("\n"));
 

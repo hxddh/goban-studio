@@ -96,8 +96,11 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   “play from here” are one click away.
 - **Practice** — a course that starts from zero and goes on to intermediate
   play (opening principles, basic joseki, shape, endgame, middle-game
-  fighting), in units of multi-step lessons with explanation, placement
-  exercises and live problems; problem
+  fighting) and, since v6, an advanced course for players around 5 kyu to
+  1 dan (whole-board judgement, invasion and reduction, life and death with
+  ko and seki, tesuji in combination, middle-game strategy; 5 units, 15
+  lessons), 18 units and 80 lessons in all, in multi-step lessons with
+  explanation, placement exercises and live problems; problem
   collections by topic, and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
   refutation on the board, a right move with the most stubborn defence.
@@ -177,7 +180,9 @@ The course and the problems are verified, not counted:
   `problem-grades.json` must match a fresh measurement (solution length,
   proof size and number of tempting wrong moves).
 - `scripts/check-course.mjs` checks every lesson in four languages and proves
-  every lesson problem the same way.
+  every lesson problem the same way; advanced problems also pass the full
+  `validate()` of the problem bank (a ko step must really be a ko, a seki
+  step a real seki).
 - Every problem is proved under real-board rules: a captured point can be
   played again (retake, throw back in, fill an eye), and the key stones of a
   life or kill problem must be sealed in, so they can never live through a

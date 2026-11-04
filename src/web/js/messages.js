@@ -914,4 +914,8 @@ export const MESSAGES = {
   "a11y.key.step": m("复盘：上一手 / 下一手", "Review: previous / next move", "복기: 이전 수 / 다음 수", "検討：前の手 / 次の手"),
   "a11y.key.menus": m("在菜单、分段按钮和选项之间移动", "Move within menus, segmented controls and choices", "메뉴·분할 버튼·선택지 안에서 이동", "メニュー・セグメント・選択肢の中を移動"),
   "a11y.key.text": m("放大 / 恢复文字", "Larger / normal text", "글자 크게 / 원래대로", "文字を大きく / 元に戻す"),
+
+
+  // v6 advanced
+  "course.advanced": m("高级", "Advanced", "고급", "上級"),
 };

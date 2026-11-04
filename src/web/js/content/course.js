@@ -1,6 +1,7 @@
 /**
  * The course: eight beginner units (v2), then the intermediate units of
- * ./course-intermediate.js (v5), appended so that saved progress, which is
+ * ./course-intermediate.js (v5) and the advanced units of
+ * ./course-advanced.js (v6), appended so that saved progress, which is
  * keyed by lesson id, keeps working. Each lesson is a short list of steps.
  *
  * A lesson is a list of steps:
@@ -18,8 +19,8 @@
  * problem with the solver and checks every place step.
  *
  * Schema. A unit is { id, title, summary, lessons, level? }; `level:
- * "intermediate"` marks a unit past the basics (the beginner logic in
- * practice-ctl.js ignores those). A board is { size = 19, diagram, corner |
+ * "intermediate"` or `"advanced"` marks a unit past the basics (the
+ * beginner logic in practice-ctl.js ignores those). A board is { size = 19, diagram, corner |
  * at, marks? }: a diagram smaller than the board is shown in a window
  * framed around its '.' points, stones, marks and the step's accept points.
  * Marks (circle, triangle, square, label) are drawn on read steps only; a
@@ -27,6 +28,7 @@
  */
 
 import { INTERMEDIATE } from "./course-intermediate.js";
+import { ADVANCED } from "./course-advanced.js";
 
 const L = (zh, en, ko, ja) => ({ zh, en, ko, ja });
 
@@ -2492,4 +2494,4 @@ const BEGINNER = [
 ];
 
 /** Every unit, beginner first. A unit with `level: "intermediate"` is past the basics. */
-export const COURSE = [...BEGINNER, ...INTERMEDIATE];
+export const COURSE = [...BEGINNER, ...INTERMEDIATE, ...ADVANCED];
