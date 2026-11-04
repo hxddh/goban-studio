@@ -487,3 +487,5 @@
 "shape.rabbity-six","Rabbity six","梅花六","","매화육궁","","花六",""
 "shape.rectangular-six","Rectangular six","板六","","판육궁","","板六",""
 "shape.second-line-seven","Seven stones on the second line","二路七子","","2선의 일곱 점","","二線の七子",""
+"problem.twoOne.title","The 2-1 point","二一路","","2·1의 급소","","二の一",""
+"problem.twoOne.hint","In the corner, the 2-1 point (on the first line, next to the 2-2 point) is often the killing point.","角上的二一路（一路上紧挨二二的那一点）常常是杀棋的要点。","","귀에서는 2·1의 자리(1선에서 2·2 바로 옆)가 잡는 급소인 경우가 많습니다.","","隅では二の一（一線で二の二のすぐ隣）が殺しの急所になることがよくあります。",""
