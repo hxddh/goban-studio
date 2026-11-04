@@ -1406,6 +1406,35 @@ await test("v5: a backup carries every stored key and restores it", async () => 
   assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
 });
 
+await test("v5: a restore that cannot write leaves the old data in place", async () => {
+  const P = await import("../src/web/js/persist.js");
+  const doc = { app: "goban-studio", format: 1, version: "5.0.0", exportedAt: "2026-11-04T00:00:00.000Z", data: { settings: { lang: "ja" }, library: { v: 2, games: [{ id: "new" }] } } };
+  const map = new Map();
+  const full = {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => {
+      if (k === P.KEYS.library && v.includes('"new"')) throw new Error("QuotaExceededError");
+      map.set(k, String(v));
+    },
+    removeItem: (k) => map.delete(k),
+  };
+  const had = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { value: full, configurable: true, writable: true });
+  try {
+    P.writeJSON(P.KEYS.settings, { lang: "en" });
+    P.writeJSON(P.KEYS.library, { v: 2, games: [{ id: "old" }] });
+    P.writeJSON(P.KEYS.progress, { lessons: { a: { done: true } } });
+    if (!P.checkBackup(doc).ok) throw new Error("fixture: " + P.checkBackup(doc).error);
+    assert.deepEqual(P.restoreBackup(doc), { ok: false, error: "storage" });
+    assert.equal(P.readJSON(P.KEYS.settings, {}).lang, "en");
+    assert.equal(P.readJSON(P.KEYS.library, {}).games[0].id, "old");
+    assert.equal(P.readJSON(P.KEYS.progress, {}).lessons.a.done, true);
+  } finally {
+    if (had) Object.defineProperty(globalThis, "localStorage", had);
+    else delete globalThis.localStorage;
+  }
+});
+
 await test("v5: removing a network retries while the engine is busy, without blocking", async () => {
   let calls = 0;
   const invoke = async (cmd) => {

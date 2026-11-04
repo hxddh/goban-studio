@@ -202,10 +202,19 @@ function Rollback([string]$Why) {
   # Its WebView2 processes too: they hold the folder after the app is gone.
   Wait-InstallProcesses $InstallDir 10
   # The player's profile goes back with the old version.
-  $null = Move-Profiles $InstallDir $old
+  $profileBack = Move-Profiles $InstallDir $old
   if ((Retry { [System.IO.Directory]::Move($InstallDir, $failed) } "move the new version aside") -and
       (Retry { [System.IO.Directory]::Move($old, $InstallDir) } "restore the previous version")) {
-    try { Remove-Item -LiteralPath $failed -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+    if (-not $profileBack) {
+      # One more try now that nothing holds the failed version's folder.
+      $profileBack = Move-Profiles $failed $InstallDir
+    }
+    if ($profileBack) {
+      try { Remove-Item -LiteralPath $failed -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+    } else {
+      # Never delete the only copy of the player's data.
+      Log "PROFILE NOT RESTORED: the player's WebView2 profile is kept in $failed\bin"
+    }
     try { Remove-Item -LiteralPath $AckFile -Force -ErrorAction SilentlyContinue } catch { }
     Log "previous version restored"
     Relaunch-Old

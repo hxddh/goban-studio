@@ -74,19 +74,22 @@ async function refineKeyMoves(review) {
   const line = review.game.mainLine();
   const todo = review.keyMoves.filter((km) => !review.refined[km.index] && line[km.index]).slice(0, 3);
   if (!todo.length) return;
+  // This pass owns the token it started with: a main-line change cancels
+  // it (results are stored by main-line index) and hands out a new one.
+  const token = review.token;
   review.refining = true;
   update();
   const size = review.game.size;
   const visits = size === 19 ? 120 : size === 13 ? 160 : 200;
   for (const km of todo) {
-    if (review.token.cancelled) break;
+    if (token.cancelled) break;
     let a = null;
     try {
       a = await Engine.analyzeNode(review.game, line[km.index], visits);
     } catch (_) {
       a = null;
     }
-    if (review.token.cancelled) break;
+    if (token.cancelled) return;
     if (a) {
       review.refined[km.index] = a;
       review.keyMoves = keyMovesOf(review);
@@ -94,6 +97,7 @@ async function refineKeyMoves(review) {
       update();
     }
   }
+  if (token.cancelled) return;
   review.refining = false;
   update();
 }
@@ -401,14 +405,14 @@ function realign(r, before) {
   r.keyMoves = keyMovesOf(r);
   refreshSummary(r);
   if (r.source === "current" && state.game?.game === r.game && state.game.analysis) state.game.analysis = r.points;
-  if (r.analyzing || (hadAny && !r.guess && r.points.some((p) => !p))) {
-    // The pass in flight writes by main-line index: stop it, start over
-    // with what is known.
-    r.token.cancelled = true;
-    r.token = { cancelled: false };
-    r.refining = false;
-    analyzeReview(r, { existing: r.points.slice() });
-  }
+  // Passes in flight write by main-line index: stop them (whole-game and
+  // refinement alike) and start over with what is known.
+  const wasRefining = r.refining;
+  r.token.cancelled = true;
+  r.token = { cancelled: false };
+  r.refining = false;
+  if (r.analyzing || (hadAny && !r.guess && r.points.some((p) => !p))) analyzeReview(r, { existing: r.points.slice() });
+  else if (wasRefining) refineKeyMoves(r);
 }
 
 const nodeOf = (r, node) => (node == null ? r.game.current : typeof node === "object" ? node : r.game.nodeById(node));

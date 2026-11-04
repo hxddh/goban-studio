@@ -484,9 +484,29 @@ export function checkBackup(doc) {
 export function restoreBackup(doc) {
   const c = checkBackup(doc);
   if (!c.ok) return c;
+  // Snapshot first: a full or locked storage must not leave half a restore.
+  const before = {};
+  for (const key of Object.values(KEYS)) {
+    try {
+      before[key] = storage().getItem(key);
+    } catch (_) {
+      return { ok: false, error: "storage" };
+    }
+  }
+  let failed = false;
   for (const [name, key] of Object.entries(KEYS)) {
     if (doc.data[name] == null) removeKey(key);
-    else writeJSON(key, doc.data[name]);
+    else if (!writeJSON(key, doc.data[name])) {
+      failed = true;
+      break;
+    }
   }
-  return c;
+  if (!failed) return c;
+  for (const [key, raw] of Object.entries(before)) {
+    try {
+      if (raw == null) storage().removeItem(key);
+      else storage().setItem(key, raw);
+    } catch (_) {}
+  }
+  return { ok: false, error: "storage" };
 }

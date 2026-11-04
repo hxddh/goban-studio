@@ -713,6 +713,7 @@ export const MESSAGES = {
   "backup.restore": m("恢复", "Restore", "복원", "復元"),
   "backup.error.notBackup": m("这不是 Goban Studio 的备份文件。", "That isn't a Goban Studio backup.", "Goban Studio 백업 파일이 아닙니다.", "Goban Studio のバックアップではありません。"),
   "backup.error.newerFormat": m("这份备份来自更新的版本，请先更新 Goban Studio。", "This backup is from a newer version. Update Goban Studio first.", "더 새 버전에서 만든 백업입니다. 먼저 Goban Studio를 업데이트하세요.", "新しいバージョンのバックアップです。先に Goban Studio を更新してください。"),
+  "backup.error.storage": m("无法写入数据，未作任何更改。请释放磁盘空间后重试。", "Couldn't save the data, so nothing was changed. Free some disk space and try again.", "데이터를 저장할 수 없어 아무것도 바꾸지 않았습니다. 디스크 공간을 확보한 뒤 다시 시도하세요.", "データを保存できなかったため、何も変更していません。ディスクの空きを増やしてもう一度お試しください。"),
   "backup.error.damaged": m("备份文件已损坏，无法恢复。", "The backup file is damaged and can't be restored.", "백업 파일이 손상되어 복원할 수 없습니다.", "バックアップが壊れているため復元できません。"),
   // v5 rules
   "rules.title": m("规则", "Rules", "규칙", "ルール"),

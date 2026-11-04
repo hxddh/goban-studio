@@ -286,7 +286,8 @@ export async function importBackup() {
     confirm: t("backup.restore"),
     danger: true,
     onConfirm: () => {
-      Backup.restoreBackup(doc);
+      const r = Backup.restoreBackup(doc);
+      if (!r.ok) return toast(t("backup.error." + r.error), "warn");
       location.reload();
     },
   });
