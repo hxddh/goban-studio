@@ -13,6 +13,7 @@ import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
 import { Button, Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { weekSummary } from "./week.js";
 
 function greeting() {
   const h = new Date().getHours();
@@ -180,6 +181,8 @@ export function TodayView() {
           ))}
         </ul>
 
+        <WeekStrip />
+
         {r?.games > 0 && (
         <section class="section level enter-up">
           <div class="level-text">
@@ -215,6 +218,33 @@ export function TodayView() {
         )}
       </div>
     </>
+  );
+}
+
+/** This week: four numbers, never an empty card (zeros are information). */
+function WeekStrip() {
+  const w = weekSummary(state.progress, Lib.listGames());
+  const stats = [
+    { n: w.played, key: "week.games" },
+    { n: w.solved, key: "week.problems" },
+    { n: w.lessons, key: "week.lessons" },
+  ];
+  return (
+    <section class="section week enter-up" aria-label={t("week.title")}>
+      <h2 class="section-title">{t("week.title")}</h2>
+      <ul class="week-grid">
+        {stats.map((x) => (
+          <li>
+            <strong>{x.n}</strong>
+            <span>{t(x.key)}</span>
+          </li>
+        ))}
+        <li>
+          <strong class={w.delta > 0 ? "up" : w.delta < 0 ? "down" : ""}>{w.delta == null ? "—" : (w.delta > 0 ? "+" : "") + w.delta}</strong>
+          <span>{t("week.level")}</span>
+        </li>
+      </ul>
+    </section>
   );
 }
 

@@ -552,6 +552,11 @@ export const MESSAGES = {
   "shape.second-line-seven": m("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
 
   // v5 ui
+  "week.title": m("本周", "This week", "이번 주", "今週"),
+  "week.games": m("盘对局", "games", "대국", "局"),
+  "week.problems": m("道题解出", "problems solved", "문제 해결", "問 正解"),
+  "week.lessons": m("节课学完", "lessons", "강의 완료", "講座 修了"),
+  "week.level": m("棋力变化", "level change", "기력 변화", "棋力の変化"),
   "backup.title": m("备份", "Backup", "백업", "バックアップ"),
   "backup.export": m("导出备份…", "Export backup…", "백업 내보내기…", "バックアップを書き出す…"),
   "backup.import": m("从备份恢复…", "Restore from backup…", "백업에서 복원…", "バックアップから復元…"),

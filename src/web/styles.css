@@ -656,3 +656,12 @@ button.group-row:hover { background: var(--fill); }
 .score-detail { display: flex; flex-direction: column; gap: 1px; }
 .score-detail i { font-style: normal; white-space: nowrap; }
 .celebrate .fine { display: inline-flex; align-items: center; gap: 4px; }
+
+/* v5: this week on Today */
+.week-grid { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
+.week-grid li { display: flex; flex-direction: column; gap: 2px; padding: var(--s-4); }
+.week-grid li + li { border-left: 1px solid var(--line); }
+.week-grid strong { font: 600 22px/28px var(--font); font-variant-numeric: tabular-nums; }
+.week-grid strong.up { color: var(--good); }
+.week-grid strong.down { color: var(--bad); }
+.week-grid span { font: var(--t-small); color: var(--text-3); }
