@@ -47,7 +47,9 @@ export function TodayView() {
   const next = C.nextLesson();
   const daily = C.todaysDaily();
   const dailyDone = daily ? daily.index >= daily.items.length : false;
-  const weak = topWeaknesses(p.weakness, 2);
+  // v7: with a focus from the plan, it replaces the older "weak spot" rows.
+  const plan = C.trainingFocus();
+  const weak = plan.items.length ? [] : topWeaknesses(p.weakness, 2);
   const recent = Lib.listGames().slice(0, 3);
   const r = p.rating;
   const dueMistakes = p.mistakes.filter((m) => (m.due || 0) <= Date.now()).length;
@@ -108,7 +110,7 @@ export function TodayView() {
             </span>
             <span class="gr-text">
               <strong>{dailyDone ? t("practice.dailyFinished") : t("practice.dailyTitle")}</strong>
-              <span>{dailyDone ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : dueMistakes ? t("today.dailyMistakes", [Math.min(2, dueMistakes)]) : t("practice.dailyHelp")}</span>
+              <span>{dailyDone ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : dueMistakes ? t("today.dailyMistakes", [Math.min(2, dueMistakes)]) : plan.items.length ? t("plan.daily", [plan.items.map((f) => f.name).join(" · ")]) : t("practice.dailyHelp")}</span>
             </span>
             <DailyDots daily={daily} />
             {!dailyDone && (
@@ -165,6 +167,7 @@ export function TodayView() {
           ))}
         </ul>
 
+        <WeekFocus plan={plan} />
         <WeekStrip />
         <Trends />
 
@@ -203,6 +206,58 @@ export function TodayView() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * v7: this week's focus from the training plan (plan.js): one or two themes,
+ * the evidence, the lesson and the problems. Without enough evidence it is a
+ * single quiet line once there are analysed games, and nothing before.
+ */
+function WeekFocus({ plan }) {
+  if (!plan.items.length) {
+    if (plan.status !== "notEnough" || !state.progress.games?.some((g) => g.phases)) return null;
+    return (
+      <section class="section plan-focus enter-up" aria-label={t("plan.title")}>
+        <h2 class="section-title">{t("plan.title")}</h2>
+        <p class="muted plan-empty">{t("plan.notEnough")}</p>
+      </section>
+    );
+  }
+  return (
+    <section class="section plan-focus enter-up" aria-label={t("plan.title")}>
+      <h2 class="section-title">{t("plan.title")}</h2>
+      <ul class="group">
+        {plan.items.map((f) => (
+          <FocusRow f={f} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** One focus as a row: the theme, why, a quiet lesson link and the problems. */
+export function FocusRow({ f, compact = false }) {
+  return (
+    <li class="group-row plan-row" data-focus={f.key}>
+      <span class="gr-icon">
+        <Icon name="target" size={18} />
+      </span>
+      <span class="gr-text">
+        <strong>{compact ? t("plan.focusOf", [f.name]) : f.name}</strong>
+        {f.why && <span>{f.why}</span>}
+      </span>
+      {f.lesson && (
+        <button type="button" class="link plan-lesson" onClick={() => C.openFocusLesson(f)}>
+          {t("plan.lesson")}
+        </button>
+      )}
+      {f.topic && (
+        <Button size="sm" onClick={() => C.openFocusProblems(f)}>
+          {t("summary.practice")}
+        </Button>
+      )}
+    </li>
   );
 }
 

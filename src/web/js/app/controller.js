@@ -39,6 +39,7 @@ export * from "./report-ctl.js";
 export * from "./collections-ctl.js";
 
 export * from "./explorer-ctl.js";
+export * from "./plan-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */

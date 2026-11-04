@@ -827,6 +827,14 @@ button.group-row:hover { background: var(--fill); }
 .explorer-about p { margin-top: var(--s-2); }
 .page > .explorer-help { margin: calc(var(--s-2) * -1) auto var(--s-3); }
 
+/* v7 plan */
+.plan-focus .plan-empty { font: var(--t-small); }
+.plan-row .plan-lesson { flex: none; font: var(--t-small); }
+.plan-row .plan-links { display: flex; gap: var(--s-3); }
+.plan-row .plan-links .link { font: var(--t-small); }
+.topic-card.focus strong { display: flex; align-items: center; gap: var(--s-2); }
+.plan-mark { font: var(--t-caption); color: var(--text-2); background: var(--fill); border-radius: var(--r-1); padding: 1px 6px; }
+
 /* v7 problems */
 .collections-actions { margin-top: var(--s-3); align-items: center; }
 .collection-item .mini-progress { width: 64px; flex: none; }

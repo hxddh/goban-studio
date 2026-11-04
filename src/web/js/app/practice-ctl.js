@@ -306,8 +306,20 @@ export function dailyPool() {
   return pool.length >= 5 ? pool : PROBLEMS;
 }
 
+/**
+ * v7: the training plan (plan-ctl.js) may choose today's five. It is called
+ * with { progress, pool, grades, now } and returns items, or null to leave
+ * the choice below (players without enough evidence).
+ */
+let dailyPlanner = null;
+export function setDailyPlanner(fn) {
+  dailyPlanner = typeof fn === "function" ? fn : null;
+}
+
 export function buildDaily(now = Date.now()) {
   const p = state.progress;
+  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now }) : null;
+  if (Array.isArray(planned) && planned.length) return planned;
   const items = [];
   const due = p.mistakes.filter((m) => (m.due || 0) <= now).slice(0, 2);
   for (const m of due) items.push({ kind: "m", id: m.id });
