@@ -151,7 +151,20 @@ export function wrap(g, text, max) {
  * Lay out (and, with `draw`, paint) the report at width W. Returns the
  * height used, so the first pass sizes the canvas for the second.
  */
-function layout(g, model, { W, date, draw }) {
+const rankText = (rank) => (rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]));
+
+/**
+ * v7: the words for a rated game's change of strength estimate
+ * ({ before: { rank, pm }, after: { rank, pm } }, library record `rating`):
+ * "Strength ≈ 12 kyu → ≈ 11 kyu (±1)", or "".
+ */
+export function ratingChangeText(rt) {
+  if (!rt?.before || !rt?.after || !Number.isFinite(rt.before.rank) || !Number.isFinite(rt.after.rank)) return "";
+  if (rt.before.rank === rt.after.rank) return t("sched.report.ratingSame", [rankText(rt.after.rank), rt.after.pm]);
+  return t("sched.report.rating", [rankText(rt.before.rank), rankText(rt.after.rank), rt.after.pm]);
+}
+
+function layout(g, model, { W, date, draw, rating = null }) {
   const F = fontStack();
   const c = LIGHT;
   const pad = 72;
@@ -190,6 +203,8 @@ function layout(g, model, { W, date, draw }) {
   para(reportHeadline(model), `600 52px ${F}`, c.text, 64);
   y += 4;
   para(reportFacts(model), `400 26px ${F}`, c.text2, 36);
+  const change = ratingChangeText(rating);
+  if (change) para(change, `400 24px ${F}`, c.text2, 34);
   rule();
 
   // Phases, or what the estimate can say
@@ -264,9 +279,9 @@ function layout(g, model, { W, date, draw }) {
 }
 
 /** The report as a PNG blob (≤ 380 KB, so it fits the native file bridge). */
-export async function renderReportPNG(model, { date = Date.now(), W = 1080 } = {}) {
+export async function renderReportPNG(model, { date = Date.now(), W = 1080, rating = null } = {}) {
   const measure = document.createElement("canvas").getContext("2d");
-  const H = layout(measure, model, { W, date, draw: false });
+  const H = layout(measure, model, { W, date, draw: false, rating });
   for (const scale of [1, 0.8, 0.6]) {
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(W * scale);
@@ -275,7 +290,7 @@ export async function renderReportPNG(model, { date = Date.now(), W = 1080 } = {
     g.scale(scale, scale);
     g.fillStyle = LIGHT.bg;
     g.fillRect(0, 0, W, H);
-    layout(g, model, { W, date, draw: true });
+    layout(g, model, { W, date, draw: true, rating });
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     if (blob && blob.size <= 380 * 1024) return blob;
   }

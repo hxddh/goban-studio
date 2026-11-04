@@ -740,39 +740,58 @@ async function summarizeAnalysis(g, recordId) {
     const spread = a?.moves?.length > 1 ? Math.abs(a.moves[0].scoreLead - a.moves[1].scoreLead) : 0;
     if (m.loss <= 0.5 && spread >= 2 && (!good || spread > good.spread)) good = { ...m, spread };
   }
+  learnFromGame({ game: g.game, points, humanColor: g.humanColor, recordId: g.recordId, trendId: g.trendId, mistakes });
+  const theme = mistakes.top.find((m) => m.theme)?.theme || null;
+  g.summary = { status: "done", big, good, theme, topic: theme ? THEME_TOPIC[theme] || null : null };
+  update();
+}
+
+/**
+ * What a rated game teaches, from its whole-game analysis: the trend record
+ * in progress.games (per-phase losses, themes, v7 plan themeLoss), the
+ * weaknesses, and the two costliest mistakes as drills (ids
+ * `${recordId}-${index}`). The post-game summary does it; when a new game
+ * cancelled the summary, the game's background report does (report-ctl).
+ * Once per record: the library record is marked `learned`. Returns false
+ * when it was already done.
+ */
+export function learnFromGame({ game, points, humanColor, recordId = null, trendId = recordId, mistakes = null }) {
+  const lib = recordId ? Lib.getGame(recordId) : null;
+  if (lib?.learned) return false;
+  mistakes = mistakes || describeMistakes(game, points, humanColor);
   // v5: complete the game's trend record with per-phase losses and the
   // themes of up to ten explained mistakes.
-  if (g.trendId) {
-    const summary = summarizeGame({ game: g.game, points, meta: { humanColor: g.humanColor }, keyMoves: mistakes.top });
-    const ten = describeMistakes(g.game, points, g.humanColor, 10).top;
-    const themes = themeCounts(ten, g.humanColor);
+  if (trendId && (state.progress.games || []).some((r) => r.id === String(trendId))) {
+    const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
+    const ten = describeMistakes(game, points, humanColor, 10).top;
+    const themes = themeCounts(ten, humanColor);
     // v7 plan: also what each theme cost, for "this week's focus".
-    updateGameRecord(state.progress, g.trendId, { ...recordAnalysis(summary, g.humanColor, themes), themeLoss: themeLosses(ten, g.humanColor) }, { save: false });
+    updateGameRecord(state.progress, trendId, { ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) }, { save: false });
   }
   // Record weaknesses and keep the two costliest mistakes as drills.
   let weak = state.progress.weakness;
   for (const m of mistakes.top) if (m.theme) weak = addWeakness(weak, m.theme);
   state.progress.weakness = weak;
-  const key = g.recordId || String(Date.now());
+  const key = recordId || String(Date.now());
+  const sgf = game.toSGF();
   for (const m of mistakes.top.slice(0, 2)) {
     if (m.loss < 4 || !m.best || m.best.pass) continue;
     addMistake(state.progress, {
       gameKey: key,
       index: m.index,
-      sgf: g.game.toSGF(),
+      sgf,
       color: m.move.color,
       played: { x: m.move.x, y: m.move.y },
       best: { x: m.best.x, y: m.best.y },
       accept: m.accept,
       loss: m.loss,
       theme: m.theme,
-      size: g.game.size,
+      size: game.size,
     });
   }
   saveProgress(state.progress);
-  const theme = mistakes.top.find((m) => m.theme)?.theme || null;
-  g.summary = { status: "done", big, good, theme, topic: theme ? THEME_TOPIC[theme] || null : null };
-  update();
+  if (lib) Lib.patchGame(recordId, { learned: true });
+  return true;
 }
 
 export function resultHeadline(g) {
