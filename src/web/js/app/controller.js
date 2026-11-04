@@ -20,7 +20,7 @@ import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, set
 import { startRating } from "./rating.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, openLesson, openMistakeDrill, openProblem, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates } from "./update-ctl.js";
 
 export * from "./ctl-core.js";
@@ -103,7 +103,8 @@ function restore(loc) {
     if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
-    else if (p.view === "topic" && p.topic) openTopic(p.topic);
+    else if (p.view === "topic" && p.shape) openShape(p.shape);
+    else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
     else practiceHome();
   }
   const rv = loc.review;

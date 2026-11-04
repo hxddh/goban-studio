@@ -305,6 +305,23 @@ await check("history: back and forward across places", async () => {
   return `${ms} ms`;
 });
 
+await check("history: Back from a shape problem returns to its collection", async () => {
+  const page = await fresh();
+  await onboard(page, 1);
+  await page.keyboard.press("Control+3");
+  await page.click(".shape-chips .chip >> nth=0");
+  await page.waitForSelector(".problem-card");
+  const before = await page.locator(".problem-card").count();
+  await page.click(".problem-card >> nth=0");
+  await page.waitForFunction(() => window.__state.practice.view === "problem");
+  await page.keyboard.press("Control+[");
+  await page.waitForFunction(() => window.__state.practice.view === "topic");
+  const after = await page.locator(".problem-card").count();
+  const shape = await page.evaluate(() => window.__state.practice.shape);
+  assert(shape && after === before && after > 0, `collection lost on Back: shape=${shape}, ${after} of ${before} problems`);
+  await page.close();
+});
+
 await check("all four languages render every place without overflow or missing strings", async () => {
   for (const locale of ["zh-CN", "en-US", "ko-KR", "ja-JP"]) {
     const page = await fresh(locale);
