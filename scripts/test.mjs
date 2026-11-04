@@ -985,7 +985,7 @@ await test("every practice problem is verified and graded by the solver", () => 
 
 await test("every course lesson is complete, four-language and solver-verified", () => {
   execFileSync(process.execPath, [path.join(root, "scripts/check-course.mjs")], { stdio: "inherit" });
-  assert.ok(COURSE.length >= 8);
+  assert.ok(COURSE.length >= 13);
 });
 
 await test("the offline opponent returns a legal move on 9x9 and 19x19", async () => {

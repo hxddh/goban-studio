@@ -46,7 +46,7 @@ function buildStep(step) {
     return { kind: "problem", step, pz, ...problemState(pz) };
   }
   if (step.kind === "place") {
-    const pz = boardPuzzle(step.board);
+    const pz = boardPuzzle(step.board, step.accept);
     return { kind: "place", step, pz, board: pz.board, toMove: step.toMove ?? BLACK, result: null, wrongAt: null };
   }
   const pz = step.board ? boardPuzzle(step.board) : null;
@@ -86,8 +86,12 @@ export function tightView(size, points) {
   return { x0, y0, x1, y1 };
 }
 
-/** A display-only board from a diagram (place/read steps). */
-function boardPuzzle(b) {
+/**
+ * A display-only board from a diagram (place/read steps). The view frames
+ * the diagram's region, stones and marks, and every accept point, so a
+ * place step never hides one of its answers outside the window.
+ */
+function boardPuzzle(b, accept = null) {
   const size = b.size || 19;
   const d = S.parseDiagram(b.diagram);
   let x0 = 0;
@@ -101,7 +105,7 @@ function boardPuzzle(b) {
   const board = Array.from({ length: size }, () => Array(size).fill(0));
   for (const s of d.stones) board[s.y + y0][s.x + x0] = s.c;
   const pts = [...d.stones, ...d.region, ...(b.marks || [])].map((p) => ({ x: p.x + x0, y: p.y + y0 }));
-  if (b.accept) for (const a of b.accept) pts.push({ x: a.x + x0, y: a.y + y0 });
+  for (const a of accept || []) pts.push({ x: a.x + x0, y: a.y + y0 });
   const full = d.w >= size && d.h >= size;
   return { size, board, x0, y0, view: full ? null : tightView(size, pts.length ? pts : [{ x: x0, y: y0 }, { x: x0 + d.w - 1, y: y0 + d.h - 1 }]) };
 }
@@ -252,13 +256,15 @@ export function openProblem(id, { daily = null } = {}) {
 const GOAL_TOPICS = { capture: ["capture"], save: ["escape", "connect"], live: ["life"], kill: ["kill"] };
 
 /**
- * New problems for today's five. Someone still working through the course
- * only gets topics their finished lessons have taught (capturing from the
- * start), so a beginner is never handed a vital-point kill on day two.
+ * New problems for today's five. Someone still working through the
+ * beginner units only gets topics their finished lessons have taught
+ * (capturing from the start), so a beginner is never handed a vital-point
+ * kill on day two. The intermediate units do not count here: finishing the
+ * beginner units opens the whole problem bank.
  */
 export function dailyPool() {
   const p = state.progress;
-  const lessons = allLessons();
+  const lessons = allLessons().filter(({ unit }) => !unit.level);
   const done = lessons.filter(({ lesson }) => p.lessons[lesson.id]?.done);
   const beginner = state.settings.experience === "new" || (state.settings.playerRank ?? 30) >= 25;
   if (!beginner || done.length >= lessons.length) return PROBLEMS;

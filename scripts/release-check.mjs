@@ -1,8 +1,8 @@
 /**
  * Release gate for the content and packaging promises.
  *
- * Counts what is real: a course of at least 8 units / 36 lessons / 150
- * steps, at least 250 solver-verified problems with themes with measured grades, 40 pro
+ * Counts what is real: a course of at least 13 units / 60 lessons / 240
+ * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades, 40 pro
  * openings with unique titles and lines, 20 classics, four languages
  * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
  * licences and one version string.
@@ -25,9 +25,10 @@ const assertLocalized = (item, fields, label) => {
 
 const lessons = COURSE.flatMap((u) => u.lessons);
 const steps = lessons.flatMap((l) => l.steps);
-assert.ok(COURSE.length >= 8, "at least 8 course units");
-assert.ok(lessons.length >= 36, "at least 36 lessons");
-assert.ok(steps.length >= 150, "at least 150 lesson steps");
+assert.ok(COURSE.length >= 13, "at least 13 course units");
+assert.ok(COURSE.filter((u) => u.level === "intermediate").length >= 5, "at least 5 intermediate units");
+assert.ok(lessons.length >= 60, "at least 60 lessons");
+assert.ok(steps.length >= 240, "at least 240 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);
 for (const lesson of lessons) assertLocalized(lesson, ["title"], lesson.id);
 
