@@ -800,8 +800,9 @@ export class Game {
     const pad = (n) => String(n).padStart(2, "0");
     const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
     const rules = this.ruleset.sgf;
-    // SGF skips I in columns, exactly as the board labels do.
-    const sgfColumn = (x) => String.fromCharCode(97 + x + (x >= 8 ? 1 : 0));
+    // SGF columns run a, b, c … with the i included (FF[4]); only board
+    // labels skip I. (Before v7 this skipped the i too; see sgf.js.)
+    const sgfColumn = (x) => String.fromCharCode(97 + x);
     const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
       "(;GM[1]FF[4]CA[UTF-8]AP[Goban Studio:" + APP_VERSION + "]SZ[" +

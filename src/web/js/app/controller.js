@@ -22,10 +22,11 @@ import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, set
 import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { allLessons, openCollection, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { dropReport, restoreReport } from "./report-ctl.js";
+import { resumeBackground } from "./report-batch.js";
 
 import { closeExplorer } from "./explorer-ctl.js";
 
@@ -36,8 +37,11 @@ export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
 export * from "./report-ctl.js";
+export * from "./report-batch.js";
+export * from "./collections-ctl.js";
 
 export * from "./explorer-ctl.js";
+export * from "./plan-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -72,6 +76,8 @@ export function boot() {
     update({ engine: info });
     maybeComputerMove();
     ponder();
+    // v7: background reports and "Analyse all" that quitting interrupted.
+    resumeBackground();
   });
   // v5: which optional networks are installed (a local status call, no
   // network request).
@@ -132,6 +138,7 @@ function restore(loc) {
     if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
+    else if (p.view === "collection" && p.collection) openCollection(p.collection);
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
     else practiceHome();

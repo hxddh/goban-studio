@@ -9,6 +9,7 @@ import { ReviewView, rankLabel } from "./play.jsx";
 import { Button, Icon, MoreMenu, Segmented, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { ExplorerEntries, ExplorerView } from "./explorer.jsx";
+import { useJobs } from "./background.jsx";
 
 export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
@@ -17,6 +18,7 @@ export function LibraryView() {
   return (
     <>
     <Toolbar>
+      {L.tab === "mine" && <AnalyseAll />}
       <Button size="sm" icon="upload" onClick={C.pickImport}>
         {t("library.import")}
       </Button>
@@ -47,6 +49,32 @@ export function LibraryView() {
     </div>
     </>
   );
+}
+
+/** v7: "Analyse all" — reports for the player's games that have none (report-batch.js). */
+function AnalyseAll() {
+  useJobs();
+  if (C.batchState()) {
+    return (
+      <Button size="sm" kind="ghost" class="analyse-all" onClick={C.cancelBatch}>
+        {t("sched.stopAnalysing")}
+      </Button>
+    );
+  }
+  const n = C.batchCandidates().length;
+  if (!n) return null;
+  return (
+    <Button size="sm" kind="ghost" icon="chart" class="analyse-all" aria-description={t("sched.analyseAllHelp", [n])} onClick={() => C.analyseAll()}>
+      {t("sched.analyseAll")}
+    </Button>
+  );
+}
+
+/** v7: a row's place in the batch ("Waiting to be analysed", "Analysing… 40%"). */
+function rowNote(id) {
+  const a = C.rowAnalysis(id);
+  if (!a) return null;
+  return <span class="row-analysis">{a.queued ? t("sched.row.queued") : t("sched.row.progress", [Math.round(a.progress * 100)])}</span>;
 }
 
 function ContinueCard() {
@@ -141,6 +169,7 @@ function MyGames() {
                     <strong>{recordTitle(g)}</strong>
                     <span>
                       {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {t("play.moveN", [g.moves])}
+                      {rowNote(g.id)}
                     </span>
                   </span>
                   <span class={`outcome ${o.cls}`}>{o.label}</span>

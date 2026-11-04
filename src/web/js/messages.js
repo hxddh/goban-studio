@@ -5,7 +5,13 @@
  * a silent fallback; the test suite also checks that every key the UI uses
  * exists here.
  */
-const m = (zh, en, ko, ja) => ({ zh, en, ko, ja });
+import { m } from "./messages/m.js";
+import { V7_FIXES } from "./messages/v7-fixes.js";
+import { V7_SCHEDULER } from "./messages/v7-scheduler.js";
+import { V7_PLAN } from "./messages/v7-plan.js";
+import { V7_CALIBRATION } from "./messages/v7-calibration.js";
+import { V7_BOOK } from "./messages/v7-book.js";
+import { V7_PROBLEMS } from "./messages/v7-problems.js";
 
 export const MESSAGES = {
   "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
@@ -1088,4 +1094,11 @@ export const MESSAGES = {
     "컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.",
     "コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",
   ),
+  // v7: one file per area (src/web/js/messages/v7-*.js).
+  ...V7_FIXES,
+  ...V7_SCHEDULER,
+  ...V7_PLAN,
+  ...V7_CALIBRATION,
+  ...V7_BOOK,
+  ...V7_PROBLEMS,
 };

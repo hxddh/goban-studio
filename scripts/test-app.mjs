@@ -710,6 +710,7 @@ async function loadControllers() {
         'export * as Lib from "./src/web/js/library.js";',
         'export * as P from "./src/web/js/persist.js";',
         'export { loadSGF } from "./src/web/js/sgf.js";',
+        'export { buildReport, reportFits } from "./src/web/js/app/report-model.js";',
       ].join("\n"),
       resolveDir: root,
       loader: "js",
@@ -726,6 +727,29 @@ async function loadControllers() {
 }
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+await test("v7: saving edited moves drops a stored report of the old moves; comments keep it", async () => {
+  const { R, state, Lib, P, loadSGF, buildReport, reportFits } = await loadControllers();
+  state.settings = { ...P.DEFAULT_SETTINGS, liveAnalysis: false };
+  state.progress = P.loadProgress();
+  const base = v5Review({ losses: { 25: 8 } });
+  const rec = Lib.saveGame(base.game, { name: "v7 stale report", opponent: "ai", humanColor: BLACK });
+  Lib.patchGame(rec.id, { report: buildReport({ game: loadSGF(rec.sgf).game, points: base.points, humanColor: BLACK }) });
+  assert.ok(reportFits(Lib.getGame(rec.id).report, loadSGF(rec.sgf).game));
+  R.openReview(loadSGF(rec.sgf).game, { source: "record", recordId: rec.id, humanColor: BLACK, points: base.points, startAt: 10 });
+  // A comment only: the report still describes the game.
+  R.setComment("note");
+  R.saveEdits();
+  assert.ok(Lib.getGame(rec.id).report, "a comment keeps the report");
+  // A variation promoted to the main line: the stored report is of other moves.
+  R.reviewGoto(30);
+  R.reviewPlay(6, 6);
+  assert.equal(R.promoteVariation(), true);
+  R.saveEdits();
+  assert.equal(Lib.getGame(rec.id).report, null, "a report of the old moves is dropped");
+  R.dropReview();
+  Lib.deleteGame(rec.id);
+});
 
 await test("v5: the review controller edits comments, marks and variations and saves them to the library", async () => {
   const { R, state, Lib, P, loadSGF } = await loadControllers();
@@ -878,8 +902,9 @@ await test("v6 explorer: book moves, out of the book, back/forward, reset and pl
   assert.equal(g.root.board.signMap.flat().filter(Boolean).length, 4);
   assert.equal(state.game.humanColor, BLACK);
   assert.equal(state.game.opponent, "ai");
-  // Review: where a game leaves the whole-board book (this SGF reader skips "i" in columns).
-  const { game } = loadSGF("(;GM[1]SZ[19];B[qd];W[dp];B[qp];W[aa];B[dd])");
+  // Review: where a game leaves the whole-board book (Q16 D4 Q4, the named
+  // two-star opening, then a first-line move; SGF columns include the i).
+  const { game } = loadSGF("(;GM[1]SZ[19];B[pd];W[dp];B[pp];W[aa];B[dd])");
   assert.equal(X.bookExit(game), 3);
   assert.equal(X.bookExit(loadSGF("(;GM[1]SZ[9];B[ee])").game), null);
   X.closeExplorer();

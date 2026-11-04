@@ -233,9 +233,17 @@ function showLog(log) {
 }
 
 /** Hold a file open without sharing, so the folder cannot be renamed (Windows). */
-function lockFile(file, ms) {
-  const script = `$f = [System.IO.File]::Open('${file.replace(/'/g, "''")}', 'Open', 'Read', 'None'); Start-Sleep -Milliseconds ${ms}; $f.Close()`;
-  return spawn(powershell, ["-NoProfile", "-Command", script], { stdio: "ignore" });
+// Resolves once the file is actually held: PowerShell can take seconds to
+// start on a busy runner, and a lock taken after the swap tests nothing.
+async function lockFile(file, ms) {
+  // The marker lives outside the folder being swapped.
+  const ready = path.join(tempDir("lock"), "locked");
+  fs.rmSync(ready, { force: true });
+  const q = (s) => s.replace(/'/g, "''");
+  const script = `$f = [System.IO.File]::Open('${q(file)}', 'Open', 'Read', 'None'); Set-Content -LiteralPath '${q(ready)}' -Value 1; Start-Sleep -Milliseconds ${ms}; $f.Close(); Remove-Item -LiteralPath '${q(ready)}' -ErrorAction SilentlyContinue`;
+  const child = spawn(powershell, ["-NoProfile", "-Command", script], { stdio: "ignore" });
+  await waitFor(() => fs.existsSync(ready), 60000, "the file lock");
+  return child;
 }
 
 /** Launch the real app with GOBAN_UPDATE_PROBE_OUT and read its report. */
@@ -283,10 +291,11 @@ if (!liveTag) {
     const cleanup = path.join(dir, "GobanStudio-update");
     const ack = path.join(cleanup, "goban-update-ack-0123abcd.txt");
     const log = path.join(dir, "update.log");
-    const app = fakeApp(3000);
     // Windows: something holds a file in the install folder for a while after
-    // the app exits (WebView2, antivirus); the swap has to wait it out.
-    const locker = isWin ? lockFile(path.join(target, "README-Windows.txt"), 7000) : null;
+    // the app exits (WebView2, antivirus); the swap has to wait it out. The
+    // lock is in place before the app starts, and outlasts it.
+    const locker = isWin ? await lockFile(path.join(target, "README-Windows.txt"), 7000) : null;
+    const app = fakeApp(3000);
     try {
       const code = await runHelper({ pid: app.pid, target, staged, ack, log, cleanup });
       if (code !== 0) showLog(log);

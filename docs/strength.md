@@ -19,6 +19,11 @@ v6 measured the optional human-style levels and the stronger network
 ("v6: the human-style levels…" below). It also replaced the player's
 level with an estimate with an uncertainty ("v6: your strength").
 
+v7 measured them again on GitHub's runners (708 games on 19×19, 824 on
+9×9), retuned three human-style levels so that ladder has no gap (v6's
+jumped from ≈12 kyu to ≈3 kyu) and moved the top two labels ("v7: the
+human-style ladder without a gap" below).
+
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `30k` | ≈30 kyu | 8 | 2 | 40 | 0.3 | 1 | 0 (reference) | −1272 (−2154 to −933) | 34k (43k–30k) |
@@ -637,6 +642,198 @@ substitute. The obvious next step is 19×19 games of each moved level
 against the next standard level up (`HL:5k`–`L:1k`, `HL:1k`–`L:2d`),
 which this run planned and dropped.
 
+## v7: the human-style ladder without a gap
+
+**Short version.** 1,532 new games (708 on 19×19, 824 on 9×9; 64
+game-hours, about 17 runner-hours on GitHub-hosted Linux runners), pooled
+with v6's 426 for the settings that did not change. Three human-style
+levels have new settings, chosen from candidates and then measured:
+
+| ID | v6 settings | v6 label | v7 settings | Measured 19×19 (95% CI) | v7 label |
+| --- | --- | --- | --- | ---: | --- |
+| `15k` | `rank_20k`, raw | ≈18 kyu (measured ≈15) | `rank_20k`, raw, 12% beginner's moves | 18k (20k–17k) | ≈18 kyu |
+| `5k` | `rank_7k`, search, 24 visits | ≈3 kyu | the same plus 12% beginner's moves | 7k (8k–6k) | ≈7 kyu |
+| `1k` | `rank_2k`, search, 64 visits | ≈1 dan | `rank_4k`, search, 32 visits | 1k (2k–1d) | ≈1 kyu |
+
+and two labels moved on more evidence: human-style `2d` ≈4 dan →
+**≈6 dan**, stronger-network `2d` ≈5 dan → **≈7 dan**. The human-style
+ladder now reads 30, 29, 23, 18, 12, 7 kyu, 1 kyu, 6 dan: no step is
+larger than six ranks, and from 25 kyu to 7 kyu it shows the same labels
+as the standard ladder.
+
+**Where it ran.** `.github/workflows/calibrate.yml` runs only on pushes to
+a `calibrate/**` branch (never on `main` or a release branch). The branch
+carries `docs/calibration/plan.json`: runs, each a board size, a list of
+pairs and a number of games, split into shards. Every shard is one job on
+a 4-core `ubuntu-latest` runner: it downloads KataGo's official 1.18.1
+Linux release (`katago-v1.18.1-eigenavx2-linux-x64.zip`, Eigen AVX2 CPU
+build, SHA-256 pinned in the workflow) and the two optional networks from
+the URLs and SHA-256 pinned in `src/models.zig`, then plays its slice of
+the schedule (`calibrate-strength.mjs play --shard I/N`, four games at a
+time, one search thread per process) with the harness described under
+Method. A last job merges the games into
+`docs/calibration/results/<run>.jsonl` and commits them to the branch. All
+the games are in that directory; v6's are there too (`v6-19.jsonl`,
+`v6-9.jsonl`).
+
+| Run | Board | Games | What | Runner-minutes |
+| --- | --- | ---: | --- | ---: |
+| `v7-screen9` | 9×9 | 540 | nine search-style candidates vs `L:10k`…`L:2d`, `HL:10k`…`HL:1k` | 56 |
+| `v7-19a` | 19×19 | 300 | every v6 human-style level vs the standard levels around it; `HL:1k`, `HL:2d`, `LS:2d` vs a 400-visit bridge | 475 |
+| `v7-19b`, `v7-9b` | both | 144 + 144 | `5k` candidates with 8, 15, 25% beginner's moves | 136 |
+| `v7-19c`, `v7-9c` | both | 120 + 80 | the chosen `5k` (12%) | 141 |
+| `v7-19d`, `v7-9d` | both | 80 + 60 | the chosen `15k` | 148 |
+| `v7-19e` | 19×19 | 64 | the chosen `1k` | 70 |
+
+Of the 708 19×19 games, 492 ended by two passes, 162 by adjudication and
+54 at the move cap (all among the three weakest levels); every 9×9 game
+ended by two passes. No game failed.
+
+**How the settings were found.**
+
+- *The gap.* On 9×9 every search-style candidate — profiles `rank_12k` to
+  `rank_4k`, 8 to 32 visits — measured between θ 10.1 and 12.9, all far
+  above `HL:10k` (6.8) and the standard `5k` (7.5): KataGo's veto of
+  losing moves, not the profile or the budget, is what makes the search
+  style strong, and it does so already at 8 visits. The raw style, for its
+  part, does not reach single-digit kyu (v4). So the lever is the one the
+  standard ladder uses, beginner's moves. On 19×19, `rank_7k` at 24 visits
+  with 8% beginner's moves measured 6k (θ 14.8), with 15% 8k (13.0) and
+  with 25% 11k (11.0); 12% interpolates to the standard `5k`'s 7 kyu and
+  measured 7k (θ 13.7, 13.0–14.4) in its own 120 games.
+- *`15k`.* Without beginner's moves `rank_20k`'s raw policy measured 15k
+  on 19×19 (θ 8.4 in 42 games), eight ranks above `HL:20k` (24k). With
+  12% it measured 18k (θ 6.8, 5.9–7.6), as the standard `15k`.
+- *`1k`.* v6's `rank_2k` at 64 visits measured 1d (θ 19.8) and v6's `5k`
+  settings 3k (16.8); `rank_4k` at 32 visits sits between them at 1k
+  (θ 18.4), next to the standard `1k` (2k).
+- *The top.* v6 had only sweeps of `L:2d` above 4 dan. v7 adds a bridge
+  `C:v400` (the standard network, 400 visits, best move), which beat
+  `L:2d` 10–2 (5d, 5d–6d). Human-style `2d` beat the bridge 11–1 and the
+  stronger network 12–0: 7d (6d–8d) and 8d (7d–8d). The labels take the
+  lower ends, ≈6 dan and ≈7 dan. On 9×9 the stronger network agrees (about
+  7 dan) and human-style `2d` does not (even with `L:2d`, as in v6); the
+  labels are 19×19 ranks and the 19×19 evidence is now 30 games with a
+  bridge, so it decides. Above 4 dan this scale is the furthest
+  extrapolation from the 10-kyu anchor: read both as "strong dan, at
+  least this".
+
+**Fitted strengths** (the standard ladder held at its v4 values,
+`fit --fixed`; 19×19 and 9×9 fitted separately; intervals are 1000-game
+bootstraps):
+
+| Level | Settings | 19×19 games | θ 19×19 (95% CI) | 19×19 rank (95% CI) | θ 9×9 (95% CI) | Label |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `HL:30k` | `rank_20k` raw, 90% beginner | 42 | 0.42 (−0.39 to 1.22) | 33k (35k–31k) | 0.41 (−0.29 to 1.09) | ≈30 kyu |
+| `HL:25k` | `rank_20k` raw, 70% | 42 | 1.39 (0.59 to 2.20) | 30k (32k–28k) | 1.15 (0.57 to 1.74) | ≈29 kyu |
+| `HL:20k` | `rank_20k` raw, 35% | 58 | 3.90 (3.11 to 4.57) | 24k (26k–23k) | 2.10 (1.50 to 2.70) | ≈23 kyu |
+| `HL:15k` | `rank_20k` raw, 12% (v7) | 80 | 6.77 (5.85 to 7.59) | 18k (20k–17k) | 4.64 (3.78 to 5.54) | ≈18 kyu |
+| `HL:10k` | `rank_12k` raw | 82 | 10.19 (9.43 to 11.05) | 12k (14k–11k) | 6.79 (6.20 to 7.30) | ≈12 kyu |
+| `HL:5k` | `rank_7k` search 24, 12% (v7) | 120 | 13.68 (12.99 to 14.39) | 7k (8k–6k) | 8.03 (7.33 to 8.93) | ≈7 kyu |
+| `HL:1k` | `rank_4k` search 32 (v7) | 64 | 18.42 (17.55 to 19.42) | 1k (2k–1d) | 12.89 (12.27 to 13.53) | ≈1 kyu |
+| `HL:2d` | `rank_4d` search 200 | 30 | 26.99 (25.97 to 28.62) | 7d (6d–8d) | 14.99 (14.21 to 15.91) | ≈6 dan |
+| `LS:2d` | b15c192, 64 visits | 30 | 28.11 (27.42 to 29.02) | 8d (7d–8d) | 16.82 (15.81 to 19.08) | ≈7 dan |
+
+The order holds on both boards. These θ are what the strength estimate
+uses for games against the human-style levels and the stronger network
+(`strength.js MEASURED`). Settings that did not change pool v6's games;
+for the three that changed only games with the new settings count. The
+labels of `HL:25k` (30k measured), `HL:20k` (24k) and `HL:10k` (12k)
+stay: each interval contains the label.
+
+19×19 games, all v6 and v7 pairs (A is the player the fit rates lower;
+`CH:` names are the candidates and the old settings in
+`docs/calibration/v7-candidates.json`: `CH:r20k`, `CH:s7k24` and
+`CH:s2k64` are v6's `15k`, `5k` and `1k`):
+
+| Pair (A vs B) | Games | A–B | B win % (95% CI) | Avg plies |
+| --- | ---: | ---: | ---: | ---: |
+| L:30k vs HL:30k | 18 | 7–11 | 61 (39–80) | 374 |
+| L:30k vs HL:25k | 12 | 4–8 | 67 (39–86) | 406 |
+| HL:30k vs L:25k | 12 | 2–10 | 83 (55–95) | 324 |
+| HL:25k vs L:25k | 18 | 9–9 | 50 (29–71) | 373 |
+| HL:25k vs L:20k | 12 | 0–12 | 100 (76–100) | 190 |
+| L:25k vs HL:20k | 12 | 1–11 | 92 (65–99) | 304 |
+| HL:20k vs L:20k | 18 | 7–11 | 61 (39–80) | 292 |
+| HL:20k vs HL:15k | 16 | 0–16 | 100 (81–100) | 404 |
+| HL:20k vs L:15k | 12 | 0–12 | 100 (76–100) | 210 |
+| L:20k vs HL:15k | 16 | 5–11 | 69 (44–86) | 396 |
+| L:20k vs CH:r20k | 12 | 3–9 | 75 (47–91) | 183 |
+| HL:15k vs L:15k | 16 | 10–6 | 38 (18–61) | 370 |
+| HL:15k vs HL:10k | 16 | 0–16 | 100 (81–100) | 317 |
+| HL:15k vs L:10k | 16 | 1–15 | 94 (72–99) | 351 |
+| L:15k vs CH:r20k | 18 | 2–16 | 89 (67–97) | 239 |
+| L:15k vs HL:10k | 12 | 0–12 | 100 (76–100) | 233 |
+| CH:r20k vs L:10k | 12 | 3–9 | 75 (47–91) | 213 |
+| HL:10k vs L:10k | 18 | 7–11 | 61 (39–80) | 257 |
+| HL:10k vs HL:5k | 24 | 1–23 | 96 (80–99) | 294 |
+| HL:10k vs L:5k | 12 | 1–11 | 92 (65–99) | 208 |
+| L:10k vs CH:s7k24b25 | 16 | 6–10 | 63 (39–82) | 312 |
+| L:10k vs CH:s7k24b15 | 16 | 1–15 | 94 (72–99) | 339 |
+| L:10k vs HL:5k | 24 | 0–24 | 100 (86–100) | 343 |
+| L:10k vs CH:s7k24b8 | 16 | 0–16 | 100 (81–100) | 349 |
+| CH:s7k24b25 vs L:5k | 16 | 2–14 | 88 (64–97) | 306 |
+| CH:s7k24b25 vs L:1k | 16 | 0–16 | 100 (81–100) | 331 |
+| CH:s7k24b15 vs L:5k | 16 | 5–11 | 69 (44–86) | 298 |
+| CH:s7k24b15 vs L:1k | 16 | 0–16 | 100 (81–100) | 295 |
+| HL:5k vs L:5k | 24 | 10–14 | 58 (39–76) | 305 |
+| HL:5k vs CH:s7k24 | 24 | 1–23 | 96 (80–99) | 283 |
+| HL:5k vs L:1k | 24 | 1–23 | 96 (80–99) | 274 |
+| L:5k vs CH:s7k24b8 | 16 | 5–11 | 69 (44–86) | 312 |
+| L:5k vs CH:s7k24 | 18 | 1–17 | 94 (74–99) | 244 |
+| CH:s7k24b8 vs L:1k | 16 | 1–15 | 94 (72–99) | 276 |
+| CH:s7k24 vs L:1k | 12 | 2–10 | 83 (55–95) | 240 |
+| CH:s7k24 vs HL:1k | 16 | 4–12 | 75 (51–90) | 259 |
+| CH:s7k24 vs L:2d | 12 | 0–12 | 100 (76–100) | 201 |
+| L:1k vs HL:1k | 16 | 5–11 | 69 (44–86) | 272 |
+| L:1k vs CH:s2k64 | 18 | 2–16 | 89 (67–97) | 226 |
+| HL:1k vs CH:s2k64 | 16 | 3–13 | 81 (57–93) | 271 |
+| HL:1k vs L:2d | 16 | 1–15 | 94 (72–99) | 247 |
+| CH:s2k64 vs L:2d | 12 | 0–12 | 100 (76–100) | 207 |
+| CH:s2k64 vs C:v400 | 12 | 0–12 | 100 (76–100) | 218 |
+| L:2d vs C:v400 | 12 | 2–10 | 83 (55–95) | 245 |
+| L:2d vs HL:2d | 18 | 0–18 | 100 (82–100) | 233 |
+| L:2d vs LS:2d | 18 | 0–18 | 100 (82–100) | 233 |
+| C:v400 vs HL:2d | 12 | 1–11 | 92 (65–99) | 268 |
+| C:v400 vs LS:2d | 12 | 0–12 | 100 (76–100) | 247 |
+
+Candidates on 19×19 (same fit): `CH:s7k24b25` 11k (θ 11.0), `CH:s7k24b15`
+8k (13.0), `CH:s7k24b8` 6k (14.8), `CH:s7k24` (v6's `5k`) 3k (16.8, 4k–2k),
+`CH:s2k64` (v6's `1k`) 1d (19.8, 1k–2d), `CH:r20k` (v6's `15k`) 15k (8.4,
+18k–13k), `C:v400` 5d (24.6, 5d–6d). v6's two moved labels, ≈3 kyu and
+≈1 dan, were close to these fuller measurements.
+
+9×9 screen (θ in the 9×9 frame, 60 games each against `L:10k`, `L:5k`,
+`L:1k`, `HL:10k`, `HL:5k` or, for the last two, `L:5k`…`L:2d`, `HL:5k`,
+`HL:1k`): `rank_7k` 24 visits with 5% beginner's moves 9.9; `rank_10k`
+8 visits 10.2; `rank_7k` 8 and 12 visits 11.0; `rank_10k` 16 visits 11.5;
+`rank_12k` 24 visits 11.7; `rank_5k` 24 visits 11.8; `rank_10k` 24 visits
+11.9; `rank_4k` 32 visits 12.9 (now `HL:1k`). For comparison `L:1k` is
+12.1 and `L:2d` 14.9.
+
+**What changed in the app.** `STRENGTHS[].human` of `15k`, `5k` and `1k`
+(the settings above; `human.rank` 1 for `1k`, none for `5k`, which now
+shows the standard ≈7 kyu), `human.rank` −5 (6 dan) for `2d` and
+`strong.rank` −6 (7 dan). `strength.js MEASURED.human` and `.strong` hold
+the θ above, so the strength estimate, the suggested opponent and the
+handicap suggestion use them. Saved games against a human-style `5k`,
+`15k` or `1k` keep their level ID; from v7 they are shown with the v7
+label, as in v6.
+
+**Limitations of this measurement.** Everything under Limitations below
+still applies: the frame is the v4 ladder and the 10-kyu anchor, and the
+intervals here include neither. 12–24 games per pair separate levels a
+few ranks apart and leave ±1 rank on most labels. The top two labels rest
+on one bridge player and on the anchor's furthest extrapolation. The
+human-style beginner's moves are the ladder's (`beginnerMove`), not a
+model of how real 7-kyu players err: the `5k` level now plays mostly
+human-like strong moves with occasional random ones, which may feel less
+human than its v6 version did. The settings were chosen on the same data
+that measures them for `5k` and `15k` (a choice between bracketing
+candidates, then 120 and 80 games of the chosen one); `1k` was measured
+once. The runners used four games at a time with one thread per process;
+the app uses more threads, which matters little at these visit budgets.
+
 ## v6: your strength — the estimate
 
 Until v5 the player's level was an Elo-style number that moved by a fixed
@@ -817,3 +1014,21 @@ the anchor's place) but not the exact digits.
 strength fields) to try settings before changing `STRENGTHS`; `--alias`
 pools their games with a ladder level whose settings are identical. A run
 can be interrupted and resumed: games already in `--out` are skipped.
+
+v7 (on GitHub's runners). Write a plan (`docs/calibration/plan.json` holds
+one that re-measures the shipped human-style ladder; candidates with a
+`human` object play as `CH:<name>`), commit it on a branch named
+`calibrate/<anything>` and push; the games come back as a commit on that
+branch in `docs/calibration/results/`. Pushing the same plan with more
+games plays only the new ones. To refit v7's numbers from the committed
+games, naming the levels as shipped (v7's games are stored under the
+names they were played under):
+
+```bash
+A="HL:5k=CH:s7k24,HL:15k=CH:r20k,HL:1k=CH:s2k64,CH:s7k24b12=HL:5k,CH:r20kb12=HL:15k,CH:s4k32=HL:1k"
+node scripts/calibrate-strength.mjs fit docs/calibration/results/*-19*.jsonl --size 19 --fixed --alias "$A" --markdown
+node scripts/calibrate-strength.mjs fit docs/calibration/results/*9*.jsonl --size 9 --fixed --alias "$A" --markdown
+```
+
+The same commands run locally: `play --shard I/N` plays one of N
+disjoint slices of a schedule, `merge OUT IN…` joins result files.

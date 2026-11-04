@@ -1,0 +1,137 @@
+name: calibrate
+
+# Strength calibration on GitHub-hosted runners (docs/strength.md, "v7").
+#
+# Runs only on pushes to a dedicated calibrate/** branch, never on v7 or
+# main. The branch carries docs/calibration/plan.json (runs: size, pairs,
+# games, shards); each (run, shard) is one job that plays its slice of the
+# schedule with scripts/calibrate-strength.mjs. The last job merges every
+# game into docs/calibration/results/<run>.jsonl and commits that back to
+# the branch (a push made with GITHUB_TOKEN does not start this workflow
+# again). Games already in that file are skipped, so pushing the same plan
+# with more games only plays the new ones.
+#
+# KataGo (official 1.18.1 Linux release, Eigen AVX2 CPU build) and the two
+# optional networks (the URLs pinned in src/models.zig) are downloaded and
+# checked against their SHA-256; none of them is committed.
+on:
+  push:
+    branches: ["calibrate/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: calibrate-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
+  KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - id: m
+        run: |
+          set -euo pipefail
+          m=$(node scripts/calibrate-strength.mjs matrix docs/calibration/plan.json)
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+
+  play:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: KataGo and networks (SHA-256 checked)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kg" && cd "$RUNNER_TEMP/kg"
+          curl -fsSL --retry 5 --retry-all-errors -o katago.zip "$KATAGO_URL"
+          echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -
+          unzip -q katago.zip katago
+          chmod +x katago
+          ./katago --appimage-extract > /dev/null
+          node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");for(const m of s.matchAll(/\.url = "([^"]+)",\s*\.sha256 = "([0-9a-f]{64})"/g))console.log(m[1]+" "+m[2])' "$GITHUB_WORKSPACE/src/models.zig" > nets.txt
+          test "$(wc -l < nets.txt)" -eq 2
+          while read -r url sha; do
+            f=$(basename "$url")
+            curl -fsSL --retry 5 --retry-all-errors -o "$f" "$url"
+            echo "$sha  $f" | sha256sum -c -
+          done < nets.txt
+          echo "KATAGO=$RUNNER_TEMP/kg/squashfs-root/AppRun" >> "$GITHUB_ENV"
+          echo "KATAGO_HUMAN_MODEL=$RUNNER_TEMP/kg/b18c384nbt-humanv0.bin.gz" >> "$GITHUB_ENV"
+          echo "KATAGO_STRONG_MODEL=$RUNNER_TEMP/kg/g170e-b15c192-s1672170752-d466197061.txt.gz" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/kg/squashfs-root/AppRun" version
+          nproc
+      - name: play ${{ matrix.run }} shard ${{ matrix.shard }}
+        env:
+          RUN: ${{ matrix.run }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          mapfile -t ARGS < <(node scripts/calibrate-strength.mjs run-args docs/calibration/plan.json "$RUN")
+          mkdir -p out
+          OUT="out/$RUN-${SHARD%/*}.jsonl"
+          # Games already collected for this run are skipped.
+          if [ -f "docs/calibration/results/$RUN.jsonl" ]; then cp "docs/calibration/results/$RUN.jsonl" "$OUT"; fi
+          node scripts/calibrate-strength.mjs play "${ARGS[@]}" --shard "$SHARD" --deadline 320 --out "$OUT"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: games-${{ matrix.run }}-${{ strategy.job-index }}
+          path: out/*.jsonl
+          if-no-files-found: ignore
+          retention-days: 14
+
+  collect:
+    needs: play
+    if: always() && needs.play.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: games-*
+          path: in
+          merge-multiple: true
+      - run: npm ci --ignore-scripts
+      - name: merge and commit the games
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$GITHUB_REF_NAME"
+            git reset --hard "origin/$GITHUB_REF_NAME"
+            for run in $(node -e 'for (const r of JSON.parse(require("fs").readFileSync("docs/calibration/plan.json","utf8")).runs) console.log(r.id)'); do
+              files=$(ls in/"$run"-*.jsonl 2>/dev/null || true)
+              [ -n "$files" ] || continue
+              node scripts/calibrate-strength.mjs merge "docs/calibration/results/$run.jsonl" $files
+            done
+            git add docs/calibration/results
+            if git diff --cached --quiet; then echo "no new games"; exit 0; fi
+            git commit -q -m "calibration results (run ${GITHUB_RUN_ID})"
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then exit 0; fi
+            sleep $((attempt * 10))
+          done
+          exit 1

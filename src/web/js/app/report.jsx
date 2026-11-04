@@ -11,8 +11,9 @@ import * as C from "./controller.js";
 import { BLUNDER, MISTAKE } from "./summary.js";
 import { storyText } from "./story.js";
 import { accuracyText, drawMoment, lossText, momentWords, reportFacts, reportHeadline } from "./report-draw.js";
-import { Button, Stone } from "./parts.jsx";
+import { Button, Segmented, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { RatingChange, ReportStopped } from "./report-status.jsx";
 
 export function ReportView() {
   const r = state.report;
@@ -29,11 +30,13 @@ export function ReportView() {
       <div class="page report">
         {busy && !m && <Pending />}
         {r.status === "missing" && !m && <p class="muted">{t("report.missing")}</p>}
+        {r.status === "stopped" && <ReportStopped />}
         {m && (
           <>
             <header class="page-head">
               <h1>{reportHeadline(m)}</h1>
               <span class="muted">{reportFacts(m)}</span>
+              <RatingChange />
             </header>
             {busy && <Pending />}
             <Phases m={m} />
@@ -71,9 +74,13 @@ function Phases({ m }) {
       <h2 class="section-title">{t("report.phases")}</h2>
       {m.players.map((who) => (
         <table class="phase-table report-phases">
+          <caption class="sr-only">{t("report.phasesOf", [t("common." + who)])}</caption>
           <thead>
             <tr>
-              <th>{m.players.length > 1 ? <Stone color={who === "black" ? BLACK : WHITE} size={10} /> : ""}</th>
+              <th scope="col">
+                {m.players.length > 1 && <Stone color={who === "black" ? BLACK : WHITE} size={10} />}
+                <span class="sr-only">{t("common." + who)}</span>
+              </th>
               <th title={t("report.lossHelp")}>{t("gameSummary.pointsLost")}</th>
               <th title={t("gameSummary.mistakesHelp", [MISTAKE, BLUNDER])}>{t("gameSummary.mistakes")}</th>
               <th title={t("gameSummary.mistakesHelp", [MISTAKE, BLUNDER])}>{t("gameSummary.blunders")}</th>
@@ -127,7 +134,7 @@ function Moments({ m }) {
           const w = momentWords(m, mo);
           return (
             <li>
-              <button type="button" class="report-moment" onClick={() => C.openReportMove(mo.index)} aria-label={t("report.openMove", [mo.index])}>
+              <button type="button" class="report-moment" onClick={() => C.openReportMove(mo.index)} title={t("report.openMove", [mo.index])}>
                 <MomentBoard mo={mo} size={m.size} />
                 <strong>{w.title}</strong>
                 <span>{w.played}</span>
@@ -188,8 +195,23 @@ function Practise({ m }) {
       </Button>
     );
   }
+  const side = C.reportDrillColor();
   return (
     <section class="card report-practise">
+      {side != null && m.confidence === "high" && (
+        <div class="row">
+          <span>{t("report.practiseSide")}</span>
+          <Segmented
+            label={t("report.practiseSide")}
+            value={side}
+            onChange={C.setReportDrillColor}
+            options={[
+              { value: BLACK, label: t("common.black") },
+              { value: WHITE, label: t("common.white") },
+            ]}
+          />
+        </div>
+      )}
       <p>{text}</p>
       <div class="actions">
         {action}
