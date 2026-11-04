@@ -1,0 +1,26 @@
+{
+  "note": "v7 stage 5: a weaker human-style 15k (rank_20k raw policy with 12% beginner moves) on 19x19 and 9x9 (docs/strength.md, v7)",
+  "runs": [
+    {
+      "id": "v7-19d",
+      "size": 19,
+      "games": 16,
+      "pairs": "CH:r20kb12-L:20k,CH:r20kb12-L:15k,CH:r20kb12-L:10k,CH:r20kb12-HL:20k,CH:r20kb12-HL:10k",
+      "shards": 10,
+      "workers": 4,
+      "scoreVisits": 200,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    },
+    {
+      "id": "v7-9d",
+      "size": 9,
+      "games": 12,
+      "pairs": "CH:r20kb12-L:20k,CH:r20kb12-L:15k,CH:r20kb12-L:10k,CH:r20kb12-HL:20k,CH:r20kb12-HL:10k",
+      "shards": 2,
+      "workers": 4,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    }
+  ]
+}
