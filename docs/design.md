@@ -206,3 +206,10 @@ dark, in all four languages, before every release:
 
 The automated part (`npm run ui-test`) checks contrast, primary-button
 count, layout budgets and pixel baselines; the rest is a human pass.
+
+Since v7 a cross check (`scripts/ui-tests/z-cross.mjs`) visits every place
+and page added since v5 — Today, Practice and a problem, Library, the
+explorer, a classic in review (every tab), a game report, every Settings
+pane — in four combinations of language, light/dark and larger text, and
+runs the accessibility audit, the raw-key, clipping, sideways-scroll and
+one-primary checks on each. A new page joins that list in the same change.

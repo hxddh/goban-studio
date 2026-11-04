@@ -629,7 +629,7 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
 // Each v7 area keeps its browser checks in scripts/ui-tests/*.mjs.
 for (const f of fs.readdirSync(path.join(root, "scripts/ui-tests")).filter((n) => n.endsWith(".mjs")).sort()) {
   const mod = await import("./ui-tests/" + f);
-  await mod.default({ check, assert, fresh, onboard, clickPoint, pointOf, origin, browser });
+  await mod.default({ check, assert, fresh, onboard, clickPoint, pointOf, origin, browser, audit });
 }
 
 /* ------------------------------------------------------------ visuals */
