@@ -46,7 +46,10 @@ the endgame problem themes count as *endgame*.
 
 **Stable for the week.** The focus is worked out from the evidence as it
 stood on Monday 00:00. If there was no focus on Monday, it uses what there
-is now. This week's games therefore change next week's focus, not today's.
+is now. This week's games therefore change next week's focus, not today's. Once a focus has been shown in a week it is
+kept for the rest of that week (`progress.planWeek`): a problem record only
+keeps its latest attempt, so reviewing last week's misses would otherwise
+erase the evidence the focus came from.
 
 ## Solving level
 

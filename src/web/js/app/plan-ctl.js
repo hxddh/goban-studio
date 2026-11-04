@@ -6,12 +6,25 @@
 import { t } from "../i18n.js";
 import { state } from "./store.js";
 import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, setDailyPlanner, themeName } from "./practice-ctl.js";
-import { evidenceOf, focusLesson, focusTopic, planDaily, weeklyModel } from "./plan.js";
+import { evidenceOf, focusLesson, focusTopic, planDaily, weekToKeep, weeklyModel } from "./plan.js";
+import { saveProgress } from "../persist.js";
 import { weekStart } from "./week.js";
 
 /** The model behind this week's focus (see plan.weeklyModel). */
 export function planModel(now = Date.now()) {
-  return weeklyModel(state.progress, { problems: PROBLEMS, grades: GRADES, now, weekStart: weekStart(new Date(now)) });
+  return weekly(state.progress, GRADES, now);
+}
+
+/** The week's model; the first focus shown in a week is kept for that week. */
+function weekly(progress, grades, now) {
+  const ws = weekStart(new Date(now));
+  const model = weeklyModel(progress, { problems: PROBLEMS, grades, now, weekStart: ws });
+  const keep = weekToKeep(progress, model, ws);
+  if (keep && progress) {
+    progress.planWeek = keep;
+    saveProgress(progress);
+  }
+  return model;
 }
 
 /**
@@ -48,6 +61,6 @@ export function openFocusProblems(item) {
 
 /** Today's five: the plan chooses when it has a focus (else practice-ctl's own choice). */
 setDailyPlanner(({ progress, pool, grades, now }) => {
-  const model = weeklyModel(progress, { problems: PROBLEMS, grades, now, weekStart: weekStart(new Date(now)) });
+  const model = weekly(progress, grades, now);
   return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now });
 });

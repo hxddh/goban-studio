@@ -327,6 +327,8 @@ export function loadProgress() {
     // v5
     v: 5,
     games: normalizeGameRecords(p.games),
+    // v7: the training plan's focus, kept for the week it was chosen in.
+    planWeek: p.planWeek && Number.isFinite(p.planWeek.weekStart) && Array.isArray(p.planWeek.focus) ? p.planWeek : null,
   };
 }
 

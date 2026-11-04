@@ -58,6 +58,9 @@ export default async function ({ test, assert, root }) {
     // Pre-v7 Goban Studio export skips the letter i in columns.
     const [l] = I.readProblemSGF("(;AP[Goban Studio:6.0.0]SZ[19]AB[ja][ta])");
     assert.deepEqual(l.stones.map((p) => p.x), [8, 18]);
+    // A v7 export is standard FF[4]: the i is a column.
+    const [v7] = I.readProblemSGF("(;AP[Goban Studio:7.0.0]SZ[19]AB[ia][ja][sa])");
+    assert.deepEqual(v7.stones.map((p) => p.x), [8, 9, 18]);
     assert.equal(I.readProblemSGF("not sgf")[0].error, "invalid");
   });
 

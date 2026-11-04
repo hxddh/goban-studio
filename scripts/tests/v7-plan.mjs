@@ -176,6 +176,29 @@ export default async function ({ test, assert, root }) {
     assert.equal(fresh.since, null);
   });
 
+  await test("v7 plan: a focus from problems survives reviewing those problems during the week", () => {
+    const week = new Date(2026, 10, 2).getTime(); // Monday
+    const cuts = PROBLEMS.filter((p) => p.theme === "cut").slice(0, 6);
+    assert.ok(cuts.length >= 5, "enough cutting problems");
+    // Last week: every cutting problem missed.
+    const missed = Object.fromEntries(cuts.map((p) => [p.id, { solved: false, attempts: 1, streak: 0, last: week - 2 * DAY, due: week }]));
+    const pr = progress({ problems: missed });
+    const first = P.weeklyModel(pr, { ...opts, weekStart: week });
+    assert.deepEqual(first.focus.map((a) => a.key), ["cut"]);
+    const keep = P.weekToKeep(pr, first, week);
+    assert.equal(keep.weekStart, week);
+    pr.planWeek = keep;
+    assert.equal(P.weekToKeep(pr, first, week), null, "stored once per week");
+    // This week: most of them reviewed and solved, which overwrites `last`.
+    for (const p of cuts.slice(0, 4)) pr.problems[p.id] = { solved: true, clean: true, attempts: 2, streak: 1, last: NOW - 1000, due: NOW + 3 * DAY };
+    const later = P.weeklyModel(pr, { ...opts, weekStart: week });
+    assert.deepEqual(later.focus.map((a) => a.key), ["cut"], "the week's focus stays");
+    assert.equal(later.since, week);
+    // Next week the stored focus no longer applies.
+    const next = P.weeklyModel(pr, { ...opts, now: NOW + 7 * DAY, weekStart: week + 7 * DAY });
+    assert.notEqual(next.since, week);
+  });
+
   await test("v7 plan: records keep what each theme cost", () => {
     assert.deepEqual(P.themeLosses([{ theme: "cut", loss: 3.24, move: { color: 1 } }, { theme: "cut", loss: 2, move: { color: 1 } }, { theme: "ko", loss: 9, move: { color: -1 } }, { theme: null, loss: 5, move: { color: 1 } }], 1), { cut: 5.2 });
     const rec = persist.normalizeGameRecord({ at: NOW, size: 19, themes: { cut: 2 }, themeLoss: { cut: 5.2, bad: "x" } });

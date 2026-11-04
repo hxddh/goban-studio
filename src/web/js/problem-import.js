@@ -77,7 +77,7 @@
  * collections (`collectionToSGF`) use standard coordinates and name
  * themselves `AP[Goban Studio Problems:…]`.
  */
-import { parseSgfTrees } from "./sgf.js";
+import { isLegacyGobanSgf, parseSgfTrees } from "./sgf.js";
 import * as S from "./solver.js";
 import { GRADE_CUTS } from "./content/problems.js";
 
@@ -179,7 +179,8 @@ function readTree(root, file, index) {
   const base = { file, index, name: first(data, "GN").trim(), size };
   if (size < 5 || size > 19) return { ...base, error: "invalid" };
   const ap = first(data, "AP");
-  const legacy = /^Goban Studio:/.test(ap);
+  // Only records written before v7 skip the i (see sgf.isLegacyGobanSgf).
+  const legacy = isLegacyGobanSgf(ap);
   const board = new Map();
   let comment = first(data, "C").trim();
   let pl = first(data, "PL").toUpperCase();

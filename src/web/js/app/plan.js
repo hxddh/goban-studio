@@ -283,6 +283,14 @@ export function evidenceOf(a) {
  * the current evidence when the week began without a focus.
  */
 export function weeklyModel(progress, { problems = [], grades = {}, now = Date.now(), weekStart } = {}) {
+  // A focus already chosen this week is kept (progress.planWeek): problem
+  // records only keep their latest attempt, so reviewing last week's
+  // misses would otherwise erase the evidence the focus came from.
+  const kept = progress?.planWeek;
+  if (Number.isFinite(weekStart) && kept?.weekStart === weekStart && Array.isArray(kept.focus) && kept.focus.length) {
+    const m = playerModel(progress, { problems, grades, now });
+    return { ...m, status: "focus", focus: kept.focus, since: weekStart };
+  }
   if (Number.isFinite(weekStart) && weekStart < now) {
     const before = {
       ...progress,
@@ -294,6 +302,16 @@ export function weeklyModel(progress, { problems = [], grades = {}, now = Date.n
     if (m.focus.length) return { ...m, since: weekStart };
   }
   return { ...playerModel(progress, { problems, grades, now }), since: null };
+}
+
+/**
+ * The focus to keep for the rest of the week once one is shown: returns the
+ * new progress.planWeek, or null when nothing needs storing.
+ */
+export function weekToKeep(progress, model, weekStart) {
+  if (!Number.isFinite(weekStart) || !model?.focus?.length) return null;
+  if (progress?.planWeek?.weekStart === weekStart) return null;
+  return { weekStart, focus: JSON.parse(JSON.stringify(model.focus)) };
 }
 
 function seeded(now) {
