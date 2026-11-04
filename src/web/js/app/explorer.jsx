@@ -66,7 +66,7 @@ export function ExplorerView() {
     <>
       <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
         <div class="tool-group">
-          {mode === "corner" && (
+          {X.explorerZoomable(e) && (
             <IconButton
               icon={e.zoom === false ? "focus" : "grid"}
               class="explorer-zoom"

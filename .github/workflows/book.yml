@@ -48,6 +48,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      # The generator replays moves with the app's own rules (@sabaki/go-board).
+      - run: npm ci --omit=dev --ignore-scripts
       - name: KataGo and the network
         run: |
           set -euo pipefail
@@ -87,6 +89,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      # The generator replays moves with the app's own rules (@sabaki/go-board).
+      - run: npm ci --omit=dev --ignore-scripts
       - name: KataGo and the network
         run: |
           set -euo pipefail
@@ -135,6 +139,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      # The generator replays moves with the app's own rules (@sabaki/go-board).
+      - run: npm ci --omit=dev --ignore-scripts
       - uses: actions/download-artifact@v8
         with:
           pattern: seed-*
