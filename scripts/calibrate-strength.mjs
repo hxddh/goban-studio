@@ -15,7 +15,7 @@
  *            --size 9 --games 40 --pairs adjacent,gap2 [--workers 4]
  *          node scripts/calibrate-strength.mjs play ... --size 19 --pairs "L:10k-L:5k,L:5k-H:rank_5k" \
  *            --human-model b18c384nbt-humanv0.bin.gz
- *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [--size 19] [--anchor rank_10k] [--boot 1000]
+ *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [more.jsonl …] [--size 19] [--anchor rank_10k] [--boot 1000]
  *            [--fixed]   (v6: hold the L: ladder at its v4 measurement; needs --size 9 or 19)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
@@ -837,12 +837,15 @@ async function main() {
     if (r.tag) out.push("--tag", r.tag);
     console.log(out.join("\n"));
   } else if (cmd === "fit") {
-    const file = a._[1] || "calibration.jsonl";
-    let games = fs
-      .readFileSync(file, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => JSON.parse(l));
+    // v7: several files are pooled (e.g. docs/calibration/results/*.jsonl).
+    const files = a._.length > 1 ? a._.slice(1) : ["calibration.jsonl"];
+    let games = files.flatMap((file) =>
+      fs
+        .readFileSync(file, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => JSON.parse(l)),
+    );
     if (a.size) games = games.filter((g) => g.size === Number(a.size));
     // --alias "C:b100=L:30k,...": pool games of a candidate whose settings are
     // identical to a ladder level (exploration runs) under the level's name.
