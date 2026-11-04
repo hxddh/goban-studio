@@ -21,6 +21,7 @@ import { describeMistakes, lossesOf } from "./explain.js";
 import { summarizeGame, trends } from "./summary.js";
 import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
+import { reportFits } from "./report-model.js";
 
 /* --------------------------------------------------------- analysis */
 
@@ -413,16 +414,26 @@ function edited(r, { mainBefore = null } = {}) {
  * Write pending edits now (they are otherwise saved 0.4 s after the last
  * one, and when the review closes). Returns true when something was saved.
  */
+/**
+ * Save edited moves to a record. A stored report of other moves (a
+ * variation promoted, moves deleted) is dropped, so the report and
+ * Analyse all make it again; comments and marks keep it.
+ */
+function saveRecord(id, game) {
+  const rec = Lib.saveGame(game, { id });
+  if (rec?.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
+}
+
 export function saveEdits(r = state.review) {
   clearTimeout(saveTimer);
   if (!r?.edits?.dirty) return false;
   const target = editTarget(r);
   if (target === "record") {
     if (!Lib.getGame(r.meta.recordId)) return false;
-    Lib.saveGame(r.game, { id: r.meta.recordId });
+    saveRecord(r.meta.recordId, r.game);
   } else if (target === "current") {
     persistCurrent();
-    if (state.game.recordId && Lib.getGame(state.game.recordId)) Lib.saveGame(r.game, { id: state.game.recordId });
+    if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
   } else return false;
   r.edits = { ...r.edits, dirty: false, savedAt: Date.now(), target };
   return true;

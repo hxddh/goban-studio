@@ -710,6 +710,7 @@ async function loadControllers() {
         'export * as Lib from "./src/web/js/library.js";',
         'export * as P from "./src/web/js/persist.js";',
         'export { loadSGF } from "./src/web/js/sgf.js";',
+        'export { buildReport, reportFits } from "./src/web/js/app/report-model.js";',
       ].join("\n"),
       resolveDir: root,
       loader: "js",
@@ -726,6 +727,29 @@ async function loadControllers() {
 }
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+await test("v7: saving edited moves drops a stored report of the old moves; comments keep it", async () => {
+  const { R, state, Lib, P, loadSGF, buildReport, reportFits } = await loadControllers();
+  state.settings = { ...P.DEFAULT_SETTINGS, liveAnalysis: false };
+  state.progress = P.loadProgress();
+  const base = v5Review({ losses: { 25: 8 } });
+  const rec = Lib.saveGame(base.game, { name: "v7 stale report", opponent: "ai", humanColor: BLACK });
+  Lib.patchGame(rec.id, { report: buildReport({ game: loadSGF(rec.sgf).game, points: base.points, humanColor: BLACK }) });
+  assert.ok(reportFits(Lib.getGame(rec.id).report, loadSGF(rec.sgf).game));
+  R.openReview(loadSGF(rec.sgf).game, { source: "record", recordId: rec.id, humanColor: BLACK, points: base.points, startAt: 10 });
+  // A comment only: the report still describes the game.
+  R.setComment("note");
+  R.saveEdits();
+  assert.ok(Lib.getGame(rec.id).report, "a comment keeps the report");
+  // A variation promoted to the main line: the stored report is of other moves.
+  R.reviewGoto(30);
+  R.reviewPlay(6, 6);
+  assert.equal(R.promoteVariation(), true);
+  R.saveEdits();
+  assert.equal(Lib.getGame(rec.id).report, null, "a report of the old moves is dropped");
+  R.dropReview();
+  Lib.deleteGame(rec.id);
+});
 
 await test("v5: the review controller edits comments, marks and variations and saves them to the library", async () => {
   const { R, state, Lib, P, loadSGF } = await loadControllers();
