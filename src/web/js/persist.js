@@ -137,6 +137,11 @@ export function migrate() {
       streak: v1.streak && typeof v1.streak === "object" ? v1.streak : { count: 0, last: null },
     });
   }
+  // v5: progress gains per-game records (and a version).
+  if (has(KEYS.progress)) {
+    const p = readJSON(KEYS.progress, null);
+    if (p && !(p.v >= 5)) writeJSON(KEYS.progress, migrateProgress(p));
+  }
   if (!has(KEYS.current) && has(V1_KEYS.current)) {
     const v1 = readJSON(V1_KEYS.current, null);
     if (v1 && v1.sgf) {
@@ -186,7 +191,112 @@ export function saveSettings(settings) {
 }
 
 function emptyProgress() {
-  return { lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null }, rating: null, weakness: {}, mistakes: [] };
+  return { v: 5, lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null }, rating: null, weakness: {}, mistakes: [], games: [] };
+}
+
+/* ------------------------------------------- v5: per-game records */
+
+/** How many per-game records progress keeps (newest first). */
+export const MAX_GAME_RECORDS = 50;
+export const PHASES = ["opening", "middle", "endgame"];
+
+const num = (v, d = null) => (v !== null && v !== "" && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : d);
+
+function dayOf(at) {
+  const d = new Date(at);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+/**
+ * A stored record of one rated game against the computer (see
+ * app/summary.js gameRecord), checked and normalised; null when unusable.
+ *   { v: 1, id, at, date, size, rules, komi, handicap, color, opponent,
+ *     result, won, moves, confidence: "high" | "low" | null,
+ *     phases: { opening|middle|endgame: { loss, mistakes, blunders, moves,
+ *               accuracy } } | null,
+ *     themes: { theme: count }, rating: { before, after, delta } | null }
+ */
+export function normalizeGameRecord(r) {
+  if (!r || typeof r !== "object") return null;
+  const at = num(r.at);
+  const size = num(r.size);
+  if (at == null || ![9, 13, 19].includes(size)) return null;
+  let phases = null;
+  if (r.phases && typeof r.phases === "object") {
+    phases = {};
+    for (const p of PHASES) {
+      const s = r.phases[p] && typeof r.phases[p] === "object" ? r.phases[p] : {};
+      phases[p] = { loss: num(s.loss, 0), mistakes: num(s.mistakes, 0), blunders: num(s.blunders, 0), moves: num(s.moves, 0), accuracy: num(s.accuracy) };
+    }
+  }
+  const themes = {};
+  if (r.themes && typeof r.themes === "object") for (const [k, v] of Object.entries(r.themes)) if (num(v, 0) > 0) themes[k] = num(v);
+  const rt = r.rating && typeof r.rating === "object" && num(r.rating.after) != null ? { before: num(r.rating.before), after: num(r.rating.after), delta: num(r.rating.delta, 0) } : null;
+  return {
+    v: 1,
+    id: String(r.id ?? at),
+    at,
+    date: typeof r.date === "string" && r.date ? r.date : dayOf(at),
+    size,
+    rules: r.rules ? String(r.rules) : null,
+    komi: num(r.komi),
+    handicap: num(r.handicap, 0),
+    color: r.color === -1 ? -1 : 1,
+    opponent: r.opponent ? String(r.opponent) : null,
+    result: r.result ? String(r.result) : null,
+    won: r.won === true ? true : r.won === false ? false : null,
+    moves: num(r.moves, 0),
+    confidence: phases ? (r.confidence === "high" ? "high" : "low") : null,
+    phases,
+    themes,
+    rating: rt,
+  };
+}
+
+/** Records as stored → a clean list, newest first, bounded. */
+export function normalizeGameRecords(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const r = normalizeGameRecord(raw);
+    if (!r || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+  }
+  return out.sort((a, b) => b.at - a.at).slice(0, MAX_GAME_RECORDS);
+}
+
+/** Add or replace (same id) a record and save. */
+export function addGameRecord(progress, record, { save = true } = {}) {
+  const rec = normalizeGameRecord(record);
+  if (!rec) return null;
+  progress.games = normalizeGameRecords([rec, ...(progress.games || []).filter((g) => g.id !== rec.id)]);
+  if (save) saveProgress(progress);
+  return rec;
+}
+
+/** Merge fields into a stored record (by id) and save; null when missing. */
+export function updateGameRecord(progress, id, patch, { save = true } = {}) {
+  const i = (progress.games || []).findIndex((g) => g.id === String(id));
+  if (i < 0) return null;
+  const rec = normalizeGameRecord({ ...progress.games[i], ...patch });
+  if (!rec) return null;
+  progress.games[i] = rec;
+  if (save) saveProgress(progress);
+  return rec;
+}
+
+/**
+ * v5 progress migration. v2–v4 progress has no `v` and no `games`; it gains
+ * an empty list. Rating history is kept as it is: the trend view reads it
+ * for games that were played before records existed.
+ */
+export function migrateProgress(p) {
+  const out = p && typeof p === "object" ? p : {};
+  out.games = normalizeGameRecords(out.games);
+  out.v = 5;
+  return out;
 }
 
 export function loadProgress() {
@@ -202,6 +312,9 @@ export function loadProgress() {
     rating: p.rating && typeof p.rating === "object" && Number.isFinite(p.rating.r) ? p.rating : null,
     weakness: obj(p.weakness),
     mistakes: Array.isArray(p.mistakes) ? p.mistakes.slice(0, 200) : [],
+    // v5
+    v: 5,
+    games: normalizeGameRecords(p.games),
   };
 }
 

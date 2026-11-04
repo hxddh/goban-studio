@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap, RULESETS, DEFAULT_RULES, defaultKomi, handicapCompensation, normalizeRules, findSeki, rulesFromSgf } from "../src/web/js/rules.js";
+import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap, treeLayout, RULESETS, DEFAULT_RULES, defaultKomi, handicapCompensation, normalizeRules, findSeki, rulesFromSgf } from "../src/web/js/rules.js";
 import { loadSGF } from "../src/web/js/sgf.js";
 import { execFileSync } from "node:child_process";
 import { chooseMove } from "../src/web/js/ai.js";
@@ -27,6 +27,9 @@ import { LANG_IDS, setLang, t } from "../src/web/js/i18n.js";
 import {
   DEFAULT_SETTINGS,
   KEYS,
+  MAX_GAME_RECORDS,
+  addGameRecord,
+  updateGameRecord,
   V1_KEYS,
   dailySet,
   loadProgress,
@@ -1589,6 +1592,221 @@ await test("v4: the screenshot tour visits five screens and starts only with GOB
     assert.match(y, /scripts\/tour-app\.mjs/, wf);
     assert.match(y, wf.includes("macos") ? /native-screenshots-macos/ : /native-screenshots-windows/, wf);
   }
+});
+
+/* ------------------------------------------------------------------ v5 */
+
+await test("v5: SGF comments and markup survive a round trip on every node", () => {
+  const g = newGame(9);
+  g.setRootComment("Game notes\nline two ] with a bracket \\ and a backslash");
+  g.toggleMark(g.root, 4, 4, "triangle");
+  g.play(2, 2);
+  const a = g.current;
+  g.setComment(a, "A [solid] start");
+  g.toggleMark(a, 3, 3, "square");
+  g.toggleMark(a, 5, 5, "circle");
+  g.toggleMark(a, 6, 6, "cross");
+  g.toggleMark(a, 7, 7, "label");
+  g.toggleMark(a, 8, 8, "label");
+  g.toggleMark(a, 0, 8, "label", "x:y]");
+  g.play(6, 6);
+  const sgf = g.toSGF();
+  assert.match(sgf, /TR\[ee\]/);
+  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ji:B][ai:x:y\\]]"), sgf);
+  const back = loadSGF(sgf).game;
+  assert.equal(back.root.comment, g.root.comment);
+  assert.deepEqual(back.root.marks, [{ x: 4, y: 4, type: "triangle" }]);
+  const b = back.mainLine()[1];
+  assert.equal(b.comment, "A [solid] start");
+  const byType = Object.fromEntries(b.marks.filter((m) => m.type !== "label").map((m) => [m.type, [m.x, m.y]]));
+  assert.deepEqual(byType, { square: [3, 3], circle: [5, 5], cross: [6, 6] });
+  assert.deepEqual(b.marks.filter((m) => m.type === "label").map((m) => [m.x, m.y, m.text]), [[7, 7, "A"], [8, 8, "B"], [0, 8, "x:y]"]]);
+  assert.equal(back.toSGF(), sgf, "a second round trip is byte-identical");
+});
+
+await test("v5: unknown SGF properties are kept on the root and on moves", () => {
+  const text =
+    "(;GM[1]FF[4]SZ[9]KM[6.5]RU[Japanese]GN[Club final]PC[Seoul]BR[3k]WR[2k]EV[Spring cup]XY[a\\]b][c]C[root]" +
+    ";B[ee]BL[295.5]OB[0]N[Tengen];W[cc]MN[2]TB[aa:bb]" +
+    "(;B[gg]C[main])(;B[gc]LB[gg:1]C[side]XX[keep me]))";
+  const { game, warnings } = loadSGF(text);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(game.root.extra, { GN: ["Club final"], PC: ["Seoul"], BR: ["3k"], WR: ["2k"], XY: ["a]b", "c"] });
+  assert.equal(game.event, "Spring cup");
+  const [, b1, w2] = game.mainLine();
+  assert.deepEqual(b1.extra, { BL: ["295.5"], OB: ["0"], N: ["Tengen"] });
+  assert.deepEqual(w2.extra, { MN: ["2"], TB: ["aa:bb"] });
+  const side = w2.children[1];
+  assert.deepEqual(side.extra, { XX: ["keep me"] });
+  assert.deepEqual(side.marks, [{ x: 6, y: 6, type: "label", text: "1" }]);
+  const out = game.toSGF();
+  for (const s of ["GN[Club final]", "PC[Seoul]", "BR[3k]", "WR[2k]", "EV[Spring cup]", "XY[a\\]b][c]", "BL[295.5]OB[0]N[Tengen]", "MN[2]TB[aa:bb]", "XX[keep me]", "LB[gg:1]"]) assert.ok(out.includes(s), s);
+  const again = loadSGF(out).game;
+  assert.deepEqual(again.root.extra, game.root.extra);
+  assert.deepEqual(again.mainLine()[2].children[1].extra, { XX: ["keep me"] });
+  assert.equal(again.toSGF(), out);
+});
+
+await test("v5: a set-up position records who plays first, and move-less nodes fold into the move before", () => {
+  const { game } = loadSGF("(;GM[1]FF[4]SZ[9]AB[aa][bb]AW[cc]PL[W];W[dd];C[a note]TR[ee];B[ff])");
+  const line = game.mainLine();
+  assert.equal(line.length, 3);
+  assert.equal(line[1].comment, "a note");
+  assert.deepEqual(line[1].marks, [{ x: 4, y: 4, type: "triangle" }]);
+  const out = game.toSGF();
+  assert.match(out, /PL\[W\]/);
+  assert.equal(loadSGF(out).game.root.turn, WHITE);
+});
+
+await test("v5: marks toggle, replace and take the next free letter", () => {
+  const g = newGame(9);
+  g.play(4, 4);
+  const n = g.current;
+  assert.deepEqual(g.toggleMark(n, 1, 1, "triangle"), { x: 1, y: 1, type: "triangle" });
+  assert.deepEqual(g.toggleMark(n, 1, 1, "square"), { x: 1, y: 1, type: "square" }, "another kind replaces");
+  assert.equal(n.marks.length, 1);
+  assert.equal(g.toggleMark(n, 1, 1, "square"), null, "the same kind removes");
+  assert.equal(n.marks.length, 0);
+  assert.equal(g.toggleMark(n, 0, 0, "label").text, "A");
+  assert.equal(g.toggleMark(n, 0, 1, "label").text, "B");
+  g.toggleMark(n, 0, 0, "label");
+  assert.equal(g.toggleMark(n, 0, 2, "label").text, "A", "a freed letter is reused");
+  assert.equal(g.toggleMark(n, 9, 0, "circle"), null, "off the board");
+  assert.equal(g.toggleMark(n, 2, 2, "star"), null, "unknown kind");
+  assert.equal(n.marks.length, 2);
+  g.setComment(n, "line\r\nbreak");
+  assert.equal(n.comment, "line\nbreak");
+});
+
+function branchedGame() {
+  // Main line 1-2-3-4-5; a variation at move 2 (2a-3a), one at move 4 (4b),
+  // a second at move 2 (2c), and a sub-variation inside 2a (after 2a: 3x).
+  const g = newGame(9);
+  const ids = {};
+  const at = (node) => g.goto(node.id);
+  g.play(0, 0);
+  ids[1] = g.current;
+  g.play(1, 0);
+  ids[2] = g.current;
+  g.play(2, 0);
+  ids[3] = g.current;
+  g.play(3, 0);
+  ids[4] = g.current;
+  g.play(4, 0);
+  ids[5] = g.current;
+  at(ids[1]);
+  g.play(1, 1);
+  ids["2a"] = g.current;
+  g.play(2, 1);
+  ids["3a"] = g.current;
+  at(ids["2a"]);
+  g.play(2, 2);
+  ids["3x"] = g.current;
+  at(ids[3]);
+  g.play(3, 3);
+  ids["4b"] = g.current;
+  at(ids[1]);
+  g.play(1, 2);
+  ids["2c"] = g.current;
+  ids["2c"].comment = "idea";
+  return { g, ids };
+}
+
+await test("v5: tree layout puts the main line on row 0 and nests variations without overlaps", () => {
+  const { g, ids } = branchedGame();
+  g.goto(ids["3a"].id);
+  const L = treeLayout(g);
+  const at = new Map(L.nodes.map((n) => [n.node, n]));
+  assert.equal(L.nodes.length, 11);
+  for (const k of [1, 2, 3, 4, 5]) {
+    assert.equal(at.get(ids[k]).y, 0);
+    assert.equal(at.get(ids[k]).x, k);
+    assert.equal(at.get(ids[k]).isMain, true);
+  }
+  assert.deepEqual([at.get(g.root).x, at.get(g.root).y], [0, 0]);
+  // The later branch (at move 3) is nearest the main line.
+  assert.deepEqual([at.get(ids["4b"]).x, at.get(ids["4b"]).y], [4, 1]);
+  assert.deepEqual([at.get(ids["2a"]).x, at.get(ids["2a"]).y], [2, 2]);
+  assert.deepEqual([at.get(ids["3a"]).x, at.get(ids["3a"]).y], [3, 2]);
+  assert.deepEqual([at.get(ids["3x"]).x, at.get(ids["3x"]).y], [3, 3]);
+  assert.deepEqual([at.get(ids["2c"]).x, at.get(ids["2c"]).y], [2, 4]);
+  assert.equal(at.get(ids["2a"]).isMain, false);
+  assert.equal(at.get(ids["2c"]).hasComment, true);
+  assert.equal(at.get(ids["3a"]).isCurrent, true);
+  assert.equal(at.get(ids["2a"]).onPath, true);
+  assert.equal(at.get(ids[2]).onPath, false);
+  assert.deepEqual(L.current, { x: 3, y: 2 });
+  assert.equal(L.width, 6);
+  assert.equal(L.height, 5);
+  // No two nodes share a cell, and no edge's vertical run crosses a node.
+  const cells = new Set(L.nodes.map((n) => `${n.x},${n.y}`));
+  assert.equal(cells.size, L.nodes.length);
+  assert.equal(L.edges.length, L.nodes.length - 1);
+  for (const e of L.edges) {
+    for (let i = 1; i < e.points.length - 1; i++) assert.ok(!cells.has(e.points[i].join(",")), "bend on a node");
+    const [[x0, y0], [x1, y1]] = [e.points[0], e.points[e.points.length - 1]];
+    for (let y = y0 + 1; y < y1 - 0; y++) if (e.points.length > 2) assert.ok(!cells.has(`${x0},${y}`), `edge through ${x0},${y}`);
+    assert.equal(x1 - x0, 1);
+  }
+  const toC = L.edges.find((e) => e.to.x === 2 && e.to.y === 4);
+  assert.deepEqual(toC.points, [[1, 0], [1, 3], [2, 4]]);
+});
+
+await test("v5: deleting and promoting variations edit the tree and the SGF", () => {
+  const { g, ids } = branchedGame();
+  assert.equal(g.isMainLine(ids[5]), true);
+  assert.equal(g.isMainLine(ids["3a"]), false);
+  assert.equal(g.promoteVariation(ids["3x"]), true);
+  assert.deepEqual(g.mainLine().map((n) => n.id), [g.root.id, ids[1].id, ids["2a"].id, ids["3x"].id]);
+  assert.deepEqual(ids[1].children.map((n) => n.id), [ids["2a"].id, ids[2].id, ids["2c"].id], "others keep their order");
+  assert.equal(g.promoteVariation(ids["3x"]), false, "already the main line");
+  // Round trip keeps the new order.
+  const back = loadSGF(g.toSGF()).game;
+  assert.deepEqual(back.mainLine().map((n) => [n.move?.x, n.move?.y]).slice(1), [[0, 0], [1, 1], [2, 2]]);
+  assert.equal(back.mainLine()[1].children.length, 3);
+  // Delete a whole branch with the cursor inside: the cursor moves up.
+  g.goto(ids[4].id);
+  assert.equal(g.deleteNode(ids[3]), ids[2]);
+  assert.equal(g.current, ids[2]);
+  assert.equal(ids[2].children.length, 0);
+  assert.equal(g.deleteNode(g.root), null, "the root stays");
+  // Deleting the first child makes the next variation the main line there.
+  g.deleteNode(ids["2a"]);
+  assert.deepEqual(g.mainLine().map((n) => n.id), [g.root.id, ids[1].id, ids[2].id]);
+  assert.equal(treeLayout(g).nodes.length, 4);
+});
+
+await test("v5: progress gains bounded, validated per-game records (migrated from v4)", () => {
+  for (const k of Object.values(KEYS)) removeKey(k);
+  writeJSON(KEYS.progress, { problems: { a: { solved: true } }, rating: { r: 1200, games: 3, history: [{ at: 1, r: 1100 }, { at: 2, r: 1200 }] } });
+  migrate();
+  const raw = readJSON(KEYS.progress, {});
+  assert.equal(raw.v, 5);
+  assert.deepEqual(raw.games, []);
+  assert.equal(raw.problems.a.solved, true, "nothing else changes");
+  const p = loadProgress();
+  assert.deepEqual(p.games, []);
+  const rec = (i, extra = {}) => ({ id: "g" + i, at: 1000 + i, size: 9, color: -1, result: "W+3.5", won: true, phases: { opening: { loss: 1, mistakes: 0, blunders: 0, moves: 5 }, middle: { loss: "4" }, endgame: null }, themes: { ladder: 1, bad: -2 }, ...extra });
+  for (let i = 0; i < MAX_GAME_RECORDS + 5; i++) addGameRecord(p, rec(i), { save: false });
+  assert.equal(p.games.length, MAX_GAME_RECORDS);
+  assert.equal(p.games[0].id, "g" + (MAX_GAME_RECORDS + 4), "newest first");
+  const g0 = p.games[0];
+  assert.deepEqual(g0.phases.middle, { loss: 4, mistakes: 0, blunders: 0, moves: 0, accuracy: null });
+  assert.deepEqual(g0.phases.endgame, { loss: 0, mistakes: 0, blunders: 0, moves: 0, accuracy: null });
+  assert.deepEqual(g0.themes, { ladder: 1 });
+  assert.equal(g0.confidence, "low");
+  assert.equal(g0.date.length, 10);
+  // Replace by id, then patch.
+  addGameRecord(p, rec(MAX_GAME_RECORDS + 4, { result: "B+R", won: false }), { save: false });
+  assert.equal(p.games.length, MAX_GAME_RECORDS);
+  assert.equal(p.games[0].won, false);
+  updateGameRecord(p, p.games[0].id, { confidence: "high", themes: { cut: 2 } });
+  assert.equal(loadProgress().games[0].confidence, "high");
+  assert.deepEqual(loadProgress().games[0].themes, { cut: 2 });
+  assert.equal(updateGameRecord(p, "missing", {}), null);
+  // Junk in storage is dropped, not fatal.
+  writeJSON(KEYS.progress, { v: 5, games: [null, { at: "x", size: 9 }, { at: 5, size: 7 }, { id: "ok", at: 5, size: 13 }, { id: "ok", at: 6, size: 13 }] });
+  assert.deepEqual(loadProgress().games.map((g) => g.id), ["ok"]);
 });
 
 if (failures) {

@@ -6,7 +6,7 @@ import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
-import { addMistake, saveProgress } from "../persist.js";
+import { addGameRecord, addMistake, saveProgress, updateGameRecord } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
@@ -16,6 +16,7 @@ import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./
 import { newClock, tick, moveMade } from "./clock.js";
 import { rankToRating, startRating, updateRating, ratingToRank } from "./rating.js";
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
+import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -609,6 +610,7 @@ function finishGame() {
   else if (won === false) Audio.lose();
   else Audio.gameEnd?.();
   // Rating: games against the computer with enough moves to mean something.
+  let rated = null;
   if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
     const p = state.progress;
     const prev = p.rating || startRating(state.settings.playerRank ?? 30);
@@ -617,9 +619,15 @@ function finishGame() {
     p.rating = updateRating(prev, { opponentRating: opp, handicap, won });
     g.ratingDelta = p.rating.r - prev.r;
     g.rated = false;
+    rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
     saveProgress(p);
   }
   saveToLibrary({ quiet: true });
+  // v5: a compact record for the trends view; the analysis fills it in.
+  if (rated) {
+    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.strength, won, rating: rated });
+    if (addGameRecord(state.progress, rec)) g.trendId = rec.id;
+  }
   announce(resultText(result));
   update();
   if (g.opponent === "ai") summarize(g);
@@ -656,6 +664,13 @@ async function summarize(g) {
     const a = points[m.index - 1];
     const spread = a?.moves?.length > 1 ? Math.abs(a.moves[0].scoreLead - a.moves[1].scoreLead) : 0;
     if (m.loss <= 0.5 && spread >= 2 && (!good || spread > good.spread)) good = { ...m, spread };
+  }
+  // v5: complete the game's trend record with per-phase losses and the
+  // themes of up to ten explained mistakes.
+  if (g.trendId) {
+    const summary = summarizeGame({ game: g.game, points, meta: { humanColor: g.humanColor }, keyMoves: mistakes.top });
+    const themes = themeCounts(describeMistakes(g.game, points, g.humanColor, 10).top, g.humanColor);
+    updateGameRecord(state.progress, g.trendId, recordAnalysis(summary, g.humanColor, themes), { save: false });
   }
   // Record weaknesses and keep the two costliest mistakes as drills.
   let weak = state.progress.weakness;

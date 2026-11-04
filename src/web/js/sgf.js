@@ -7,6 +7,10 @@
  * Node-only parser into the WebView bundle.
  *
  * Export lives on Game.toSGF(); this module only reads.
+ *
+ * v5: comments (C) and markup (TR, SQ, CR, MA, LB) are read on every node,
+ * and properties the app does not interpret are kept on node.extra (root
+ * and moves) so that toSGF() writes them back.
  */
 import { BLACK, WHITE, Game, EMPTY, rulesFromSgf, rulesetById, starPoints } from "./rules.js";
 
@@ -196,6 +200,35 @@ function marksOf(data, size) {
   return marks;
 }
 
+/** Root properties toSGF() regenerates from the Game itself. */
+const ROOT_KNOWN = new Set(["GM", "FF", "CA", "AP", "SZ", "KM", "RU", "HA", "PB", "PW", "DT", "RE", "EV", "C", "AB", "AW", "PL", "TR", "SQ", "CR", "MA", "LB"]);
+/** Node properties toSGF() regenerates from the node. */
+const NODE_KNOWN = new Set(["B", "W", "C", "TR", "SQ", "CR", "MA", "LB"]);
+
+/** Properties not in `known`, as { KEY: [raw values] }, or null. */
+function extraOf(data, known) {
+  let out = null;
+  for (const [key, values] of Object.entries(data || {})) {
+    if (known.has(key) || !/^[A-Z]+$/.test(key)) continue;
+    (out ||= {})[key] = values.slice();
+  }
+  return out;
+}
+
+function mergeExtra(a, b) {
+  if (!b) return a;
+  const out = { ...(a || {}) };
+  for (const [k, v] of Object.entries(b)) out[k] = [...(out[k] || []), ...v];
+  return out;
+}
+
+/** Merge marks: a later mark on the same point replaces an earlier one. */
+function mergeMarks(a, b) {
+  if (!b.length) return a || [];
+  const rest = (a || []).filter((m) => !b.some((n) => n.x === m.x && n.y === m.y));
+  return [...rest, ...b];
+}
+
 /**
  * @param {string} text
  * @returns {{game: Game, warnings: string[]}}
@@ -256,6 +289,8 @@ export function loadSGF(text) {
     game.setup(stones, turn);
   }
   game.setRootComment(first(data, "C"));
+  game.root.marks = marksOf(data, size);
+  game.root.extra = extraOf(data, ROOT_KNOWN);
 
   const warnings = [];
   const map = new Map();
@@ -282,7 +317,13 @@ export function loadSGF(text) {
         break;
       }
       if (!played) {
-        if (first(d, "C")) game.current.comment = first(d, "C");
+        // A node without a move (setup or comment only) folds into the
+        // node it follows. Mid-game setup stones are not applied; they are
+        // kept, like any unknown property, for the round trip.
+        const into = game.current;
+        if (first(d, "C")) into.comment = into.comment ? into.comment + "\n\n" + first(d, "C") : first(d, "C");
+        into.marks = mergeMarks(into.marks, marksOf(d, size));
+        into.extra = mergeExtra(into.extra, extraOf(d, into === game.root ? ROOT_KNOWN : NODE_KNOWN));
         map.set(child.id, game.current.id);
         walk(child);
         continue;
@@ -291,6 +332,8 @@ export function loadSGF(text) {
       if (first(d, "C")) made.comment = first(d, "C");
       const marks = marksOf(d, size);
       if (marks.length) made.marks = marks;
+      const extra = extraOf(d, NODE_KNOWN);
+      if (extra) made.extra = extra;
       map.set(child.id, made.id);
       walk(child);
     }

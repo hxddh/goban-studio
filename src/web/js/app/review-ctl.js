@@ -2,16 +2,23 @@
  * Review: a layer over any game. Whole-game analysis, live analysis of the
  * position on the board, free variations, explanations of key mistakes, and
  * turning a mistake into a drill.
+ *
+ * v5: a whole-game summary by phase (review.summary, see summary.js), the
+ * trends across rated games, and editing the record itself: comments,
+ * marks, deleting and promoting variations, and a layout of the game tree.
+ * Edits to a saved game are written back to its library record.
  */
-import { Game, influenceMap } from "../rules.js";
+import { Game, influenceMap, MARK_KINDS, treeLayout as layoutTree } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import { markClassic, markOpening, addMistake } from "../persist.js";
+import * as Lib from "../library.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { state, update, toast } from "./store.js";
 import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
+import { summarizeGame, trends } from "./summary.js";
 import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
 
@@ -22,11 +29,17 @@ import { openMistakeDrill } from "./practice-ctl.js";
  * game.mainLine(); null when cancelled. Falls back to the offline estimate
  * per position when KataGo is not there.
  */
-export async function analyzeLine(game, { visits = 40, token = { cancelled: false }, onProgress, onPoint } = {}) {
+export async function analyzeLine(game, { visits = 40, token = { cancelled: false }, onProgress, onPoint, existing = null } = {}) {
   const line = game.mainLine();
   const points = new Array(line.length).fill(null);
   for (let i = 0; i < line.length; i++) {
     if (token.cancelled) return null;
+    // v5: positions already analysed (after an edit of the main line) are kept.
+    if (existing?.[i]) {
+      points[i] = existing[i];
+      onProgress?.(i + 1, line.length);
+      continue;
+    }
     let p = null;
     try {
       p = await Engine.analyzeNode(game, line[i], visits);
@@ -77,6 +90,7 @@ async function refineKeyMoves(review) {
     if (a) {
       review.refined[km.index] = a;
       review.keyMoves = keyMovesOf(review);
+      refreshSummary(review);
       update();
     }
   }
@@ -113,8 +127,17 @@ export function openReview(game, meta = {}) {
     // whether that pass is running. See refineKeyMoves.
     refined: {},
     refining: false,
+    // v5: whole-game summary (summary.js summarizeGame), the board-click
+    // mark tool (null | a MARK_KINDS entry) and the state of record edits.
+    summary: null,
+    markTool: null,
+    edits: { dirty: false, savedAt: 0, target: null },
   };
-  if (meta.points) review.keyMoves = keyMovesOf(review);
+  review.edits.target = editTarget(review);
+  if (meta.points) {
+    review.keyMoves = keyMovesOf(review);
+    refreshSummary(review);
+  }
   update((s) => {
     s.review = review;
     s.space = meta.space || "play";
@@ -128,6 +151,7 @@ export function openReview(game, meta = {}) {
 
 export function closeReview() {
   const r = state.review;
+  if (r) saveEdits(r);
   if (canGoBack() && back()) return;
   if (r?.token) r.token.cancelled = true;
   stopLive();
@@ -142,6 +166,7 @@ export function closeReview() {
 /** Leave a review without touching history (used by restore). */
 export function dropReview(r = state.review) {
   if (!r) return;
+  saveEdits(r);
   if (r.token) r.token.cancelled = true;
   stopLive();
   if (r.source === "current" && state.game) {
@@ -153,15 +178,17 @@ export function dropReview(r = state.review) {
   state.review = null;
 }
 
-async function analyzeReview(review) {
+async function analyzeReview(review, { existing = null } = {}) {
   const game = review.game;
+  const token = review.token;
   review.analyzing = true;
   update();
   const size = game.size;
   const visits = size === 19 ? 40 : size === 13 ? 56 : 80;
   const points = await analyzeLine(game, {
     visits,
-    token: review.token,
+    token,
+    existing,
     onPoint: (i, p) => {
       review.points[i] = p;
       review.engine = p.source;
@@ -170,13 +197,15 @@ async function analyzeReview(review) {
       review.analyzed = k;
       if (k % 4 === 0 || k === n) {
         review.keyMoves = keyMovesOf(review);
+        if (k % 16 === 0 || k === n) refreshSummary(review);
         update();
       }
     },
   });
-  if (!points) return;
+  if (!points || token.cancelled) return;
   review.analyzing = false;
   review.keyMoves = keyMovesOf(review);
+  refreshSummary(review);
   if (review.source === "current" && state.game?.game === game) state.game.analysis = review.points;
   update();
   refineKeyMoves(review);
@@ -259,6 +288,7 @@ export function reviewPlay(x, y) {
   const r = state.review;
   if (!r) return;
   if (r.guess) return guessPlay(x, y);
+  if (r.markTool) return toggleMark(r.markTool, x, y);
   const cur = r.game.current;
   const existing = cur.children.find((c) => c.move && !c.move.pass && c.move.x === x && c.move.y === y);
   if (existing) return gotoNode(existing);
@@ -280,9 +310,191 @@ export function deleteVariation() {
   const main = new Set(r.game.mainLine().map((n) => n.id));
   let n = r.game.current;
   while (n.parent && !main.has(n.parent.id)) n = n.parent;
-  const parent = n.parent;
-  parent.children = parent.children.filter((c) => c !== n);
-  gotoNode(parent);
+  deleteBranch(n);
+}
+
+/* ------------------------------------------- v5: whole-game summary */
+
+function refreshSummary(review) {
+  if (!review) return null;
+  try {
+    review.summary = summarizeGame(review);
+  } catch (e) {
+    console.error("summary failed", e);
+    review.summary = null;
+  }
+  return review.summary;
+}
+
+/** The summary of the review on screen (computed on demand), or null. */
+export function reviewSummary() {
+  const r = state.review;
+  if (!r) return null;
+  return r.summary || refreshSummary(r);
+}
+
+/** Trends across the last `n` rated games (summary.js trends). */
+export function gameTrends(n = 10) {
+  return trends(state.progress, { n });
+}
+
+/* ------------------------------------------ v5: editing the record */
+
+/** Where edits are saved: "record" (library), "current" (the game in play) or null (kept in memory only: classics, openings). */
+function editTarget(r) {
+  if (r.source === "record" && r.meta.recordId) return "record";
+  if (r.source === "current" && state.game?.game === r.game) return "current";
+  return null;
+}
+
+let saveTimer = 0;
+
+function edited(r, { mainBefore = null } = {}) {
+  r.edits = { ...r.edits, dirty: true, target: editTarget(r) };
+  if (mainBefore) realign(r, mainBefore);
+  if (r.edits.target) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveEdits(r), 400);
+  }
+  update();
+}
+
+/**
+ * Write pending edits now (they are otherwise saved 0.4 s after the last
+ * one, and when the review closes). Returns true when something was saved.
+ */
+export function saveEdits(r = state.review) {
+  clearTimeout(saveTimer);
+  if (!r?.edits?.dirty) return false;
+  const target = editTarget(r);
+  if (target === "record") {
+    if (!Lib.getGame(r.meta.recordId)) return false;
+    Lib.saveGame(r.game, { id: r.meta.recordId });
+  } else if (target === "current") {
+    persistCurrent();
+    if (state.game.recordId && Lib.getGame(state.game.recordId)) Lib.saveGame(r.game, { id: state.game.recordId });
+  } else return false;
+  r.edits = { ...r.edits, dirty: false, savedAt: Date.now(), target };
+  return true;
+}
+
+/**
+ * After the main line changed (promote / delete), keep each analysis with
+ * its position: points and refined analyses follow their nodes; positions
+ * new to the main line are analysed, unless nothing had been analysed yet.
+ */
+function realign(r, before) {
+  const line = r.game.mainLine();
+  if (line.length === before.length && line.every((n, i) => n === before[i])) return;
+  const at = new Map(before.map((n, i) => [n, i]));
+  const hadAny = r.points.some(Boolean);
+  r.points = line.map((n) => (at.has(n) ? r.points[at.get(n)] : null));
+  const refined = {};
+  for (const [i, a] of Object.entries(r.refined)) {
+    const j = line.indexOf(before[i]);
+    if (j >= 0) refined[j] = a;
+  }
+  r.refined = refined;
+  r.analyzed = r.points.filter(Boolean).length;
+  r.variation = null;
+  r.focus = null;
+  r.keyMoves = keyMovesOf(r);
+  refreshSummary(r);
+  if (r.source === "current" && state.game?.game === r.game && state.game.analysis) state.game.analysis = r.points;
+  if (r.analyzing || (hadAny && !r.guess && r.points.some((p) => !p))) {
+    // The pass in flight writes by main-line index: stop it, start over
+    // with what is known.
+    r.token.cancelled = true;
+    r.token = { cancelled: false };
+    r.refining = false;
+    analyzeReview(r, { existing: r.points.slice() });
+  }
+}
+
+const nodeOf = (r, node) => (node == null ? r.game.current : typeof node === "object" ? node : r.game.nodeById(node));
+
+/** Set the comment of a node (default: the one on the board). "" clears it. */
+export function setComment(text, node = null) {
+  const r = state.review;
+  if (!r) return false;
+  const n = nodeOf(r, node);
+  if (!n || (n.comment || "") === String(text ?? "")) return false;
+  r.game.setComment(n, text);
+  edited(r);
+  return true;
+}
+
+/**
+ * Board marks. toggleMark(kind, x, y[, text]) toggles a mark on the node on
+ * the board; toggleMark(kind) with no point picks (or drops, when it is the
+ * current one) the mark tool, so that board clicks place marks instead of
+ * stones. kind: "triangle" | "square" | "circle" | "cross" | "label"; null
+ * drops the tool.
+ */
+export function toggleMark(kind, x = null, y = null, text = null) {
+  const r = state.review;
+  if (!r) return null;
+  if (x == null || y == null) {
+    setMarkTool(r.markTool === kind ? null : kind);
+    return null;
+  }
+  if (!MARK_KINDS.includes(kind)) return null;
+  const mark = r.game.toggleMark(r.game.current, x, y, kind, text);
+  edited(r);
+  return mark;
+}
+
+export function setMarkTool(kind) {
+  const r = state.review;
+  if (!r) return;
+  r.markTool = MARK_KINDS.includes(kind) ? kind : null;
+  update();
+}
+
+/** Remove every mark on a node (default: the one on the board). */
+export function clearMarks(node = null) {
+  const r = state.review;
+  const n = r && nodeOf(r, node);
+  if (!n?.marks?.length) return false;
+  n.marks = [];
+  edited(r);
+  return true;
+}
+
+/**
+ * Delete a node and everything after it (default: the node on the board).
+ * Deleting a main-line move makes its next variation the main line there;
+ * the UI should confirm that first. The root cannot be deleted.
+ */
+export function deleteBranch(node = null) {
+  const r = state.review;
+  if (!r) return false;
+  const n = nodeOf(r, node);
+  if (!n?.parent) return false;
+  const before = r.game.mainLine();
+  const parent = r.game.deleteNode(n);
+  if (!parent) return false;
+  edited(r, { mainBefore: before });
+  // The cursor was inside the deleted branch: show the branch point.
+  if (r.game.current === parent) gotoNode(parent);
+  return true;
+}
+
+/** Make the line through a node (default: the one on the board) the main line. */
+export function promoteVariation(node = null) {
+  const r = state.review;
+  if (!r) return false;
+  const n = nodeOf(r, node);
+  const before = r.game.mainLine();
+  if (!n || !r.game.promoteVariation(n)) return false;
+  edited(r, { mainBefore: before });
+  return true;
+}
+
+/** The game tree laid out for the variation mini-map (rules.treeLayout). */
+export function treeLayout() {
+  const r = state.review;
+  return r ? layoutTree(r.game) : null;
 }
 
 /* ------------------------------------------------------ live analysis */
