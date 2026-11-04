@@ -19,6 +19,7 @@
  */
 import { t } from "./i18n.js";
 import { LETTERS } from "./rules.js";
+import { windowOf } from "./board.js";
 
 const BLACK = 1;
 const WHITE = -1;
@@ -126,6 +127,15 @@ function stonesOn(board, points, label) {
 }
 
 const fullWindow = (size) => ({ x0: 0, y0: 0, x1: size - 1, y1: size - 1 });
+
+/**
+ * The part of the board a model draws: a problem window is widened before
+ * it is drawn (windowOf), so reading uses the same window, not the
+ * problem's own view. Null for the whole board.
+ */
+export function shownWindow(model, size = model?.size) {
+  return model?.view ? windowOf(model.view, size) : null;
+}
 
 /** One row of the board (inside the visible window): "Row 4: black D, F; white E". */
 export function rowText(board, y, { size = board.length, view = null } = {}) {

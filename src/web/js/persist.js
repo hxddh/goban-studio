@@ -411,6 +411,18 @@ export function markProblem(progress, id, { solved, clean = solved }, now = Date
 }
 
 /**
+ * Solved later in the same visit, after a miss already counted: the problem
+ * is solved (not clean); the review schedule the miss set stays.
+ */
+export function markSolvedLate(progress, id, now = Date.now()) {
+  const prev = progress.problems[id];
+  if (!prev) return markProblem(progress, id, { solved: true, clean: false }, now);
+  progress.problems[id] = { ...prev, solved: true, last: now };
+  saveProgress(progress);
+  return progress;
+}
+
+/**
  * Today's five: problems due for review first, then new problems at the
  * learner's level (the lowest grade with unsolved problems, and one above).
  * Stable for a given day.

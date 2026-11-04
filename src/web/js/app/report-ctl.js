@@ -13,6 +13,7 @@
  * Opening a key moment opens the review of the game at that move; the
  * analysis made for the report is handed to the review so it opens at once.
  */
+import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Lib from "../library.js";
 import { t } from "../i18n.js";
@@ -238,12 +239,25 @@ export function openReportReview() {
 }
 
 /** The drills this report can add, and the ones already in practice. */
+/** In a game between two people: whose mistakes to practise (BLACK / WHITE). */
+export function reportDrillColor() {
+  const r = state.report;
+  if (!r?.model || r.model.humanColor != null) return null;
+  return r.drillColor ?? BLACK;
+}
+
+export function setReportDrillColor(color) {
+  if (!state.report) return;
+  state.report.drillColor = color;
+  update();
+}
+
 export function reportPractice() {
   const r = state.report;
   if (!r?.model) return { add: [], have: [] };
   const rec = Lib.getGame(r.recordId);
   if (!rec) return { add: [], have: [] };
-  return reportDrills(r.model, { sgf: rec.sgf, gameKey: rec.id, existing: state.progress.mistakes });
+  return reportDrills(r.model, { sgf: rec.sgf, gameKey: rec.id, existing: state.progress.mistakes, color: reportDrillColor() });
 }
 
 /** "Practise this game": add the worst mistakes as drills and start the first. */

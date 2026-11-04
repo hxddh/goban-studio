@@ -168,10 +168,12 @@ export function reportFits(report, game) {
 }
 
 /** The moments worth practising: the costliest 1–3 with a better move, worst first. */
-export function drillMoments(report, max = MAX_DRILLS) {
+export function drillMoments(report, max = MAX_DRILLS, color = null) {
   if (!report || report.confidence !== "high") return [];
+  // A game against the computer only has the player's moments; a game
+  // between two people drills one side at a time (`color`).
   return report.moments
-    .filter((m) => m.best && m.loss > MISTAKE)
+    .filter((m) => m.best && m.loss > MISTAKE && (color == null || m.color === color))
     .slice()
     .sort((a, b) => b.loss - a.loss || a.index - b.index)
     .slice(0, max);
@@ -184,10 +186,10 @@ export function drillMoments(report, max = MAX_DRILLS) {
  * build it) or the same position (same SGF and move index) under another
  * key, so a game drilled from the review is not added twice.
  */
-export function reportDrills(report, { sgf, gameKey, existing = [] }) {
+export function reportDrills(report, { sgf, gameKey, existing = [], color = null }) {
   const add = [];
   const have = [];
-  for (const mo of drillMoments(report)) {
+  for (const mo of drillMoments(report, MAX_DRILLS, color)) {
     const id = `${gameKey}-${mo.index}`;
     const same = existing.find((m) => m.id === id || (m.index === mo.index && m.sgf === sgf));
     if (same) {
