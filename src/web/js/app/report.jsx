@@ -13,6 +13,7 @@ import { storyText } from "./story.js";
 import { accuracyText, drawMoment, lossText, momentWords, reportFacts, reportHeadline } from "./report-draw.js";
 import { Button, Segmented, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { RatingChange, ReportStopped } from "./report-status.jsx";
 
 export function ReportView() {
   const r = state.report;
@@ -29,11 +30,13 @@ export function ReportView() {
       <div class="page report">
         {busy && !m && <Pending />}
         {r.status === "missing" && !m && <p class="muted">{t("report.missing")}</p>}
+        {r.status === "stopped" && <ReportStopped />}
         {m && (
           <>
             <header class="page-head">
               <h1>{reportHeadline(m)}</h1>
               <span class="muted">{reportFacts(m)}</span>
+              <RatingChange />
             </header>
             {busy && <Pending />}
             <Phases m={m} />

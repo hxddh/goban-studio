@@ -32,8 +32,30 @@ what the signing steps actually did, not from a template. Until the
 certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
 are ad-hoc signed (macOS) and unsigned (Windows).
 
-`SHA256SUMS` is attached to every GitHub release. The v5.0.0 notes are in
-[`.github/release-notes/v5.0.0.md`](.github/release-notes/v5.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v7.0.0 notes are in
+[`.github/release-notes/v7.0.0.md`](.github/release-notes/v7.0.0.md).
+
+## v7 at a glance
+
+- **A training plan** — *This week's focus* on Today: one or two themes
+  chosen from your analysed games and problem results, with the reason, and
+  a Daily five built around them ([`docs/plan.md`](docs/plan.md)).
+- **Reports that make themselves** — prepared in the background after
+  every game, with the change in your strength estimate; *Analyse all* in
+  the Library for older games; two-player reports drill one side at a time.
+- **Problem collections** — import SGF problems; each answer is proved by
+  the solver before it is added, and an answer proved wrong is shown with
+  its refutation.
+- **The engine answers your move first** — analysis is scheduled (your
+  opponent's move, then what you look at, then background work) and work
+  that is no longer needed is cancelled.
+- **Strength** — the human-style ladder measured again on GitHub's build
+  machines (1,532 new games): no gap any more between ≈12 kyu and ≈3 kyu.
+- **SGF coordinates** — records from other programs are read correctly
+  (FF[4] uses the letter *i*; earlier versions skipped it); records saved by
+  earlier versions of the app keep reading as they were.
+- **Checked together** — every page in all four languages, light and dark,
+  with and without larger text.
 
 ## v6 at a glance
 
@@ -259,6 +281,10 @@ against each other and against KataGo's human-imitation model on 19×19 and
 9×9 and fits Bradley–Terry ratings, mapped to kyu/dan with the EGF rating
 formula and a 10-kyu anchor. They run from ≈30 kyu to ≈4 dan, about five
 ranks apart; labels stay “≈” because the anchor is a model, not people.
+The human-style levels were measured again in v7 (708 games on 19×19 and
+824 on 9×9, played on GitHub's runners by `.github/workflows/calibrate.yml`)
+and run from ≈30 kyu to ≈6 dan without a gap; the stronger network's top
+level is ≈7 dan.
 Method, raw results and limitations: [docs/strength.md](docs/strength.md).
 In the browser preview there is no KataGo: 9×9 falls back to Moka v2.1 and
 other sizes to a small heuristic engine, and the interface says so

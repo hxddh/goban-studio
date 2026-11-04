@@ -14,6 +14,7 @@ import { rankLabel } from "./play.jsx";
 import { estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
+import { BackgroundGroup } from "./background.jsx";
 
 export function Sheets() {
   const sheet = state.sheet;
@@ -394,7 +395,12 @@ function SettingsSheet({ pane: open }) {
               </section>
             </>
           )}
-          {pane === "engine" && <ModelsGroup />}
+          {pane === "engine" && (
+            <>
+              <ModelsGroup />
+              <BackgroundGroup />
+            </>
+          )}
           {pane === "data" && (
             <>
               <section class="settings-group">
@@ -723,15 +729,17 @@ function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   );
 }
 
-function RenameSheet({ id, name }) {
+function RenameSheet({ id, name, title, onSave }) {
   const [value, setValue] = useState(name || "");
   const save = () => {
-    C.renameRecord(id, value.trim());
+    // v7: a collection (or anything else) can bring its own save.
+    if (onSave) onSave(value.trim());
+    else C.renameRecord(id, value.trim());
     update({ sheet: null });
   };
   return (
     <Modal
-      title={t("library.rename")}
+      title={title || t("library.rename")}
       footer={
         <>
           <Button kind="ghost" onClick={C.closeSheet}>
@@ -750,7 +758,7 @@ function RenameSheet({ id, name }) {
         value={value}
         onFocus={(e) => e.currentTarget.select()}
         maxLength={120}
-        aria-label={t("library.rename")}
+        aria-label={title || t("library.rename")}
         onInput={(e) => setValue(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && save()}
       />

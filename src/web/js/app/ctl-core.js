@@ -105,6 +105,7 @@ export function locationNow() {
       topic: p.topic,
       theme: p.theme || null,
       shape: p.shape || null,
+      collection: p.collection || null, // v7
       lessonId: p.lesson?.lesson?.id || null,
       lessonIndex: p.lesson?.index ?? null,
       problemId: p.problem?.def?.id || null,

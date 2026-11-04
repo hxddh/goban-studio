@@ -35,7 +35,7 @@ export const gorToTheta = (g) => -20 * Math.log((4100 - Math.min(g, 3900)) / ANC
 /**
  * Measured strength of each level, θ on 19×19 and on 9×9 (each board its
  * own Bradley–Terry fit, both with the weakest standard level at 0).
- * standard: v4 (527 + 620 games); human and strong: v6 (docs/strength.md).
+ * standard: v4 (527 + 620 games); human and strong: v7 (docs/strength.md).
  * A missing entry falls back to the standard level.
  */
 export const MEASURED = {
@@ -49,21 +49,22 @@ export const MEASURED = {
     "1k": { 19: 17.9, 9: 12.08 },
     "2d": { 19: 23.35, 9: 14.93 },
   },
-  // v6, 54 games on 19×19 and 372 on 9×9 against the standard levels held
-  // at their v4 values. 19×19 values from sweeps (5k, 1k, 2d, strong) are
-  // closer to lower bounds.
+  // v7, 708 games on 19×19 and 824 on 9×9 (with v6's 54 and 372 for the
+  // settings that did not change) against the standard levels held at
+  // their v4 values; 5k, 15k and 1k have v7 settings. The top two rest on
+  // a 400-visit bridge above the ladder and are the least certain.
   human: {
-    "30k": { 19: 0.19, 9: 0.4 },
-    "25k": { 19: 0.42, 9: 1.12 },
-    "20k": { 19: 3.14, 9: 1.98 },
-    "15k": { 19: 8.59, 9: 5.23 },
-    "10k": { 19: 10.2, 9: 6.57 },
-    "5k": { 19: 17.26, 9: 12.25 },
-    "1k": { 19: 20.9, 9: 13.16 },
-    "2d": { 19: 25.94, 9: 15.03 },
+    "30k": { 19: 0.42, 9: 0.41 },
+    "25k": { 19: 1.39, 9: 1.15 },
+    "20k": { 19: 3.9, 9: 2.1 },
+    "15k": { 19: 6.77, 9: 4.64 },
+    "10k": { 19: 10.19, 9: 6.79 },
+    "5k": { 19: 13.68, 9: 8.03 },
+    "1k": { 19: 18.42, 9: 12.89 },
+    "2d": { 19: 26.99, 9: 14.99 },
   },
   strong: {
-    "2d": { 19: 25.94, 9: 16.85 },
+    "2d": { 19: 28.11, 9: 16.82 },
   },
 };
 

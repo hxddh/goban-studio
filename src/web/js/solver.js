@@ -945,7 +945,7 @@ export function pointOf(pz, i) {
  * them. A problem is valid when the list is non-empty and every move outside
  * the list loses.
  */
-export function solveFirstMoves(pz, budget = 600000) {
+export function solveFirstMoves(pz, budget = 600000, { deadline = Infinity } = {}) {
   if (pz.counting) return countSolveFirstMoves(pz);
   const st = initialState(pz);
   const keyIdx = keyIndices(pz);
@@ -954,6 +954,11 @@ export function solveFirstMoves(pz, budget = 600000) {
   let nodes = 0;
   let exact = true;
   for (const m of moves) {
+    // v7 (problem import): a wall-clock limit; the result is then inexact.
+    if (Date.now() > deadline) {
+      exact = false;
+      return { correct: correct.map((i) => pointOf(pz, i)), tried: moves.length, nodes, exact, timedOut: true };
+    }
     const r = userWins(pz, m.next, budget);
     nodes += r.nodes;
     if (!r.exact) exact = false;

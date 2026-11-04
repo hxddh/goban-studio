@@ -296,15 +296,22 @@ await test("SGF import accepts pass, setup, comments and four-digit dates", () =
   assert.equal(line[3].move.color, WHITE);
 });
 
-await test("SGF columns skip I on import and export", () => {
-  const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[jd];W[qd])");
+await test("SGF columns are a..s with the i (FF[4]); pre-v7 Goban Studio records are read without it", () => {
+  // Standard: i is the ninth column, j the tenth, s the nineteenth.
+  const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[id];W[jd];B[sd])");
   const line = game.mainLine();
-  assert.equal(line[1].move.x, 8);
+  assert.deepEqual([line[1].move.x, line[2].move.x, line[3].move.x], [8, 9, 18]);
   assert.equal(line[1].move.y, 3);
-  assert.equal(line[2].move.x, 15);
   const sgf = game.toSGF();
-  assert.match(sgf, /;B\[jd\]/);
-  assert.match(sgf, /;W\[qd\]/);
+  assert.match(sgf, /;B\[id\];W\[jd\];B\[sd\]/);
+  // Written by Goban Studio 6 or earlier: a..h, j..t.
+  const old = loadSGF("(;GM[1]FF[4]AP[Goban Studio:6.0.0]SZ[19];B[jd];W[td])").game.mainLine();
+  assert.deepEqual([old[1].move.x, old[2].move.x], [8, 18]);
+  // Read back under the new rule, a re-saved old record keeps its moves.
+  const again = loadSGF(loadSGF("(;GM[1]FF[4]AP[Goban Studio:5.1.0]SZ[19];B[jd];W[td])").game.toSGF()).game.mainLine();
+  assert.deepEqual([again[1].move.x, again[2].move.x], [8, 18]);
+  // Every bundled classic now loads without an illegal move.
+  for (const c of CLASSICS) assert.deepEqual(loadSGF(c.sgf).warnings, [], c.id);
 });
 
 /* ------------------------------------------------------------ v5 rules */
@@ -1696,7 +1703,7 @@ await test("v5: SGF comments and markup survive a round trip on every node", () 
   g.play(6, 6);
   const sgf = g.toSGF();
   assert.match(sgf, /TR\[ee\]/);
-  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ji:B][ai:x:y\\]]"), sgf);
+  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ii:B][ai:x:y\\]]"), sgf);
   const back = loadSGF(sgf).game;
   assert.equal(back.root.comment, g.root.comment);
   assert.deepEqual(back.root.marks, [{ x: 4, y: 4, type: "triangle" }]);
@@ -2206,17 +2213,20 @@ await test("v5: every level has a valid human SL profile, in ladder order", () =
     return m[2] === "k" ? -Number(m[1]) : Number(m[1]);
   };
   let prev = -Infinity;
-  let prevBlunder = Infinity;
+  // v7: beginner moves fall up the ladder within each style (the search
+  // style at 5k needs its own to play at the level, docs/strength.md v7).
+  const prevBlunder = { raw: Infinity, search: Infinity };
   for (const s of STRENGTHS) {
     assert.ok(s.human && valid(s.human.profile), s.id);
     assert.ok(!s.human.style || ["raw", "search"].includes(s.human.style), s.id);
     const v = strengthOf(s.human.profile);
     assert.ok(v >= prev, `${s.id}: profile weaker than the level below`);
     const b = s.human.blunder ?? 0;
-    assert.ok(b <= prevBlunder, `${s.id}: more beginner moves than the level below`);
-    assert.ok(b < s.blunder || s.blunder === 0, `${s.id}: human style adds no beginner moves of its own`);
+    const style = s.human.style || "raw";
+    assert.ok(b <= prevBlunder[style], `${s.id}: more beginner moves than the level below`);
+    if (style === "raw") assert.ok(b < s.blunder || s.blunder === 0, `${s.id}: human style adds no beginner moves of its own`);
     prev = v;
-    prevBlunder = b;
+    prevBlunder[style] = b;
     const req = humanRequest(s.human);
     assert.equal(req.engine, "human");
     assert.ok(req.visits >= 1 && req.visits <= 400, s.id);
@@ -3270,14 +3280,14 @@ await test("v6 strength: the calibration fit can hold the measured ladder and pl
 
 await test("v6 strength: human-style and stronger-network labels follow the v6 measurement", async () => {
   const E = await import("../src/web/js/engine.js");
-  // Moved only where both boards agreed (docs/strength.md).
-  assert.equal(E.labelRank("5k", "human"), 3);
-  assert.equal(E.labelRank("1k", "human"), 0);
-  assert.equal(E.labelRank("2d", "strong"), -4);
-  for (const id of ["30k", "25k", "20k", "15k", "10k", "2d"]) assert.equal(E.labelRank(id, "human"), strengthById(id).rank, id);
+  // v7 values (docs/strength.md, v7; the v7 tests check the whole ladder).
+  assert.equal(E.labelRank("1k", "human"), 1);
+  assert.equal(E.labelRank("2d", "human"), -5);
+  assert.equal(E.labelRank("2d", "strong"), -6);
+  for (const id of ["30k", "25k", "20k", "15k", "10k", "5k"]) assert.equal(E.labelRank(id, "human"), strengthById(id).rank, id);
   for (const s of STRENGTHS) assert.equal(E.labelRank(s.id, "standard"), s.rank);
-  assert.deepEqual(rankParts("5k", "human"), { n: 3, unit: "kyu" });
-  assert.deepEqual(rankParts("2d", "strong"), { n: 5, unit: "dan" });
+  assert.deepEqual(rankParts("1k", "human"), { n: 1, unit: "kyu" });
+  assert.deepEqual(rankParts("2d", "strong"), { n: 7, unit: "dan" });
   assert.deepEqual(rankParts("5k", "standard"), { n: 7, unit: "kyu" });
   // Every mode's measured strength is ordered as its labels are, on 19×19.
   for (const mode of ["standard", "human"]) {
