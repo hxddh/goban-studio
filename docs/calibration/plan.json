@@ -1,0 +1,26 @@
+{
+  "note": "v7 stage 4: the chosen human-style 5k (rank_7k, search style, 24 visits, 12% beginner moves) on 19x19 and 9x9 (docs/strength.md, v7)",
+  "runs": [
+    {
+      "id": "v7-19c",
+      "size": 19,
+      "games": 24,
+      "pairs": "CH:s7k24b12-L:10k,CH:s7k24b12-L:5k,CH:s7k24b12-L:1k,CH:s7k24b12-HL:10k,CH:s7k24b12-HL:5k",
+      "shards": 12,
+      "workers": 4,
+      "scoreVisits": 200,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    },
+    {
+      "id": "v7-9c",
+      "size": 9,
+      "games": 16,
+      "pairs": "CH:s7k24b12-L:10k,CH:s7k24b12-L:5k,CH:s7k24b12-L:1k,CH:s7k24b12-HL:10k,CH:s7k24b12-HL:5k",
+      "shards": 2,
+      "workers": 4,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    }
+  ]
+}
