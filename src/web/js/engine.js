@@ -21,6 +21,7 @@
 import { BLACK, WHITE, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
 import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
+import { scheduler } from "./scheduler.js";
 
 /**
  * Strength ladder, calibrated by self-play and against KataGo's human SL
@@ -119,18 +120,19 @@ export function suggestHandicap(playerRank, strengthId, size) {
 }
 
 /**
- * One search at a time. The sidecar supersedes a running search with a new
- * one; queueing here keeps the whole-game review, live analysis, pondering
- * and the opponent from cancelling each other. A caller that no longer
- * wants its result aborts its own signal.
+ * One search at a time, by priority (v7, scheduler.js): the computer's move
+ * first, then what the player is looking at, then pondering, then batch
+ * work. The sidecar supersedes a running search with a new one, so nothing
+ * else may reach KataGo. Every call takes `{ signal, lane }`; a caller that
+ * no longer wants its result aborts its signal, and a search still queued
+ * then never runs.
  */
-let chain = Promise.resolve();
-function queued(fn) {
-  const run = chain.then(fn, fn);
-  chain = run.catch(() => {});
-  return run;
-}
-const analyzeQ = (game, opts) => queued(() => (opts?.signal?.aborted ? null : KataGo.analyze(game, opts)));
+export { LANES } from "./scheduler.js";
+export const sched = scheduler;
+const analyzeQ = (game, opts = {}) => {
+  const { lane = "background", signal = null, ...rest } = opts;
+  return scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal });
+};
 
 /**
  * An analysis search on the analysis engine (the stronger network when it is
@@ -375,18 +377,18 @@ export function humanRequest(human) {
  * its reply. `analysis` is null when KataGo is not available. `mode` says
  * how the move was chosen ("human", "strong", "standard" or "offline").
  */
-export async function decide(game, strengthId, { signal } = {}) {
+export async function decide(game, strengthId, { signal, lane = "move" } = {}) {
   const strength = strengthById(strengthId);
   const mode = opponentMode(strength);
   if (mode === "human") {
-    const analysis = await analyzeQ(game, { ...humanRequest(strength.human), signal });
+    const analysis = await analyzeQ(game, { ...humanRequest(strength.human), signal, lane });
     if (signal?.aborted) return { move: null, analysis: null, mode };
     const move = analysis && humanMoveFromAnalysis(game, analysis, strength.human);
     if (move) return { move, analysis, mode };
     // The human process could not answer: the level's standard play.
   }
   if (mode === "strong") {
-    const analysis = await analyzeQ(game, { visits: strength.strong.visits, engine: "strong", signal });
+    const analysis = await analyzeQ(game, { visits: strength.strong.visits, engine: "strong", signal, lane });
     if (signal?.aborted) return { move: null, analysis: null, mode };
     const move = analysis && moveFromAnalysis(game, analysis, strength);
     if (move) {
@@ -395,7 +397,7 @@ export async function decide(game, strengthId, { signal } = {}) {
     }
     if (!analysis) strongFailures++;
   }
-  const analysis = await analyzeQ(game, { visits: strength.visits, signal });
+  const analysis = await analyzeQ(game, { visits: strength.visits, signal, lane });
   if (signal?.aborted) return { move: null, analysis: null, mode: "standard" };
   if (analysis) {
     const move = moveFromAnalysis(game, analysis, strength);
@@ -405,30 +407,36 @@ export async function decide(game, strengthId, { signal } = {}) {
   return { move, analysis: null, mode: "offline" };
 }
 
-/** A quick look at the position (for teaching mode and the eval bar). */
-export async function evaluate(game, { node = game.current, visits = 48, signal } = {}) {
-  return analysisQ(game, { node, visits, signal });
+/** A quick look at the position (for teaching mode and the eval bar): pondering. */
+export async function evaluate(game, { node = game.current, visits = 48, signal, lane = "live" } = {}) {
+  return analysisQ(game, { node, visits, signal, lane });
 }
 
-/** Live analysis for review, with partial results while it searches. */
-export async function live(game, node, { visits = 240, onInfo, signal } = {}) {
-  return analysisQ(game, { node, visits, onInfo, signal });
+/** Live analysis of the position on screen (review, explorer), with partial results. */
+export async function live(game, node, { visits = 240, onInfo, signal, lane = "interactive" } = {}) {
+  return analysisQ(game, { node, visits, onInfo, signal, lane });
 }
 
+/**
+ * Stop the searches of the play view (the computer's move, hints, counting,
+ * pondering and the position on screen): queued ones never run, a running
+ * one is cancelled. Background work (reviews, reports) carries on; it is
+ * stopped through its owner (scheduler.js cancelOwner).
+ */
 export function cancel() {
-  KataGo.cancel?.();
+  scheduler.cancelLanes(["move", "interactive", "live"]);
 }
 
-export async function chooseMove(game, strengthId) {
+export async function chooseMove(game, strengthId, opts = {}) {
   // Never resign, never pass early while the board is open: KataGo's own
   // choice is a pass only when the game is really over.
-  const { move } = await decide(game, strengthId);
+  const { move } = await decide(game, strengthId, opts);
   return move || chooseLocal(game, { level: strengthById(strengthId).local, color: game.turn });
 }
 
-/** The engine's suggestion for the side to move, with a short line. */
-export async function hint(game) {
-  const analysis = await analysisQ(game, { visits: 200 });
+/** The engine's suggestion for the side to move, with a short line (the player waits on it). */
+export async function hint(game, { signal, lane = "move" } = {}) {
+  const analysis = await analysisQ(game, { visits: 200, signal, lane });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
     return { ...toMove(top), pv: top.pv || [], source: "katago" };
@@ -441,8 +449,8 @@ export async function hint(game) {
  * Review data for one position: Black-POV win rate and score lead, and the
  * best move with its line. `visits` trades accuracy for speed.
  */
-export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
-  const a = await analysisQ(game, { node, visits, signal });
+export async function analyzeNode(game, node, visits = 48, { signal, lane = "background" } = {}) {
+  const a = await analysisQ(game, { node, visits, signal, lane });
   if (a && a.moves.length) {
     const top = a.moves[0];
     return {
@@ -473,8 +481,8 @@ export function estimateNode(game, node) {
  * dead when the area under it clearly belongs to the other colour. Returns
  * [] when the engine is unavailable; the player marks stones by hand then.
  */
-export async function deadStones(game) {
-  const a = await analysisQ(game, { visits: 160 });
+export async function deadStones(game, { signal, lane = "interactive" } = {}) {
+  const a = await analysisQ(game, { visits: 160, signal, lane });
   if (!a?.ownership) return { stones: [], source: "manual" };
   const size = game.size;
   const signMap = game.board.signMap;

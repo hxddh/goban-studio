@@ -16,14 +16,23 @@ import { confirmAction, openSheet, remember, resultText, setSetting, syncMenus, 
 import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { newClock, tick, moveMade } from "./clock.js";
 import { ratingToRank } from "./rating.js";
-import { rateGame, recommendStrength, startEstimate } from "./strength.js";
+import { estimateNow, rateGame, recommendStrength, startEstimate } from "./strength.js";
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
 import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
+import { notePoints, queueReport } from "./report-ctl.js";
 
 /* ------------------------------------------------------------ state */
 
+/** v7: the signal of everything a game queued (cancelled when it is replaced). */
+const gameSignal = (g) => Engine.sched.ownerSignal(g?.owner);
+
 export function freshGameState(game, meta = {}) {
+  // v7: a new game ends whatever the last one still had queued (its
+  // pondering, its post-game summary); a rated game's report carries on in
+  // the background (report-ctl queueReport).
+  if (state.game?.owner) Engine.sched.cancelOwner(state.game.owner);
   return {
+    owner: Engine.sched.newOwner("game"),
     game,
     recordId: meta.recordId || null,
     name: meta.name || "",
@@ -277,7 +286,7 @@ export async function ponder() {
   g.pondering = true;
   let a = null;
   try {
-    a = await Engine.evaluate(g.game, { node, visits: 64 });
+    a = await Engine.evaluate(g.game, { node, visits: 64, signal: gameSignal(g) });
   } catch (_) {}
   if (state.game !== g || gen !== g.gen) return;
   g.pondering = false;
@@ -321,7 +330,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const started = performance.now();
   let result = { move: null, analysis: null };
   try {
-    result = await Engine.decide(g.game, g.strength);
+    result = await Engine.decide(g.game, g.strength, { signal: gameSignal(g) });
   } catch (_) {
     result = { move: null, analysis: null };
   }
@@ -513,7 +522,7 @@ export async function askHint() {
   update();
   let h = null;
   try {
-    h = await Engine.hint(g.game);
+    h = await Engine.hint(g.game, { signal: gameSignal(g) });
   } catch (_) {
     h = null;
   }
@@ -562,7 +571,7 @@ async function startScoring() {
   update();
   let dead = { stones: [], source: "manual" };
   try {
-    dead = await Engine.deadStones(g.game);
+    dead = await Engine.deadStones(g.game, { signal: gameSignal(g) });
   } catch (_) {}
   if (state.game !== g || !g.scoring) return;
   g.scoring = { dead: dead.stones, score: g.game.score(dead.stones), source: dead.source, at: performance.now() };
@@ -631,8 +640,11 @@ function finishGame() {
     g.rated = false;
     rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
     saveProgress(p);
+    // v7: the estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
+    g.ratingChange = ratingChange(prev, p.rating);
   }
   saveToLibrary({ quiet: true });
+  if (g.ratingChange && g.recordId) Lib.patchGame(g.recordId, { rating: g.ratingChange });
   // v5: a compact record for the trends view; the analysis fills it in.
   if (rated) {
     const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.strength, won, rating: rated });
@@ -640,30 +652,81 @@ function finishGame() {
   }
   announce(resultText(result));
   update();
+  // v7: a rated game gets its report in the background, so opening it is
+  // instant (report-ctl queueReport, after the summary's analysis).
+  const autoReport = !!rated && !!g.recordId;
   // v6: the report waits for this analysis (report-ctl).
-  if (g.opponent === "ai") g.summaryJob = summarize(g);
+  if (g.opponent === "ai") g.summaryJob = summarize(g, { autoReport });
+  else if (autoReport) queueReport(g.recordId);
+}
+
+/** v7: the strength estimate before and after a rated game, as the report shows it. */
+export function ratingChange(before, after, now = Date.now()) {
+  const a = estimateNow(before, now);
+  const b = estimateNow(after, now);
+  if (!a || !b) return null;
+  return { before: { r: a.r, rank: a.rank, pm: a.pm }, after: { r: b.r, rank: b.rank, pm: b.pm } };
+}
+
+/** The computer level as a title shows it ("≈ 12 kyu"). */
+function levelText(id) {
+  const r = Engine.rankParts(id);
+  return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
 }
 
 /**
  * After a game against the computer: analyse it in the background and say
  * three things — the biggest mistake, a good move, and what to practise.
+ *
+ * v7: a background job owned by the game (scheduler.js): a new game cancels
+ * it, and its computer's move never waits behind it. The positions analysed
+ * so far are handed to the report (report-ctl notePoints), which finishes
+ * the analysis in the background when the game was rated.
  */
-async function summarize(g) {
-  if (!state.engine.available || g.game.mainLine().length < 8) return;
+async function summarize(g, { autoReport = false } = {}) {
+  const recordId = g.recordId;
+  try {
+    if (!state.engine.available || g.game.mainLine().length < 8) return;
+    await summarizeAnalysis(g, recordId);
+  } finally {
+    if (autoReport) queueReport(recordId);
+  }
+}
+
+async function summarizeAnalysis(g, recordId) {
   g.summary = { status: "analyzing", progress: 0 };
   update();
-  const token = { cancelled: false };
-  g.summaryToken = token;
-  const points = await analyzeLine(g.game, {
-    visits: g.game.size === 19 ? 32 : 48,
-    token,
-    onProgress: (k, n) => {
-      if (state.game !== g || !g.summary) return;
-      g.summary.progress = k / n;
-      update();
-    },
+  const partial = new Array(g.game.mainLine().length).fill(null);
+  if (recordId) notePoints(recordId, partial);
+  const job = Engine.sched.startJob({
+    kind: "summary",
+    owner: g.owner,
+    title: () => t("sched.job.game", [levelText(g.strength)]),
+    meta: { recordId },
+    run: (job) =>
+      analyzeLine(g.game, {
+        visits: g.game.size === 19 ? 32 : 48,
+        signal: job.signal,
+        onPoint: (i, p) => {
+          partial[i] = p;
+        },
+        onProgress: (k, n) => {
+          job.setProgress(k / n);
+          if (state.game !== g || !g.summary) return;
+          g.summary.progress = k / n;
+          update();
+        },
+      }),
   });
-  if (token.cancelled || state.game !== g || !points) return;
+  const points = await job.promise;
+  if (!points) {
+    // Cancelled (a new game, or from Settings): no summary.
+    if (g.summary?.status === "analyzing") g.summary = null;
+    if (state.game === g) update();
+    return;
+  }
+  if (recordId) notePoints(recordId, points);
+  if (state.game !== g) return;
   g.analysis = points;
   const mistakes = describeMistakes(g.game, points, g.humanColor);
   const losses = mistakes.all;

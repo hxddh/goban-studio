@@ -26,6 +26,7 @@ import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openT
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { dropReport, restoreReport } from "./report-ctl.js";
+import { resumeBackground } from "./report-batch.js";
 
 import { closeExplorer } from "./explorer-ctl.js";
 
@@ -36,6 +37,7 @@ export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
 export * from "./report-ctl.js";
+export * from "./report-batch.js";
 
 export * from "./explorer-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
@@ -72,6 +74,8 @@ export function boot() {
     update({ engine: info });
     maybeComputerMove();
     ponder();
+    // v7: background reports and "Analyse all" that quitting interrupted.
+    resumeBackground();
   });
   // v5: which optional networks are installed (a local status call, no
   // network request).

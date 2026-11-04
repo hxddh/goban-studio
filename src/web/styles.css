@@ -826,3 +826,13 @@ button.group-row:hover { background: var(--fill); }
 .explorer-about summary { cursor: pointer; font: var(--t-small); color: var(--text-2); }
 .explorer-about p { margin-top: var(--s-2); }
 .page > .explorer-help { margin: calc(var(--s-2) * -1) auto var(--s-3); }
+
+/* v7 scheduler */
+.bg-job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bg-job { display: flex; align-items: center; gap: var(--s-3); min-height: 44px; padding: var(--s-2) 0; border-top: 1px solid var(--line); }
+.bg-job:first-child { border-top: 0; }
+.bg-job-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.row-analysis { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.row-analysis::before { content: " · "; }
+.page-head .report-rating { font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.report-stopped { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s-3); }
