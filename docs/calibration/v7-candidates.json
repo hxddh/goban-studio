@@ -1,0 +1,13 @@
+{
+  "s12k24": { "human": { "profile": "rank_12k", "style": "search", "visits": 24 } },
+  "s10k8": { "human": { "profile": "rank_10k", "style": "search", "visits": 8 } },
+  "s10k16": { "human": { "profile": "rank_10k", "style": "search", "visits": 16 } },
+  "s10k24": { "human": { "profile": "rank_10k", "style": "search", "visits": 24 } },
+  "s7k8": { "human": { "profile": "rank_7k", "style": "search", "visits": 8 } },
+  "s7k12": { "human": { "profile": "rank_7k", "style": "search", "visits": 12 } },
+  "s7k24b5": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.05 } },
+  "s5k24": { "human": { "profile": "rank_5k", "style": "search", "visits": 24 } },
+  "s4k32": { "human": { "profile": "rank_4k", "style": "search", "visits": 32 } },
+  "v400": { "visits": 400, "temp": 0, "maxLoss": 0, "slip": 0, "blunder": 0 },
+  "v1000": { "visits": 1000, "temp": 0, "maxLoss": 0, "slip": 0, "blunder": 0 }
+}

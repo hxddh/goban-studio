@@ -30,6 +30,16 @@
  *                 humanMoveFromAnalysis); needs --human-model
  *   LS:<id>       v5: a level on the optional stronger network
  *                 (STRENGTHS[].strong); needs --strong-model
+ *   CH:<name>     v7: a candidate human-style level from --candidates FILE
+ *                 (an entry with a `human` object: profile, style, visits,
+ *                 blunder), played exactly like HL:; needs --human-model
+ *
+ * v7, for parallel runners (.github/workflows/calibrate.yml):
+ *   --shard I/N   play only every N-th game of the schedule, starting at I
+ *                 (0-based), so N machines split one schedule between them
+ *   --deadline M  start no new game after M minutes (finished games are kept)
+ *   merge OUT IN…  append the games of IN files to OUT, once per game key
+ *   matrix PLAN    the runner matrix of a plan file (docs/calibration/plan.json)
  *
  * Pair specs: "adjacent" (neighbouring levels), "gap2"/"gap3" (two/three
  * levels apart), "anchors" (each H: profile in --anchors against the two
@@ -135,6 +145,11 @@ function resolvePlayer(spec, candidates) {
     return { spec, kind: "ladder", strength: { id: name, ...s } };
   }
   if (kind === "H") return { spec, kind: "human", profile: name };
+  if (kind === "CH") {
+    const s = candidates[name];
+    if (!s?.human) throw new Error(`unknown human-style candidate ${spec}`);
+    return { spec, kind: "humanLadder", strength: { id: name, human: s.human } };
+  }
   if (kind === "HL" || kind === "LS") {
     const s = STRENGTHS.find((x) => x.id === name);
     if (!s || (kind === "HL" && !s.human) || (kind === "LS" && !s.strong)) throw new Error(`unknown level ${spec}`);
@@ -393,7 +408,7 @@ function expandPairs(text, opt) {
         for (const s of near) out.push([`H:${profile}`, `L:${s.id}`]);
       }
     } else {
-      const [a, b] = part.split(/-(?=(?:L|C|H|HL|LS):)/);
+      const [a, b] = part.split(/-(?=(?:L|C|H|HL|LS|CH):)/);
       out.push([a, b]);
     }
   }
@@ -411,14 +426,29 @@ function doneKeys(file) {
   );
 }
 
-async function runPlay(opt) {
-  const candidates = loadCandidates(opt.candidates);
+/** "I/N" → { index, count } (v7 --shard); null when absent. */
+export function parseShard(text) {
+  if (text == null || text === true || text === "") return null;
+  const m = /^(\d+)\/(\d+)$/.exec(String(text));
+  if (!m || Number(m[2]) < 1 || Number(m[1]) >= Number(m[2])) throw new Error(`bad --shard ${text} (want I/N, 0 <= I < N)`);
+  return { index: Number(m[1]), count: Number(m[2]) };
+}
+
+/**
+ * The games of a schedule, round-robin over pairs (so a partial run is
+ * still balanced), colours alternating by game number. v7: with `shard`,
+ * only every count-th game of the full schedule, so parallel machines
+ * play disjoint slices whose union is the whole schedule; games whose key
+ * is in `done` are left out after slicing (a rerun keeps the same slices).
+ */
+export function planTasks(opt, candidates = {}, done = new Set()) {
   const pairs = expandPairs(opt.pairs, opt);
-  const done = doneKeys(opt.out);
   const tasks = [];
-  // Round-robin over pairs so a partial run is still balanced.
+  let n = 0;
   for (let g = 0; g < opt.games; g++) {
     for (const [a, b] of pairs) {
+      const i = n++;
+      if (opt.shard && i % opt.shard.count !== opt.shard.index) continue;
       const key = `${opt.size}|${opt.komi}|${a}|${b}|${g}${opt.tag ? "|" + opt.tag : ""}`;
       if (done.has(key)) continue;
       const pa = resolvePlayer(a, candidates);
@@ -427,17 +457,25 @@ async function runPlay(opt) {
       tasks.push({ key, size: opt.size, komi: opt.komi, a, b, black, white });
     }
   }
-  console.error(`${tasks.length} games to play (${done.size} already in ${opt.out}), ${opt.workers} workers`);
+  return tasks;
+}
+
+async function runPlay(opt) {
+  const candidates = loadCandidates(opt.candidates);
+  const done = doneKeys(opt.out);
+  const tasks = planTasks(opt, candidates, done);
+  console.error(`${tasks.length} games to play (${done.size} already in ${opt.out}), ${opt.workers} workers${opt.shard ? `, shard ${opt.shard.index}/${opt.shard.count}` : ""}`);
   let next = 0;
   let finished = 0;
   const started = Date.now();
+  const deadline = opt.deadline ? started + opt.deadline * 60000 : Infinity;
   async function worker(w) {
     const cache = new Map();
     const proc = (key, human, variant) => {
       if (!cache.has(key)) cache.set(key, new GTP(katagoArgv(opt, human, variant), `w${w}:${key}`));
       return cache.get(key);
     };
-    while (next < tasks.length) {
+    while (next < tasks.length && Date.now() < deadline) {
       const task = tasks[next++];
       const pick = (player, side) => {
         if (player.kind === "human") return proc(`H:${player.profile}`, player.profile);
@@ -692,6 +730,62 @@ function report(result, { markdown }) {
   return lines.join("\n");
 }
 
+/* ------------------------------------------------------ v7: CI plans */
+
+/**
+ * Merge JSONL game files: every line of `inputs` whose key is not already
+ * in `existing` (or earlier in `inputs`), in input order. Lines that are
+ * not JSON with a key (a job killed mid-write) are dropped.
+ */
+export function mergeGames(existing, inputs) {
+  const seen = new Set(existing.map((g) => g.key));
+  const out = [];
+  for (const text of inputs) {
+    for (const line of text.split("\n")) {
+      let g;
+      try {
+        g = JSON.parse(line);
+      } catch (_) {
+        continue;
+      }
+      if (!g?.key || seen.has(g.key)) continue;
+      seen.add(g.key);
+      out.push(g);
+    }
+  }
+  return out;
+}
+
+const readGames = (file) =>
+  fs.existsSync(file)
+    ? fs.readFileSync(file, "utf8").split("\n").filter(Boolean).flatMap((l) => {
+        try {
+          return [JSON.parse(l)];
+        } catch (_) {
+          return [];
+        }
+      })
+    : [];
+
+/**
+ * A calibration plan (docs/calibration/plan.json): { runs: [{ id, size,
+ * games, pairs, shards, workers?, scoreVisits?, candidates? }] }. Returns
+ * the GitHub Actions matrix, one entry per (run, shard).
+ */
+export function planMatrix(plan) {
+  const include = [];
+  for (const r of plan.runs || []) {
+    if (!/^[\w.-]+$/.test(r.id || "")) throw new Error(`plan: bad run id ${r.id}`);
+    if (![9, 13, 19].includes(r.size)) throw new Error(`plan ${r.id}: size must be 9, 13 or 19`);
+    if (!(r.games > 0) || !r.pairs) throw new Error(`plan ${r.id}: games and pairs are required`);
+    const shards = r.shards || 1;
+    for (let i = 0; i < shards; i++) include.push({ run: r.id, shard: `${i}/${shards}` });
+  }
+  if (!include.length) throw new Error("plan: no runs");
+  if (include.length > 256) throw new Error("plan: more than 256 jobs");
+  return { include };
+}
+
 /* ---------------------------------------------------------------- main */
 
 async function main() {
@@ -715,13 +809,33 @@ async function main() {
       threads: Number(a.threads || 1),
       scoreVisits: Number(a["score-visits"] || 400),
       tag: a.tag || "",
+      shard: parseShard(a.shard),
+      deadline: Number(a.deadline || 0),
     };
     if (!opt.katago) throw new Error("--katago PATH (or KATAGO=…) is required");
-    if (opt.pairs.includes("H:") || opt.pairs.includes("HL:") || opt.pairs.includes("anchors")) {
+    if (opt.pairs.includes("H:") || opt.pairs.includes("HL:") || opt.pairs.includes("CH:") || opt.pairs.includes("anchors")) {
       if (!opt.humanModel) throw new Error("--human-model PATH is required for H: anchors and HL: levels");
     }
     if (opt.pairs.includes("LS:") && !opt.strongModel) throw new Error("--strong-model PATH is required for LS: levels");
     await runPlay(opt);
+  } else if (cmd === "merge") {
+    const [out, ...inputs] = a._.slice(1);
+    if (!out) throw new Error("usage: merge OUT IN…");
+    const add = mergeGames(readGames(out), inputs.map((f) => fs.readFileSync(f, "utf8")));
+    fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+    fs.appendFileSync(out, add.map((g) => JSON.stringify(g) + "\n").join(""));
+    console.error(`${add.length} new games → ${out} (${readGames(out).length} in all)`);
+  } else if (cmd === "matrix") {
+    console.log(JSON.stringify(planMatrix(JSON.parse(fs.readFileSync(a._[1] || "docs/calibration/plan.json", "utf8")))));
+  } else if (cmd === "run-args") {
+    // v7 CI: the play arguments of one plan run, one per line.
+    const plan = JSON.parse(fs.readFileSync(a._[1], "utf8"));
+    const r = (plan.runs || []).find((x) => x.id === a._[2]);
+    if (!r) throw new Error(`no run ${a._[2]} in ${a._[1]}`);
+    const out = ["--size", r.size, "--games", r.games, "--pairs", r.pairs, "--workers", r.workers || 4, "--score-visits", r.scoreVisits || (r.size === 19 ? 200 : 400)];
+    if (r.candidates) out.push("--candidates", r.candidates);
+    if (r.tag) out.push("--tag", r.tag);
+    console.log(out.join("\n"));
   } else if (cmd === "fit") {
     const file = a._[1] || "calibration.jsonl";
     let games = fs
