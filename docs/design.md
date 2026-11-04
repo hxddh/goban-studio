@@ -1,4 +1,4 @@
-# Goban Studio design specification (v4)
+# Goban Studio design specification (v6)
 
 This is the single source of truth for how Goban Studio looks and moves.
 Every screen is checked against it before release (see the acceptance
@@ -132,10 +132,16 @@ group per screen region.
   rows: stone, name, level, captures, clock), status (one line), actions
   (Pass, Undo, More), the move list (fills the rest), never empty space.
   Game facts (size, komi, handicap, time) live in the toolbar subtitle.
-* **Review.** Board left, panel right: the balance chart (the hero), the
-  analysis line, key mistakes (each expandable into its explained line),
-  variations. Tools (live analysis, territory, guess, export) are icon
-  buttons in the toolbar; *Play from here* is the one primary action.
+* **Review.** Board left, panel right: the balance chart (the hero) and
+  the analysis line stay on top; below them three tabs (segmented control):
+  *Analysis* (key mistakes, each expandable into its explained line, and
+  variations), *Summary* (the game in three phases — only when KataGo
+  analysed the game; an offline estimate never shows phase numbers) and
+  *Notes* (comment, marks, variation tree). Tools (live analysis,
+  territory, guess, export) are icon buttons in the toolbar; *Play from
+  here* is the one primary action. A record opens on its final position
+  and moves to the first key moment when the analysis is done, unless the
+  player has already moved; a classic with a famous move opens on it.
 * **Today.** One hero (continue the game, or the suggested game) with the
   only primary button; then a grouped list: today's five, next lesson,
   practise a weak spot; then your level with its sparkline. Empty states
@@ -145,6 +151,13 @@ group per screen region.
   problem topics as a grid of quiet tiles.
 * **Library.** Toolbar holds Import. Segmented tabs; games as rows with a
   thumbnail; classics and openings as rows.
+* **Settings.** A wide sheet with two panes: a source list on the left
+  (General, Board, Playing, Opponents and analysis, Data, About; arrow keys
+  move through it) and one pane on the right. Nothing scrolls past more
+  than one pane's worth of rows.
+* **Problems.** A problem window is widened towards the open side to at
+  least eight lines, so stones keep a natural size and the corner keeps its
+  surroundings.
 * **New game.** The recommended game is pre-selected and *Start* is the
   only primary action; size cards (19×19 first and standard; 13×13 and 9×9
   as quicker games); opponent, strength and colour on one row each; time,
