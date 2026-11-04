@@ -844,3 +844,19 @@ button.group-row:hover { background: var(--fill); }
 .plan-row .plan-links .link { font: var(--t-small); }
 .topic-card.focus strong { display: flex; align-items: center; gap: var(--s-2); }
 .plan-mark { font: var(--t-caption); color: var(--text-2); background: var(--fill); border-radius: var(--r-1); padding: 1px 6px; }
+
+/* v7 problems */
+.collections-actions { margin-top: var(--s-3); align-items: center; }
+.collection-item .mini-progress { width: 64px; flex: none; }
+.collection-item .fine { min-width: 40px; text-align: right; }
+.collection-head { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: var(--s-4); }
+.collection-head > div { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.problem-card .due-mark { margin-left: auto; color: var(--text-2); font-weight: 500; }
+.problem-card .problem-title { display: inline-flex; align-items: center; gap: var(--s-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.problem-card .grade-dots { margin-left: auto; }
+.import-report .fine { margin: 0 0 var(--s-2); }
+.report-row { align-items: flex-start; }
+.report-row .gr-text .wrap-text { white-space: normal; color: var(--text-2); }
+.report-row .verdict { flex: none; min-width: 96px; font: var(--t-caption); padding-top: 3px; color: var(--text-2); }
+.report-row .verdict.accepted { color: var(--good); }
+.report-row .verdict.rejected { color: var(--bad); }

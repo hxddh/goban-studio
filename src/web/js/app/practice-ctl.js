@@ -15,13 +15,14 @@ import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { pickNextLesson } from "./course-path.js";
+import { collectionProblems, findUserProblem, userProblemDef } from "./collections-store.js";
 
 export const PROBLEMS = ProblemContent.PROBLEMS;
 export const THEMES = ProblemContent.THEMES || [];
 export const SHAPES = ProblemContent.SHAPES || [];
 export { COURSE, GRADES };
 
-export const gradeOf = (id) => GRADES[id]?.grade || 1;
+export const gradeOf = (id) => GRADES[id]?.grade || findUserProblem(id)?.grade || 1;
 
 /* -------------------------------------------------------------- course */
 
@@ -250,15 +251,31 @@ export function themeName(id) {
 }
 
 export function openProblem(id, { daily = null } = {}) {
-  const p = PROBLEMS.find((x) => x.id === id);
+  // v7: a problem from one of your own collections opens the same way.
+  const p = PROBLEMS.find((x) => x.id === id) || userProblemDef(id);
   if (!p) return;
   if (!isRestoring() && !daily) remember();
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
   update((s) => {
     s.space = "practice";
-    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.practice.topic : p.topic };
+    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.practice.topic : p.topic, collection: p.collection || null };
   });
+}
+
+/** v7: one of your own problem collections, as a page. */
+export function openCollection(id) {
+  if (!isRestoring()) remember();
+  update((s) => {
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "collection", collection: id, topic: null, theme: null, shape: null, problem: null, daily: null, mistake: null };
+  });
+}
+
+/** The list a problem is browsed in: its collection, theme or topic. */
+function browseList(def) {
+  if (def.collection) return collectionProblems(def.collection);
+  return state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(def.topic);
 }
 
 /* ------------------------------------------------------------- daily */
@@ -625,16 +642,17 @@ function advanceDaily() {
 export function nextProblem() {
   if (state.practice.daily) return advanceDaily();
   const P = state.practice.problem;
-  const list = state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(P.def.topic);
+  const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i >= 0 && i + 1 < list.length) openProblem(list[i + 1].id);
+  else if (P.def.collection) openCollection(P.def.collection);
   else openTopic(P.def.topic, state.practice.theme);
 }
 
 export function prevProblem() {
   const P = state.practice.problem;
   if (!P || state.practice.daily) return;
-  const list = state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(P.def.topic);
+  const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i > 0) openProblem(list[i - 1].id);
 }
