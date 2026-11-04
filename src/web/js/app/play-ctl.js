@@ -2,11 +2,11 @@
  * Playing a game: the live board, the computer's replies and how they feel,
  * teaching aids, clocks, scoring, the end of the game and what follows it.
  */
-import { BLACK, WHITE, Game, coordLabel } from "../rules.js";
+import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
-import { addMistake, saveProgress } from "../persist.js";
+import { addGameRecord, addMistake, saveProgress, updateGameRecord } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
@@ -16,6 +16,7 @@ import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./
 import { newClock, tick, moveMade } from "./clock.js";
 import { rankToRating, startRating, updateRating, ratingToRank } from "./rating.js";
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
+import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -61,7 +62,9 @@ export function restoreCurrent() {
       /* fall through */
     }
   }
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, komi: 6.5 }), { opponent: "ai", strength: state.settings.strength });
+  // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
+  // brand-new board takes the default ruleset and its komi.
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", strength: state.settings.strength });
 }
 
 export function persistCurrent() {
@@ -142,8 +145,13 @@ export function newGame(opts = {}) {
   const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : state.settings.boardSize || 19;
   if (opts.rememberSize && size !== state.settings.boardSize) setSetting("boardSize", size);
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
-  const komi = opts.komi !== undefined && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : handicap > 0 ? 0.5 : 6.5;
-  const game = new Game({ size, komi, handicap });
+  // v5: the sheet's choice, else the `defaultRules` setting (Japanese).
+  const rules = normalizeRules(opts.rules ?? state.settings.defaultRules);
+  if (opts.rememberRules && opts.rules && rules !== state.settings.defaultRules) setSetting("defaultRules", rules);
+  // Komi: the sheet's, else the ruleset's (6.5 / 7.5 / 6.5; 0.5 with
+  // handicap stones, plus N points at the count under Chinese rules).
+  const komi = opts.komi !== undefined && opts.komi !== null && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : defaultKomi(rules, handicap > 0 ? Math.max(2, handicap) : 0);
+  const game = new Game({ size, rules, komi, handicap });
   let humanColor = opts.color === WHITE ? WHITE : BLACK;
   if (opts.color === "random") humanColor = Math.random() < 0.5 ? BLACK : WHITE;
   const opponent = opts.opponent === "human" ? "human" : "ai";
@@ -313,6 +321,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   if (state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
   if (a) g.eval = a;
+  if (result.mode) g.opponentMode = result.mode; // v5: "human" | "strong" | "standard" | "offline"
 
   // Teaching: a big drop after the player's move pauses the reply.
   if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {
@@ -602,6 +611,7 @@ function finishGame() {
   else if (won === false) Audio.lose();
   else Audio.gameEnd?.();
   // Rating: games against the computer with enough moves to mean something.
+  let rated = null;
   if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
     const p = state.progress;
     const prev = p.rating || startRating(state.settings.playerRank ?? 30);
@@ -610,9 +620,15 @@ function finishGame() {
     p.rating = updateRating(prev, { opponentRating: opp, handicap, won });
     g.ratingDelta = p.rating.r - prev.r;
     g.rated = false;
+    rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
     saveProgress(p);
   }
   saveToLibrary({ quiet: true });
+  // v5: a compact record for the trends view; the analysis fills it in.
+  if (rated) {
+    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.strength, won, rating: rated });
+    if (addGameRecord(state.progress, rec)) g.trendId = rec.id;
+  }
   announce(resultText(result));
   update();
   if (g.opponent === "ai") summarize(g);
@@ -649,6 +665,13 @@ async function summarize(g) {
     const a = points[m.index - 1];
     const spread = a?.moves?.length > 1 ? Math.abs(a.moves[0].scoreLead - a.moves[1].scoreLead) : 0;
     if (m.loss <= 0.5 && spread >= 2 && (!good || spread > good.spread)) good = { ...m, spread };
+  }
+  // v5: complete the game's trend record with per-phase losses and the
+  // themes of up to ten explained mistakes.
+  if (g.trendId) {
+    const summary = summarizeGame({ game: g.game, points, meta: { humanColor: g.humanColor }, keyMoves: mistakes.top });
+    const themes = themeCounts(describeMistakes(g.game, points, g.humanColor, 10).top, g.humanColor);
+    updateGameRecord(state.progress, g.trendId, recordAnalysis(summary, g.humanColor, themes), { save: false });
   }
   // Record weaknesses and keep the two costliest mistakes as drills.
   let weak = state.progress.weakness;
@@ -697,8 +720,11 @@ export function reviewCurrentGame() {
 export async function exportSGF(game = state.game?.game, name = state.game?.name) {
   if (!game) return;
   update({ menu: null });
-  const text = game.toSGF();
-  const filename = (name || "goban-studio") + ".sgf";
+  await saveText((name || "goban-studio") + ".sgf", game.toSGF(), "application/x-go-sgf");
+}
+
+/** Save text through the native save dialog, or as a browser download. */
+export async function saveText(filename, text, mime = "text/plain") {
   if (hasNative() && hasFileDialogs()) {
     const path = await saveFileDialog({ title: t("common.export"), defaultName: filename });
     if (path == null || (Array.isArray(path) && path.length === 0)) return;
@@ -709,7 +735,7 @@ export async function exportSGF(game = state.game?.game, name = state.game?.name
       return;
     }
   }
-  const blob = new Blob([text], { type: "application/x-go-sgf" });
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

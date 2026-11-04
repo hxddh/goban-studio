@@ -2,7 +2,7 @@
  * Small shared pieces: icons, buttons, segmented controls, the board.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BoardView } from "../board.js";
+import { BoardView, frameAspect } from "../board.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
@@ -190,7 +190,7 @@ export function Board({ model, onPlay, onHover, label }) {
   };
   return (
     <div class="board-area">
-    <div class="board-frame">
+    <div class="board-frame" style={{ "--aspect": frameAspect(model) }}>
       <canvas
         ref={canvas}
         class="board"
@@ -227,9 +227,10 @@ export function Thumb({ thumb, size }) {
     const g = c.getContext("2d");
     g.scale(dpr, dpr);
     const cell = px / size;
-    g.fillStyle = getComputedStyle(c).getPropertyValue("--thumb-board") || "#e2c08d";
+    const css = getComputedStyle(c);
+    g.fillStyle = css.getPropertyValue("--thumb-board").trim() || "#e4cb9a";
     g.fillRect(0, 0, px, px);
-    g.strokeStyle = "rgba(60,40,20,0.35)";
+    g.strokeStyle = css.getPropertyValue("--thumb-line").trim() || "rgba(60,40,20,0.35)";
     g.lineWidth = 0.5;
     g.beginPath();
     for (let i = 0; i < size; i++) {
@@ -252,9 +253,12 @@ export function Thumb({ thumb, size }) {
       if (ch === "w") {
         g.strokeStyle = "rgba(0,0,0,0.25)";
         g.stroke();
+      } else if (state.settings?.board === "ink") {
+        g.strokeStyle = "rgba(235,230,220,0.4)";
+        g.stroke();
       }
     }
-  }, [thumb, size]);
+  }, [thumb, size, state.settings?.board, state.settings?.appearance]);
   return <canvas ref={ref} class="thumb" aria-hidden="true" />;
 }
 

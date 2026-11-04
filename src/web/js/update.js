@@ -1,5 +1,6 @@
 /**
- * Update checks — the app's only network request, and only when asked.
+ * Update checks — a network request only when asked (the only other one is
+ * an optional model download the player starts, models.js).
  *
  * The page never talks to the network itself (CSP `connect-src 'self'`).
  * The native host does one HTTPS GET of GitHub's "latest release" document
@@ -163,4 +164,212 @@ export function canCheckUpdates() {
 /** Open the app's releases page in the system browser (fixed address). */
 export function openReleasePage() {
   return Host.openReleasePage();
+}
+
+/* ------------------------------------------------------ v5 update install */
+//
+// After a check found a newer release, "Download and install" asks the host
+// to fetch this platform's package of that release and the release's
+// SHA256SUMS from GitHub (github.com/hxddh/goban-studio/releases/download/…
+// only), verify, unpack, and — on "Restart to update" — swap the app and
+// restart it, rolling back if the new version does not start. The host
+// decides whether this installation can be replaced at all (a read-only
+// location, App Translocation or a development build cannot); then the
+// interface offers "Open download page" instead.
+
+/** Why an installation cannot update itself (`status.blocked`). */
+export const INSTALL_BLOCKED = ["Unsupported", "NotPackaged", "Translocated", "ReadOnlyLocation", "NoTempDir"];
+
+/** Error names `studio.updateDownload` / `studio.updateApply` can answer. */
+export const INSTALL_ERRORS = [
+  "Busy",
+  "BadTag",
+  "Network",
+  "BadRedirect",
+  "HttpStatus",
+  "NoAsset",
+  "TooLarge",
+  "NoChecksum",
+  "ChecksumMismatch",
+  "Unpack",
+  "BadPackage",
+  "Disk",
+  "Stalled",
+  "Cancelled",
+  "NotReady",
+  "Helper",
+  "QuitFailed",
+  "OutOfMemory",
+  "Unavailable",
+  ...INSTALL_BLOCKED,
+];
+
+/** How often the page asks for download progress (ms). */
+export const INSTALL_POLL_MS = 500;
+
+const PHASES = ["idle", "downloading", "verifying", "unpacking", "ready", "installing", "failed", "cancelled"];
+
+/**
+ * Normalize a `studio.updateStatus` reply:
+ *
+ *   { phase, tag, received, total, progress (0…1 or null), error,
+ *     canInstall, blocked, justUpdated, installFailed }
+ *
+ * phase "unavailable" without a host (canInstall false, blocked "Unsupported").
+ */
+export function interpretInstallStatus(reply) {
+  if (!reply || typeof reply !== "object" || reply.ok !== true) {
+    return { phase: "unavailable", tag: "", received: 0, total: 0, progress: null, error: "", canInstall: false, blocked: "Unsupported", justUpdated: false, installFailed: false };
+  }
+  const received = Math.max(0, Number(reply.received) || 0);
+  const total = Math.max(0, Number(reply.total) || 0);
+  const blocked = INSTALL_BLOCKED.includes(reply.blocked) ? reply.blocked : "";
+  return {
+    phase: PHASES.includes(reply.phase) ? reply.phase : "idle",
+    tag: String(reply.tag || ""),
+    received,
+    total,
+    progress: total > 0 ? Math.min(1, received / total) : null,
+    error: String(reply.error || ""),
+    canInstall: reply.canInstall === true && !blocked,
+    blocked,
+    justUpdated: reply.justUpdated === true,
+    installFailed: reply.installFailed === true,
+  };
+}
+
+/** `studio.updateDownload`'s reply → { ok: true, tag } | { ok: false, error }. */
+export function interpretDownloadReply(reply) {
+  if (reply && typeof reply === "object" && reply.ok === true && reply.phase === "ready") return { ok: true, tag: String(reply.tag || "") };
+  const error = reply && typeof reply === "object" ? String(reply.error || "Unavailable") : "BadResponse";
+  return { ok: false, error: error === "unavailable" ? "Unsupported" : error };
+}
+
+/** The `updateCheck.status` a host phase is shown as (null: not installing). */
+export function installStatusOf(phase) {
+  if (phase === "downloading" || phase === "verifying" || phase === "unpacking") return "downloading";
+  if (phase === "ready" || phase === "installing") return phase;
+  return null;
+}
+
+/** "download" | "verify" | "unpack" — the step of a "downloading" status. */
+export function installStepOf(phase) {
+  return phase === "verifying" ? "verify" : phase === "unpacking" ? "unpack" : "download";
+}
+
+/**
+ * When install is impossible, or failed in a way a retry will not fix, the
+ * interface falls back to "Open download page".
+ */
+export function installFallsBack(code) {
+  return INSTALL_BLOCKED.includes(code) || ["NoAsset", "NoChecksum", "ChecksumMismatch", "BadPackage", "BadTag", "BadRedirect", "Helper"].includes(code);
+}
+
+/** The message key that explains an install error or block to the player. */
+export function installMessageKey(code) {
+  switch (code) {
+    case "ReadOnlyLocation":
+      return "update.readOnly";
+    case "Translocated":
+      return "update.translocated";
+    case "NotPackaged":
+    case "Unsupported":
+    case "NoTempDir":
+      return "update.cannotInstall";
+    case "ChecksumMismatch":
+    case "NoChecksum":
+    case "BadPackage":
+    case "Unpack":
+      return "update.verifyError";
+    case "Cancelled":
+      return "update.cancelled";
+    case "Disk":
+      return "update.diskError";
+    case "NotReady":
+    case "Helper":
+    case "QuitFailed":
+      return "update.applyError";
+    default:
+      return "update.downloadError";
+  }
+}
+
+/** "12.3 MB" — for "Downloading… 12.3 MB of 98.0 MB". */
+export function formatBytes(n) {
+  const v = Math.max(0, Number(n) || 0);
+  if (v < 1024 * 1024) return `${Math.round(v / 1024)} KB`;
+  return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Can this installation update itself? → { can, blocked, status } (one
+ * status call; with `probe` the host checks that the app's folder is
+ * writable — once a session).
+ */
+export async function installInfo(deps = {}, { probe = true } = {}) {
+  let reply;
+  try {
+    reply = await (deps.status || Host.updateStatus)({ probe });
+  } catch (_) {
+    reply = null;
+  }
+  const status = interpretInstallStatus(reply);
+  return { can: status.canInstall, blocked: status.canInstall ? "" : status.blocked || "Unsupported", status };
+}
+
+/**
+ * Download `tag`, reporting progress. Resolves to interpretDownloadReply().
+ * `deps`: { download, status, onProgress(status), pollMs, sleep } (tests).
+ */
+export async function downloadNow(tag, deps = {}) {
+  const download = deps.download || Host.updateDownload;
+  const status = deps.status || Host.updateStatus;
+  const sleep = deps.sleep || wait;
+  const pollMs = deps.pollMs ?? INSTALL_POLL_MS;
+  let done = false;
+  const finished = Promise.resolve()
+    .then(() => download(tag))
+    .catch(() => ({ ok: false, error: "Network" }))
+    .finally(() => {
+      done = true;
+    });
+  const poll = (async () => {
+    while (!done) {
+      await sleep(pollMs);
+      if (done) break;
+      try {
+        const s = interpretInstallStatus(await status());
+        if (!done && deps.onProgress) deps.onProgress(s);
+      } catch (_) {
+        // Progress is best effort; the download's own answer decides.
+      }
+    }
+  })();
+  const reply = await finished;
+  await poll;
+  return interpretDownloadReply(reply);
+}
+
+/** Install the downloaded update; the host quits on success. → { ok, error? } */
+export async function applyNow(deps = {}) {
+  let reply;
+  try {
+    reply = await (deps.apply || Host.updateApply)();
+  } catch (_) {
+    reply = { ok: false, error: "Unavailable" };
+  }
+  if (reply && reply.ok === true) return { ok: true };
+  const error = reply && typeof reply === "object" ? String(reply.error || "Unavailable") : "BadResponse";
+  return { ok: false, error: error === "unavailable" ? "Unsupported" : error };
+}
+
+/** Stop a download or discard a downloaded update. */
+export async function cancelNow(deps = {}) {
+  try {
+    return await (deps.cancel || Host.updateCancel)();
+  } catch (_) {
+    return { ok: false, error: "Unavailable" };
+  }
 }

@@ -99,6 +99,7 @@ in this table. Usage targets:
 | seven stones on the second line ("six die, eight live") | 二路七子（六死八活） | seven stones on the second line (six die, eight live) | 2선의 일곱 점 (육사팔활) | 二線の七子（六死八活） | v4 `shape.second-line-seven` |
 | independent life (two eyes, as opposed to seki) | 净活 | independent life | 완생 | 完全な生き | used in docs and code comments; the UI says "live" / "seki" |
 | classic shapes (collection) | 基本死活形 | classic shapes | 사활의 기본형 | 死活の基本形 | v4 `practice.shapes` |
+| 2-1 point (corner: first line, next to the 2-2 point) | 二一路 | the 2-1 point | 2·1의 급소 / 2의 1 | 二の一 | v5 `problem.twoOne.title`: problem title for corner kills whose answer is the 2-1 point; see review list |
 
 ## Capturing races
 
@@ -129,6 +130,15 @@ in this table. Usage targets:
 | handicap game, N stones | 让 N 子 | N handicap stones | N점 접바둑 | N子局 | |
 | even game | 分先 | even game | 호선 | 互先 | |
 | Japanese rules | 日本规则 | Japanese rules | 일본 규칙 | 日本ルール | |
+| Chinese rules | 中国规则 | Chinese rules | 중국 규칙 | 中国ルール | v5 `rules.chinese` |
+| Korean rules | 韩国规则 | Korean rules | 한국 규칙 | 韓国ルール | v5 `rules.korean` |
+| rules (ruleset) | 规则 | rules | 규칙 | ルール | v5 `rules.title` |
+| territory scoring | 数目（数目法） | territory scoring | 계지 | 計地 | v5 `rules.territory`; Japanese and Korean rules. zh 数目 is also "counting" in general (`score.title`) |
+| area scoring | 数子（数子法） | area scoring | 계자 | 計子 | v5 `rules.area`; Chinese rules. See review list |
+| counting under area scoring | 数子 | counting | 계가 | 計算 | v5 `score.titleArea`; ja 整地 is the Japanese-rules procedure, so the area card says 計算 |
+| stones (in an area count) | 棋子 | stones | 돌 | 石 | v5 `score.detailArea*` |
+| handicap compensation (Chinese rules) | 让子补偿（还子） | handicap (points White receives) | 치석 보상 | 置き石の補正 | v5: White receives N points for N handicap stones (Black returns half a stone per handicap stone) |
+| shared liberties of a seki | 公气 | shared liberties | 공동 공배 | 内ダメ | v5 `score.sekiArea`; same terms as in capturing races |
 | byo-yomi | 读秒 | byo-yomi | 초읽기 | 秒読み | UI shows "10 min + 3×30 s" in every language |
 | main time | 基本用时 | main time | 제한 시간 | 持ち時間 | |
 | kyu / dan | 级 / 段 | kyu / dan | 급 / 단 | 級 / 段 | |
@@ -140,14 +150,70 @@ in this table. Usage targets:
 | Concept | zh | en | ko | ja | Notes |
 |---|---|---|---|---|---|
 | tengen | 天元 | tengen (centre point) | 천원 | 天元 | |
-| star point | 星位 | star point | 화점 | 星 | not used in v3 strings |
+| star point (4-4 point) | 星位 | star point (4-4) | 화점 | 星 | v5 course: "star point (4-4)" on first use |
 | corner | 角 | corner | 귀 | 隅 | |
 | side | 边 | side | 변 | 辺 | |
 | centre | 中腹 / 中央 | centre | 중앙 | 中央 | |
 | first / second line | 一路 / 二路 | first / second line | 1선 / 2선 | 一線 / 二線 | |
 | opening (whole board) | 布局 | opening | 포석 | 布石 | |
-| joseki | 定式 | joseki | 정석 | 定石 | not used in v3 strings |
+| joseki | 定式 | joseki | 정석 | 定石 | v5 unit `joseki` |
 | hane | 扳 | hane | 젖히기 | ハネ | |
+| 3-4 point | 小目 | 3-4 point | 소목 | 小目 | |
+| 3-3 point | 三三 | 3-3 point | 삼삼 | 三々 | |
+| enclosure | 守角 | enclosure | 굳힘 | シマリ | small knight's / one-space / large knight's: zh 小飞 / 单关 / 大飞守角, ko 날일자 / 한 칸 / 눈목자 굳힘, ja 小ゲイマ / 一間 / 大ゲイマジマリ |
+| approach | 挂角 | approach | 걸침 | カカリ | small knight's approach: zh 小飞挂, ko 날일자 걸침, ja 小ゲイマガカリ; one-space high approach: 高一路的单关挂 / one-space high approach / 한 칸 높은 걸침 / 一間高ガカリ |
+| small / large knight's move | 小飞 / 大飞 | small / large knight's move | 날일자 / 눈목자 | 小ゲイマ / 大ゲイマ | |
+| one-space jump | 单关（一间跳） | one-space jump | 한 칸 뜀 | 一間トビ | |
+| extension | 拆（拆二、拆三） | extension (two-space extension) | 벌림 (두 칸 벌림) | ヒラキ（二間ビラキ） | |
+| stand two, extend three | 立二拆三 / 立三拆四 | stand two, extend three | 입이전삼 / 입삼전사 | 二立三析 / 三立四析 | proverb; see review list |
+| base (of a group) | 根据地 | base | 근거 | 根拠 | |
+| pincer | 夹击 | pincer | 협공 | ハサミ | |
+| big point | 大场 | big point | 큰 곳 | 大場 | |
+| urgent point | 急所 | urgent point | 급한 곳 | 急場 | proverb: 大场不如急所 / urgent points before big points / 큰 곳보다 급한 곳 / 大場より急場 |
+| splitting move (on a side) | 分投 | split | 갈라치기 | 割り打ち | |
+| 3-3 invasion | 点三三 | 3-3 invasion | 삼삼 침입 | 三々入り | |
+| block | 挡 | block | 막기 | オサエ | |
+| crawl | 爬 | crawl | 기기 | ハイ | |
+| attach (contact play) | 托 / 碰 | attach | 붙이기 | ツケ | 托 for the attachment on the corner side in 托退 |
+| draw back | 退 | draw back | 물러서기 | ヒキ | |
+| attach and draw back (3-4 joseki) | 托退 | attach and draw back | 붙여 물러서기 | ツケヒキ | ko is descriptive; see review list |
+| thickness / outside strength | 厚势 / 外势 | thickness / strength facing outward | 두터움 / 세력 | 厚み / 外勢 | |
+
+## Shape
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| good shape / bad shape | 好形 / 愚形 | good shape / bad shape | 좋은 모양 / 나쁜 모양 (우형) | 好形 / 愚形 | |
+| empty triangle | 空三角 | empty triangle | 빈삼각 | 空き三角 | |
+| peep | 觑 | peep | 들여다보기 | ノゾキ | |
+| head of two stones | 二子头 | head of two stones | 두 점 머리 | 二目の頭 | proverbs: 二子头必扳 / 두 점 머리는 두드려라 / 二目の頭は見ずハネよ |
+| ponnuki | 开花 | ponnuki | 빵따냄 | ポン抜き | proverb: 开花三十目 / ponnuki is worth thirty points / 빵따냄 30집 / ポン抜き三十目 |
+| one-space jump is never bad (proverb) | 单关无恶手 | the one-space jump is never a bad move | 한 칸 뜀에 악수 없다 | 一間トビに悪手なし | |
+
+## Endgame
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| endgame | 官子 | endgame | 끝내기 | ヨセ | |
+| sente / gote | 先手 / 后手 | sente / gote | 선수 / 후수 | 先手 / 後手 | |
+| double sente | 双先 | double sente | 양선수 | 両先手 | |
+| reverse sente | 逆收 | reverse sente | 역끝내기 | 逆ヨセ | |
+| first-line hane and connection | 一路扳粘 | first-line hane and connect | 1선 젖혀 잇기 | 一線のハネツギ | |
+| push (along the first line) | 冲 | push | 밀고 들어가기 | 押し込む | descriptive in ko / ja |
+| value as a swing ("the difference is N points") | 相差 N 目 | the difference is N points | N집 차이 | N目の差 | the course states values as the difference between Black and White playing first (出入り); it does not use miai counting |
+| defensive move inside own territory | 补棋 / 补一手 | defensive move (inside your territory) | 손질 | 手入れ | |
+| filling neutral points | 收单官 / 填单官 | filling neutral points | 공배 메우기 | ダメ詰め | |
+
+## Middle game
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| middle game | 中盘 | middle game | 중반 | 中盤 | |
+| cutting stones | 断子 | cutting stones | 끊은 돌 | 切り石 | proverb: capture the cutting stones |
+| invade / invasion | 打入 | invade | 침입 | 打ち込み | |
+| cap | 镇 | cap | 모자 | ボウシ | |
+| splitting attack | 分开攻击 | splitting attack | 갈라서 공격하기 | 分断して攻める | descriptive in zh / ko / ja |
+| attack from a distance | 从远处攻击 | attack from a distance | 멀리서 공격하기 | 離れて攻める | descriptive |
 
 ## Review and analysis
 
@@ -167,6 +233,15 @@ in this table. Usage targets:
 | balance / position evaluation | 形势 | balance | 형세 | 形勢 | |
 | ownership / territory estimate | 形势判断 | territory estimate | 형세 판단 | 形勢判断 | |
 | teaching game mode | 指导棋 | teaching mode | 지도 모드 | 指導碁モード | |
+| opening (phase of a game) | 布局 | opening | 포석 | 布石 | v5 `phase.opening`: the same term as the whole-board opening above |
+| middle game | 中盘 | middle game | 중반 | 中盤 | v5 `phase.middle` |
+| endgame (yose) | 官子 | endgame | 끝내기 | ヨセ | v5 `phase.endgame` |
+| blunder (a move losing > 6 points) | 大失误 | blunder | 큰 실수 | 大悪手 | v5; "mistake" (> 2 points) keeps 失误 / 실수 / 悪手 |
+| accuracy (moves within 1 point of the best) | 准确率 | accuracy | 정확도 | 正確さ | v5 summary |
+| comment (on a move, SGF C[]) | 注释 | comment | 코멘트 | コメント | v5 |
+| mark (triangle, square, circle, cross, letter) | 标记（三角、方块、圆圈、叉、字母） | mark (triangle, square, circle, cross, letter) | 표시 (세모, 네모, 동그라미, 가위표, 글자) | マーク（三角、四角、丸、バツ、文字） | v5 SGF markup |
+| main line (of a record) | 主线 | main line | 본선 | 本線 | v5; ja 本譜 means the game as played, which a promoted variation is not |
+| variation tree | 变化树 | variation tree | 변화도 | 変化図 | v5 |
 
 ## Decisions on doubtful terms
 
@@ -235,8 +310,32 @@ The items I am least sure about:
    reviewer may prefer ダメ everywhere.
 7. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
    bank. I kept them as the author wrote them, but I have not confirmed them.
-8. v4: the big-eye race theme — ko **큰 눈 대 작은 눈** and ja
+8. v5 intermediate course (all model-written, none reviewed by a native
+   speaker): ko **입이전삼 / 입삼전사** as the Korean form of the
+   extension proverb; ko **붙여 물러서기** for 托退 / ツケヒキ (descriptive;
+   an established Korean name may exist); ko **두 점 머리는 두드려라** and
+   **빵따냄 30집** as proverbs; zh **单关无恶手**; zh **分开攻击** and the
+   descriptive ko / ja names for the splitting attack; ja **押し込む** and ko
+   **밀고 들어가기** for the first-line push.
+9. v4: the big-eye race theme — ko **큰 눈 대 작은 눈** and ja
    **大きい眼と小さい眼** are descriptive; an established short name may exist
    (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
    for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
    collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.
+9. v5 rules: ko **계자 / 계지** and ja **計子 / 計地** for area / territory
+   scoring. zh 数子 / 数目 are standard; the ko and ja pairs are the
+   Sino-Korean / Sino-Japanese readings of the same idea and appear in rules
+   discussions, but everyday writing more often says "중국식 계산 / 일본식
+   계산" or "中国ルールの数え方 / 日本ルールの数え方". The ruleset notes
+   (`rules.*Note`) describe the method in plain words, so the label never
+   stands alone. Also ja **計算** as the title of an area count, ja
+   **置き石の補正** and ko **치석 보상** for the Chinese handicap
+   compensation, and zh **让子补偿**.
+10. v5: ko **본선** / ja **本線** for the main line of a record (Go software
+   varies; ko 주 변화 / ja 本譜 are possible), ko **변화도** / ja **変化図**
+   for the variation tree, ja **大悪手** and ko **큰 실수** for blunder, and
+   ja **正確さ** for accuracy (一致率 is used for "agrees with the AI", which
+   is a different measure).
+11. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
+   **二一路** and ko **2·1의 급소** (also written 2의 1) follow the same pattern,
+   but a native reviewer should confirm them.

@@ -19,13 +19,25 @@
  *                     script; blocks the host's UI thread while searching.
  *
  * All numbers are reported from Black's point of view
- * (reportAnalysisWinratesAs = BLACK in gtp.cfg).
+ * (reportAnalysisWinratesAs = BLACK in gtp.cfg and human.cfg).
+ *
+ * v5: a request may name the KataGo process that serves it (`engine`):
+ * "standard" (the shipped network, default), "strong" (the optional larger
+ * network) or "human" (the optional human SL model, with a `profile` such
+ * as "rank_12k" and a `humanStyle` "raw" | "search"). The host answers
+ * `ModelMissing` when that network is not installed; callers fall back.
+ *
+ * Rules (v5): every request carries the game's ruleset, and KataGo is set
+ * to it before it searches: `kata-set-rules japanese|chinese|korean` in the
+ * sync script, the `rules` field of the async payload (the host sends the
+ * same command when it resets the board). Analysis, the computer's moves
+ * and the dead stones at the end therefore all use the game's rules.
  *
  * The browser preview has no child processes, so status() reports
  * unavailable and engine.js uses its offline fallbacks.
  */
 import { hasNative, nativeInvoke } from "./host.js";
-import { BLACK, LETTERS, coordLabel } from "./rules.js";
+import { BLACK, LETTERS, coordLabel, rulesetById } from "./rules.js";
 
 const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
 
@@ -39,7 +51,7 @@ export async function status() {
     try {
       const value = await nativeInvoke("studio.katagoStatus");
       if (!value || typeof value !== "object") return OFFLINE;
-      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream };
+      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
     } catch (_) {
       return OFFLINE;
     }
@@ -60,18 +72,38 @@ export function maxTimeFor(visits) {
   return visits > 600 ? 12 : visits > 150 ? 6 : 3;
 }
 
-/** Root stones (handicap and SGF setup) as GTP plays: ["B D4", "W Q16", ...]. */
+/**
+ * Root stones (handicap and SGF setup) as GTP plays: ["W Q16", "B D4", ...].
+ *
+ * White stones go first. KataGo treats the black stones played before
+ * White's first move as handicap stones, and under Chinese rules gives
+ * White one point for each (whiteHandicapBonus N). A root of black stones
+ * only is a handicap, and KataGo counts exactly those; a root with White
+ * stones is a set-up position, and placing White first keeps KataGo from
+ * counting any of it as handicap. That is the same reading as
+ * Game.handicap after SGF import, so the app's count and KataGo's agree.
+ */
 function setupStones(game) {
   const size = game.size;
   const root = game.root.board.signMap;
-  const out = [];
+  const black = [];
+  const white = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const v = root[y][x];
-      if (v) out.push(`${v === BLACK ? "B" : "W"} ${coordLabel(x, y, size)}`);
+      if (v === BLACK) black.push(`B ${coordLabel(x, y, size)}`);
+      else if (v) white.push(`W ${coordLabel(x, y, size)}`);
     }
   }
-  return out;
+  return [...white, ...black];
+}
+
+/**
+ * The `kata-set-rules` argument for a game: exactly "japanese", "chinese"
+ * or "korean" (the native host accepts nothing else).
+ */
+export function katagoRules(game) {
+  return rulesetById(game?.rules).katago;
 }
 
 /** The moves from the root to `node`: ["B D4", "W pass", ...]. */
@@ -90,7 +122,10 @@ export function positionPayload(game, node = game.current, visits = 64) {
   const v = Math.max(1, Math.round(visits));
   return {
     size: game.size,
+    // The game's komi only: under Chinese rules KataGo adds the handicap
+    // compensation itself (see RULESETS in rules.js).
     komi: game.komi,
+    rules: katagoRules(game),
     setup: setupStones(game).join(" "),
     moves: lineMoves(game, node).join(" "),
     color: node.turn === BLACK ? "B" : "W",
@@ -106,13 +141,13 @@ function positionScript(game, node, visits) {
     "clear_board",
     `boardsize ${game.size}`,
     `komi ${game.komi}`,
-    "kata-set-rules japanese",
+    `kata-set-rules ${katagoRules(game)}`,
     `kata-set-param maxVisits ${v}`,
     `kata-set-param maxTime ${maxTimeFor(v)}`,
   ];
   // GTP `play` does not have to alternate, so setup stones are simply
-  // placed one by one before the game's own moves. Under Japanese rules this
-  // changes nothing about the position KataGo searches.
+  // placed one by one before the game's own moves (White's first, so that
+  // only a black-only root reads as a handicap; see setupStones).
   for (const stone of setupStones(game)) commands.push(`play ${stone}`);
   for (const move of lineMoves(game, node)) commands.push(`play ${move}`);
   return commands.join("\n");
@@ -214,10 +249,17 @@ function listen() {
   } catch (_) {}
 }
 
-function analyzeAsync(game, node, visits, onInfo, signal) {
+/** The v5 fields of a request (nothing for the standard engine, as in v4). */
+export function enginePayload({ engine = "standard", profile = "", humanStyle = "raw" } = {}) {
+  if (engine === "strong") return { engine };
+  if (engine === "human") return { engine, profile, humanStyle: humanStyle === "search" ? "search" : "raw" };
+  return {};
+}
+
+function analyzeAsync(game, node, visits, onInfo, signal, select) {
   const id = `k${++nextId}`;
   const stream = typeof onInfo === "function";
-  const payload = { id, ...positionPayload(game, node, visits), stream };
+  const payload = { id, ...positionPayload(game, node, visits), stream, ...enginePayload(select) };
   if (stream) listen();
   return new Promise((resolve) => {
     const entry = { size: game.size, onInfo: stream ? onInfo : null, finish: null };
@@ -242,6 +284,7 @@ function analyzeAsync(game, node, visits, onInfo, signal) {
         if (!reply || typeof reply !== "object" || reply.ok !== true) return finish(null);
         const result = toAnalysis(reply.info, reply.play, game.size);
         if (result && reply.sync && typeof reply.sync === "object") result.sync = reply.sync;
+        if (result) result.engine = typeof reply.engine === "string" ? reply.engine : "standard";
         finish(result);
       },
       (error) => {
@@ -273,16 +316,21 @@ async function analyzeSync(game, node, visits) {
  *   onInfo(partial)  called with partial results (same shape) while the
  *                    search runs, about five times a second (async hosts)
  *   signal           AbortSignal: abort cancels the search; resolves null
+ *   engine           v5: "standard" | "strong" | "human" (see above)
+ *   profile, humanStyle   v5, human engine only
  *
- * Resolves { moves, ownership, winrate, scoreLead, play, visits } or null
- * when KataGo is not available, the request fails, or it was cancelled or
+ * Resolves { moves, ownership, winrate, scoreLead, play, visits, engine }
+ * or null when KataGo is not available, the request fails (including an
+ * optional network that is not installed), or it was cancelled or
  * superseded by a newer request.
  */
-export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null } = {}) {
+export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null, engine = "standard", profile = "", humanStyle = "raw" } = {}) {
   if (!hasNative() || signal?.aborted) return null;
   const st = await status();
   if (!st?.available || signal?.aborted) return null;
-  if (st.async) return analyzeAsync(game, node, visits, onInfo, signal);
+  // Optional networks need a v5 host (async, with `models`).
+  if (engine !== "standard" && !(st.async && st.models)) return null;
+  if (st.async) return analyzeAsync(game, node, visits, onInfo, signal, { engine, profile, humanStyle });
   const result = await analyzeSync(game, node, visits);
   return signal?.aborted ? null : result;
 }

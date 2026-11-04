@@ -7,6 +7,7 @@
  * keeps focus, scroll and transitions intact.
  */
 import { useEffect, useState } from "preact/hooks";
+import { initialModels } from "../models.js";
 
 const listeners = new Set();
 let scheduled = false;
@@ -26,6 +27,7 @@ export const state = {
   review: null,
   practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   library: { tab: "mine", kind: "all", query: "" },
+  models: initialModels(), // v5 optional downloads (app/models-ctl.js)
 };
 
 export function update(fn) {

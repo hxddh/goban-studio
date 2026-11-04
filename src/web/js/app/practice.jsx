@@ -1,6 +1,7 @@
 /**
  * Practice: the course, problem collections and today's five.
  */
+import { useState } from "preact/hooks";
 import { BLACK } from "../rules.js";
 import * as S from "../solver.js";
 import { t } from "../i18n.js";
@@ -81,39 +82,7 @@ function PracticeHome() {
 
         <section class="section">
           <h2 class="section-title">{t("practice.course")}</h2>
-          <ol class="units">
-            {C.COURSE.map((unit, ui) => {
-              const done = unit.lessons.filter((l) => p.lessons[l.id]?.done).length;
-              return (
-                <li class="unit">
-                  <div class="unit-head">
-                    <span class="unit-no">{ui + 1}</span>
-                    <div class="unit-text">
-                      <h3>{C.tx(unit.title)}</h3>
-                      <p>{C.tx(unit.summary)}</p>
-                    </div>
-                    <span class={`unit-count ${done === unit.lessons.length ? "all" : ""}`}>
-                      {done === unit.lessons.length ? <Icon name="check" size={14} /> : t("practice.ofN", [done, unit.lessons.length])}
-                    </span>
-                  </div>
-                  <ul class="lesson-list">
-                    {unit.lessons.map((lesson) => {
-                      const lp = p.lessons[lesson.id];
-                      const isNext = next?.lesson.id === lesson.id;
-                      return (
-                        <li>
-                          <button type="button" class={`lesson-row ${lp?.done ? "done" : ""} ${isNext ? "next" : ""}`} onClick={() => C.openLesson(lesson.id)}>
-                            <span class="lesson-mark">{lp?.done ? <Icon name="check" size={13} /> : <i class="dot" />}</span>
-                            <span class="lesson-title">{C.tx(lesson.title)}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              );
-            })}
-          </ol>
+          <CourseMap next={next} />
         </section>
 
         <MistakesSection />
@@ -168,6 +137,65 @@ function PracticeHome() {
 }
 
 
+/**
+ * The course as a map: every unit with its progress at a glance; the unit
+ * you are in is open, the others open on click.
+ */
+function CourseMap({ next }) {
+  const p = state.progress;
+  const [open, setOpen] = useState(null);
+  const current = next ? C.COURSE.findIndex((u) => u.lessons.some((l) => l.id === next.lesson.id)) : -1;
+  const shown = open ?? current;
+  return (
+    <ol class="units map">
+      {C.COURSE.map((unit, ui) => {
+        const done = unit.lessons.filter((l) => p.lessons[l.id]?.done).length;
+        const all = done === unit.lessons.length;
+        const state_ = all ? "done" : ui === current ? "now" : done > 0 ? "some" : "todo";
+        const expanded = shown === ui;
+        const firstMid = unit.level === "intermediate" && C.COURSE[ui - 1]?.level !== "intermediate";
+        return (
+          <>
+          {firstMid && <li class="units-heading">{t("course.intermediate")}</li>}
+          <li class={`unit ${state_} ${expanded ? "open" : ""}`}>
+            <button type="button" class="unit-head" aria-expanded={expanded} onClick={() => setOpen(expanded ? -1 : ui)}>
+              <span class="unit-no">{all ? <Icon name="check" size={13} /> : ui + 1}</span>
+              <span class="unit-text">
+                <h3>{C.tx(unit.title)}</h3>
+                <p>{C.tx(unit.summary)}</p>
+              </span>
+              <span class="unit-progress" aria-label={t("practice.ofN", [done, unit.lessons.length])}>
+                <span class="mini-progress">
+                  <i style={{ width: `${(done / unit.lessons.length) * 100}%` }} />
+                </span>
+                <span class="unit-count">{t("practice.ofN", [done, unit.lessons.length])}</span>
+              </span>
+              <Icon name={expanded ? "down" : "next"} size={14} />
+            </button>
+            {expanded && (
+              <ul class="lesson-list">
+                {unit.lessons.map((lesson) => {
+                  const lp = p.lessons[lesson.id];
+                  const isNext = next?.lesson.id === lesson.id;
+                  return (
+                    <li>
+                      <button type="button" class={`lesson-row ${lp?.done ? "done" : ""} ${isNext ? "next" : ""}`} onClick={() => C.openLesson(lesson.id)}>
+                        <span class="lesson-mark">{lp?.done ? <Icon name="check" size={13} /> : <i class="dot" />}</span>
+                        <span class="lesson-title">{C.tx(lesson.title)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </li>
+          </>
+        );
+      })}
+    </ol>
+  );
+}
+
 function MistakesSection() {
   const list = state.progress.mistakes;
   if (!list.length) return null;
@@ -199,6 +227,9 @@ function TopicPage() {
   const p = state.progress;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
   const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
+  // Grades fold away: the first grade with unsolved problems starts open.
+  const firstOpen = byGrade.find(({ items }) => items.some((x) => !p.problems[x.id]?.solved))?.g ?? byGrade[0]?.g;
+  const [openGrades, setOpenGrades] = useState([firstOpen]);
   return (
     <>
     <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
@@ -219,26 +250,34 @@ function TopicPage() {
           ))}
         </div>
       )}
-      {byGrade.map(({ g, items }) => (
-        <section class="section">
-          <h2 class="section-title">
-            <GradeDots grade={g} /> {t("grade." + g)}
-          </h2>
-          <div class="problem-grid">
-            {items.map((x) => {
-              const pr = p.problems[x.id];
-              const n = all.indexOf(x) + 1;
-              return (
-                <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
-                  <span class="problem-no">{n}</span>
-                  <span class="problem-title">{C.tx(x.title)}</span>
-                  {pr?.solved ? <Icon name="check" size={14} /> : pr ? <i class="dot tried" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {byGrade.map(({ g, items }) => {
+        const solved = items.filter((x) => p.problems[x.id]?.solved).length;
+        const isOpen = openGrades.includes(g);
+        return (
+          <section class="section grade-section">
+            <button type="button" class="section-title grade-head" aria-expanded={isOpen} onClick={() => setOpenGrades(isOpen ? openGrades.filter((x) => x !== g) : [...openGrades, g])}>
+              <Icon name={isOpen ? "down" : "next"} size={14} />
+              <GradeDots grade={g} /> {t("grade." + g)}
+              <span class="fine">{t("practice.ofN", [solved, items.length])}</span>
+            </button>
+            {isOpen && (
+              <div class="problem-grid">
+                {items.map((x) => {
+                  const pr = p.problems[x.id];
+                  const n = all.indexOf(x) + 1;
+                  return (
+                    <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
+                      <span class="problem-no">{n}</span>
+                      <span class="problem-title">{C.tx(x.title)}</span>
+                      {pr?.solved ? <Icon name="check" size={14} /> : pr ? <i class="dot tried" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
     </>
   );
@@ -382,6 +421,32 @@ function ProblemControls({ P, onNext, nextLabel }) {
   );
 }
 
+/** What this problem is: difficulty, theme, and your record with it. */
+function ProblemFacts({ def, grade }) {
+  const rec = state.progress.problems[def.id];
+  const record = !rec ? t("practice.recordNew") : rec.solved ? t("practice.recordSolved", [rec.attempts]) : t("practice.recordTried", [rec.attempts]);
+  return (
+    <dl class="facts">
+      <dt>{t("practice.difficulty")}</dt>
+      <dd>
+        <GradeDots grade={grade} /> {t("grade." + grade)}
+      </dd>
+      {def.theme && (
+        <>
+          <dt>{t("practice.themes")}</dt>
+          <dd>
+            <button type="button" class="link" onClick={() => C.openTopic(def.topic, def.theme)}>
+              {C.themeName(def.theme)}
+            </button>
+          </dd>
+        </>
+      )}
+      <dt>{t("practice.record")}</dt>
+      <dd>{record}</dd>
+    </dl>
+  );
+}
+
 function ProblemView() {
   const pr = state.practice;
   const P = pr.problem;
@@ -402,7 +467,6 @@ function ProblemView() {
       <aside class="panel">
         <div class="panel-title">
           <h1>{C.tx(def.title)}</h1>
-          <GradeDots grade={grade} />
         </div>
         <p class="goal">
           <Stone color={P.pz.userColor} size={14} /> {C.goalText(P.pz)}
@@ -410,6 +474,7 @@ function ProblemView() {
         {P.hintAt || P.used ? <p class="note">{C.tx(def.hint)}</p> : null}
         <ProblemFeedback P={P} />
         <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t(daily.index >= daily.items.length - 1 ? "practice.finishDaily" : "practice.nextDaily") : t("practice.nextProblem")} />
+        <ProblemFacts def={def} grade={grade} />
         {!daily && (
           <footer class="panel-foot">
             <button type="button" class="link" onClick={C.prevProblem} disabled={n <= 1}>

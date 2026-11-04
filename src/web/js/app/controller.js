@@ -11,6 +11,8 @@ import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
 import { DEFAULT_SETTINGS, clearAll, loadProgress, loadSettings, markClassic, migrate, saveProgress, saveSettings } from "../persist.js";
 import { detectLang, setLang, t } from "../i18n.js";
+import * as Backup from "../persist.js";
+import { APP_VERSION } from "../version.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
 import { OPENINGS } from "../content/openings.js";
@@ -21,13 +23,15 @@ import { startRating } from "./rating.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
-import { autoCheckForUpdates } from "./update-ctl.js";
+import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
+import { initModels } from "./models-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
 export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
+export * from "./models-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -58,8 +62,14 @@ export function boot() {
     maybeComputerMove();
     ponder();
   });
+  // v5: which optional networks are installed (a local status call, no
+  // network request).
+  initModels().catch(() => {});
   // v4: the opt-in weekly update check (no request unless it is on and due).
   if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
+  // v5: how the last in-app update went (no request), and tell a waiting
+  // update helper that this new version is up.
+  if (hasNative()) setTimeout(() => restoreUpdateState().catch(() => {}), 600);
 }
 
 /* --------------------------------------------------------------- places */
@@ -193,12 +203,19 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
   if (warnings.length) toast(warnings[0], "warn");
 }
 
+/** v5: a record under rules the app cannot score names those rules. */
+function importErrorText(e) {
+  if (e?.code !== "unsupported-rules") return t("library.importError");
+  const name = String(e.rules || "").replace(/\s+/g, " ").trim().slice(0, 40) || "?";
+  return t("rules.unsupported", [name]);
+}
+
 export async function importFromFile(file) {
   if (!file) return;
   try {
     await importSGFText(await file.text(), file.name);
   } catch (e) {
-    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
+    toast(importErrorText(e), "error");
   }
 }
 
@@ -209,7 +226,7 @@ export async function importFromPath(path) {
     await importSGFText(text, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
-    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
+    toast(importErrorText(e), "error");
   }
 }
 
@@ -222,6 +239,58 @@ export async function pickImport() {
     return;
   }
   document.getElementById("file-input")?.click();
+}
+
+/* ----------------------------------------------------------------- backup */
+
+export async function exportBackup() {
+  const { saveText } = await import("./play-ctl.js");
+  const doc = Backup.exportBackup(APP_VERSION);
+  const day = new Date().toISOString().slice(0, 10);
+  await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json");
+}
+
+/** Pick a backup file, show what it holds, and replace everything on confirm. */
+export async function importBackup() {
+  let text = null;
+  if (hasNative() && hasFileDialogs()) {
+    const files = await openFileDialog({ title: t("backup.import"), allowMultiple: false });
+    const path = normalizePaths(files)[0];
+    if (!path) return;
+    text = await readTextFile(path);
+  } else {
+    text = await new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (!f) return resolve(null);
+        f.text().then(resolve, () => resolve(null));
+      };
+      input.click();
+    });
+  }
+  if (text == null) return;
+  let doc = null;
+  try {
+    doc = JSON.parse(text);
+  } catch (_) {
+    doc = null;
+  }
+  const c = Backup.checkBackup(doc);
+  if (!c.ok) return toast(t("backup.error." + c.error), "warn");
+  confirmAction({
+    title: t("backup.confirmTitle"),
+    body: t("backup.confirmBody", [c.summary.games, c.summary.lessons, c.summary.problems]),
+    confirm: t("backup.restore"),
+    danger: true,
+    onConfirm: () => {
+      const r = Backup.restoreBackup(doc);
+      if (!r.ok) return toast(t("backup.error." + r.error), "warn");
+      location.reload();
+    },
+  });
 }
 
 export function clearData() {

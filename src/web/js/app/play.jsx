@@ -3,7 +3,7 @@
  * game (whole-game analysis, live analysis, variations, key mistakes).
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
+import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
 import { areaOf, rankParts, strengthById } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
@@ -106,6 +106,7 @@ function gameFacts(g) {
   const game = g.game;
   return [
     `${game.size} × ${game.size}`,
+    t(rulesetById(game.rules).labelKey),
     t("play.komiN", [formatPoints(game.komi)]),
     game.handicap ? t("play.handicapN", [game.handicap]) : null,
     g.clock ? t("time." + g.clock.mode) : null,
@@ -174,6 +175,7 @@ function PlayerRow({ color }) {
   if (g.opponent === "ai" && color !== g.humanColor) {
     name = state.engine.available ? "KataGo" : t("play.offlineEngine");
     sub = rankLabel(g.strength);
+    if (g.opponentMode === "human" || g.opponentMode === "strong") sub += " · " + t("models.mode." + g.opponentMode);
   } else if (g.opponent === "ai") {
     name = t("play.you");
     const r = state.progress.rating?.r;
@@ -241,6 +243,9 @@ function MoveStrip() {
   return (
     <section class="moves" aria-label={t("play.moveList")}>
       <h2 class="slot-title">{t("play.moveList")}</h2>
+      {line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13 && (
+        <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>
+      )}
       {line.length === 0 ? (
         <p class="moves-empty">{t("play.noMoves")}</p>
       ) : (
@@ -356,7 +361,7 @@ function ScoringCard() {
   const pending = sc.source === "pending";
   return (
     <section class="card score-card enter-up" aria-live="polite">
-      <h2>{t("score.title")}</h2>
+      <h2>{t(s.method === "area" ? "score.titleArea" : "score.title")}</h2>
       <p class="muted">{pending ? t("score.judging") : sc.source === "katago" ? t("score.engineMarked") : t("score.manual")}</p>
       <div class="score-pair">
         <div>
@@ -364,16 +369,25 @@ function ScoringCard() {
           <strong>
             <CountUp value={pending ? 0 : s.black} format={formatPoints} />
           </strong>
-          <span class="score-detail">{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory]).split(" · ").map((x) => <i>{x}</i>)}</span>
+          <span class="score-detail">{lines(s.method === "area" ? t("score.detailArea", [s.blackStones, s.blackTerritory]) : t("score.detail", [s.blackTerritory, s.blackPrisoners]))}</span>
         </div>
         <div>
           <Stone color={WHITE} size={14} />
           <strong>
             <CountUp value={pending ? 0 : s.white} format={formatPoints} />
           </strong>
-          <span class="score-detail">{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)]).split(" · ").map((x) => <i>{x}</i>)}</span>
+          <span class="score-detail">
+            {lines(
+              s.method === "area"
+                ? s.handicapCompensation > 0
+                  ? t("score.detailAreaHandicap", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi), s.handicapCompensation])
+                  : t("score.detailAreaKomi", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi)])
+                : t("score.detailKomi", [s.whiteTerritory, s.whitePrisoners, formatPoints(s.komi ?? g.game.komi)]),
+            )}
+          </span>
         </div>
       </div>
+      {!pending && s.seki?.length > 0 && <p class="fine">{t(s.method === "area" ? "score.sekiArea" : "score.sekiTerritory")}</p>}
       {!pending && <p class="score-result enter-fade">{C.resultText(s.result)}</p>}
       <div class="actions">
         <Button kind="primary" onClick={C.confirmScore} disabled={pending}>
@@ -385,6 +399,11 @@ function ScoringCard() {
       </div>
     </section>
   );
+}
+
+/** "a · b · c" → one fact per line. */
+function lines(text) {
+  return text.split(" · ").map((x) => <i>{x}</i>);
 }
 
 function SummaryBlock() {
@@ -475,6 +494,8 @@ export function ReviewView() {
   const node = game.current;
   const marks = [];
   if (r.guess?.last === "wrong" && r.guess.wrongAt) marks.push({ ...r.guess.wrongAt, type: "cross", tone: "bad" });
+  // Marks recorded on this move (SGF TR/SQ/CR/MA/LB).
+  if (!r.variation) for (const mk of node.marks || []) marks.push({ x: mk.x, y: mk.y, type: mk.type, label: mk.text });
   const focusKm = r.focus != null ? r.keyMoves.find((k) => k.index === r.focus) : null;
   if (focusKm?.source && r.variation) for (const p of focusKm.source.points) marks.push({ ...p, type: "area", tone: "bad" });
   if (r.variation) {
@@ -805,6 +826,9 @@ function Variations() {
           <button type="button" class="link" onClick={C.backToMainLine}>
             {t("review.backToMain")}
           </button>
+          <button type="button" class="link" onClick={() => C.promoteVariation()}>
+            {t("edit.promote")}
+          </button>
           <button type="button" class="link danger" onClick={C.deleteVariation}>
             {t("review.deleteVariation")}
           </button>
@@ -870,7 +894,10 @@ function ReviewPanel() {
               <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
             )}
           </section>
+          <GameSummary />
           <Variations />
+          <TreeView />
+          <EditSection />
         </>
       )}
 
@@ -892,6 +919,134 @@ function ReviewPanel() {
         </Button>
       </div>
     </aside>
+  );
+}
+
+/** The game in three phases, and three things to remember. */
+function GameSummary() {
+  const r = state.review;
+  const sm = r.summary;
+  if (!sm || sm.confidence === "none" || !sm.phases?.length) return null;
+  const me = sm.humanColor === WHITE ? "white" : sm.humanColor === BLACK ? "black" : null;
+  const cols = me ? [me] : ["black", "white"];
+  const fmt = (v) => (v == null ? "—" : formatPoints(Math.round(v * 2) / 2));
+  return (
+    <section class="game-summary">
+      <h2 class="slot-title">{t("gameSummary.title")}</h2>
+      <table class="phase-table">
+        <thead>
+          <tr>
+            <th />
+            {cols.map((c) => (
+              <th>{me ? t("gameSummary.pointsLost") : <Stone color={c === "black" ? BLACK : WHITE} size={10} />}</th>
+            ))}
+            {me && <th>{t("gameSummary.mistakes")}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {sm.phases.map((ph) =>
+            ph.from > ph.to ? null : (
+              <tr>
+                <th title={t("gameSummary.phaseMoves", [ph.from, ph.to])}>{t("phase." + ph.id)}</th>
+                {cols.map((c) => (
+                  <td>{fmt(ph.players[c].loss)}</td>
+                ))}
+                {me && <td>{ph.players[me].mistakes + ph.players[me].blunders || "—"}</td>}
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+      {sm.takeaways?.length > 0 && (
+        <ol class="takeaways">
+          {sm.takeaways.filter((tk) => tk.kind !== "estimate").slice(0, 3).map((tk) => (
+            <li class={tk.tone}>
+              {tk.index != null ? (
+                <button type="button" class="link" onClick={() => C.reviewGoto(tk.index)}>
+                  {storyText(tk)}
+                </button>
+              ) : (
+                storyText(tk)
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** The variation tree: every branch of the record, the current move ringed. */
+function TreeView() {
+  const lay = C.treeLayout();
+  const box = useRef(null);
+  useEffect(() => {
+    const el = box.current?.querySelector(".tree-node.cur");
+    el?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  });
+  if (!lay || lay.height <= 1) return null;
+  const S = 14;
+  const pad = 8;
+  const w = lay.width * S + pad * 2;
+  const h = lay.height * S + pad * 2;
+  const X = (x) => pad + x * S;
+  const Y = (y) => pad + y * S;
+  return (
+    <section class="tree-view">
+      <h2 class="slot-title">{t("edit.tree")}</h2>
+      <div class="tree-scroll" ref={box}>
+        <svg width={w} height={h} role="img" aria-label={t("edit.tree")}>
+          {lay.edges.map((e) => (
+            <polyline class={`tree-edge ${e.isMain ? "main" : ""}`} points={e.points.map(([x, y]) => `${X(x)},${Y(y)}`).join(" ")} />
+          ))}
+          {lay.nodes.map((n) => (
+            <circle
+              class={`tree-node ${n.color > 0 ? "b" : n.color < 0 ? "w" : "root"} ${n.isCurrent ? "cur" : ""} ${n.hasComment ? "note" : ""}`}
+              cx={X(n.x)}
+              cy={Y(n.y)}
+              r={n.isCurrent ? 5 : 4}
+              onClick={() => C.gotoNode(n.node)}
+            >
+              <title>{n.x}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+/** Comment on the current move, and the marking tools. */
+function EditSection() {
+  const r = state.review;
+  const node = r.game.current;
+  const kinds = ["triangle", "square", "circle", "cross", "label"];
+  const glyph = { triangle: "△", square: "□", circle: "○", cross: "×", label: "A" };
+  return (
+    <section class="edit-section">
+      <h2 class="slot-title">{t("edit.comment")}</h2>
+      <textarea
+        class="comment-box"
+        rows="3"
+        key={node.id}
+        placeholder={t("edit.commentPlaceholder")}
+        value={node.comment || ""}
+        onInput={(e) => C.setComment(e.currentTarget.value)}
+      />
+      <div class="mark-tools" role="toolbar" aria-label={t("edit.marks")}>
+        {kinds.map((k) => (
+          <button type="button" class={`mark-btn ${r.markTool === k ? "on" : ""}`} aria-pressed={r.markTool === k} title={t("edit.mark." + k)} onClick={() => C.setMarkTool(r.markTool === k ? null : k)}>
+            {glyph[k]}
+          </button>
+        ))}
+        {(node.marks || []).length > 0 && (
+          <button type="button" class="link" onClick={() => C.clearMarks()}>
+            {t("edit.clearMarks")}
+          </button>
+        )}
+      </div>
+      {r.edits?.target === null && <p class="fine">{t("edit.notSaved")}</p>}
+    </section>
   );
 }
 

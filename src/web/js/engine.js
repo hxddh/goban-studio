@@ -11,6 +11,12 @@
  * start) the calls fall back to Moka on 9×9 and the local heuristics
  * elsewhere, and `info()` says so, so the UI never presents a fallback as
  * the real thing.
+ *
+ * v5: optional networks (models.js). With the stronger network installed,
+ * analysis, review, hints, scoring and the top level use it; with the human
+ * SL model installed and `settings.humanStyle` on, the opponent plays like a
+ * human of its level (`opponentMode`). Every optional path falls back to the
+ * shipped network when its process cannot answer.
  */
 import { BLACK, WHITE, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
@@ -32,17 +38,44 @@ import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
  *            lever for every level below ≈ 2 kyu, since even KataGo's worst
  *            candidates are moves a strong network finds plausible
  *   local    offline fallback level (ai.js) when KataGo is unavailable
+ *
+ * v5, used only when the optional networks are installed:
+ *
+ *   human    the human-style opponent: KataGo's human SL model imitating
+ *            `profile` (a KataGo humanSLProfile). `style` "raw" plays the
+ *            profile's own move distribution at one network evaluation
+ *            (KataGo's gtp_human5k_example.cfg); "search" keeps the style
+ *            but lets `visits` of search veto losing moves
+ *            (gtp_human9d_search_example.cfg) — the raw policy alone does
+ *            not reach single-digit kyu against these programs (v4
+ *            measurement, docs/strength.md). The model has no profile
+ *            below 20 kyu, so the weakest levels add the level's own kind
+ *            of beginner's move (`blunder`). Profiles follow the v4 anchor
+ *            measurements: rank_20k measured ≈ 17 kyu and rank_15k ≈ 14 kyu
+ *            on the ladder's scale.
+ *   strong   the top level with the stronger network: `visits` of its
+ *            search (the larger network is several times slower per visit
+ *            and much stronger per visit).
  */
 export const STRENGTHS = [
-  { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1 },
-  { id: "25k", rank: 29, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1 },
-  { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2 },
-  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3 },
-  { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4 },
-  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5 },
-  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5 },
-  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5 },
+  { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1, human: { profile: "rank_20k", blunder: 0.9 } },
+  { id: "25k", rank: 29, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1, human: { profile: "rank_20k", blunder: 0.7 } },
+  { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2, human: { profile: "rank_20k", blunder: 0.35 } },
+  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3, human: { profile: "rank_20k" } },
+  { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4, human: { profile: "rank_12k" } },
+  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24 } },
+  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_2k", style: "search", visits: 64 } },
+  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200 }, strong: { visits: 64 } },
 ];
+
+/** Search budget of a human-style move in "raw" style (passes only). */
+export const HUMAN_VISITS = 40;
+/**
+ * Analysis with the stronger network uses this share of the visits asked
+ * for: it is several times slower per visit on a laptop CPU and much
+ * stronger per visit, and the review should not get slower than v4's.
+ */
+export const STRONG_VISIT_SCALE = 0.5;
 
 export function strengthById(id) {
   return STRENGTHS.find((s) => s.id === id) || STRENGTHS[1];
@@ -83,6 +116,23 @@ function queued(fn) {
 }
 const analyzeQ = (game, opts) => queued(() => (opts?.signal?.aborted ? null : KataGo.analyze(game, opts)));
 
+/**
+ * An analysis search on the analysis engine (the stronger network when it is
+ * installed, with scaled visits), falling back to the shipped network when
+ * that process cannot answer.
+ */
+async function analysisQ(game, opts = {}) {
+  const engine = analysisEngine();
+  if (engine === "standard") return analyzeQ(game, opts);
+  const a = await analyzeQ(game, { ...opts, engine, visits: scaledVisits(opts.visits ?? 64, engine) });
+  if (a || opts.signal?.aborted) {
+    if (a) strongFailures = 0;
+    return a;
+  }
+  strongFailures++;
+  return analyzeQ(game, opts);
+}
+
 let cached = null;
 export async function info() {
   if (cached) return cached;
@@ -91,6 +141,53 @@ export async function info() {
     ? { kind: "katago", name: st.version || "KataGo", available: true }
     : { kind: "offline", name: "", available: false };
   return cached;
+}
+
+/* ------------------------------------------------- optional networks (v5) */
+
+/**
+ * Which optional networks are installed and wanted. Set by the models
+ * controller (app/models-ctl.js) from the host's status and
+ * `settings.humanStyle`; all false until then.
+ */
+const models = { strong: false, human: false, humanStyle: true };
+/** Consecutive failures of the strong process; after two, use the standard one. */
+let strongFailures = 0;
+
+export function setModels({ strong, human, humanStyle } = {}) {
+  if (strong !== undefined) {
+    if (strong && !models.strong) strongFailures = 0;
+    models.strong = !!strong;
+  }
+  if (human !== undefined) models.human = !!human;
+  if (humanStyle !== undefined) models.humanStyle = humanStyle !== false;
+}
+
+export function modelsState() {
+  return { ...models, strongUsable: models.strong && strongFailures < 2 };
+}
+
+/** The process for analysis, review, hints and scoring. */
+export function analysisEngine(m = modelsState()) {
+  return m.strong && m.strongUsable !== false ? "strong" : "standard";
+}
+
+/** Visits to ask of `engine` for an analysis the app sizes for the shipped network. */
+export function scaledVisits(visits, engine) {
+  return engine === "strong" ? Math.max(1, Math.round(visits * STRONG_VISIT_SCALE)) : visits;
+}
+
+/**
+ * How the opponent plays at `strength`: "human" (human SL model, when
+ * installed and `humanStyle` is on), "strong" (the stronger network, for
+ * the levels that have a `strong` entry), else "standard". Pure; `m` is
+ * for the tests.
+ */
+export function opponentMode(strengthOrId, m = modelsState()) {
+  const s = typeof strengthOrId === "string" ? strengthById(strengthOrId) : strengthOrId;
+  if (m.human && m.humanStyle && s?.human) return "human";
+  if (m.strong && m.strongUsable !== false && s?.strong) return "strong";
+  return "standard";
 }
 
 function sample(list, weight, rnd) {
@@ -232,30 +329,74 @@ export function moveFromAnalysis(game, analysis, strength, rnd = Math.random) {
 }
 
 /**
+ * A human-style move from the human SL process's report: KataGo's own
+ * choice (`play`, made with humanSLChosenMoveProp = 1, so it is the human
+ * model's move except that KataGo's search decides when to pass), or a
+ * beginner's move for the levels below the model's 20-kyu floor. Falls back
+ * to KataGo's top candidate when the choice is illegal under the app's
+ * superko rule. Exported for the tests and the calibration harness.
+ */
+export function humanMoveFromAnalysis(game, analysis, human, rnd = Math.random) {
+  const top = analysis.moves?.[0];
+  if (human.blunder > 0 && !top?.pass && rnd() < human.blunder) {
+    const b = beginnerMove(game, rnd);
+    if (b) return b;
+  }
+  let move = analysis.play;
+  if (!legal(game, move) && top) move = toMove(top);
+  return legal(game, move) ? move : null;
+}
+
+/** The human SL process's search request for a level (katago.js options). */
+export function humanRequest(human) {
+  const style = human.style === "search" ? "search" : "raw";
+  return { engine: "human", profile: human.profile, humanStyle: style, visits: human.visits ?? HUMAN_VISITS };
+}
+
+/**
  * The computer's move plus the search behind it, so the caller can judge
  * the position (teaching warnings, resignation, "shall we count?") and pace
- * its reply. `analysis` is null when KataGo is not available.
+ * its reply. `analysis` is null when KataGo is not available. `mode` says
+ * how the move was chosen ("human", "strong", "standard" or "offline").
  */
 export async function decide(game, strengthId, { signal } = {}) {
   const strength = strengthById(strengthId);
+  const mode = opponentMode(strength);
+  if (mode === "human") {
+    const analysis = await analyzeQ(game, { ...humanRequest(strength.human), signal });
+    if (signal?.aborted) return { move: null, analysis: null, mode };
+    const move = analysis && humanMoveFromAnalysis(game, analysis, strength.human);
+    if (move) return { move, analysis, mode };
+    // The human process could not answer: the level's standard play.
+  }
+  if (mode === "strong") {
+    const analysis = await analyzeQ(game, { visits: strength.strong.visits, engine: "strong", signal });
+    if (signal?.aborted) return { move: null, analysis: null, mode };
+    const move = analysis && moveFromAnalysis(game, analysis, strength);
+    if (move) {
+      strongFailures = 0;
+      return { move, analysis, mode };
+    }
+    if (!analysis) strongFailures++;
+  }
   const analysis = await analyzeQ(game, { visits: strength.visits, signal });
-  if (signal?.aborted) return { move: null, analysis: null };
+  if (signal?.aborted) return { move: null, analysis: null, mode: "standard" };
   if (analysis) {
     const move = moveFromAnalysis(game, analysis, strength);
-    if (move) return { move, analysis };
+    if (move) return { move, analysis, mode: "standard" };
   }
   const move = await chooseLocal(game, { level: strength.local, color: game.turn });
-  return { move, analysis: null };
+  return { move, analysis: null, mode: "offline" };
 }
 
 /** A quick look at the position (for teaching mode and the eval bar). */
 export async function evaluate(game, { node = game.current, visits = 48, signal } = {}) {
-  return analyzeQ(game, { node, visits, signal });
+  return analysisQ(game, { node, visits, signal });
 }
 
 /** Live analysis for review, with partial results while it searches. */
 export async function live(game, node, { visits = 240, onInfo, signal } = {}) {
-  return analyzeQ(game, { node, visits, onInfo, signal });
+  return analysisQ(game, { node, visits, onInfo, signal });
 }
 
 export function cancel() {
@@ -263,20 +404,15 @@ export function cancel() {
 }
 
 export async function chooseMove(game, strengthId) {
-  const strength = strengthById(strengthId);
-  const analysis = await analyzeQ(game, { visits: strength.visits });
-  if (analysis) {
-    // Never resign, never pass early while the board is open: KataGo's own
-    // choice is a pass only when the game is really over.
-    const move = moveFromAnalysis(game, analysis, strength);
-    if (move) return move;
-  }
-  return chooseLocal(game, { level: strength.local, color: game.turn });
+  // Never resign, never pass early while the board is open: KataGo's own
+  // choice is a pass only when the game is really over.
+  const { move } = await decide(game, strengthId);
+  return move || chooseLocal(game, { level: strengthById(strengthId).local, color: game.turn });
 }
 
 /** The engine's suggestion for the side to move, with a short line. */
 export async function hint(game) {
-  const analysis = await analyzeQ(game, { visits: 200 });
+  const analysis = await analysisQ(game, { visits: 200 });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
     return { ...toMove(top), pv: top.pv || [], source: "katago" };
@@ -290,7 +426,7 @@ export async function hint(game) {
  * best move with its line. `visits` trades accuracy for speed.
  */
 export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
-  const a = await analyzeQ(game, { node, visits, signal });
+  const a = await analysisQ(game, { node, visits, signal });
   if (a && a.moves.length) {
     const top = a.moves[0];
     return {
@@ -308,7 +444,11 @@ export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
 
 /** Offline stand-in for analyzeNode: a heuristic score estimate. */
 export function estimateNode(game, node) {
-  const lead = evaluateLocal(node.board, BLACK, game.size) - game.komi;
+  // White's points for nothing on the board: komi, plus the handicap
+  // compensation under Chinese rules (0 otherwise). The board heuristic is
+  // a rough balance either way; area and territory scores differ by little
+  // more than the captures.
+  const lead = evaluateLocal(node.board, BLACK, game.size) - game.komi - (game.handicapCompensation || 0);
   return { source: "estimate", winrate: 1 / (1 + Math.exp(-lead / 8)), scoreLead: lead, best: null, pv: [], ownership: null };
 }
 
@@ -318,7 +458,7 @@ export function estimateNode(game, node) {
  * [] when the engine is unavailable; the player marks stones by hand then.
  */
 export async function deadStones(game) {
-  const a = await analyzeQ(game, { visits: 160 });
+  const a = await analysisQ(game, { visits: 160 });
   if (!a?.ownership) return { stones: [], source: "manual" };
   const size = game.size;
   const signMap = game.board.signMap;

@@ -1,7 +1,8 @@
 name: release
 
-# One complete v1.0: all content, both desktop packages and the 19x19 KataGo
-# sidecar must be green before a tag or release exists.
+# One complete release: all content, every desktop package (macOS Apple
+# Silicon, macOS Intel, Windows x64) and the 19x19 KataGo sidecar must be
+# green before a tag or release exists.
 on:
   workflow_dispatch:
     inputs:
@@ -45,8 +46,24 @@ jobs:
     uses: ./.github/workflows/build-macos.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
+      runner: macos-15
+      arch: arm64
     # Signing secrets are optional (docs/signing.md); without them the
     # build is ad-hoc signed and the notes say so.
+    secrets: inherit
+
+  # v5: a native Intel build (KataGo built for x86_64 on the Intel runner),
+  # self-tested and updater-tested on real Intel hardware. A separate
+  # package rather than a universal one: each build is tested on the CPU it
+  # ships for, the jobs run in parallel, and each download stays ~half the
+  # size of a universal app with two KataGo and two app binaries.
+  macos-intel:
+    needs: preflight
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      sdk_version: ${{ inputs.sdk_version }}
+      runner: macos-15-intel
+      arch: x64
     secrets: inherit
 
   windows:
@@ -57,9 +74,9 @@ jobs:
     secrets: inherit
 
   publish:
-    needs: [preflight, macos, windows]
+    needs: [preflight, macos, macos-intel, windows]
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.macos.result == 'success' && needs.macos-intel.result == 'success' && needs.windows.result == 'success' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -68,11 +85,19 @@ jobs:
           path: dist-macos
       - uses: actions/download-artifact@v8
         with:
+          name: GobanStudio-macOS-x64
+          path: dist-macos
+      - uses: actions/download-artifact@v8
+        with:
           name: GobanStudio-Windows-x64
           path: dist-windows
       - uses: actions/download-artifact@v8
         with:
           name: signing-status-macos
+          path: signing
+      - uses: actions/download-artifact@v8
+        with:
+          name: signing-status-macos-x64
           path: signing
       - uses: actions/download-artifact@v8
         with:
@@ -85,11 +110,12 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
           MAC_SIGNING: ${{ needs.macos.outputs.signing }}
+          MAC_INTEL_SIGNING: ${{ needs.macos-intel.outputs.signing }}
           WIN_SIGNING: ${{ needs.windows.outputs.signing }}
         run: |
           set -euo pipefail
-          echo "macOS: ${MAC_SIGNING:-unknown}; Windows: ${WIN_SIGNING:-unknown}"
-          cat signing/signing-macos.json signing/signing-windows.json
+          echo "macOS arm64: ${MAC_SIGNING:-unknown}; macOS x64: ${MAC_INTEL_SIGNING:-unknown}; Windows: ${WIN_SIGNING:-unknown}"
+          cat signing/signing-macos.json signing/signing-macos-x64.json signing/signing-windows.json
           notes=".github/release-notes/${TAG}.md"
           if [ ! -f "$notes" ]; then
             # Rehearsal without a notes file: a stub, so the table is still shown.
@@ -98,7 +124,7 @@ jobs:
           fi
           # The "First launch" table follows what the builds actually did,
           # whatever the notes file says.
-          node scripts/signing-notes.mjs notes "$notes" signing/signing-macos.json signing/signing-windows.json > release-notes.md
+          node scripts/signing-notes.mjs notes "$notes" signing/signing-macos.json signing/signing-windows.json signing/signing-macos-x64.json > release-notes.md
           {
             echo "## Release notes as they will be published"
             echo
@@ -113,14 +139,19 @@ jobs:
           set -euo pipefail
           test -s dist-macos/GobanStudio-macOS-arm64.zip
           test -s dist-macos/GobanStudio-macOS-arm64.dmg
+          test -s dist-macos/GobanStudio-macOS-x64.zip
+          test -s dist-macos/GobanStudio-macOS-x64.dmg
           test -s dist-windows/GobanStudio-Windows-x64.zip
           ls -lh dist-macos dist-windows
       - name: checksums
         run: |
           set -euo pipefail
-          (cd dist-macos && sha256sum GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg) > SHA256SUMS
+          # The in-app updater (v5) checks the .zip it downloads against this
+          # file's line for that exact name.
+          (cd dist-macos && sha256sum GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg GobanStudio-macOS-x64.zip GobanStudio-macOS-x64.dmg) > SHA256SUMS
           (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip) >> SHA256SUMS
           cat SHA256SUMS
+          test "$(wc -l < SHA256SUMS)" -eq 5
       - name: publish
         if: ${{ inputs.rehearse != true }}
         env:
@@ -135,6 +166,8 @@ jobs:
           gh release upload "$TAG" \
             dist-macos/GobanStudio-macOS-arm64.zip \
             dist-macos/GobanStudio-macOS-arm64.dmg \
+            dist-macos/GobanStudio-macOS-x64.zip \
+            dist-macos/GobanStudio-macOS-x64.dmg \
             dist-windows/GobanStudio-Windows-x64.zip \
             SHA256SUMS
           gh release edit "$TAG" --draft=false

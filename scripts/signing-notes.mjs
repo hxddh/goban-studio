@@ -12,7 +12,10 @@
  * package. Usage:
  *
  *   node scripts/signing-notes.mjs status macos|windows <mode> [--notarized|--timestamped] > status.json
- *   node scripts/signing-notes.mjs notes <notes.md> <signing-macos.json> <signing-windows.json> > out.md
+ *   node scripts/signing-notes.mjs notes <notes.md> <signing-macos.json> <signing-windows.json> [<signing-macos-x64.json>] > out.md
+ *
+ * v5: with the Intel Mac status (fourth file) the table gains a
+ * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
  *   node scripts/signing-notes.mjs readme <README-*.txt> <signing-*.json> > out.txt
  */
 import fs from "node:fs";
@@ -45,11 +48,12 @@ export function firstLaunchText(status) {
   return "**Not Authenticode-signed.** If SmartScreen appears, choose More info → Run anyway. WebView2 is preinstalled on Windows 10/11.";
 }
 
-export function firstLaunchTable(macos, windows) {
+export function firstLaunchTable(macos, windows, macosIntel = null) {
   return [
     "| Platform | File | First launch |",
     "| --- | --- | --- |",
     `| macOS (Apple Silicon) | \`GobanStudio-macOS-arm64.dmg\` or \`.zip\` | ${firstLaunchText(macos)} |`,
+    ...(macosIntel ? [`| macOS (Intel) | \`GobanStudio-macOS-x64.dmg\` or \`.zip\` | ${firstLaunchText(macosIntel)} |`] : []),
     `| Windows (x64) | \`GobanStudio-Windows-x64.zip\` | ${firstLaunchText(windows)} |`,
   ].join("\n");
 }
@@ -60,8 +64,8 @@ export function firstLaunchTable(macos, windows) {
  * table under "## Download and first launch", else inserts that section
  * after the title.
  */
-export function applyToNotes(notes, macos, windows) {
-  const table = firstLaunchTable(macos, windows);
+export function applyToNotes(notes, macos, windows, macosIntel = null) {
+  const table = firstLaunchTable(macos, windows, macosIntel);
   const marked = /<!-- first-launch -->[\s\S]*?<!-- \/first-launch -->/;
   if (marked.test(notes)) return notes.replace(marked, `<!-- first-launch -->\n${table}\n<!-- /first-launch -->`);
   const lines = notes.split("\n");
@@ -151,9 +155,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const status = normalizeStatus(platform, { mode, notarized: args.includes("--notarized"), timestamped: args.includes("--timestamped") });
     process.stdout.write(JSON.stringify(status) + "\n");
   } else if (cmd === "notes") {
-    const [notesFile, macFile, winFile] = args;
+    const [notesFile, macFile, winFile, macIntelFile] = args;
     const notes = fs.readFileSync(notesFile, "utf8");
-    process.stdout.write(applyToNotes(notes, readStatus(macFile, "macos"), readStatus(winFile, "windows")));
+    const intel = macIntelFile ? readStatus(macIntelFile, "macos") : null;
+    process.stdout.write(applyToNotes(notes, readStatus(macFile, "macos"), readStatus(winFile, "windows"), intel));
   } else if (cmd === "readme") {
     const [readmeFile, statusFile] = args;
     const platform = /windows/i.test(readmeFile) ? "windows" : "macos";

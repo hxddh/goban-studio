@@ -1,10 +1,11 @@
 /**
  * Release gate for the content and packaging promises.
  *
- * Counts what is real: a course of at least 8 units / 36 lessons / 150
- * steps, at least 250 solver-verified problems with themes with measured grades, 40 pro
+ * Counts what is real: a course of at least 13 units / 60 lessons / 240
+ * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades, 40 pro
  * openings with unique titles and lines, 20 classics, four languages
- * everywhere, Japanese rules, licences and one version string.
+ * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
+ * licences and one version string.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -24,13 +25,14 @@ const assertLocalized = (item, fields, label) => {
 
 const lessons = COURSE.flatMap((u) => u.lessons);
 const steps = lessons.flatMap((l) => l.steps);
-assert.ok(COURSE.length >= 8, "at least 8 course units");
-assert.ok(lessons.length >= 36, "at least 36 lessons");
-assert.ok(steps.length >= 150, "at least 150 lesson steps");
+assert.ok(COURSE.length >= 13, "at least 13 course units");
+assert.ok(COURSE.filter((u) => u.level === "intermediate").length >= 5, "at least 5 intermediate units");
+assert.ok(lessons.length >= 60, "at least 60 lessons");
+assert.ok(steps.length >= 240, "at least 240 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);
 for (const lesson of lessons) assertLocalized(lesson, ["title"], lesson.id);
 
-assert.ok(PROBLEMS.length >= 250, "at least 250 problems");
+assert.ok(PROBLEMS.length >= 500, "at least 500 problems");
 for (const p of PROBLEMS) assertLocalized(p, ["title", "hint"], p.id);
 const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
 for (const p of PROBLEMS) assert.ok(grades[p.id]?.grade >= 1 && grades[p.id].grade <= 5, `${p.id} has a measured grade`);
@@ -65,12 +67,17 @@ for (const file of [
   assert.ok(fs.existsSync(path.join(root, file)), file);
 }
 const cfg = fs.readFileSync(path.join(root, "engine/model/gtp.cfg"), "utf8");
+// KataGo starts under Japanese rules (the default); every request then sets
+// the game's own ruleset with `kata-set-rules`.
 assert.match(cfg, /rules = japanese/);
 assert.match(cfg, /reportAnalysisWinratesAs = BLACK/, "the page reads analysis from Black's point of view");
 
 const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
 const mainZig = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
 assert.match(engineZig, /kata-search_analyze/);
+for (const rules of ["japanese", "chinese", "korean"]) {
+  assert.match(engineZig, new RegExp(`"kata-set-rules ${rules}"`), `the host sends kata-set-rules ${rules}`);
+}
 assert.match(mainZig, /studio\.katagoAnalyze/);
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
@@ -86,5 +93,5 @@ assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html
 assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");
 
 console.log(
-  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 40 openings · 20 classics · 4 languages · Japanese rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
+  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 40 openings · 20 classics · 4 languages · Japanese, Chinese and Korean rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
 );

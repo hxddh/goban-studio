@@ -1,4 +1,5 @@
-//! Update check: the app's only network request.
+//! Update check: one of the app's two kinds of network request (the other is
+//! an optional model download the player starts, models.zig).
 //!
 //! The page asks for it (the user picks "Check for updates…", or turned on
 //! the weekly check, which is off by default). A short-lived thread makes
@@ -203,7 +204,7 @@ fn errorReply(out: []u8, name: []const u8) []const u8 {
     return "{\"ok\":false}";
 }
 
-fn validTag(tag: []const u8) bool {
+pub fn validTag(tag: []const u8) bool {
     if (tag.len == 0 or tag.len > 64) return false;
     for (tag) |c| {
         if (!(std.ascii.isAlphanumeric(c) or c == '.' or c == '-' or c == '+' or c == '_')) return false;

@@ -14,14 +14,91 @@
 //!     final result for the UI thread to collect after a platform wake.
 //!     Nothing here touches the webview or the runtime.
 //!
+//! v5: up to three KataGo processes, one per `Slot`, all driven by the same
+//! worker thread (the page runs one search at a time anyway):
+//!
+//!   * `standard`  the shipped b6c96 network: the opponent ladder (its
+//!                 labels are measured with this network) and the fallback
+//!                 for everything else;
+//!   * `strong`    the optional larger network (models.zig), started on
+//!                 first use: analysis, review, hints and the top level;
+//!   * `human`     the optional human SL model (`-human-model`, with the
+//!                 b6c96 network for the short search that decides passes),
+//!                 started only when a human-style game asks for a move.
+//!
+//! The optional networks live in the app's data directory; their paths are
+//! fixed at start-up and a process is only started when its file exists.
+//!
 //! A missing or unusable engine is not fatal: the bridge returns an error
 //! and the page falls back to its local opponent.
 const std = @import("std");
 
 const bin_name = if (@import("builtin").os.tag == .windows) "katago.exe" else "katago";
 
+/// Which KataGo process serves a request.
+pub const Slot = enum(u2) {
+    standard = 0,
+    strong = 1,
+    human = 2,
+
+    pub fn parse(text: []const u8) ?Slot {
+        inline for (.{ "standard", "strong", "human" }, 0..) |name, i| {
+            if (std.mem.eql(u8, text, name)) return @enumFromInt(i);
+        }
+        return null;
+    }
+};
+pub const slot_count = 3;
+
+/// How the human SL model picks its move (see engine/model/human.cfg):
+/// `raw` follows the human policy of the profile at one network
+/// evaluation (KataGo's gtp_human5k_example.cfg); `search` keeps the
+/// human style but lets a search veto losing moves (KataGo's
+/// gtp_human9d_search_example.cfg), for ranks the raw policy cannot reach.
+pub const HumanStyle = enum(u1) { raw = 0, search = 1 };
+
+const StyleParam = struct { name: []const u8, raw: []const u8, search: []const u8 };
+const style_params = [_]StyleParam{
+    .{ .name = "humanSLChosenMovePiklLambda", .raw = "100000000", .search = "0.08" },
+    .{ .name = "humanSLRootExploreProbWeightless", .raw = "0.0", .search = "0.8" },
+    .{ .name = "humanSLCpuctPermanent", .raw = "0.2", .search = "2.0" },
+    .{ .name = "chosenMoveTemperatureEarly", .raw = "0.85", .search = "0.70" },
+    .{ .name = "chosenMoveTemperature", .raw = "0.70", .search = "0.25" },
+    .{ .name = "chosenMoveTemperatureHalflife", .raw = "80", .search = "30" },
+    .{ .name = "chosenMoveTemperatureOnlyBelowProb", .raw = "0.01", .search = "1.0" },
+    .{ .name = "staticScoreUtilityFactor", .raw = "0.30", .search = "0.5" },
+    .{ .name = "dynamicScoreUtilityFactor", .raw = "0.0", .search = "0.5" },
+};
+
+pub const max_profile = 16;
+
+/// A human SL profile KataGo knows: `rank_` or `preaz_` and 20k…1k or
+/// 1d…9d. Anything else never reaches KataGo.
+pub fn validProfile(text: []const u8) bool {
+    const rest = if (std.mem.startsWith(u8, text, "rank_"))
+        text[5..]
+    else if (std.mem.startsWith(u8, text, "preaz_"))
+        text[6..]
+    else
+        return false;
+    if (rest.len < 2 or rest.len > 3) return false;
+    if (rest[0] == '0') return false;
+    const unit = rest[rest.len - 1];
+    const n = std.fmt.parseInt(u8, rest[0 .. rest.len - 1], 10) catch return false;
+    return switch (unit) {
+        'k' => n >= 1 and n <= 20,
+        'd' => n >= 1 and n <= 9,
+        else => false,
+    };
+}
+
 pub const Engine = struct {
     io: std.Io = undefined,
+    slot: Slot = .standard,
+    /// The downloaded network this slot needs (strong: `-model`, human:
+    /// `-human-model`); empty for the standard slot.
+    extra_model: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    extra_model_len: usize = 0,
     env_map: *std.process.Environ.Map = undefined,
     child: ?std.process.Child = null,
     stdin: ?std.Io.File = null,
@@ -40,6 +117,7 @@ pub const Engine = struct {
     model_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     config_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     version_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    human_config_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     info_buf: [256 * 1024]u8 = undefined,
     info_len: usize = 0,
     play_buf: [16]u8 = undefined,
@@ -55,6 +133,13 @@ pub const Engine = struct {
         // `write_lock`; retract it before the process goes away.
         self.setStdin(null);
         if (self.child) |*child| {
+            // std's kill sends SIGTERM and then waits; a KataGo that does not
+            // exit on SIGTERM (it may still be blocked reading our stdin)
+            // would block the caller forever. SIGKILL cannot be caught, so
+            // the wait that follows only reaps. Windows terminates outright.
+            if (comptime @import("builtin").os.tag != .windows) {
+                if (child.id) |pid| std.posix.kill(pid, std.posix.SIG.KILL) catch {};
+            }
             child.kill(io);
             self.child = null;
         }
@@ -77,7 +162,20 @@ pub const Engine = struct {
         model: []const u8,
         config: []const u8,
         version: []const u8,
+        human_config: []const u8,
     };
+
+    /// Set the slot and its downloaded network before the worker starts.
+    pub fn setSlot(self: *@This(), slot: Slot, extra_model: []const u8) void {
+        self.slot = slot;
+        const n = @min(extra_model.len, self.extra_model.len);
+        @memcpy(self.extra_model[0..n], extra_model[0..n]);
+        self.extra_model_len = if (n == extra_model.len) n else 0;
+    }
+
+    pub fn extraModel(self: *const @This()) []const u8 {
+        return self.extra_model[0..self.extra_model_len];
+    }
 
     fn exists(io: std.Io, path: []const u8) bool {
         var file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch return false;
@@ -110,6 +208,7 @@ pub const Engine = struct {
         var model_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var cfg_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var version_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        var human_cfg_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var abs_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var cwd_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         const platform = @tagName(@import("builtin").os.tag);
@@ -150,6 +249,7 @@ pub const Engine = struct {
             const model = join(&model_buf, &.{ abs_root, "model", "model.txt.gz" }) orelse continue;
             const config = join(&cfg_buf, &.{ abs_root, "model", "gtp.cfg" }) orelse continue;
             const version = join(&version_buf, &.{ abs_root, "model", "version.txt" }) orelse continue;
+            const human_config = join(&human_cfg_buf, &.{ abs_root, "model", "human.cfg" }) orelse continue;
             if (!exists(self.io, bin)) continue;
             if (!exists(self.io, model)) continue;
             if (!exists(self.io, config)) continue;
@@ -157,11 +257,13 @@ pub const Engine = struct {
             @memcpy(self.model_path[0..model.len], model);
             @memcpy(self.config_path[0..config.len], config);
             @memcpy(self.version_path[0..version.len], version);
+            @memcpy(self.human_config_path[0..human_config.len], human_config);
             return .{
                 .binary = self.bin_path[0..bin.len],
                 .model = self.model_path[0..model.len],
                 .config = self.config_path[0..config.len],
                 .version = if (exists(self.io, version)) self.version_path[0..version.len] else "KataGo",
+                .human_config = self.human_config_path[0..human_config.len],
             };
         }
         return null;
@@ -192,16 +294,19 @@ pub const Engine = struct {
             .{ log_dir, log_dir },
         ) catch return error.EngineMissing;
 
+        // Only fixed arguments and paths the host resolved itself: the page
+        // chooses a slot, never a file.
+        const extra = self.extraModel();
+        if (self.slot != .standard and (extra.len == 0 or !exists(self.io, extra))) return error.ModelMissing;
+        if (self.slot == .human and !exists(self.io, resolved.human_config)) return error.EngineMissing;
+        const standard_argv = [_][]const u8{ resolved.binary, "gtp", "-model", resolved.model, "-config", resolved.config, "-override-config", override };
+        const strong_argv = [_][]const u8{ resolved.binary, "gtp", "-model", extra, "-config", resolved.config, "-override-config", override };
+        const human_argv = [_][]const u8{ resolved.binary, "gtp", "-model", resolved.model, "-human-model", extra, "-config", resolved.human_config, "-override-config", override };
         var child = try std.process.spawn(self.io, .{
-            .argv = &.{
-                resolved.binary,
-                "gtp",
-                "-model",
-                resolved.model,
-                "-config",
-                resolved.config,
-                "-override-config",
-                override,
+            .argv = switch (self.slot) {
+                .standard => &standard_argv,
+                .strong => &strong_argv,
+                .human => &human_argv,
             },
             .stdin = .pipe,
             .stdout = .pipe,
@@ -266,6 +371,12 @@ pub const Engine = struct {
     }
 
     pub fn validateLine(line: []const u8) bool {
+        // `kata-set-rules` takes exactly one of the three rulesets the app
+        // plays (v5); any other preset or a rules string is rejected.
+        const rules_prefix = "kata-set-rules ";
+        if (std.mem.startsWith(u8, line, rules_prefix)) {
+            return Rules.parse(line[rules_prefix.len..]) != null;
+        }
         const allowed = [_][]const u8{
             "clear_board",
             "undo",
@@ -273,7 +384,6 @@ pub const Engine = struct {
             "komi ",
             "play ",
             "kata-set-param ",
-            "kata-set-rules ",
             "time_settings ",
         };
         for (allowed) |prefix| {
@@ -450,17 +560,42 @@ pub fn parseMoves(list: []const u8, size: u8, allow_pass: bool, out: []Move) err
     return n;
 }
 
+/// The rulesets the page can ask for (v5). Each maps to one KataGo
+/// `kata-set-rules` preset; anything else is an invalid request.
+pub const Rules = enum {
+    japanese,
+    chinese,
+    korean,
+
+    /// Exact, lower-case names only: the page sends what rules.js lists.
+    pub fn parse(text: []const u8) ?Rules {
+        if (std.mem.eql(u8, text, "japanese")) return .japanese;
+        if (std.mem.eql(u8, text, "chinese")) return .chinese;
+        if (std.mem.eql(u8, text, "korean")) return .korean;
+        return null;
+    }
+
+    pub fn command(self: Rules) []const u8 {
+        return switch (self) {
+            .japanese => "kata-set-rules japanese",
+            .chinese => "kata-set-rules chinese",
+            .korean => "kata-set-rules korean",
+        };
+    }
+};
+
 pub const Position = struct {
     size: u8 = 19,
     komi: f64 = 6.5,
+    rules: Rules = .japanese,
     setup: [max_setup]Move = undefined,
     setup_len: usize = 0,
     moves: [max_moves]Move = undefined,
     moves_len: usize = 0,
 
-    /// Same board, komi and root stones: only the move list may differ.
+    /// Same board, komi, rules and root stones: only the move list may differ.
     pub fn sameBase(a: *const Position, b: *const Position) bool {
-        if (a.size != b.size or a.komi != b.komi or a.setup_len != b.setup_len) return false;
+        if (a.size != b.size or a.komi != b.komi or a.rules != b.rules or a.setup_len != b.setup_len) return false;
         for (a.setup[0..a.setup_len], b.setup[0..b.setup_len]) |x, y| {
             if (!x.eql(y)) return false;
         }
@@ -483,6 +618,15 @@ pub const Request = struct {
     visits: u32 = 64,
     max_time: f64 = 6.0,
     stream: bool = false,
+    slot: Slot = .standard,
+    /// Human slot only: a `validProfile` and the move-choice style.
+    profile: [max_profile]u8 = undefined,
+    profile_len: usize = 0,
+    style: HumanStyle = .raw,
+
+    pub fn profileText(self: *const Request) []const u8 {
+        return self.profile[0..self.profile_len];
+    }
 };
 
 /// How the worker brought KataGo to the requested position.
@@ -545,8 +689,29 @@ pub const CancelResult = enum { not_found, removed_pending, signalled_running };
 /// GTP exchange (the worker for a job, the UI thread for a legacy sync
 /// call). The worker never waits for the UI thread while holding either
 /// lock, and reaches it only through `wake_fn` (documented thread-safe).
+/// What one KataGo process has been told: owned by whoever holds
+/// `engine_lock`.
+const SlotState = struct {
+    sent: Position = .{},
+    sent_valid: bool = false,
+    sent_generation: u32 = 0,
+    params_valid: bool = false,
+    sent_visits: u32 = 0,
+    sent_max_time: f64 = 0,
+    human_valid: bool = false,
+    sent_profile: [max_profile]u8 = undefined,
+    sent_profile_len: usize = 0,
+    sent_style: HumanStyle = .raw,
+
+    fn invalidate(self: *SlotState) void {
+        self.sent_valid = false;
+        self.params_valid = false;
+        self.human_valid = false;
+    }
+};
+
 pub const Worker = struct {
-    engine: Engine = .{},
+    engines: [slot_count]Engine = [_]Engine{.{}} ** slot_count,
     io: std.Io = undefined,
 
     lock: std.Io.Mutex = .init,
@@ -559,10 +724,15 @@ pub const Worker = struct {
     has_pending: bool = false,
     pending: Request = .{},
     running_seq: u64 = 0,
+    /// The process the running request talks to (cancel newline target).
+    running_slot: Slot = .standard,
     cancel_seq: u64 = 0,
     results: [16]Result = undefined,
     results_len: usize = 0,
     stream: ?StreamInfo = null,
+    /// Slots whose process must stop once the running request ends
+    /// (`stopSlot` found the engine busy).
+    stop_after: [slot_count]bool = [_]bool{false} ** slot_count,
 
     // --- set on the UI thread before the worker starts
     wake_context: ?*anyopaque = null,
@@ -570,19 +740,31 @@ pub const Worker = struct {
 
     // --- owned by whoever holds `engine_lock`
     current: Request = .{},
-    sent: Position = .{},
-    sent_valid: bool = false,
-    sent_generation: u32 = 0,
-    params_valid: bool = false,
-    sent_visits: u32 = 0,
-    sent_max_time: f64 = 0,
+    states: [slot_count]SlotState = [_]SlotState{.{}} ** slot_count,
     last_stream_ms: i64 = 0,
+    /// The current request got as far as talking to KataGo.
+    touched: bool = false,
 
-    pub fn init(self: *Worker, io: std.Io, env_map: *std.process.Environ.Map) void {
+    /// `strong_model` / `human_model`: absolute paths of the optional
+    /// networks (they need not exist yet; empty disables the slot).
+    pub fn init(self: *Worker, io: std.Io, env_map: *std.process.Environ.Map, strong_model: []const u8, human_model: []const u8) void {
         self.* = .{};
         self.io = io;
-        self.engine.init(io, env_map);
-        self.engine.write_lock = &self.lock;
+        for (&self.engines, 0..) |*engine, i| {
+            engine.init(io, env_map);
+            engine.write_lock = &self.lock;
+            const slot: Slot = @enumFromInt(i);
+            engine.setSlot(slot, switch (slot) {
+                .standard => "",
+                .strong => strong_model,
+                .human => human_model,
+            });
+        }
+    }
+
+    /// The shipped engine (legacy sync calls, status, version).
+    pub fn standard(self: *Worker) *Engine {
+        return &self.engines[@intFromEnum(Slot.standard)];
     }
 
     pub fn setWake(self: *Worker, context: ?*anyopaque, wake_fn: ?WakeFn) void {
@@ -609,7 +791,7 @@ pub const Worker = struct {
     /// by KataGo's command loop at any other moment.
     fn signalCancelLocked(self: *Worker, seq: u64) void {
         self.cancel_seq = seq;
-        self.engine.writeUnlocked("\n") catch {};
+        self.engines[@intFromEnum(self.running_slot)].writeUnlocked("\n") catch {};
     }
 
     pub const Submitted = struct {
@@ -684,9 +866,28 @@ pub const Worker = struct {
 
     /// The synchronous call rewrote KataGo's board and parameters.
     pub fn unlockExclusive(self: *Worker) void {
-        self.sent_valid = false;
-        self.params_valid = false;
+        self.states[@intFromEnum(Slot.standard)].invalidate();
         self.engine_lock.unlock(self.io);
+    }
+
+    /// Stop one slot's process (its network is being removed). Returns
+    /// false when the worker is busy: the slot then stops as soon as the
+    /// running request ends, and the caller should try again shortly.
+    /// The next request for the slot starts it again if its file exists.
+    /// UI thread; never blocks.
+    pub fn stopSlot(self: *Worker, slot: Slot) bool {
+        // Never wait on the worker from the UI thread: a search or a
+        // network still loading can hold the engine for a long time.
+        if (self.engine_lock.tryLock()) {
+            defer self.engine_lock.unlock(self.io);
+            self.engines[@intFromEnum(slot)].deinit(self.io);
+            self.states[@intFromEnum(slot)].invalidate();
+            return true;
+        }
+        self.lock.lockUncancelable(self.io);
+        self.stop_after[@intFromEnum(slot)] = true;
+        self.lock.unlock(self.io);
+        return false;
     }
 
     /// App exit. Stops the worker without waiting for it; KataGo is told to
@@ -696,14 +897,16 @@ pub const Worker = struct {
         const started = self.started;
         self.quit = true;
         self.has_pending = false;
-        if (started) self.engine.writeUnlocked("\nquit\n") catch {};
+        if (started) {
+            for (&self.engines) |*engine| engine.writeUnlocked("\nquit\n") catch {};
+        }
         self.cond.signal(self.io);
         self.lock.unlock(self.io);
         if (!started) {
-            self.engine.deinit(self.io);
+            for (&self.engines) |*engine| engine.deinit(self.io);
         } else if (self.engine_lock.tryLock()) {
-            // Worker idle: reap the process ourselves.
-            self.engine.deinit(self.io);
+            // Worker idle: reap the processes ourselves.
+            for (&self.engines) |*engine| engine.deinit(self.io);
             self.engine_lock.unlock(self.io);
         }
     }
@@ -723,6 +926,7 @@ pub const Worker = struct {
             self.current = self.pending;
             self.has_pending = false;
             self.running_seq = self.current.seq;
+            self.running_slot = self.current.slot;
             self.lock.unlock(self.io);
 
             // Lock order is engine_lock → lock everywhere (GTP writes take
@@ -731,10 +935,24 @@ pub const Worker = struct {
             var result = Result{ .seq = self.current.seq };
             self.engine_lock.lockUncancelable(self.io);
             self.process(&self.current, &result);
+            self.stopRequested();
             self.engine_lock.unlock(self.io);
 
             self.publish(result);
             self.notify();
+        }
+    }
+
+    /// `engine_lock` held: stop the slots `stopSlot` could not stop at once.
+    fn stopRequested(self: *Worker) void {
+        self.lock.lockUncancelable(self.io);
+        const stops = self.stop_after;
+        self.stop_after = [_]bool{false} ** slot_count;
+        self.lock.unlock(self.io);
+        for (stops, 0..) |stop, i| {
+            if (!stop) continue;
+            self.engines[i].deinit(self.io);
+            self.states[i].invalidate();
         }
     }
 
@@ -776,18 +994,26 @@ pub const Worker = struct {
                 return;
             }
             result.outcome = .failed;
+            // Refused before anything reached KataGo: the process is fine.
+            if (err == error.InvalidRequest and !self.touched) return;
+            result.outcome = .failed;
             // Unknown GTP state: start from a fresh process next time.
-            self.engine.deinit(self.io);
-            self.sent_valid = false;
-            self.params_valid = false;
+            self.engines[@intFromEnum(req.slot)].deinit(self.io);
+            self.states[@intFromEnum(req.slot)].invalidate();
         };
     }
 
     fn processInner(self: *Worker, req: *const Request, result: *Result) !void {
+        self.touched = false;
         if (self.isCancelled(req.seq)) return error.Cancelled;
-        try self.engine.start();
-        result.sync = try self.syncPosition(&req.position);
-        try self.syncParams(req.visits, req.max_time);
+        if (req.slot == .human and !validProfile(req.profileText())) return error.InvalidRequest;
+        self.touched = true;
+        const engine = &self.engines[@intFromEnum(req.slot)];
+        const state = &self.states[@intFromEnum(req.slot)];
+        try engine.start();
+        result.sync = try syncPosition(engine, state, &req.position);
+        try syncParams(engine, state, req.visits, req.max_time);
+        if (req.slot == .human) try syncHuman(engine, state, req);
 
         var cmd_buf: [96]u8 = undefined;
         const color: []const u8 = if (req.color == 'W') "W" else "B";
@@ -797,22 +1023,22 @@ pub const Worker = struct {
 
         self.last_stream_ms = 0;
         const sink: ?Engine.InfoSink = if (req.stream) .{ .context = self, .on_info = onInfo } else null;
-        self.engine.readAnalysis(sink) catch |err| switch (err) {
+        engine.readAnalysis(sink) catch |err| switch (err) {
             // An engine without the cancellable flavour: same search, not
             // interruptible (a cancel then waits for maxTime at worst).
             error.EngineRejected => {
                 const fallback = std.fmt.bufPrint(&cmd_buf, "kata-search_analyze {s}{s} ownership true\n", .{ color, interval }) catch return error.InvalidRequest;
                 try self.launch(req.seq, fallback);
-                try self.engine.readAnalysis(sink);
+                try engine.readAnalysis(sink);
             },
             else => return err,
         };
-        const play = self.engine.play_buf[0..self.engine.play_len];
+        const play = engine.play_buf[0..engine.play_len];
         if (std.mem.eql(u8, play, "cancelled") or self.isCancelled(req.seq)) return error.Cancelled;
         result.play_len = @min(play.len, result.play_buf.len);
         @memcpy(result.play_buf[0..result.play_len], play[0..result.play_len]);
-        if (self.engine.info_len > 0) {
-            result.info = try result_allocator.dupe(u8, self.engine.info_buf[0..self.engine.info_len]);
+        if (engine.info_len > 0) {
+            result.info = try result_allocator.dupe(u8, engine.info_buf[0..engine.info_len]);
         }
         result.outcome = .ok;
     }
@@ -822,7 +1048,7 @@ pub const Worker = struct {
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
         if (self.cancel_seq == seq or self.quit) return error.Cancelled;
-        try self.engine.writeUnlocked(command_line);
+        try self.engines[@intFromEnum(self.running_slot)].writeUnlocked(command_line);
     }
 
     fn onInfo(context: *anyopaque, line: []const u8) void {
@@ -843,19 +1069,19 @@ pub const Worker = struct {
         self.notify();
     }
 
-    fn playMove(self: *Worker, move: *const Move) !void {
+    fn playMove(engine: *Engine, move: *const Move) !void {
         var buf: [32]u8 = undefined;
         const line = std.fmt.bufPrint(&buf, "play {c} {s}", .{ move.color, move.text() }) catch return error.InvalidRequest;
-        _ = try self.engine.command(line);
+        _ = try engine.command(line);
     }
 
     /// Bring KataGo's board to `target`, reusing what it already has:
     /// `undo` back to the common prefix of the move lists, then `play`
-    /// forward. A different size, komi or set of root stones (or a fresh
-    /// process) starts over from `clear_board`.
-    fn syncPosition(self: *Worker, target: *const Position) !SyncStats {
+    /// forward. A different size, komi, ruleset or set of root stones (or a
+    /// fresh process) starts over from `clear_board`.
+    fn syncPosition(engine: *Engine, self: *SlotState, target: *const Position) !SyncStats {
         var stats = SyncStats{};
-        const reusable = self.sent_valid and self.sent_generation == self.engine.generation and self.sent.sameBase(target);
+        const reusable = self.sent_valid and self.sent_generation == engine.generation and self.sent.sameBase(target);
         // Until the end of this function KataGo's board is in flux.
         self.sent_valid = false;
         var incremental = false;
@@ -865,7 +1091,7 @@ pub const Worker = struct {
             incremental = true;
             var i: usize = 0;
             while (i < undo_count) : (i += 1) {
-                _ = self.engine.command("undo") catch |err| switch (err) {
+                _ = engine.command("undo") catch |err| switch (err) {
                     error.EngineRejected => {
                         incremental = false;
                         break;
@@ -876,7 +1102,7 @@ pub const Worker = struct {
             }
             if (incremental) {
                 for (target.moves[keep..target.moves_len]) |*move| {
-                    try self.playMove(move);
+                    try playMove(engine, move);
                     stats.play += 1;
                 }
             }
@@ -884,36 +1110,59 @@ pub const Worker = struct {
         if (!incremental) {
             stats = .{ .reset = true };
             var buf: [64]u8 = undefined;
-            _ = try self.engine.command(std.fmt.bufPrint(&buf, "boardsize {d}", .{target.size}) catch return error.InvalidRequest);
-            _ = try self.engine.command("clear_board");
-            _ = try self.engine.command(std.fmt.bufPrint(&buf, "komi {d}", .{target.komi}) catch return error.InvalidRequest);
-            _ = try self.engine.command("kata-set-rules japanese");
+            _ = try engine.command(std.fmt.bufPrint(&buf, "boardsize {d}", .{target.size}) catch return error.InvalidRequest);
+            _ = try engine.command("clear_board");
+            _ = try engine.command(std.fmt.bufPrint(&buf, "komi {d}", .{target.komi}) catch return error.InvalidRequest);
+            _ = try engine.command(target.rules.command());
             // GTP `play` need not alternate, so root stones are simply
             // placed one by one before the game's own moves.
-            for (target.setup[0..target.setup_len]) |*move| try self.playMove(move);
+            for (target.setup[0..target.setup_len]) |*move| try playMove(engine, move);
             for (target.moves[0..target.moves_len]) |*move| {
-                try self.playMove(move);
+                try playMove(engine, move);
                 stats.play += 1;
             }
         }
         self.sent = target.*;
-        self.sent_generation = self.engine.generation;
+        self.sent_generation = engine.generation;
         self.sent_valid = true;
         return stats;
     }
 
-    fn syncParams(self: *Worker, visits: u32, max_time: f64) !void {
-        const fresh = self.params_valid and self.sent_generation == self.engine.generation;
+    fn syncParams(engine: *Engine, self: *SlotState, visits: u32, max_time: f64) !void {
+        const fresh = self.params_valid and self.sent_generation == engine.generation;
         var buf: [64]u8 = undefined;
         if (!fresh or self.sent_visits != visits) {
-            _ = try self.engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxVisits {d}", .{visits}) catch return error.InvalidRequest);
+            _ = try engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxVisits {d}", .{visits}) catch return error.InvalidRequest);
             self.sent_visits = visits;
         }
         if (!fresh or self.sent_max_time != max_time) {
-            _ = try self.engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxTime {d}", .{max_time}) catch return error.InvalidRequest);
+            _ = try engine.command(std.fmt.bufPrint(&buf, "kata-set-param maxTime {d}", .{max_time}) catch return error.InvalidRequest);
             self.sent_max_time = max_time;
         }
         self.params_valid = true;
+    }
+
+    /// Profile and style of the human slot, sent only when they change
+    /// (a fresh process starts from engine/model/human.cfg).
+    fn syncHuman(engine: *Engine, self: *SlotState, req: *const Request) !void {
+        const profile = req.profileText();
+        if (!validProfile(profile)) return error.InvalidRequest;
+        const fresh = self.human_valid and self.sent_generation == engine.generation;
+        self.human_valid = false;
+        var buf: [96]u8 = undefined;
+        if (!fresh or !std.mem.eql(u8, self.sent_profile[0..self.sent_profile_len], profile)) {
+            _ = try engine.command(std.fmt.bufPrint(&buf, "kata-set-param humanSLProfile {s}", .{profile}) catch return error.InvalidRequest);
+            @memcpy(self.sent_profile[0..profile.len], profile);
+            self.sent_profile_len = profile.len;
+        }
+        if (!fresh or self.sent_style != req.style) {
+            for (style_params) |p| {
+                const value = if (req.style == .search) p.search else p.raw;
+                _ = try engine.command(std.fmt.bufPrint(&buf, "kata-set-param {s} {s}", .{ p.name, value }) catch return error.InvalidRequest);
+            }
+            self.sent_style = req.style;
+        }
+        self.human_valid = true;
     }
 };
 
@@ -946,6 +1195,40 @@ test "incremental sync reuses the common prefix" {
     try std.testing.expectEqual(@as(usize, 2), a.commonPrefix(b));
     b.komi = 0.5;
     try std.testing.expect(!a.sameBase(b));
+    // A different ruleset starts over, so `kata-set-rules` is sent again.
+    b.komi = a.komi;
+    try std.testing.expect(a.sameBase(b));
+    b.rules = .chinese;
+    try std.testing.expect(!a.sameBase(b));
+}
+
+test "rules are one of three presets" {
+    try std.testing.expectEqual(Rules.japanese, Rules.parse("japanese").?);
+    try std.testing.expectEqual(Rules.chinese, Rules.parse("chinese").?);
+    try std.testing.expectEqual(Rules.korean, Rules.parse("korean").?);
+    try std.testing.expect(Rules.parse("aga") == null);
+    try std.testing.expect(Rules.parse("Chinese") == null);
+    try std.testing.expect(Rules.parse("chinese ") == null);
+    try std.testing.expect(Rules.parse("") == null);
+    try std.testing.expectEqualStrings("kata-set-rules chinese", Rules.chinese.command());
+    try std.testing.expect(Engine.validateLine(Rules.korean.command()));
+}
+
+test "human profiles are validated before they reach KataGo" {
+    try std.testing.expect(validProfile("rank_20k"));
+    try std.testing.expect(validProfile("rank_1k"));
+    try std.testing.expect(validProfile("rank_4d"));
+    try std.testing.expect(validProfile("preaz_9d"));
+    try std.testing.expect(!validProfile("rank_21k"));
+    try std.testing.expect(!validProfile("rank_10d"));
+    try std.testing.expect(!validProfile("rank_0k"));
+    try std.testing.expect(!validProfile("rank_05k"));
+    try std.testing.expect(!validProfile("rank_5k maxVisits 1"));
+    try std.testing.expect(!validProfile("proyear_2020"));
+    try std.testing.expect(!validProfile(""));
+    try std.testing.expectEqual(Slot.human, Slot.parse("human").?);
+    try std.testing.expectEqual(Slot.standard, Slot.parse("standard").?);
+    try std.testing.expect(Slot.parse("/tmp/x.bin.gz") == null);
 }
 
 test "engine script vocabulary is narrow" {
@@ -953,8 +1236,30 @@ test "engine script vocabulary is narrow" {
     try std.testing.expect(Engine.validateLine("boardsize 19"));
     try std.testing.expect(Engine.validateLine("kata-set-param maxVisits 200"));
     try std.testing.expect(Engine.validateLine("undo"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules japanese"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules chinese"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules korean"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules tromp-taylor"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules koRule:POSITIONAL"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules "));
     try std.testing.expect(!Engine.validateLine("genmove B"));
     try std.testing.expect(!Engine.validateLine("kata-genmove_analyze B"));
     try std.testing.expect(!Engine.validateLine("quit"));
     try std.testing.expect(!Engine.validateLine("loadsgf /etc/passwd"));
+}
+
+test "stopping a process that ignores SIGTERM does not hang" {
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const io = std.testing.io;
+    var engine: Engine = .{};
+    // A stand-in for a KataGo that catches SIGTERM and keeps reading stdin.
+    const argv = [_][]const u8{ "/bin/sh", "-c", "trap '' TERM; while :; do sleep 1; done" };
+    engine.child = try std.process.spawn(io, .{ .argv = &argv, .stdin = .pipe, .stdout = .pipe, .stderr = .ignore });
+    engine.stdin = engine.child.?.stdin;
+    engine.stdout = engine.child.?.stdout;
+    const started = std.Io.Timestamp.now(io, .awake);
+    engine.deinit(io);
+    const elapsed = started.durationTo(std.Io.Timestamp.now(io, .awake)).toMilliseconds();
+    try std.testing.expect(engine.child == null);
+    try std.testing.expect(elapsed < 5000);
 }

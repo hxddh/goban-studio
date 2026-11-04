@@ -8,6 +8,11 @@
  * distinguishes "the executable linked" from "the app a player double-clicks
  * actually starts".
  *
+ * v5: the optional downloads are exercised too, end to end against the
+ * pinned KataGo release URLs (human model 99 MB, stronger network 48 MB:
+ * seconds on a GitHub-hosted runner), into a temporary models folder that
+ * is deleted afterwards. GOBAN_SELFTEST_MODELS=0 skips them (offline runs).
+ *
  * Usage: node scripts/selftest-app.mjs <path-to-executable>
  */
 import fs from "node:fs";
@@ -23,10 +28,18 @@ if (!exe || !fs.existsSync(exe)) {
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "goban-selftest-"));
 const reportPath = path.join(temp, "report.json");
-const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || 180000);
+const withModels = process.env.GOBAN_SELFTEST_MODELS !== "0";
+const modelsDir = path.join(temp, "models");
+// Below the workflow step's 10-minute limit, so a stall is reported here.
+const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || (withModels ? 480000 : 180000));
 const child = spawn(path.resolve(exe), [], {
   cwd: path.dirname(path.resolve(exe)),
-  env: { ...process.env, GOBAN_SELFTEST_OUT: reportPath },
+  env: {
+    ...process.env,
+    GOBAN_SELFTEST_OUT: reportPath,
+    GOBAN_SELFTEST_MODELS: withModels ? "1" : "0",
+    GOBAN_MODELS_DIR: modelsDir,
+  },
   stdio: "inherit",
 });
 
@@ -56,8 +69,13 @@ if (!exited) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
+// The downloaded networks never outlive the test.
+fs.rmSync(modelsDir, { recursive: true, force: true });
+
 if (!report) {
   console.error("selftest: no report from the packaged app");
+  const progress = reportPath + ".progress";
+  if (fs.existsSync(progress)) console.error("selftest: last progress mark:\n" + fs.readFileSync(progress, "utf8"));
   process.exit(1);
 }
 
@@ -67,8 +85,12 @@ const failed = Object.entries(checks).filter(([, value]) => value !== true).map(
 // plays in a handicap game. async/stream/incremental/cancel: the search
 // runs off the UI thread (no frame gap ≥ 250 ms), reports partial results,
 // re-syncs a one-move change with one `play`, and stops within 1 s.
+// modelsResume/modelsHuman/modelsStrong/modelsRemove (v5): the pinned
+// downloads stop, resume, verify, run on their own KataGo processes and are
+// removed again.
 const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
-const ok = report.ok === true && report.boardSize === 19 && required.every((k) => checks[k] === true) && failed.length === 0;
+if (withModels) required.push("modelsResume", "modelsHuman", "modelsStrong", "modelsRemove");
+const ok = report.ok === true && report.boardSize === 19 && required.every((k) => checks[k] === true) && failed.length === 0 && report.modelsChecked === withModels;
 console.log(JSON.stringify(report, null, 2));
 if (!ok) {
   console.error("selftest: failed checks:", failed.join(", ") || "report.ok/boardSize/engine");

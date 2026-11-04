@@ -23,6 +23,12 @@
  *   C:<name>      a candidate level from --candidates FILE (JSON: name → strength fields)
  *   H:<profile>   KataGo's human SL model (raw policy, 1 visit) imitating a
  *                 human rank profile such as rank_10k — the absolute anchor
+ *   HL:<id>       v5: a level's human-style opponent, exactly as shipped
+ *                 (STRENGTHS[].human, engine/model/human.cfg, the style
+ *                 parameters of src/engine.zig, engine.js
+ *                 humanMoveFromAnalysis); needs --human-model
+ *   LS:<id>       v5: a level on the optional stronger network
+ *                 (STRENGTHS[].strong); needs --strong-model
  *
  * Pair specs: "adjacent" (neighbouring levels), "gap2"/"gap3" (two/three
  * levels apart), "anchors" (each H: profile in --anchors against the two
@@ -38,7 +44,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BLACK, WHITE, Game, coordLabel } from "../src/web/js/rules.js";
-import { STRENGTHS, moveFromAnalysis } from "../src/web/js/engine.js";
+import { STRENGTHS, humanMoveFromAnalysis, humanRequest, moveFromAnalysis } from "../src/web/js/engine.js";
 import { parseVertex, toAnalysis } from "../src/web/js/katago.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -127,7 +133,26 @@ function resolvePlayer(spec, candidates) {
     return { spec, kind: "ladder", strength: { id: name, ...s } };
   }
   if (kind === "H") return { spec, kind: "human", profile: name };
+  if (kind === "HL" || kind === "LS") {
+    const s = STRENGTHS.find((x) => x.id === name);
+    if (!s || (kind === "HL" && !s.human) || (kind === "LS" && !s.strong)) throw new Error(`unknown level ${spec}`);
+    return { spec, kind: kind === "HL" ? "humanLadder" : "strongLadder", strength: s };
+  }
   throw new Error(`bad player ${spec}`);
+}
+
+/**
+ * The human slot's move-choice parameters, read from src/engine.zig
+ * (`style_params`) so the harness sends exactly what the app sends.
+ */
+export function humanStyleParams(source = fs.readFileSync(path.join(ROOT, "src/engine.zig"), "utf8")) {
+  const out = { raw: [], search: [] };
+  for (const m of source.matchAll(/\.\{ \.name = "(\w+)", \.raw = "([^"]+)", \.search = "([^"]+)" \}/g)) {
+    out.raw.push([m[1], m[2]]);
+    out.search.push([m[1], m[3]]);
+  }
+  if (!out.raw.length) throw new Error("style_params not found in src/engine.zig");
+  return out;
 }
 
 /** Nominal EGF rating of a human profile (rank_5k → 1600, rank_1d → 2100). */
@@ -179,10 +204,15 @@ class GTP {
   }
 }
 
-function katagoArgv(opt, human) {
+function katagoArgv(opt, human, variant = "") {
   const logs = path.join(os.tmpdir(), "goban-calibrate-logs");
   fs.mkdirSync(logs, { recursive: true });
   const common = `logDir=${logs},homeDataDir=${logs},logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false,numSearchThreads=${opt.threads}`;
+  // v5: the app's own human process (engine.zig Slot.human) and stronger network.
+  if (variant === "humanLadder") {
+    return [opt.katago, "gtp", "-model", opt.model, "-human-model", opt.humanModel, "-config", path.join(ROOT, "engine/model/human.cfg"), "-override-config", common];
+  }
+  if (variant === "strongLadder") return [opt.katago, "gtp", "-model", opt.strongModel, "-config", opt.config, "-override-config", common];
   if (!human) return [opt.katago, "gtp", "-model", opt.model, "-config", opt.config, "-override-config", common];
   // Human SL anchor: KataGo's own gtp_human5k_example.cfg recipe (raw human
   // policy picks every move; a short b6c96 search only decides passes).
@@ -239,6 +269,31 @@ async function ladderMove(proc, game, strength, rnd) {
   return { move: move || { pass: true }, analysis, fallback: !move };
 }
 
+/** v5: one human-style move, as the app plays it (engine.js decide, mode "human"). */
+async function humanLadderMove(proc, game, strength, rnd) {
+  const req = humanRequest(strength.human);
+  const styles = (humanLadderMove.styles ||= humanStyleParams());
+  if (proc.profile !== req.profile) {
+    await proc.send(`kata-set-param humanSLProfile ${req.profile}`);
+    proc.profile = req.profile;
+  }
+  if (proc.style !== req.humanStyle) {
+    for (const [name, value] of styles[req.humanStyle]) await proc.send(`kata-set-param ${name} ${value}`);
+    proc.style = req.humanStyle;
+  }
+  await proc.send(`kata-set-param maxVisits ${req.visits}`);
+  await proc.send("kata-set-param maxTime 60");
+  const color = game.turn === BLACK ? "B" : "W";
+  const reply = await proc.send(`kata-search_analyze ${color}`);
+  const lines = reply.split("\n");
+  const info = lines.filter((l) => l.startsWith("info")).pop() || "";
+  const playText = (lines.find((l) => l.startsWith("play")) || "").slice(5);
+  const analysis = toAnalysis(info, playText, game.size);
+  if (!analysis) return { move: { pass: true }, analysis: null };
+  const move = humanMoveFromAnalysis(game, analysis, strength.human, rnd);
+  return { move: move || { pass: true }, analysis, fallback: !move };
+}
+
 async function humanMove(proc, game) {
   const color = game.turn === BLACK ? "B" : "W";
   const text = await proc.send(`genmove ${color}`);
@@ -265,7 +320,7 @@ async function playGame(task, procs, opt) {
   await setup(procs.black, size, komi);
   if (procs.white !== procs.black) await setup(procs.white, size, komi);
   const evals = [];
-  const slack = Math.max(...[task.black, task.white].map((p) => (p.kind === "ladder" ? p.strength.maxLoss : 20)));
+  const slack = Math.max(...[task.black, task.white].map((p) => (p.strength ? p.strength.maxLoss : 20)));
   const threshold = 20 + 2 * slack;
   let reason = "passes";
   let fallbacks = 0;
@@ -277,7 +332,14 @@ async function playGame(task, procs, opt) {
     const color = game.turn;
     const p = players[color];
     const proc = procOf[color];
-    const r = p.kind === "ladder" ? await ladderMove(proc, game, p.strength, rnd) : await humanMove(proc, game);
+    const r =
+      p.kind === "ladder"
+        ? await ladderMove(proc, game, p.strength, rnd)
+        : p.kind === "strongLadder"
+          ? await ladderMove(proc, game, { ...p.strength, visits: p.strength.strong.visits }, rnd)
+          : p.kind === "humanLadder"
+            ? await humanLadderMove(proc, game, p.strength, rnd)
+            : await humanMove(proc, game);
     if (r.fallback) fallbacks++;
     let move = r.move;
     if (!move.pass && !game.canPlay(move.x, move.y).ok) move = { pass: true }; // human SL under superko
@@ -303,7 +365,7 @@ async function playGame(task, procs, opt) {
     }
   }
   // Score with the stronger search of a ladder process.
-  const scorer = task.black.kind === "ladder" ? procs.black : procs.white;
+  const scorer = task.black.kind === "ladder" || task.black.kind === "strongLadder" ? procs.black : procs.white;
   await scorer.send(`kata-set-param maxVisits ${opt.scoreVisits}`);
   const reply = await scorer.send(`kata-search_analyze ${game.turn === BLACK ? "B" : "W"}`);
   const info = reply.split("\n").filter((l) => l.startsWith("info")).pop() || "";
@@ -329,7 +391,7 @@ function expandPairs(text, opt) {
         for (const s of near) out.push([`H:${profile}`, `L:${s.id}`]);
       }
     } else {
-      const [a, b] = part.split(/-(?=[LCH]:)/);
+      const [a, b] = part.split(/-(?=(?:L|C|H|HL|LS):)/);
       out.push([a, b]);
     }
   }
@@ -369,14 +431,19 @@ async function runPlay(opt) {
   const started = Date.now();
   async function worker(w) {
     const cache = new Map();
-    const proc = (key, human) => {
-      if (!cache.has(key)) cache.set(key, new GTP(katagoArgv(opt, human), `w${w}:${key}`));
+    const proc = (key, human, variant) => {
+      if (!cache.has(key)) cache.set(key, new GTP(katagoArgv(opt, human, variant), `w${w}:${key}`));
       return cache.get(key);
     };
     while (next < tasks.length) {
       const task = tasks[next++];
-      const black = task.black.kind === "human" ? proc(`H:${task.black.profile}`, task.black.profile) : proc("ladderB");
-      const white = task.white.kind === "human" ? proc(`H:${task.white.profile}`, task.white.profile) : proc("ladderW");
+      const pick = (player, side) => {
+        if (player.kind === "human") return proc(`H:${player.profile}`, player.profile);
+        if (player.kind === "humanLadder" || player.kind === "strongLadder") return proc(`${player.kind}${side}`, null, player.kind);
+        return proc(`ladder${side}`);
+      };
+      const black = pick(task.black, "B");
+      const white = pick(task.white, "W");
       const t0 = Date.now();
       try {
         const r = await playGame(task, { black, white }, opt);
@@ -618,6 +685,7 @@ async function main() {
       model: a.model || path.join(ROOT, "engine/model/model.txt.gz"),
       config: a.config || path.join(ROOT, "engine/model/gtp.cfg"),
       humanModel: a["human-model"] || process.env.KATAGO_HUMAN_MODEL,
+      strongModel: a["strong-model"] || process.env.KATAGO_STRONG_MODEL,
       candidates: a.candidates,
       out: a.out || "calibration.jsonl",
       size: Number(a.size || 19),
@@ -631,9 +699,10 @@ async function main() {
       tag: a.tag || "",
     };
     if (!opt.katago) throw new Error("--katago PATH (or KATAGO=…) is required");
-    if (opt.pairs.includes("H:") || opt.pairs.includes("anchors")) {
-      if (!opt.humanModel) throw new Error("--human-model PATH is required for H: anchors");
+    if (opt.pairs.includes("H:") || opt.pairs.includes("HL:") || opt.pairs.includes("anchors")) {
+      if (!opt.humanModel) throw new Error("--human-model PATH is required for H: anchors and HL: levels");
     }
+    if (opt.pairs.includes("LS:") && !opt.strongModel) throw new Error("--strong-model PATH is required for LS: levels");
     await runPlay(opt);
   } else if (cmd === "fit") {
     const file = a._[1] || "calibration.jsonl";

@@ -4,6 +4,8 @@ const runner = @import("runner");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
 const update_mod = @import("update.zig");
+const install_mod = @import("install.zig");
+const models_mod = @import("models.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -27,6 +29,10 @@ const max_jobs = 8;
 /// deadline) while one is open; same role as the KataGo timer.
 const update_timer_id: u64 = 0x7570_6461_7465;
 const update_timer_interval_ns: u64 = 250 * std.time.ns_per_ms;
+/// Timer that collects a finished update download (and runs its stall
+/// watchdog) while `studio.updateDownload` is open.
+const install_timer_id: u64 = 0x696e_7374_616c;
+const install_timer_interval_ns: u64 = 500 * std.time.ns_per_ms;
 
 /// An async analysis the page is waiting for. UI thread only.
 const Job = struct {
@@ -43,6 +49,8 @@ const Job = struct {
     /// The page cancelled or superseded it: reply `cancelled` whatever
     /// KataGo says (it may have finished in the same instant).
     cancelled: bool = false,
+    /// The KataGo process that serves it (echoed as `engine`).
+    slot: engine_mod.Slot = .standard,
 
     fn idText(self: *const Job) []const u8 {
         return self.id[0..self.id_len];
@@ -109,9 +117,25 @@ const App = struct {
     update_responder: native_sdk.bridge.AsyncResponder = undefined,
     update_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
     update_bridge_id_len: usize = 0,
-    handlers: [12]native_sdk.BridgeHandler = undefined,
-    async_handlers: [2]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [14]native_sdk.BridgeCommandPolicy = undefined,
+    /// Update install (v5; see install.zig). One open `studio.updateDownload`
+    /// call at a time; progress is read with `studio.updateStatus`.
+    installer: *install_mod.Installer = undefined,
+    install_wake_installed: bool = false,
+    install_active: bool = false,
+    install_gen: u64 = 0,
+    install_timer_running: bool = false,
+    install_responder: native_sdk.bridge.AsyncResponder = undefined,
+    install_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
+    install_bridge_id_len: usize = 0,
+    /// Whether this installation can be replaced in place, decided once.
+    install_target: install_mod.Target = .{},
+    install_target_known: bool = false,
+    staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    /// Optional networks (v5, models.zig): the page polls their state.
+    models: *models_mod.Manager = undefined,
+    handlers: [18]native_sdk.BridgeHandler = undefined,
+    async_handlers: [4]native_sdk.bridge.AsyncHandler = undefined,
+    policies: [22]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -137,6 +161,8 @@ const App = struct {
         _ = it.next(); // executable
         while (it.next()) |arg| {
             if (std.ascii.endsWithIgnoreCase(arg, ".sgf")) self.queueOpenPath(arg);
+            // Launched by the update helper (install.zig).
+            self.installer.note.noteArg(arg);
         }
     }
 
@@ -252,6 +278,26 @@ const App = struct {
             .context = self,
             .invoke_fn = openReleasePage,
         };
+        self.handlers[12] = .{
+            .name = "studio.modelStatus",
+            .context = self,
+            .invoke_fn = modelStatus,
+        };
+        self.handlers[13] = .{
+            .name = "studio.modelDownload",
+            .context = self,
+            .invoke_fn = modelDownload,
+        };
+        self.handlers[14] = .{
+            .name = "studio.modelCancel",
+            .context = self,
+            .invoke_fn = modelCancel,
+        };
+        self.handlers[15] = .{
+            .name = "studio.modelRemove",
+            .context = self,
+            .invoke_fn = modelRemove,
+        };
         self.async_handlers[0] = .{
             .name = "studio.katagoAnalyzeAsync",
             .context = self,
@@ -261,6 +307,26 @@ const App = struct {
             .name = "studio.checkUpdate",
             .context = self,
             .invoke_fn = checkUpdate,
+        };
+        self.handlers[16] = .{
+            .name = "studio.updateStatus",
+            .context = self,
+            .invoke_fn = updateStatus,
+        };
+        self.handlers[17] = .{
+            .name = "studio.updateCancel",
+            .context = self,
+            .invoke_fn = updateCancel,
+        };
+        self.async_handlers[2] = .{
+            .name = "studio.updateDownload",
+            .context = self,
+            .invoke_fn = updateDownload,
+        };
+        self.async_handlers[3] = .{
+            .name = "studio.updateApply",
+            .context = self,
+            .invoke_fn = updateApply,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -391,10 +457,12 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
         .effects_wake => {
             drainKatago(self);
             drainUpdate(self);
+            drainInstall(self);
         },
         .timer => |timer| {
             if (timer.id == katago_timer_id) drainKatago(self);
             if (timer.id == update_timer_id) drainUpdate(self);
+            if (timer.id == install_timer_id) drainInstall(self);
         },
         else => {},
     }
@@ -563,7 +631,7 @@ fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, out
     _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
-    const move = self.katago.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
+    const move = self.katago.standard().move(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
@@ -590,7 +658,7 @@ fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
-    const result = self.katago.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
+    const result = self.katago.standard().analyze(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
@@ -611,7 +679,7 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     const self: *App = @ptrCast(@alignCast(context));
     var n: usize = 0;
     if (!jsonAppend(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"version\":")) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
     if (!jsonAppendString(output, &n, self.katago_version)) return error.HandlerFailed;
     if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
@@ -630,12 +698,21 @@ const AnalyzePayload = struct {
     id: []const u8 = "",
     size: u32 = 19,
     komi: f64 = 6.5,
+    /// v5: "japanese" | "chinese" | "korean". A page without the field
+    /// (before v5) means Japanese, the only ruleset it knew.
+    rules: []const u8 = "japanese",
     setup: []const u8 = "",
     moves: []const u8 = "",
     color: []const u8 = "B",
     visits: u32 = 64,
     maxTime: f64 = 6.0,
     stream: bool = false,
+    /// v5: "standard" (default), "strong" or "human".
+    engine: []const u8 = "standard",
+    /// v5, human engine only: a KataGo human SL profile ("rank_12k").
+    profile: []const u8 = "",
+    /// v5, human engine only: "raw" or "search".
+    humanStyle: []const u8 = "raw",
 };
 
 fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request, job: *Job) !void {
@@ -656,12 +733,25 @@ fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request
     const size: u8 = @intCast(p.size);
     req.position.size = size;
     req.position.komi = p.komi;
+    req.position.rules = engine_mod.Rules.parse(p.rules) orelse return error.InvalidRequest;
     req.position.setup_len = try engine_mod.parseMoves(p.setup, size, false, &req.position.setup);
     req.position.moves_len = try engine_mod.parseMoves(p.moves, size, true, &req.position.moves);
     req.color = p.color[0];
     req.visits = p.visits;
     req.max_time = p.maxTime;
     req.stream = p.stream;
+    req.slot = engine_mod.Slot.parse(p.engine) orelse return error.InvalidRequest;
+    job.slot = req.slot;
+    req.profile_len = 0;
+    req.style = .raw;
+    if (req.slot == .human) {
+        if (!engine_mod.validProfile(p.profile)) return error.InvalidRequest;
+        @memcpy(req.profile[0..p.profile.len], p.profile);
+        req.profile_len = p.profile.len;
+        if (std.mem.eql(u8, p.humanStyle, "search")) {
+            req.style = .search;
+        } else if (!std.mem.eql(u8, p.humanStyle, "raw")) return error.InvalidRequest;
+    }
 }
 
 fn findJob(self: *App, seq: u64) ?*Job {
@@ -719,6 +809,8 @@ fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, re
             const r = result.?;
             ok = jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and
                 jsonAppendString(buf, &n, job.idText()) and
+                jsonAppend(buf, &n, ",\"engine\":") and
+                jsonAppendString(buf, &n, @tagName(job.slot)) and
                 jsonAppend(buf, &n, ",\"play\":") and
                 jsonAppendString(buf, &n, r.play()) and
                 jsonAppend(buf, &n, ",\"info\":") and
@@ -793,6 +885,19 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     if (!self.katago_available) {
         respondJob(&job, .failed, "EngineMissing", null);
         return;
+    }
+    // An optional network that is not installed: answer at once, the page
+    // falls back to the standard engine.
+    const needs: ?models_mod.Kind = switch (req.slot) {
+        .standard => null,
+        .strong => .strong,
+        .human => .human,
+    };
+    if (needs) |kind| {
+        if (!self.models.isReady(kind)) {
+            respondJob(&job, .failed, "ModelMissing", null);
+            return;
+        }
     }
     var slot: ?*Job = null;
     for (&self.jobs) |*candidate| {
@@ -983,6 +1088,306 @@ fn spawnBrowser(io: std.Io, url: []const u8) bool {
     return true;
 }
 
+// ------------------------------------------------------------ update install
+//
+// v5: after a check found a newer release, the player may download and
+// install it (install.zig). The download runs on its own thread; the page
+// polls `studio.updateStatus` for progress and is answered on
+// `studio.updateDownload` when the thread is done (platform wake, or the
+// fallback timer, which also runs the stall watchdog).
+
+fn stagingRoot(self: *App) ?[]const u8 {
+    return install_mod.stagingRoot(self.env_map, &self.staging_root_buf);
+}
+
+/// Can this installation be replaced in place? Probed once a session (it
+/// writes and removes a test file next to the app), again before a download.
+fn installTarget(self: *App, refresh: bool) *const install_mod.Target {
+    if (!self.install_target_known or refresh) {
+        var token_bytes: [6]u8 = undefined;
+        self.io.random(&token_bytes);
+        const token = std.fmt.bytesToHex(token_bytes, .lower);
+        self.install_target = install_mod.detectTarget(self.io, &token);
+        if (self.install_target.blocked == .none and stagingRoot(self) == null) self.install_target.blocked = .NoTempDir;
+        self.install_target_known = true;
+    }
+    return &self.install_target;
+}
+
+fn installWakeUp(self: *App) void {
+    if (self.install_wake_installed) return;
+    const runtime = self.runtime orelse return;
+    const services = runtime.options.platform.services;
+    self.installer.setWake(services.context, services.wake_fn);
+    self.install_wake_installed = true;
+}
+
+fn stopInstallTimer(self: *App) void {
+    if (!self.install_timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.cancelTimer(install_timer_id) catch {};
+    self.install_timer_running = false;
+}
+
+const StatusPayload = struct {
+    probe: bool = false,
+};
+
+/// `studio.updateStatus` {probe?}: where an update download / install
+/// stands. Replies `{ok:true, phase, tag, asset, platform, received, total,
+/// error, canInstall, blocked, justUpdated, installFailed}`; phase is one of
+/// idle, downloading, verifying, unpacking, ready, installing, failed,
+/// cancelled. `blocked` (when canInstall is false): Unsupported,
+/// NotPackaged, Translocated, ReadOnlyLocation, NoTempDir, or NotChecked
+/// until a call with `probe:true` (which writes and removes one test file
+/// next to the app, once a session) has looked.
+fn updateStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    install_mod.writeAck(self.io, &self.installer.note);
+    const snap = self.installer.snapshot();
+    var probe = false;
+    if (std.json.parseFromSlice(StatusPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true })) |parsed| {
+        probe = parsed.value.probe;
+        parsed.deinit();
+    } else |_| {}
+    const blocked: install_mod.Blocked = if (probe or self.install_target_known) installTarget(self, false).blocked else .NotChecked;
+    return install_mod.statusReply(output, &snap, self.installer.platform, blocked, &self.installer.note);
+}
+
+/// `studio.updateCancel` {}: stop a download (its files are removed), or
+/// discard a downloaded update that was not installed. Replies `{ok, phase}`.
+fn updateCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    const phase = self.installer.cancel();
+    // The open download call is answered with Cancelled.
+    if (self.install_active) {
+        self.install_active = false;
+        self.install_responder.success(self.install_bridge_id[0..self.install_bridge_id_len], "{\"ok\":false,\"error\":\"Cancelled\"}") catch {};
+        stopInstallTimer(self);
+    }
+    return std.fmt.bufPrint(output, "{{\"ok\":true,\"phase\":\"{s}\"}}", .{@tagName(phase)}) catch error.HandlerFailed;
+}
+
+const DownloadPayload = struct {
+    tag: []const u8 = "",
+};
+
+/// `studio.updateDownload` {tag}: download this platform's package of
+/// release `tag` and SHA256SUMS from the fixed GitHub release-download
+/// address, verify and unpack it. Answered when done: `{ok:true,
+/// phase:"ready", tag, asset}` or `{ok:false, error}` with error one of
+/// Busy, BadTag, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
+/// NoTempDir, Network, BadRedirect, HttpStatus, NoAsset, TooLarge,
+/// NoChecksum, ChecksumMismatch, Unpack, BadPackage, Disk, Stalled,
+/// Cancelled, OutOfMemory, Unavailable.
+fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    const rid = invocation.request.id;
+    var reply_buf: [256]u8 = undefined;
+    if (self.install_active) {
+        responder.success(rid, "{\"ok\":false,\"error\":\"Busy\"}") catch {};
+        return;
+    }
+    const parsed = std.json.parseFromSlice(DownloadPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch {
+        responder.success(rid, "{\"ok\":false,\"error\":\"BadTag\"}") catch {};
+        return;
+    };
+    defer parsed.deinit();
+    const target = installTarget(self, true);
+    if (target.blocked != .none) {
+        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        return;
+    }
+    const root = stagingRoot(self) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
+        return;
+    };
+    installWakeUp(self);
+    const gen = self.installer.start(root, parsed.value.tag, nowMs(self)) catch |err| {
+        responder.success(rid, install_mod.errorReply(&reply_buf, install_mod.errorName(err))) catch {};
+        return;
+    };
+    const rid_len = @min(rid.len, self.install_bridge_id.len);
+    @memcpy(self.install_bridge_id[0..rid_len], rid[0..rid_len]);
+    self.install_bridge_id_len = rid_len;
+    self.install_responder = responder;
+    self.install_gen = gen;
+    self.install_active = true;
+    if (!self.install_timer_running) {
+        if (self.runtime) |runtime| {
+            if (runtime.options.platform.services.startTimer(install_timer_id, install_timer_interval_ns, true)) |_| {
+                self.install_timer_running = true;
+            } else |_| {}
+        }
+    }
+}
+
+/// Answer the open download once its thread is done; abandon it if no
+/// byte arrived for `install_mod.stall_timeout_ms`. UI thread.
+fn drainInstall(self: *App) void {
+    if (!self.install_active) {
+        stopInstallTimer(self);
+        return;
+    }
+    _ = self.installer.checkStall(nowMs(self));
+    const snap = self.installer.snapshot();
+    const done = snap.gen != self.install_gen or switch (snap.phase) {
+        .ready, .failed, .cancelled, .idle => true,
+        else => false,
+    };
+    if (!done) return;
+    var buf: [256]u8 = undefined;
+    const reply = if (snap.gen != self.install_gen)
+        install_mod.errorReply(&buf, if (snap.error_name.len > 0) snap.error_name else "Cancelled")
+    else
+        install_mod.downloadReply(&buf, &snap, self.installer.platform);
+    self.install_active = false;
+    self.install_responder.success(self.install_bridge_id[0..self.install_bridge_id_len], reply) catch {};
+    stopInstallTimer(self);
+}
+
+/// `studio.updateApply` {}: install the downloaded update. Starts the
+/// embedded helper (src/updater/), answers `{ok:true, phase:"installing"}`
+/// and quits the app; the helper swaps the installation, starts the new
+/// version and rolls back if it does not come up. `{ok:false, error}`:
+/// NotReady, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
+/// NoTempDir, Helper, QuitFailed.
+fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    const rid = invocation.request.id;
+    var reply_buf: [256]u8 = undefined;
+    var staged_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const staged = self.installer.stagedPath(&staged_buf) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NotReady\"}") catch {};
+        return;
+    };
+    const target = installTarget(self, true);
+    if (target.blocked != .none) {
+        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        return;
+    }
+    const root = stagingRoot(self) orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
+        return;
+    };
+    const runtime = self.runtime orelse {
+        responder.success(rid, "{\"ok\":false,\"error\":\"QuitFailed\"}") catch {};
+        return;
+    };
+    self.installer.markInstalling();
+    if (install_mod.startHelper(self.io, self.env_map, root, target.root(), staged)) |err_name| {
+        self.installer.markApplyFailed(err_name);
+        responder.success(rid, install_mod.errorReply(&reply_buf, err_name)) catch {};
+        return;
+    }
+    responder.success(rid, "{\"ok\":true,\"phase\":\"installing\"}") catch {};
+    // The helper waits for this process to exit (KataGo stops on the way).
+    runtime.quitApp() catch {
+        // It keeps waiting; quitting by hand still finishes the update.
+        self.installer.markApplyFailed("QuitFailed");
+    };
+}
+
+// ------------------------------------------------------------ models
+//
+// Optional networks (v5). The page names a kind, never an address: the
+// URLs, sizes and SHA-256 hashes are pinned in models.zig. Downloads run on
+// their own thread and write only under the app's data directory; the page
+// polls `studio.modelStatus` for progress.
+
+const ModelPayload = struct {
+    kind: []const u8 = "",
+};
+
+fn modelKind(self: *App, payload: []const u8) !models_mod.Kind {
+    const parsed = std.json.parseFromSlice(ModelPayload, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    return models_mod.parseKind(parsed.value.kind) orelse error.InvalidRequest;
+}
+
+fn modelSlot(kind: models_mod.Kind) engine_mod.Slot {
+    return switch (kind) {
+        .human => .human,
+        .strong => .strong,
+    };
+}
+
+/// `studio.modelStatus` {}: `{available, human:{status, bytes, total,
+/// idleMs, needed, name, error}, strong:{…}}`. `available` is false when
+/// the app has no data directory (downloads impossible).
+fn modelStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    return models_mod.statusJson(self.models, output) orelse error.HandlerFailed;
+}
+
+fn modelReply(self: *App, output: []u8, ok: bool, error_name: []const u8) ![]const u8 {
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, if (ok) "{\"ok\":true" else "{\"ok\":false")) return error.HandlerFailed;
+    if (error_name.len > 0) {
+        if (!jsonAppend(output, &n, ",\"error\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, error_name)) return error.HandlerFailed;
+    }
+    if (!jsonAppend(output, &n, ",\"models\":")) return error.HandlerFailed;
+    const status = models_mod.statusJson(self.models, output[n..]) orelse return error.HandlerFailed;
+    n += status.len;
+    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    return output[0..n];
+}
+
+/// `studio.modelDownload` {kind: "human"|"strong"}: start or resume the
+/// download and return at once; `{ok, error?, models}`. Errors: NoDataDir,
+/// Busy, ThreadFailed. Transfer errors arrive later in the status
+/// (DiskFull, Network, HttpStatus, SizeMismatch, ChecksumMismatch, …).
+fn modelDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    self.models.start(kind) catch |err| return modelReply(self, output, false, @errorName(err));
+    return modelReply(self, output, true, "");
+}
+
+/// `studio.modelCancel` {kind}: stop a download (its partial file stays for
+/// a later resume). `{ok, models}`; ok is false when nothing was running.
+fn modelCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    const cancelled = self.models.cancel(kind);
+    return modelReply(self, output, cancelled, "");
+}
+
+/// `studio.modelRemove` {kind}: stop the KataGo process that uses the
+/// network, then delete the file and any partial download. `{ok, models}`.
+fn modelRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    _ = cancelJobs(self, null);
+    // The worker may be mid-search: never block the UI thread on it. The
+    // page retries on Busy; the slot stops as soon as the search ends.
+    if (!self.katago.stopSlot(modelSlot(kind))) return modelReply(self, output, false, "Busy");
+    self.models.remove(kind) catch |err| return modelReply(self, output, false, @errorName(err));
+    return modelReply(self, output, true, "");
+}
+
+/// `<app data>/models`, or GOBAN_MODELS_DIR (self-test, development).
+fn resolveModelsDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
+    if (env_map.get("GOBAN_MODELS_DIR")) |dir| {
+        if (dir.len > 0 and dir.len <= out.len and std.fs.path.isAbsolute(dir)) {
+            @memcpy(out[0..dir.len], dir);
+            return out[0..dir.len];
+        }
+    }
+    var data_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const data = native_sdk.app_dirs.resolveOne(
+        .{ .name = bundle_id },
+        native_sdk.app_dirs.currentPlatform(),
+        native_sdk.debug.envFromMap(env_map),
+        .data,
+        &data_buf,
+    ) catch return "";
+    return std.fmt.bufPrint(out, "{s}{c}models", .{ data, std.fs.path.sep }) catch "";
+}
+
 // ------------------------------------------------------------ native menus
 
 const MenuItemSpec = struct {
@@ -1109,6 +1514,8 @@ fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
 fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
+    // The page is up: tell a waiting update helper (if it launched us).
+    install_mod.writeAck(self.io, &self.installer.note);
     const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
     const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
@@ -1118,9 +1525,29 @@ fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
         if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
     }
+    // v5: also exercise the optional downloads (GOBAN_MODELS_DIR should
+    // point at an empty temporary folder).
+    const models = self.env_map.get("GOBAN_SELFTEST_MODELS") orelse "";
+    if (path.len > 0 and std.mem.eql(u8, models, "1")) {
+        if (!jsonAppend(output, &n, ",\"models\":true")) return error.HandlerFailed;
+    }
     if (tour.len > 0) {
         if (!jsonAppend(output, &n, ",\"tour\":")) return error.HandlerFailed;
         if (!jsonAppendString(output, &n, tour)) return error.HandlerFailed;
+    }
+    // v5: GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
+    // (selftest.js; scripts/test-updater.mjs), GOBAN_UPDATE_PROBE_TAG for a
+    // real download of that release. The download address is still built
+    // and checked by install.zig; the tag is only a tag.
+    const probe = self.env_map.get("GOBAN_UPDATE_PROBE_OUT") orelse "";
+    if (probe.len > 0) {
+        if (!jsonAppend(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, probe)) return error.HandlerFailed;
+        const probe_tag = self.env_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
+        if (install_mod.validTag(probe_tag)) {
+            if (!jsonAppend(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
+            if (!jsonAppendString(output, &n, probe_tag)) return error.HandlerFailed;
+        }
     }
     if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
@@ -1137,29 +1564,45 @@ fn installPlatformOpenHandler(self: *App) void {
     }
 }
 
+const bundle_id = "dev.hxddh.gobanstudio";
+
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
     defer app_state.deinit();
+    // Optional networks (v5). Not freed at exit: a download thread may
+    // still be running.
+    var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const models = try std.heap.page_allocator.create(models_mod.Manager);
+    models.init(init.io, resolveModelsDir(init.environ_map, &models_dir_buf));
+    app_state.models = models;
+    var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const strong_model = models.modelPath(.strong, &strong_buf) orelse "";
+    const human_model = models.modelPath(.human, &human_buf) orelse "";
     // Not freed at exit: the detached worker thread may still be unwinding.
     const katago = try std.heap.page_allocator.create(engine_mod.Worker);
-    katago.init(init.io, init.environ_map);
+    katago.init(init.io, init.environ_map, strong_model, human_model);
     defer katago.shutdown();
     app_state.katago = katago;
     app_state.request_scratch = try std.heap.page_allocator.create(engine_mod.Request);
     app_state.request_scratch.* = .{};
-    app_state.katago_available = katago.engine.available();
-    app_state.katago_version = katago.engine.versionText(&app_state.katago_version_buf);
+    app_state.katago_available = katago.standard().available();
+    app_state.katago_version = katago.standard().versionText(&app_state.katago_version_buf);
     // Not freed at exit either: a check thread may still be finishing.
     const updater = try std.heap.page_allocator.create(update_mod.Checker);
     updater.init(init.io);
     app_state.updater = updater;
+    // Not freed at exit either: a download thread may still be finishing.
+    const installer = try std.heap.page_allocator.create(install_mod.Installer);
+    installer.init(init.io);
+    app_state.installer = installer;
     app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "Goban Studio",
         .window_title = "Goban Studio",
-        .bundle_id = "dev.hxddh.gobanstudio",
+        .bundle_id = bundle_id,
         .icon_path = "assets/icon.png",
         .js_window_api = true,
         .bridge = app_state.bridge(),
@@ -1173,6 +1616,8 @@ pub fn main(init: std.process.Init) !void {
 test {
     std.testing.refAllDecls(engine_mod);
     std.testing.refAllDecls(update_mod);
+    std.testing.refAllDecls(install_mod);
+    std.testing.refAllDecls(models_mod);
 }
 
 test "production source uses frontend assets" {
@@ -1193,4 +1638,20 @@ test "jsonUnescape plain path unchanged" {
     var buf: [64]u8 = undefined;
     const got = jsonUnescape("/tmp/goban-studio.sgf", &buf) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqualStrings("/tmp/goban-studio.sgf", got);
+}
+
+test "analyze payload rules default to japanese and accept only the three presets" {
+    const cases = [_]struct { json: []const u8, want: ?engine_mod.Rules }{
+        .{ .json = "{\"size\":9}", .want = .japanese },
+        .{ .json = "{\"rules\":\"japanese\"}", .want = .japanese },
+        .{ .json = "{\"rules\":\"chinese\"}", .want = .chinese },
+        .{ .json = "{\"rules\":\"korean\"}", .want = .korean },
+        .{ .json = "{\"rules\":\"aga\"}", .want = null },
+        .{ .json = "{\"rules\":\"chinese\\nquit\"}", .want = null },
+    };
+    for (cases) |c| {
+        const parsed = try std.json.parseFromSlice(AnalyzePayload, std.testing.allocator, c.json, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        try std.testing.expectEqual(c.want, engine_mod.Rules.parse(parsed.value.rules));
+    }
 }

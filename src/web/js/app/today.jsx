@@ -13,6 +13,7 @@ import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
 import { Button, Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { weekSummary } from "./week.js";
 
 function greeting() {
   const h = new Date().getHours();
@@ -180,6 +181,9 @@ export function TodayView() {
           ))}
         </ul>
 
+        <WeekStrip />
+        <Trends />
+
         {r?.games > 0 && (
         <section class="section level enter-up">
           <div class="level-text">
@@ -215,6 +219,78 @@ export function TodayView() {
         )}
       </div>
     </>
+  );
+}
+
+/** This week: four numbers, never an empty card (zeros are information). */
+function WeekStrip() {
+  const w = weekSummary(state.progress, Lib.listGames());
+  const stats = [
+    { n: w.played, key: "week.games" },
+    { n: w.solved, key: "week.problems" },
+    { n: w.lessons, key: "week.lessons" },
+  ];
+  return (
+    <section class="section week enter-up" aria-label={t("week.title")}>
+      <h2 class="section-title">{t("week.title")}</h2>
+      <ul class="week-grid">
+        {stats.map((x) => (
+          <li>
+            <strong>{x.n}</strong>
+            <span>{t(x.key)}</span>
+          </li>
+        ))}
+        <li>
+          <strong class={w.delta > 0 ? "up" : w.delta < 0 ? "down" : ""}>{w.delta == null ? "—" : (w.delta > 0 ? "+" : "") + w.delta}</strong>
+          <span>{t("week.level")}</span>
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+/** Recent rated games: where the points go, and whether it is getting better. */
+function Trends() {
+  const tr = C.gameTrends(10);
+  if (!tr || !tr.games) return null;
+  const dir = (d) => (d ? <em class={`trend-dir ${d}`}>{t("trend." + d)}</em> : null);
+  const fmt = (v) => (v == null ? "—" : String(Math.round(v * 2) / 2));
+  return (
+    <section class="section enter-up">
+      <h2 class="section-title">{t("trend.title")}</h2>
+      <div class="trend-card">
+        <p class="fine">
+          {t("trend.games", [tr.games, tr.analysed])} · {t("trend.record", [tr.record.won, tr.record.lost])}
+        </p>
+        {tr.analysed > 0 ? (
+          <ul class="trend-phases">
+            {["opening", "middle", "endgame"].map((ph) => (
+              <li>
+                <span>{t("phase." + ph)}</span>
+                <strong>{fmt(tr.avgLoss[ph])}</strong>
+                {dir(tr.phaseTrend?.[ph]?.direction)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="muted">{t("trend.none")}</p>
+        )}
+        {tr.analysed > 0 && <p class="fine">{t("trend.avgLoss")}</p>}
+        {tr.themes?.length > 0 && (
+          <ul class="trend-themes">
+            {tr.themes.slice(0, 3).map((th) => (
+              <li>
+                <button type="button" class="link" onClick={() => C.openTopic(th.topic || THEME_TOPIC[th.theme] || topicFor(th.theme), th.theme)}>
+                  {C.themeName(th.theme)}
+                </button>
+                <span class="fine">{t("trend.themeCount", [th.count])}</span>
+                {dir(th.direction)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 

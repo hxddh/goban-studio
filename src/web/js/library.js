@@ -34,9 +34,16 @@ export function thumbnail(game) {
   return node.board.signMap.map((row) => row.map((v) => (v > 0 ? "b" : v < 0 ? "w" : ".")).join("")).join("");
 }
 
+/** A record's ruleset; anything missing or unknown is Japanese. */
+export function recordRules(rec) {
+  return ["japanese", "chinese", "korean"].includes(rec?.rules) ? rec.rules : "japanese";
+}
+
 export function describeGame(game) {
   return {
     size: game.size,
+    // v5: "japanese" | "chinese" | "korean". Records saved before v5 have
+    // "japanese" here (or nothing); read them with recordRules().
     rules: game.rules,
     komi: game.komi,
     handicap: game.handicap,
@@ -116,6 +123,7 @@ export function saveCurrent(game, meta = {}) {
     ...meta,
     sgf: game.toSGF(),
     size: game.size,
+    rules: game.rules,
     moves: game.moveNumber,
     savedAt: Date.now(),
   });

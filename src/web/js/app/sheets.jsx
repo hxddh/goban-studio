@@ -2,10 +2,12 @@
  * Modal sheets: new game, settings, onboarding, shortcuts, confirm, rename.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BLACK, WHITE, formatPoints } from "../rules.js";
+import { BLACK, WHITE, RULESETS, defaultKomi, formatPoints, rulesetById } from "../rules.js";
 import { STRENGTHS, suggestHandicap } from "../engine.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
+import * as U from "../update.js";
+import * as Models from "../models.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
@@ -81,10 +83,11 @@ function NewGameSheet({ prefill }) {
   const [advanced, setAdvanced] = useState(false);
   const [handicap, setHandicap] = useState(null);
   const [komi, setKomi] = useState(null);
+  const [rules, setRules] = useState(prefill?.rules || s.defaultRules || "japanese");
   const h = handicap ?? (color === BLACK ? suggested : 0);
-  const k = komi ?? (h > 0 ? 0.5 : 6.5);
+  const k = komi ?? defaultKomi(rules, h);
   const start = () =>
-    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, timeControl: tc, rememberSize: true });
+    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, rules, timeControl: tc, rememberSize: true });
   return (
     <Modal
       title={t("common.newGame")}
@@ -171,7 +174,9 @@ function NewGameSheet({ prefill }) {
 
         <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
           <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
-          <span class="fine">{t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}</span>
+          <span class="fine">
+            {t(rulesetById(rules).labelKey)} · {t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}
+          </span>
         </button>
         {advanced && (
           <>
@@ -207,7 +212,19 @@ function NewGameSheet({ prefill }) {
               <span>{t("common.komi")}</span>
               <Stepper label={t("common.komi")} value={k} min={0} max={9.5} step={0.5} onChange={setKomi} format={formatPoints} />
             </div>
-            <p class="fine">{t("newGame.rules")}</p>
+            <div class="row">
+              <span>{t("rules.title")}</span>
+              <Segmented
+                label={t("rules.title")}
+                value={rules}
+                onChange={(v) => {
+                  setRules(v);
+                  setKomi(null);
+                }}
+                options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))}
+              />
+            </div>
+            <p class="fine">{t(rulesetById(rules).noteKey)}</p>
           </>
         )}
       </div>
@@ -288,6 +305,10 @@ function SettingsSheet() {
         <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
         <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
         <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
+        <div class="row">
+          <span>{t("rules.default")}</span>
+          <Segmented label={t("rules.default")} value={s.defaultRules || "japanese"} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
+        </div>
       </section>
       <section class="settings-group">
         <h3>{t("settings.you")}</h3>
@@ -307,6 +328,19 @@ function SettingsSheet() {
           </select>
         </div>
         <p class="fine">{t("settings.rankHelp")}</p>
+      </section>
+      <ModelsGroup />
+      <section class="settings-group">
+        <h3>{t("backup.title")}</h3>
+        <p class="fine">{t("backup.help")}</p>
+        <div class="actions">
+          <Button icon="download" onClick={C.exportBackup}>
+            {t("backup.export")}
+          </Button>
+          <Button kind="ghost" icon="upload" onClick={C.importBackup}>
+            {t("backup.import")}
+          </Button>
+        </div>
       </section>
       <section class="settings-group">
         <h3>{t("settings.about")}</h3>
@@ -334,30 +368,128 @@ function SettingsSheet() {
   );
 }
 
+/** Optional downloads: the human-style opponent and the stronger network. */
+function ModelsGroup() {
+  useEffect(() => {
+    C.refreshModels?.();
+  }, []);
+  const ms = state.models;
+  const s = state.settings;
+  return (
+    <section class="settings-group">
+      <h3>{t("models.title")}</h3>
+      <p class="fine">{t("models.intro")}</p>
+      {["human", "strong"].map((kind) => (
+        <ModelRow kind={kind} one={ms?.[kind]} />
+      ))}
+      {ms?.human?.status === "ready" && (
+        <>
+          <Switch label={t("models.humanStyle")} checked={s.humanStyle !== false} onChange={(v) => C.setHumanStyle(v)} />
+          <p class="fine">{t("models.humanStyleHelp")}</p>
+        </>
+      )}
+      <p class="fine">{t("models.source")}</p>
+    </section>
+  );
+}
+
+function ModelRow({ kind, one }) {
+  const mb = Models.megabytes(Models.MODELS[kind].bytes);
+  const st = one?.status || "unavailable";
+  const busy = st === "downloading" || st === "verifying";
+  let line = "";
+  if (st === "unavailable") line = t("models.unavailable");
+  else if (st === "ready") line = t("models.ready");
+  else if (st === "verifying") line = t("models.verifying");
+  else if (st === "downloading") line = one.stalled ? t("models.stalled") : t("models.downloading", [Models.percent(one)]);
+  else if (st === "partial") line = t("models.partial", [Models.percent(one)]);
+  else if (st === "failed") line = C.modelErrorText(one);
+  let action = null;
+  if (st === "absent") action = <Button size="sm" icon="download" onClick={() => C.downloadModel(kind)}>{t("models.download", [mb])}</Button>;
+  else if (st === "partial") action = <Button size="sm" onClick={() => C.downloadModel(kind)}>{t("models.resume")}</Button>;
+  else if (st === "failed") action = <Button size="sm" onClick={() => C.downloadModel(kind)}>{t("models.retry")}</Button>;
+  else if (busy) action = <Button size="sm" kind="ghost" onClick={() => C.cancelModelDownload(kind)}>{t("models.cancel")}</Button>;
+  else if (st === "ready") action = <Button size="sm" kind="ghost" onClick={() => C.removeModel(kind)}>{t("models.remove")}</Button>;
+  return (
+    <div class="model-row">
+      <div class="model-text">
+        <strong>{t(`models.${kind}.name`)}</strong>
+        <span class="fine">{t(`models.${kind}.desc`, [mb])}</span>
+        {line && <span class={`model-status ${st}`} aria-live="polite">{line}</span>}
+        {busy && (
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Models.percent(one)}>
+            <i style={{ width: `${Models.percent(one)}%` }} />
+          </div>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
 /** "Check for updates…" with what the last check found. */
 function UpdateRow() {
   const u = state.updateCheck;
   const can = C.canCheckUpdates();
+  const st = u?.status;
   let text = "";
-  if (u?.status === "checking") text = t("update.checking");
-  else if (u?.status === "available") text = t("update.available", [u.latest]);
-  else if (u?.status === "current") text = t("update.current", [u.current]);
-  else if (u?.status === "error") text = t("update.error");
+  if (st === "checking") text = t("update.checking");
+  else if (st === "available") text = t("update.available", [u.latest]);
+  else if (st === "downloading") text = t(u.step === "verify" ? "update.verifying" : u.step === "unpack" ? "update.unpacking" : "update.downloading", [u.latest]);
+  else if (st === "ready") text = t("update.ready", [u.latest]);
+  else if (st === "installing") text = t("update.installing");
+  else if (st === "current") text = t("update.current", [u.current]);
+  else if (st === "error") text = t("update.error");
   else if (!can) text = t("update.unavailable");
+  const canInstall = st === "available" && u.install?.can;
+  let action;
+  if (st === "available")
+    action = canInstall ? (
+      <Button size="sm" icon="download" onClick={C.downloadUpdate}>
+        {t("update.install")}
+      </Button>
+    ) : (
+      <Button size="sm" icon="download" onClick={C.openReleasePage}>
+        {t("update.download")}
+      </Button>
+    );
+  else if (st === "downloading")
+    action = (
+      <Button size="sm" kind="ghost" onClick={C.cancelUpdate}>
+        {t("update.cancel")}
+      </Button>
+    );
+  else if (st === "ready")
+    action = (
+      <Button size="sm" kind="primary" onClick={C.applyUpdate}>
+        {t("update.restart")}
+      </Button>
+    );
+  else if (st !== "installing")
+    action = (
+      <Button size="sm" onClick={() => C.checkForUpdates()} disabled={!can || st === "checking"}>
+        {t("update.check")}
+      </Button>
+    );
   return (
-    <div class="row update-row">
-      <span class={u?.status === "available" ? "" : "muted"} aria-live="polite">
-        {text}
-      </span>
-      {u?.status === "available" ? (
-        <Button size="sm" icon="download" onClick={C.openReleasePage}>
-          {t("update.download")}
-        </Button>
-      ) : (
-        <Button size="sm" onClick={() => C.checkForUpdates()} disabled={!can || u?.status === "checking"}>
-          {t("update.check")}
-        </Button>
+    <div class="update-block">
+      <div class="row update-row">
+        <span class={st === "available" || st === "ready" ? "" : "muted"} aria-live="polite">
+          {text}
+        </span>
+        {action}
+      </div>
+      {st === "downloading" && (
+        <div class="update-progress">
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round((u.progress || 0) * 100)}>
+            <i style={{ width: `${Math.round((u.progress || 0) * 100)}%` }} />
+          </div>
+          {u.total > 0 && <span class="fine">{t("update.progress", [U.formatBytes(u.received || 0), U.formatBytes(u.total)])}</span>}
+        </div>
       )}
+      {st === "ready" && <p class="fine">{t("update.restartHint")}</p>}
+      {st === "available" && !canInstall && u.install?.blocked && <p class="fine">{t(U.installMessageKey(u.install.blocked))}</p>}
+      {st === "available" && u.installError && <p class="fine">{t(U.installMessageKey(u.installError))}</p>}
     </div>
   );
 }

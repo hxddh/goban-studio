@@ -5,7 +5,7 @@ play a computer opponent that is as strong as you want it to be, and review
 every game with KataGo.
 
 **Languages:** 中文 · English · 한국어 · 日本語  
-**Boards:** 9×9, 13×13, 19×19 · Japanese rules · komi and handicap up to nine stones
+**Boards:** 9×9, 13×13, 19×19 · Japanese, Chinese or Korean rules · komi and handicap up to nine stones
 
 Goban Studio is the Go application built alongside — not instead of — the
 existing Gomoku app. It deliberately uses a different bundle ID
@@ -17,7 +17,14 @@ existing Gomoku app. It deliberately uses a different bundle ID
 | Platform | File | First launch |
 | --- | --- | --- |
 | macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | See the release notes. A build made with the project's Developer ID is signed and notarized and opens normally. A build made without it is ad-hoc signed and not notarized: right-click the app → Open once; if blocked, `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
+| macOS (Intel) | `GobanStudio-macOS-x64.dmg` / `.zip` | As for Apple Silicon. A native x86_64 build (app and KataGo), built and tested on an Intel Mac runner. |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | See the release notes. A build made without the code-signing certificate is not Authenticode-signed: if SmartScreen appears, More info → Run anyway. WebView2 is normally preinstalled. |
+
+**Windows on ARM:** use the x64 package. Windows 11 on ARM runs it, KataGo
+included, under its built-in x64 emulation; there is no native ARM64 build
+because KataGo publishes no ARM64 Windows binary, and analysis is slower
+than on a comparable x64 PC. The in-app updater keeps such an installation
+on the x64 package.
 
 Each release's notes (and the README inside the download) state how *that*
 build was signed: the release workflow writes the "First launch" text from
@@ -25,8 +32,28 @@ what the signing steps actually did, not from a template. Until the
 certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
 are ad-hoc signed (macOS) and unsigned (Windows).
 
-`SHA256SUMS` is attached to every GitHub release. The v4.0.0 notes are in
-[`.github/release-notes/v4.0.0.md`](.github/release-notes/v4.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v5.0.0 notes are in
+[`.github/release-notes/v5.0.0.md`](.github/release-notes/v5.0.0.md).
+
+## v5 at a glance
+
+- **Rules** — Japanese (still the default for everyone), Chinese (area
+  scoring) or Korean, chosen per game or as your default; SGF records in
+  any of the three open and keep their ruleset.
+- **Opponents** — an optional human-style opponent (KataGo's human model,
+  downloaded only when you choose it) that plays like a person of its level,
+  and an optional stronger network for analysis and the top level.
+- **Review** — the game in three phases (points lost, mistakes, accuracy),
+  three takeaways, trends across your recent games, comments and marks on
+  any move, a variation tree, promote and delete variations; all saved in
+  the SGF.
+- **Learning** — an intermediate course (opening, joseki, shape, endgame,
+  fighting; 26 lessons) and 509 solver-proved problems.
+- **Your data** — one-click backup to a file and restore on another computer.
+- **Updates** — download, verify and install a new version from inside the
+  app (with automatic rollback); Intel Macs get their own build.
+- **Interface** — this week on Today, the course as a map, problem facts,
+  proportioned problem windows, thumbnails that follow the board.
 
 ## v4 at a glance
 
@@ -67,16 +94,19 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   that lost the most, each with the move played and KataGo's better line to
   play through on the board. Territory estimate, “guess the next move” and
   “play from here” are one click away.
-- **Practice** — a course that starts from zero (units → multi-step lessons
-  with explanation, placement exercises and live problems), problem
+- **Practice** — a course that starts from zero and goes on to intermediate
+  play (opening principles, basic joseki, shape, endgame, middle-game
+  fighting), in units of multi-step lessons with explanation, placement
+  exercises and live problems; problem
   collections by topic, and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
   refutation on the board, a right move with the most stubborn defence.
 - **Library** — the game in progress (“Continue”), your games with
   thumbnails, filters (won / lost / imported) and search, 20 classic games
   and 40 professional openings to replay as guess-the-move drills. SGF import
-  and export; double-clicking an `.sgf` opens it on macOS and Windows; a
-  record that declares a non-Japanese ruleset is rejected with an
+  and export; double-clicking an `.sgf` opens it on macOS and Windows; records
+  under Japanese, Chinese or Korean rules keep their ruleset, and one that
+  declares another ruleset (AGA, Ing, New Zealand…) is rejected with an
   explanation rather than silently re-scored.
 - **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
   Plain / Light wood / Ink board, coordinates, move numbers, sound, your
@@ -87,9 +117,54 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 - **Offline by design** — no account, no telemetry, and no network request
   unless you ask for one: **Check for updates…** makes a single request to
   GitHub for the latest release, and the weekly automatic check is off
-  until you turn it on in Settings. Nothing about you or your games is
-  sent; everything else (KataGo, lessons, your library) stays on your
-  computer.
+  until you turn it on in Settings. When a newer version is found you may
+  choose **Download and install**, which fetches that release's package for
+  your computer and its `SHA256SUMS` from GitHub — nothing else, and only
+  when you choose it. Nothing about you or your games is sent; everything
+  else (KataGo, lessons, your library) stays on your computer.
+- **Optional downloads** (v5) — two KataGo networks you may add in
+  Settings, fetched only when you choose them: KataGo's human model, which
+  makes the opponent play like a person of its level, and a larger network
+  for analysis and review. They come from KataGo's official GitHub
+  releases (pinned addresses and SHA-256 hashes), are verified before use,
+  live in the app's data folder and can be removed again.
+
+## In-app updates (v5)
+
+After **Check for updates…** finds a newer release, **Download and install**
+does the rest:
+
+1. The app downloads this computer's package (`GobanStudio-macOS-arm64.zip`,
+   `GobanStudio-macOS-x64.zip` or `GobanStudio-Windows-x64.zip`) and the
+   release's `SHA256SUMS`, only from
+   `https://github.com/hxddh/goban-studio/releases/download/<tag>/`. The
+   address is built by the native code from the release tag; redirects are
+   followed only to GitHub's own download hosts, over HTTPS.
+2. The package must match its line in `SHA256SUMS`. It is unpacked into a
+   per-user temp folder and checked: the expected layout and bundle id, an
+   executable for this CPU, and on macOS `codesign --verify --deep --strict`.
+   The checksum catches a damaged, truncated or wrong download; it is not a
+   signature (the builds are ad-hoc signed / unsigned, and `SHA256SUMS`
+   comes from the same release), so the trust is in GitHub and HTTPS, as
+   for a manual download.
+3. **Restart to update** quits the app and hands over to a small helper the
+   app carries inside itself (`src/updater/`; nothing downloaded is run
+   except the verified new app). It waits for the app to exit, puts the new
+   version in place of the old one under the same name — keeping the old one
+   as a backup — and starts it. If the new version does not report that it
+   started within 90 seconds, the helper puts the old version back and
+   starts it, and the app says so.
+
+Your games, progress and settings are kept: on macOS they live outside the
+app; on Windows the helper moves the WebView2 profile
+(`bin\goban-studio.exe.WebView2`) into the new folder. Files the app
+downloads itself carry no quarantine flag, so macOS does not ask again.
+
+When the app cannot replace itself — it is in a folder you cannot write to
+(for example `/Applications` without administrator rights, or
+`C:\Program Files`), macOS is running it from a temporary "translocated"
+copy, or it is a development build — the app says why and offers **Open
+download page** instead.
 
 ## Honest content
 
@@ -113,19 +188,23 @@ The course and the problems are verified, not counted:
   problems and removed 37 that could not be fixed cleanly.
 - The solver treats a ko or an unsettled position as a failure for the
   attacker, so a problem is only listed when its answer is unconditional
-  (the 10 ko problems say so and are proved to be kos). Seki counts as life,
+  (the 19 ko problems say so and are proved to be kos). Seki counts as life,
   as under Japanese rules: a kill that only reaches seki fails.
 - Seki is recognised soundly: the defender survives even if the attacker
   moves first, cannot reach independent life even moving first (both with
   every ko counted against it), and lives alongside stones inside the fight
-  rather than through a point outside the problem. The 13 seki problems
+  rather than through a point outside the problem. The 23 seki problems
   (goal `seki`) are proved to have seki as their best result and to end in
   one. Bent four in the corner is never accepted as life.
-- 262 problems: 28 capturing races (eye against no eye, big eye against
-  small eye, outside liberties), 13 seki problems and 20 classic textbook
-  shapes (straight and bent three, pyramid four, bulky and crossed five,
-  rabbity six, rectangular six, seven stones on the second line), each in
-  four languages and graded by measurement.
+- 509 problems: 57 capturing races (16 big eye against small eye, eye
+  against no eye, outside liberties), 23 seki problems (from grade 1 up),
+  19 ko problems, 19 false-eye and 23 eye-space problems, 28 classic
+  textbook shapes (straight and bent three, pyramid four, bulky and crossed
+  five, rabbity six, rectangular six, seven stones on the second line) and
+  six kills at the 2-1 point of the corner, each in four languages and
+  graded by measurement into five grades of about 100 problems each. The
+  247 problems added in v5 came from shape generators and were proved,
+  filtered and reviewed the same way (`docs/problems-audit.md`, "v5").
 
 v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
 with cyclic difficulty labels. v2 removed them.
@@ -148,6 +227,16 @@ Method, raw results and limitations: [docs/strength.md](docs/strength.md).
 In the browser preview there is no KataGo: 9×9 falls back to Moka v2.1 and
 other sizes to a small heuristic engine, and the interface says so
 wherever it matters.
+
+v5 adds two optional networks (`src/models.zig`, `studio.modelDownload`):
+KataGo's human SL model `b18c384nbt-humanv0` (99 MB) and the larger
+standard network `g170e-b15c192` (48 MB), each pinned by URL, size and
+SHA-256, downloaded into `<app data>/models` with resume, verified and
+renamed into place. With the human model the opponent plays human-style
+(a second KataGo process, `-human-model`, started only for those games,
+`engine/model/human.cfg`); with the larger network, analysis, review,
+hints, scoring and the top level use it (a third process). The shipped
+b6c96 process stays the ladder's engine and every fallback.
 
 ## Run the web app
 
@@ -173,7 +262,7 @@ npm run ui-update      # rewrite tests/visual baselines after an intended change
 node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv for native-speaker review
 ```
 
-The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
+The suite covers Japanese, Chinese and Korean scoring (territory and area, seki, handicap compensation), ko and suicide, SGF round trips
 and rules rejection, every UI string in four languages (and that every key
 the interface uses exists), the solver on classic shapes and ladders,
 Benson's unconditional life, every practice problem and course lesson, the
@@ -217,7 +306,7 @@ native gates, and only then creates the tag and GitHub Release. Release
 notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v4.0.0
+gh workflow run release.yml -f tag=v5.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
@@ -233,6 +322,27 @@ also run a native screenshot tour of the packaged app
 (`scripts/tour-app.mjs`: Today, a 19×19 game, its review, Practice,
 Settings) and upload the captures as `native-screenshots-macos` /
 `native-screenshots-windows`.
+
+v5 adds an Intel Mac package: `build-macos.yml` takes `arch: x64` with the
+`macos-15-intel` runner, builds KataGo and the app natively for x86_64,
+and runs the same packaged self-test, updater tests and screenshot tour
+there (`native-screenshots-macos-x64`). The release publishes
+`GobanStudio-macOS-x64.dmg` / `.zip` beside the Apple Silicon package and
+lists all five files in `SHA256SUMS`.
+
+The updater is tested in three layers: Zig unit tests in
+`src/install.zig` (the download address and redirect allow-list,
+`SHA256SUMS` parsing and comparison, zip entry checks and extraction, CPU
+checks, and on macOS `ditto` + `codesign` + no quarantine flag on a real
+signed bundle) run in `native test` on every platform;
+`scripts/test-updater.mjs` runs the embedded helpers against temp installs
+of the packaged app on the real OS — a successful swap that starts the real
+new app (on Windows with a file held locked and the WebView2 profile
+carried over), a rollback when the new version does not start, nothing
+changed when the app does not quit, and the read-only fallback; and a
+non-blocking step downloads the newest published release for that platform
+from GitHub, verifies and unpacks it, and discards it. The download address
+is not configurable, so no test can point the app elsewhere.
 
 ## Architecture
 
@@ -255,7 +365,14 @@ src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
 src/web/js/update.js          update check: version compare, opt-in weekly schedule
-src/update.zig                the one network request: GitHub's latest-release API
+src/update.zig                the update check: GitHub's latest-release API
+src/install.zig               v5 update install: download, SHA256SUMS, unpack, checks, helper start
+src/updater/apply-macos.sh    v5 swap / relaunch / rollback helper (embedded in the app)
+src/updater/apply-windows.ps1 v5 swap / relaunch / rollback helper (embedded in the app)
+scripts/test-updater.mjs      v5 updater end-to-end tests on the packaged app
+src/models.zig                optional downloads: pinned URLs, resume, SHA-256, atomic rename
+src/web/js/models.js          optional downloads: status logic and host calls
+src/web/js/app/models-ctl.js  optional downloads for the interface (state.models)
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)

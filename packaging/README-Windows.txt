@@ -14,6 +14,24 @@ unless you choose Check for updates, or turn on the weekly update check in
 Settings (off by default); either asks GitHub for the latest version and
 sends nothing about you or your games.
 
+Updating
+--------
+When a newer version is found you can choose Download and install. The app
+downloads the new package and the release's checksums from GitHub, checks
+them, and on Restart to update replaces this folder and restarts; the
+previous version is kept until the new one has started, and put back if it
+does not start. Keep the folder somewhere you can write to (for example
+under your user folder, not C:\Program Files); otherwise the app offers
+the download page.
+
+Your games, progress and settings are stored in
+bin\goban-studio.exe.WebView2 inside this folder. The in-app update keeps
+them. If you update by hand, copy that folder into the new bin\ folder.
+
+Windows on ARM: this x64 build runs under Windows 11's x64 emulation,
+KataGo included. There is no native ARM64 build (KataGo publishes no ARM64
+Windows binary).
+
 SGF files
 ---------
 To open .sgf files by double-click, run this once from the app folder:

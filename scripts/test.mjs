@@ -10,13 +10,29 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap } from "../src/web/js/rules.js";
+import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap, treeLayout, RULESETS, DEFAULT_RULES, defaultKomi, handicapCompensation, normalizeRules, findSeki, rulesFromSgf } from "../src/web/js/rules.js";
 import { loadSGF } from "../src/web/js/sgf.js";
 import { execFileSync } from "node:child_process";
 import { chooseMove } from "../src/web/js/ai.js";
-import { STRENGTHS, beginnerMove, moveFromAnalysis, pickCandidate, rankParts, strengthById, suggestHandicap } from "../src/web/js/engine.js";
-import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
-import { parseInfo, parseVertex } from "../src/web/js/katago.js";
+import {
+  HUMAN_VISITS,
+  STRENGTHS,
+  STRONG_VISIT_SCALE,
+  analysisEngine,
+  beginnerMove,
+  humanMoveFromAnalysis,
+  humanRequest,
+  moveFromAnalysis,
+  opponentMode,
+  pickCandidate,
+  rankParts,
+  scaledVisits,
+  strengthById,
+  suggestHandicap,
+} from "../src/web/js/engine.js";
+import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, humanStyleParams, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
+import { enginePayload, parseInfo, parseVertex, positionPayload, katagoRules } from "../src/web/js/katago.js";
+import * as M from "../src/web/js/models.js";
 import * as S from "../src/web/js/solver.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
@@ -27,6 +43,9 @@ import { LANG_IDS, setLang, t } from "../src/web/js/i18n.js";
 import {
   DEFAULT_SETTINGS,
   KEYS,
+  MAX_GAME_RECORDS,
+  addGameRecord,
+  updateGameRecord,
   V1_KEYS,
   dailySet,
   loadProgress,
@@ -168,7 +187,10 @@ await test("Japanese territory scoring counts territory, prisoners and komi", ()
   assert.equal(js.black, 1);
   assert.equal(js.white, 6.5);
   assert.equal(js.result, "W+5.5");
-  assert.equal(js.blackStones, undefined);
+  assert.equal(js.method, "territory");
+  assert.equal(js.rules, "japanese");
+  assert.equal(js.blackStones, null);
+  assert.equal(js.blackPrisoners, 0);
 });
 
 await test("dead stones are removed before scoring", () => {
@@ -275,11 +297,299 @@ await test("SGF columns skip I on import and export", () => {
   assert.match(sgf, /;W\[qd\]/);
 });
 
-await test("a Chinese-rules SGF is rejected instead of silently scored as Japanese", () => {
-  assert.throws(
-    () => loadSGF("(;GM[1]FF[4]SZ[9]KM[7.5]RU[Chinese];B[ee])"),
-    (error) => error.code === "unsupported-rules" && error.rules === "Chinese",
-  );
+/* ------------------------------------------------------------ v5 rules */
+
+/** A 9×9 board from rows of "X" (black), "O" (white) and "." (empty). */
+function fromRows(rows, options = {}) {
+  const game = new Game({ size: 9, ...options });
+  const stones = [];
+  rows.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c === "X") stones.push({ x, y, color: BLACK });
+    else if (c === "O") stones.push({ x, y, color: WHITE });
+  }));
+  game.setup(stones, BLACK);
+  return game;
+}
+
+// Black wall on column E, White wall on column F: 36 / 27 points of
+// territory, 9 stones each, no dame. A white stone sits dead at B8.
+const WALLS = [
+  "....XO...",
+  ".O..XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+];
+
+// Eye-versus-eye seki in the top-left corner: Black A9 B9 A8 (eye at the
+// corner), White's group around it (eye at A6), one shared liberty at C9.
+// Black's outer wall reaches column F, White's wall is column G.
+const SEKI_BOARD = [
+  ".X.OX.O..",
+  "XXOOX.O..",
+  "OOOXX.O..",
+  ".OXX..O..",
+  "OOX...O..",
+  "XXX...O..",
+  "......O..",
+  "......O..",
+  "......O..",
+];
+// Fill column F with black stones so the board is closed.
+const SEKI_BOARD_CLOSED = SEKI_BOARD.map((row) => row.slice(0, 5) + "X" + row.slice(6));
+
+await test("v5 rules: rulesets, defaults and handicap compensation", () => {
+  assert.deepEqual(RULESETS.map((r) => r.id), ["japanese", "chinese", "korean"]);
+  assert.deepEqual(RULESETS.map((r) => r.method), ["territory", "area", "territory"]);
+  assert.deepEqual(RULESETS.map((r) => r.katago), ["japanese", "chinese", "korean"]);
+  for (const r of RULESETS) {
+    assert.ok(MESSAGES[r.labelKey], r.labelKey);
+    assert.ok(MESSAGES[r.noteKey], r.noteKey);
+  }
+  assert.equal(DEFAULT_RULES, "japanese");
+  assert.equal(defaultKomi("japanese"), 6.5);
+  assert.equal(defaultKomi("chinese"), 7.5);
+  assert.equal(defaultKomi("korean"), 6.5);
+  for (const r of ["japanese", "chinese", "korean"]) assert.equal(defaultKomi(r, 4), 0.5);
+  assert.equal(handicapCompensation("chinese", 4), 4);
+  assert.equal(handicapCompensation("chinese", 1), 0);
+  assert.equal(handicapCompensation("japanese", 4), 0);
+  assert.equal(handicapCompensation("korean", 9), 0);
+  assert.equal(normalizeRules("Chinese"), "chinese");
+  assert.equal(normalizeRules("aga"), "japanese");
+  assert.equal(normalizeRules(undefined), "japanese");
+  // A Game without rules is Japanese with komi 6.5, as before v5.
+  const g = new Game({ size: 9 });
+  assert.equal(g.rules, "japanese");
+  assert.equal(g.komi, 6.5);
+  const c = new Game({ size: 19, rules: "chinese" });
+  assert.equal(c.komi, 7.5);
+  const ch = new Game({ size: 19, rules: "chinese", handicap: 4 });
+  assert.equal(ch.komi, 0.5);
+  assert.equal(ch.handicapCompensation, 4);
+  assert.equal(new Game({ rules: "nonsense" }).rules, "japanese");
+});
+
+await test("v5 rules: area and territory scores of the same position", () => {
+  const dead = [{ x: 1, y: 1 }];
+  const jp = fromRows(WALLS).score(dead);
+  assert.equal(jp.method, "territory");
+  assert.equal(jp.blackTerritory, 36);
+  assert.equal(jp.whiteTerritory, 27);
+  assert.equal(jp.blackPrisoners, 1);
+  assert.equal(jp.whitePrisoners, 0);
+  assert.equal(jp.black, 37);
+  assert.equal(jp.white, 33.5);
+  assert.equal(jp.result, "B+3.5");
+  assert.equal(jp.neutral, 0);
+
+  const cn = fromRows(WALLS, { rules: "chinese" }).score(dead);
+  assert.equal(cn.method, "area");
+  assert.equal(cn.komi, 7.5);
+  assert.equal(cn.blackStones, 9);
+  assert.equal(cn.whiteStones, 9);
+  assert.equal(cn.blackTerritory, 36);
+  assert.equal(cn.whiteTerritory, 27);
+  assert.equal(cn.blackPrisoners, null);
+  assert.equal(cn.handicapCompensation, 0);
+  assert.equal(cn.black, 45);
+  assert.equal(cn.white, 43.5);
+  assert.equal(cn.result, "B+1.5");
+  assert.equal(cn.dead.length, 1);
+
+  const kr = fromRows(WALLS, { rules: "korean" }).score(dead);
+  assert.equal(kr.method, "territory");
+  assert.equal(kr.result, jp.result);
+
+  // Captures made during play count under territory scoring only.
+  const cap = new Game({ size: 9, rules: "chinese" });
+  const capJ = new Game({ size: 9 });
+  for (const g of [cap, capJ]) {
+    g.setup([{ x: 0, y: 1, color: BLACK }, { x: 0, y: 0, color: WHITE }], BLACK);
+    g.play(1, 0); // captures A9
+    assert.equal(g.score().captures.black, 1);
+  }
+  assert.equal(capJ.score().blackPrisoners, 1);
+  assert.equal(cap.score().blackPrisoners, null);
+  assert.equal(cap.score().black, cap.score().blackStones + cap.score().blackTerritory);
+});
+
+await test("v5 rules: Chinese handicap games give White N points for N stones", () => {
+  const cn = fromRows(WALLS, { rules: "chinese", handicap: 4 });
+  assert.equal(cn.komi, 0.5);
+  const s = cn.score([{ x: 1, y: 1 }]);
+  assert.equal(s.handicap, 4);
+  assert.equal(s.handicapCompensation, 4);
+  assert.equal(s.black, 45);
+  assert.equal(s.white, 9 + 27 + 0.5 + 4);
+  assert.equal(s.result, "B+4.5");
+  // The same game under Japanese rules: komi 0.5, no compensation.
+  const jp = fromRows(WALLS, { handicap: 4 }).score([{ x: 1, y: 1 }]);
+  assert.equal(jp.handicapCompensation, 0);
+  assert.equal(jp.white, 27.5);
+  assert.equal(jp.result, "B+9.5");
+});
+
+await test("v5 rules: seki has no territory under Japanese and Korean rules, and counts under Chinese", () => {
+  const board = fromRows(SEKI_BOARD_CLOSED).board;
+  const seki = findSeki(board);
+  assert.deepEqual(seki.points, [{ x: 2, y: 0 }]);
+  // Black's corner group (3 stones) and White's inner group (9 stones).
+  assert.equal(seki.stones.filter((s) => s.color === BLACK).length, 3);
+  assert.equal(seki.stones.filter((s) => s.color === WHITE).length, 9);
+
+  for (const rules of ["japanese", "korean"]) {
+    const s = fromRows(SEKI_BOARD_CLOSED, { rules }).score();
+    assert.equal(s.method, "territory");
+    // A9 (Black's eye) and A6 (White's eye) are not territory.
+    assert.equal(s.territory[0][0], EMPTY);
+    assert.equal(s.territory[3][0], EMPTY);
+    assert.equal(s.blackTerritory, 20);
+    assert.equal(s.whiteTerritory, 18);
+    assert.equal(s.neutral, 3);
+    assert.equal(s.result, "W+4.5");
+    assert.equal(s.seki.length, 12);
+  }
+  const c = fromRows(SEKI_BOARD_CLOSED, { rules: "chinese" }).score();
+  assert.equal(c.method, "area");
+  // The seki eyes count for their owners; the shared liberty for nobody.
+  assert.equal(c.territory[0][0], BLACK);
+  assert.equal(c.territory[3][0], WHITE);
+  assert.equal(c.blackTerritory, 21);
+  assert.equal(c.whiteTerritory, 19);
+  assert.equal(c.blackStones, 22);
+  assert.equal(c.whiteStones, 18);
+  assert.equal(c.neutral, 1);
+  assert.equal(c.black, 43);
+  assert.equal(c.white, 44.5);
+  assert.equal(c.result, "W+1.5");
+});
+
+await test("v5 rules: unfilled dame between living groups is not seki", () => {
+  const open = fromRows(WALLS.map((row) => row.slice(0, 3) + "X." + row.slice(5)));
+  const seki = findSeki(open.board);
+  assert.deepEqual(seki.points, []);
+  const s = open.score([{ x: 1, y: 1 }]);
+  assert.equal(s.neutral, 9);
+  assert.equal(s.blackTerritory, 27);
+  assert.equal(s.whiteTerritory, 27);
+  // A group in atari next to the dame is a capture, not seki.
+  const atari = setup([
+    { x: 0, y: 0, color: WHITE },
+    { x: 1, y: 0, color: BLACK },
+    { x: 1, y: 1, color: BLACK },
+  ]);
+  assert.deepEqual(findSeki(atari.board).points, []);
+});
+
+await test("v5 rules: SGF round trip keeps RU, komi and handicap for each ruleset", () => {
+  for (const [rules, ru, komi] of [["japanese", "Japanese", 6.5], ["chinese", "Chinese", 7.5], ["korean", "Korean", 6.5]]) {
+    const g = new Game({ size: 9, rules });
+    g.play(4, 4);
+    const sgf = g.toSGF();
+    assert.match(sgf, new RegExp(`RU\\[${ru}\\]`));
+    assert.match(sgf, new RegExp(`KM\\[${komi}\\]`));
+    const back = loadSGF(sgf).game;
+    assert.equal(back.rules, rules);
+    assert.equal(back.komi, komi);
+    assert.equal(back.toSGF(), sgf);
+  }
+  const h = new Game({ size: 19, rules: "chinese", handicap: 4 });
+  h.play(16, 16);
+  const back = loadSGF(h.toSGF()).game;
+  assert.equal(back.handicap, 4);
+  assert.equal(back.komi, 0.5);
+  assert.equal(back.handicapCompensation, 4);
+  // Setup with White stones is a position, not a handicap.
+  const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
+  assert.equal(pos.handicap, 0);
+  assert.equal(pos.handicapCompensation, 0);
+  // No RU (records before v5) is Japanese; a missing KM takes the ruleset's komi.
+  const old = loadSGF("(;GM[1]FF[4]SZ[9];B[ee])").game;
+  assert.equal(old.rules, "japanese");
+  assert.equal(old.komi, 6.5);
+  assert.equal(loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese];B[ee])").game.komi, 7.5);
+});
+
+await test("v5 rules: SGF import accepts Japanese, Chinese and Korean spellings and rejects the rest", () => {
+  const ru = (v) => loadSGF(`(;GM[1]FF[4]SZ[9]KM[7]RU[${v}];B[ee])`).game.rules;
+  for (const v of ["Japanese", "japanese", "JP", "jp", "uchikomi", "日本", "日本ルール", "日本规则"]) assert.equal(ru(v), "japanese", v);
+  for (const v of ["Chinese", "chinese", "CN", "cn", "China", "中国", "中国规则"]) assert.equal(ru(v), "chinese", v);
+  for (const v of ["Korean", "korean", "KR", "kr", "한국", "韩国规则"]) assert.equal(ru(v), "korean", v);
+  assert.equal(rulesFromSgf(""), "japanese");
+  for (const v of ["AGA", "BGA", "NZ", "Ing", "GOE", "Tromp-Taylor", "French", "Chinese/Japanese", "AGA (Japanese)"]) {
+    assert.equal(rulesFromSgf(v), null, v);
+    assert.throws(
+      () => loadSGF(`(;GM[1]FF[4]SZ[9]KM[7.5]RU[${v}];B[ee])`),
+      (error) => error.code === "unsupported-rules" && error.rules === v,
+      v,
+    );
+  }
+  assert.ok(MESSAGES["rules.unsupported"].en.includes("{0}"));
+});
+
+await test("v5 rules: KataGo is told the game's rules on both bridge paths", async () => {
+  // Async (structured) payload.
+  const cn = new Game({ size: 9, rules: "chinese", handicap: 2 });
+  cn.play(4, 4);
+  const payload = positionPayload(cn);
+  assert.equal(payload.rules, "chinese");
+  // Komi is the game's own; KataGo adds the handicap compensation itself.
+  assert.equal(payload.komi, 0.5);
+  assert.equal(payload.setup, "B G7 B C3");
+  assert.equal(positionPayload(new Game({ size: 9, rules: "korean" })).rules, "korean");
+  assert.equal(positionPayload(new Game({ size: 9 })).rules, "japanese");
+  assert.equal(katagoRules({}), "japanese");
+  // White setup stones go first, so a set-up position is not read as a handicap.
+  const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
+  assert.equal(positionPayload(pos).setup, "W C7 B A9 B B8");
+
+  // Sync (GTP script) path.
+  const scripts = [];
+  globalThis.zero = {
+    invoke: async (command, payload) => {
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test" };
+      if (command === "studio.katagoAnalyze") {
+        scripts.push(Buffer.from(payload.b64, "base64").toString("utf8"));
+        return { ok: true, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3" };
+      }
+      throw new Error("unexpected command " + command);
+    },
+  };
+  try {
+    const K = await import("../src/web/js/katago.js?bridge-rules");
+    for (const rules of ["japanese", "chinese", "korean"]) {
+      await K.analyze(new Game({ size: 9, rules }), { visits: 8 });
+      const script = scripts.at(-1);
+      assert.match(script, new RegExp(`^kata-set-rules ${rules}$`, "m"));
+      assert.equal(script.match(/kata-set-rules/g).length, 1);
+      assert.match(script, new RegExp(`^komi ${defaultKomi(rules)}$`, "m"));
+    }
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
+await test("v5 rules: the defaultRules setting and library records", () => {
+  assert.equal(DEFAULT_SETTINGS.defaultRules, "japanese");
+  removeKey(KEYS.settings);
+  assert.equal(loadSettings().defaultRules, "japanese");
+  writeJSON(KEYS.settings, { defaultRules: "chinese" });
+  assert.equal(loadSettings().defaultRules, "chinese");
+  writeJSON(KEYS.settings, { defaultRules: "aga" });
+  assert.equal(loadSettings().defaultRules, "japanese");
+  removeKey(KEYS.settings);
+  const g = new Game({ size: 9, rules: "korean" });
+  g.play(4, 4);
+  assert.equal(Lib.describeGame(g).rules, "korean");
+  assert.equal(Lib.recordRules({}), "japanese");
+  assert.equal(Lib.recordRules({ rules: "chinese" }), "chinese");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(messages.match(/\/\/ v5 rules\r?\n/g)?.length, 1);
 });
 
 await test("an empty SGF is rejected, not silently accepted", () => {
@@ -319,6 +629,7 @@ await test("every key the interface uses is in the string table", () => {
     "library.kind.": ["all", "won", "lost", "imported"],
     "settings.material.": ["plain", "wood", "ink"],
     "newGame.": ["quick", "medium", "full"],
+    "tip.opening.": ["1", "2", "3"],
   };
   for (const [prefix, list] of Object.entries(dynamic)) for (const v of list) used.add(prefix + v);
   for (const topic of new Set(PROBLEMS.map((p) => p.topic))) {
@@ -690,7 +1001,7 @@ await test("every practice problem is verified and graded by the solver", () => 
 
 await test("every course lesson is complete, four-language and solver-verified", () => {
   execFileSync(process.execPath, [path.join(root, "scripts/check-course.mjs")], { stdio: "inherit" });
-  assert.ok(COURSE.length >= 8);
+  assert.ok(COURSE.length >= 13);
 });
 
 await test("the offline opponent returns a legal move on 9x9 and 19x19", async () => {
@@ -1015,7 +1326,7 @@ await test("the library holds finished and saved games; the current game is sepa
 await test("today's five puts due reviews first and the review ladder spaces repeats", () => {
   writeJSON(KEYS.progress, {});
   const progress = loadProgress();
-  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
+  const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8").replace(/\r\n/g, "\n"));
   const picks = dailySet(progress, PROBLEMS, grades, 5);
   assert.equal(picks.length, 5);
   assert.equal(new Set(picks.map((p) => p.id)).size, 5);
@@ -1039,13 +1350,13 @@ await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
     assert.ok(fs.existsSync(path.join(root, "src/web/moka", file)), `moka/${file}`);
   }
-  const model = JSON.parse(fs.readFileSync(path.join(root, "src/web/moka/go-model.json"), "utf8"));
+  const model = JSON.parse(fs.readFileSync(path.join(root, "src/web/moka/go-model.json"), "utf8").replace(/\r\n/g, "\n"));
   assert.equal(model.architecture.boardSize, 9);
   assert.equal(fs.statSync(path.join(root, "src/web/moka/go-model.bin")).size, model.weightsBytes);
 });
 
 await test("design tokens meet the contrast rules in docs/design.md (light and dark)", () => {
-  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8");
+  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8").replace(/\r\n/g, "\n");
   const block = (sel) => css.slice(css.indexOf(sel + " {"), css.indexOf("}", css.indexOf(sel + " {")));
   const tokens = (b) => Object.fromEntries([...b.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
   const lum = (hex) => {
@@ -1071,9 +1382,72 @@ await test("design tokens meet the contrast rules in docs/design.md (light and d
 });
 
 await test("the native-speaker review sheet matches messages.js", () => {
-  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8").replace(/^\ufeff/, "");
+  const csv = fs.readFileSync(path.join(root, "docs/l10n/strings.csv"), "utf8").replace(/\r\n/g, "\n").replace(/^\ufeff/, "");
   const keys = csv.split("\n").slice(1).filter(Boolean).map((l) => JSON.parse(l.slice(0, l.indexOf('",') + 1)));
   assert.deepEqual(keys, Object.keys(MESSAGES), "run: node scripts/export-strings.mjs");
+});
+
+await test("v5: a backup carries every stored key and restores it", async () => {
+  const P = await import("../src/web/js/persist.js");
+  for (const k of Object.values(P.KEYS)) P.removeKey(k);
+  P.writeJSON(P.KEYS.settings, { lang: "ko", boardSize: 13 });
+  P.writeJSON(P.KEYS.progress, { lessons: { a: { done: true } }, problems: { p1: { solved: true }, p2: {} } });
+  P.writeJSON(P.KEYS.library, { v: 2, games: [{ id: "g1" }, { id: "g2" }] });
+  const doc = JSON.parse(JSON.stringify(P.exportBackup("5.0.0", new Date("2026-11-04T00:00:00Z"))));
+  assert.equal(doc.app, "goban-studio");
+  assert.deepEqual(P.checkBackup(doc).summary, { games: 2, lessons: 1, problems: 1, exportedAt: "2026-11-04T00:00:00.000Z", version: "5.0.0" });
+  for (const k of Object.values(P.KEYS)) P.removeKey(k);
+  assert.equal(P.restoreBackup(doc).ok, true);
+  assert.equal(P.readJSON(P.KEYS.settings, {}).boardSize, 13);
+  assert.equal(P.readJSON(P.KEYS.library, {}).games.length, 2);
+  assert.equal(P.readJSON(P.KEYS.current, null), null);
+  assert.equal(P.checkBackup({ app: "other" }).error, "notBackup");
+  assert.equal(P.checkBackup({ ...doc, format: 99 }).error, "newerFormat");
+  assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
+});
+
+await test("v5: a restore that cannot write leaves the old data in place", async () => {
+  const P = await import("../src/web/js/persist.js");
+  const doc = { app: "goban-studio", format: 1, version: "5.0.0", exportedAt: "2026-11-04T00:00:00.000Z", data: { settings: { lang: "ja" }, library: { v: 2, games: [{ id: "new" }] } } };
+  const map = new Map();
+  const full = {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => {
+      if (k === P.KEYS.library && v.includes('"new"')) throw new Error("QuotaExceededError");
+      map.set(k, String(v));
+    },
+    removeItem: (k) => map.delete(k),
+  };
+  const had = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { value: full, configurable: true, writable: true });
+  try {
+    P.writeJSON(P.KEYS.settings, { lang: "en" });
+    P.writeJSON(P.KEYS.library, { v: 2, games: [{ id: "old" }] });
+    P.writeJSON(P.KEYS.progress, { lessons: { a: { done: true } } });
+    if (!P.checkBackup(doc).ok) throw new Error("fixture: " + P.checkBackup(doc).error);
+    assert.deepEqual(P.restoreBackup(doc), { ok: false, error: "storage" });
+    assert.equal(P.readJSON(P.KEYS.settings, {}).lang, "en");
+    assert.equal(P.readJSON(P.KEYS.library, {}).games[0].id, "old");
+    assert.equal(P.readJSON(P.KEYS.progress, {}).lessons.a.done, true);
+  } finally {
+    if (had) Object.defineProperty(globalThis, "localStorage", had);
+    else delete globalThis.localStorage;
+  }
+});
+
+await test("v5: removing a network retries while the engine is busy, without blocking", async () => {
+  let calls = 0;
+  const invoke = async (cmd) => {
+    calls++;
+    return calls < 3 ? { ok: false, error: "Busy", models: {} } : { ok: true, models: {} };
+  };
+  const r = await M.remove("human", { invoke, hasHost: true, sleep: async () => {} });
+  assert.equal(r.ok, true);
+  assert.equal(calls, 3);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
+  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
 });
 
 await test("static page inputs and build script are present", () => {
@@ -1081,7 +1455,7 @@ await test("static page inputs and build script are present", () => {
     assert.ok(fs.existsSync(path.join(root, "src/web", file)), `src/web/${file}`);
   }
   assert.ok(fs.existsSync(path.join(root, "scripts/bundle.mjs")));
-  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8").replace(/\r\n/g, "\n");
   assert.match(html, /js\/bundle\.js/);
   // WebView2 injects window.zero as an inline script; without unsafe-inline
   // its CSP drops the bridge and the packaged page silently becomes static.
@@ -1178,8 +1552,8 @@ await test("v4: checkNow / autoCheckIfDue ask only when allowed and remember suc
 });
 
 await test("v4: the native update commands are fixed to this repository", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
-  const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /"studio\.checkUpdate"/);
   assert.match(main, /"studio\.openReleasePage"/);
   assert.match(zig, /releases_api_url = "https:\/\/api\.github\.com\/repos\/hxddh\/goban-studio\/releases\/latest"/);
@@ -1189,17 +1563,17 @@ await test("v4: the native update commands are fixed to this repository", () => 
   assert.match(open, /_ = invocation;/);
   assert.doesNotMatch(open, /payload/);
   // The page itself still cannot reach the network.
-  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8").replace(/\r\n/g, "\n");
   assert.match(html, /connect-src 'self'/);
-  const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
+  const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8").replace(/\r\n/g, "\n");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
   assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
 await test("v4: release notes and package READMEs say how the build was really signed", () => {
-  const v3 = fs.readFileSync(path.join(root, ".github/release-notes/v3.0.0.md"), "utf8");
+  const v3 = fs.readFileSync(path.join(root, ".github/release-notes/v3.0.0.md"), "utf8").replace(/\r\n/g, "\n");
   const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
   const unsigned = Sign.normalizeStatus("windows", {});
   const notarized = Sign.normalizeStatus("macos", { mode: "developer-id", notarized: true });
@@ -1264,20 +1638,663 @@ await test("v4: screenshot checks catch blank and repeated screens", () => {
 });
 
 await test("v4: the screenshot tour visits five screens and starts only with GOBAN_TOUR_OUT", () => {
-  const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8");
+  const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8").replace(/\r\n/g, "\n");
   const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
   const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
   assert.deepEqual(names, ["today", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
-  const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
+  const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /c\?\.tour && import\("\.\.\/tour\.js"\)/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_TOUR_OUT/);
   for (const wf of ["build-macos.yml", "build-windows.yml"]) {
-    const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8");
+    const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8").replace(/\r\n/g, "\n");
     assert.match(y, /scripts\/tour-app\.mjs/, wf);
     assert.match(y, wf.includes("macos") ? /native-screenshots-macos/ : /native-screenshots-windows/, wf);
   }
+});
+
+/* ------------------------------------------------------------------ v5 */
+
+await test("v5: SGF comments and markup survive a round trip on every node", () => {
+  const g = newGame(9);
+  g.setRootComment("Game notes\nline two ] with a bracket \\ and a backslash");
+  g.toggleMark(g.root, 4, 4, "triangle");
+  g.play(2, 2);
+  const a = g.current;
+  g.setComment(a, "A [solid] start");
+  g.toggleMark(a, 3, 3, "square");
+  g.toggleMark(a, 5, 5, "circle");
+  g.toggleMark(a, 6, 6, "cross");
+  g.toggleMark(a, 7, 7, "label");
+  g.toggleMark(a, 8, 8, "label");
+  g.toggleMark(a, 0, 8, "label", "x:y]");
+  g.play(6, 6);
+  const sgf = g.toSGF();
+  assert.match(sgf, /TR\[ee\]/);
+  assert.ok(sgf.includes(";B[cc]C[A [solid\\] start]SQ[dd]CR[ff]MA[gg]LB[hh:A][ji:B][ai:x:y\\]]"), sgf);
+  const back = loadSGF(sgf).game;
+  assert.equal(back.root.comment, g.root.comment);
+  assert.deepEqual(back.root.marks, [{ x: 4, y: 4, type: "triangle" }]);
+  const b = back.mainLine()[1];
+  assert.equal(b.comment, "A [solid] start");
+  const byType = Object.fromEntries(b.marks.filter((m) => m.type !== "label").map((m) => [m.type, [m.x, m.y]]));
+  assert.deepEqual(byType, { square: [3, 3], circle: [5, 5], cross: [6, 6] });
+  assert.deepEqual(b.marks.filter((m) => m.type === "label").map((m) => [m.x, m.y, m.text]), [[7, 7, "A"], [8, 8, "B"], [0, 8, "x:y]"]]);
+  assert.equal(back.toSGF(), sgf, "a second round trip is byte-identical");
+});
+
+await test("v5: unknown SGF properties are kept on the root and on moves", () => {
+  const text =
+    "(;GM[1]FF[4]SZ[9]KM[6.5]RU[Japanese]GN[Club final]PC[Seoul]BR[3k]WR[2k]EV[Spring cup]XY[a\\]b][c]C[root]" +
+    ";B[ee]BL[295.5]OB[0]N[Tengen];W[cc]MN[2]TB[aa:bb]" +
+    "(;B[gg]C[main])(;B[gc]LB[gg:1]C[side]XX[keep me]))";
+  const { game, warnings } = loadSGF(text);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(game.root.extra, { GN: ["Club final"], PC: ["Seoul"], BR: ["3k"], WR: ["2k"], XY: ["a]b", "c"] });
+  assert.equal(game.event, "Spring cup");
+  const [, b1, w2] = game.mainLine();
+  assert.deepEqual(b1.extra, { BL: ["295.5"], OB: ["0"], N: ["Tengen"] });
+  assert.deepEqual(w2.extra, { MN: ["2"], TB: ["aa:bb"] });
+  const side = w2.children[1];
+  assert.deepEqual(side.extra, { XX: ["keep me"] });
+  assert.deepEqual(side.marks, [{ x: 6, y: 6, type: "label", text: "1" }]);
+  const out = game.toSGF();
+  for (const s of ["GN[Club final]", "PC[Seoul]", "BR[3k]", "WR[2k]", "EV[Spring cup]", "XY[a\\]b][c]", "BL[295.5]OB[0]N[Tengen]", "MN[2]TB[aa:bb]", "XX[keep me]", "LB[gg:1]"]) assert.ok(out.includes(s), s);
+  const again = loadSGF(out).game;
+  assert.deepEqual(again.root.extra, game.root.extra);
+  assert.deepEqual(again.mainLine()[2].children[1].extra, { XX: ["keep me"] });
+  assert.equal(again.toSGF(), out);
+});
+
+await test("v5: a set-up position records who plays first, and move-less nodes fold into the move before", () => {
+  const { game } = loadSGF("(;GM[1]FF[4]SZ[9]AB[aa][bb]AW[cc]PL[W];W[dd];C[a note]TR[ee];B[ff])");
+  const line = game.mainLine();
+  assert.equal(line.length, 3);
+  assert.equal(line[1].comment, "a note");
+  assert.deepEqual(line[1].marks, [{ x: 4, y: 4, type: "triangle" }]);
+  const out = game.toSGF();
+  assert.match(out, /PL\[W\]/);
+  assert.equal(loadSGF(out).game.root.turn, WHITE);
+});
+
+await test("v5: marks toggle, replace and take the next free letter", () => {
+  const g = newGame(9);
+  g.play(4, 4);
+  const n = g.current;
+  assert.deepEqual(g.toggleMark(n, 1, 1, "triangle"), { x: 1, y: 1, type: "triangle" });
+  assert.deepEqual(g.toggleMark(n, 1, 1, "square"), { x: 1, y: 1, type: "square" }, "another kind replaces");
+  assert.equal(n.marks.length, 1);
+  assert.equal(g.toggleMark(n, 1, 1, "square"), null, "the same kind removes");
+  assert.equal(n.marks.length, 0);
+  assert.equal(g.toggleMark(n, 0, 0, "label").text, "A");
+  assert.equal(g.toggleMark(n, 0, 1, "label").text, "B");
+  g.toggleMark(n, 0, 0, "label");
+  assert.equal(g.toggleMark(n, 0, 2, "label").text, "A", "a freed letter is reused");
+  assert.equal(g.toggleMark(n, 9, 0, "circle"), null, "off the board");
+  assert.equal(g.toggleMark(n, 2, 2, "star"), null, "unknown kind");
+  assert.equal(n.marks.length, 2);
+  g.setComment(n, "line\r\nbreak");
+  assert.equal(n.comment, "line\nbreak");
+});
+
+function branchedGame() {
+  // Main line 1-2-3-4-5; a variation at move 2 (2a-3a), one at move 4 (4b),
+  // a second at move 2 (2c), and a sub-variation inside 2a (after 2a: 3x).
+  const g = newGame(9);
+  const ids = {};
+  const at = (node) => g.goto(node.id);
+  g.play(0, 0);
+  ids[1] = g.current;
+  g.play(1, 0);
+  ids[2] = g.current;
+  g.play(2, 0);
+  ids[3] = g.current;
+  g.play(3, 0);
+  ids[4] = g.current;
+  g.play(4, 0);
+  ids[5] = g.current;
+  at(ids[1]);
+  g.play(1, 1);
+  ids["2a"] = g.current;
+  g.play(2, 1);
+  ids["3a"] = g.current;
+  at(ids["2a"]);
+  g.play(2, 2);
+  ids["3x"] = g.current;
+  at(ids[3]);
+  g.play(3, 3);
+  ids["4b"] = g.current;
+  at(ids[1]);
+  g.play(1, 2);
+  ids["2c"] = g.current;
+  ids["2c"].comment = "idea";
+  return { g, ids };
+}
+
+await test("v5: tree layout puts the main line on row 0 and nests variations without overlaps", () => {
+  const { g, ids } = branchedGame();
+  g.goto(ids["3a"].id);
+  const L = treeLayout(g);
+  const at = new Map(L.nodes.map((n) => [n.node, n]));
+  assert.equal(L.nodes.length, 11);
+  for (const k of [1, 2, 3, 4, 5]) {
+    assert.equal(at.get(ids[k]).y, 0);
+    assert.equal(at.get(ids[k]).x, k);
+    assert.equal(at.get(ids[k]).isMain, true);
+  }
+  assert.deepEqual([at.get(g.root).x, at.get(g.root).y], [0, 0]);
+  // The later branch (at move 3) is nearest the main line.
+  assert.deepEqual([at.get(ids["4b"]).x, at.get(ids["4b"]).y], [4, 1]);
+  assert.deepEqual([at.get(ids["2a"]).x, at.get(ids["2a"]).y], [2, 2]);
+  assert.deepEqual([at.get(ids["3a"]).x, at.get(ids["3a"]).y], [3, 2]);
+  assert.deepEqual([at.get(ids["3x"]).x, at.get(ids["3x"]).y], [3, 3]);
+  assert.deepEqual([at.get(ids["2c"]).x, at.get(ids["2c"]).y], [2, 4]);
+  assert.equal(at.get(ids["2a"]).isMain, false);
+  assert.equal(at.get(ids["2c"]).hasComment, true);
+  assert.equal(at.get(ids["3a"]).isCurrent, true);
+  assert.equal(at.get(ids["2a"]).onPath, true);
+  assert.equal(at.get(ids[2]).onPath, false);
+  assert.deepEqual(L.current, { x: 3, y: 2 });
+  assert.equal(L.width, 6);
+  assert.equal(L.height, 5);
+  // No two nodes share a cell, and no edge's vertical run crosses a node.
+  const cells = new Set(L.nodes.map((n) => `${n.x},${n.y}`));
+  assert.equal(cells.size, L.nodes.length);
+  assert.equal(L.edges.length, L.nodes.length - 1);
+  for (const e of L.edges) {
+    for (let i = 1; i < e.points.length - 1; i++) assert.ok(!cells.has(e.points[i].join(",")), "bend on a node");
+    const [[x0, y0], [x1, y1]] = [e.points[0], e.points[e.points.length - 1]];
+    for (let y = y0 + 1; y < y1 - 0; y++) if (e.points.length > 2) assert.ok(!cells.has(`${x0},${y}`), `edge through ${x0},${y}`);
+    assert.equal(x1 - x0, 1);
+  }
+  const toC = L.edges.find((e) => e.to.x === 2 && e.to.y === 4);
+  assert.deepEqual(toC.points, [[1, 0], [1, 3], [2, 4]]);
+});
+
+await test("v5: deleting and promoting variations edit the tree and the SGF", () => {
+  const { g, ids } = branchedGame();
+  assert.equal(g.isMainLine(ids[5]), true);
+  assert.equal(g.isMainLine(ids["3a"]), false);
+  assert.equal(g.promoteVariation(ids["3x"]), true);
+  assert.deepEqual(g.mainLine().map((n) => n.id), [g.root.id, ids[1].id, ids["2a"].id, ids["3x"].id]);
+  assert.deepEqual(ids[1].children.map((n) => n.id), [ids["2a"].id, ids[2].id, ids["2c"].id], "others keep their order");
+  assert.equal(g.promoteVariation(ids["3x"]), false, "already the main line");
+  // Round trip keeps the new order.
+  const back = loadSGF(g.toSGF()).game;
+  assert.deepEqual(back.mainLine().map((n) => [n.move?.x, n.move?.y]).slice(1), [[0, 0], [1, 1], [2, 2]]);
+  assert.equal(back.mainLine()[1].children.length, 3);
+  // Delete a whole branch with the cursor inside: the cursor moves up.
+  g.goto(ids[4].id);
+  assert.equal(g.deleteNode(ids[3]), ids[2]);
+  assert.equal(g.current, ids[2]);
+  assert.equal(ids[2].children.length, 0);
+  assert.equal(g.deleteNode(g.root), null, "the root stays");
+  // Deleting the first child makes the next variation the main line there.
+  g.deleteNode(ids["2a"]);
+  assert.deepEqual(g.mainLine().map((n) => n.id), [g.root.id, ids[1].id, ids[2].id]);
+  assert.equal(treeLayout(g).nodes.length, 4);
+});
+
+await test("v5: progress gains bounded, validated per-game records (migrated from v4)", () => {
+  for (const k of Object.values(KEYS)) removeKey(k);
+  writeJSON(KEYS.progress, { problems: { a: { solved: true } }, rating: { r: 1200, games: 3, history: [{ at: 1, r: 1100 }, { at: 2, r: 1200 }] } });
+  migrate();
+  const raw = readJSON(KEYS.progress, {});
+  assert.equal(raw.v, 5);
+  assert.deepEqual(raw.games, []);
+  assert.equal(raw.problems.a.solved, true, "nothing else changes");
+  const p = loadProgress();
+  assert.deepEqual(p.games, []);
+  const rec = (i, extra = {}) => ({ id: "g" + i, at: 1000 + i, size: 9, color: -1, result: "W+3.5", won: true, phases: { opening: { loss: 1, mistakes: 0, blunders: 0, moves: 5 }, middle: { loss: "4" }, endgame: null }, themes: { ladder: 1, bad: -2 }, ...extra });
+  for (let i = 0; i < MAX_GAME_RECORDS + 5; i++) addGameRecord(p, rec(i), { save: false });
+  assert.equal(p.games.length, MAX_GAME_RECORDS);
+  assert.equal(p.games[0].id, "g" + (MAX_GAME_RECORDS + 4), "newest first");
+  const g0 = p.games[0];
+  assert.deepEqual(g0.phases.middle, { loss: 4, mistakes: 0, blunders: 0, moves: 0, accuracy: null });
+  assert.deepEqual(g0.phases.endgame, { loss: 0, mistakes: 0, blunders: 0, moves: 0, accuracy: null });
+  assert.deepEqual(g0.themes, { ladder: 1 });
+  assert.equal(g0.confidence, "low");
+  assert.equal(g0.date.length, 10);
+  // Replace by id, then patch.
+  addGameRecord(p, rec(MAX_GAME_RECORDS + 4, { result: "B+R", won: false }), { save: false });
+  assert.equal(p.games.length, MAX_GAME_RECORDS);
+  assert.equal(p.games[0].won, false);
+  updateGameRecord(p, p.games[0].id, { confidence: "high", themes: { cut: 2 } });
+  assert.equal(loadProgress().games[0].confidence, "high");
+  assert.deepEqual(loadProgress().games[0].themes, { cut: 2 });
+  assert.equal(updateGameRecord(p, "missing", {}), null);
+  // Junk in storage is dropped, not fatal.
+  writeJSON(KEYS.progress, { v: 5, games: [null, { at: "x", size: 9 }, { at: 5, size: 7 }, { id: "ok", at: 5, size: 13 }, { id: "ok", at: 6, size: 13 }] });
+  assert.deepEqual(loadProgress().games.map((g) => g.id), ["ok"]);
+});
+
+/* ------------------------------------------------------------ v5 updater */
+
+await test("v5: without a native host the install API says unavailable and asks nothing", async () => {
+  assert.equal(globalThis.zero, undefined);
+  for (const call of [Host.updateStatus, () => Host.updateDownload("v9.0.0"), Host.updateCancel, Host.updateApply]) {
+    assert.deepEqual(await call(), { ok: false, error: "unavailable" });
+  }
+  const info = await U.installInfo();
+  assert.equal(info.can, false);
+  assert.equal(info.blocked, "Unsupported");
+  assert.deepEqual(await U.downloadNow("v9.0.0", { pollMs: 1 }), { ok: false, error: "Unsupported" });
+  assert.deepEqual(await U.applyNow(), { ok: false, error: "Unsupported" });
+});
+
+await test("v5: install status, download replies and error explanations", () => {
+  const s = U.interpretInstallStatus({ ok: true, phase: "downloading", tag: "v5.1.0", received: 50, total: 200, error: "", canInstall: true, blocked: "", justUpdated: false, installFailed: false });
+  assert.equal(s.phase, "downloading");
+  assert.equal(s.progress, 0.25);
+  assert.equal(s.canInstall, true);
+  assert.equal(U.interpretInstallStatus({ ok: true, phase: "downloading", received: 5, total: 0 }).progress, null, "unknown size");
+  assert.equal(U.interpretInstallStatus({ ok: true, phase: "nonsense" }).phase, "idle");
+  const ro = U.interpretInstallStatus({ ok: true, phase: "idle", canInstall: true, blocked: "ReadOnlyLocation" });
+  assert.equal(ro.canInstall, false, "a block always wins");
+  assert.equal(ro.blocked, "ReadOnlyLocation");
+  assert.equal(U.interpretInstallStatus(null).phase, "unavailable");
+  assert.equal(U.interpretInstallStatus({ ok: true, justUpdated: true }).justUpdated, true);
+
+  assert.deepEqual(U.interpretDownloadReply({ ok: true, phase: "ready", tag: "v5.1.0", asset: "GobanStudio-macOS-arm64.zip" }), { ok: true, tag: "v5.1.0" });
+  assert.deepEqual(U.interpretDownloadReply({ ok: false, error: "ChecksumMismatch" }), { ok: false, error: "ChecksumMismatch" });
+  assert.deepEqual(U.interpretDownloadReply({ ok: false, error: "unavailable" }), { ok: false, error: "Unsupported" });
+  assert.deepEqual(U.interpretDownloadReply("x"), { ok: false, error: "BadResponse" });
+
+  assert.equal(U.installStatusOf("downloading"), "downloading");
+  assert.equal(U.installStatusOf("verifying"), "downloading");
+  assert.equal(U.installStatusOf("unpacking"), "downloading");
+  assert.equal(U.installStatusOf("ready"), "ready");
+  assert.equal(U.installStatusOf("installing"), "installing");
+  assert.equal(U.installStatusOf("failed"), null);
+  assert.deepEqual(["downloading", "verifying", "unpacking"].map(U.installStepOf), ["download", "verify", "unpack"]);
+
+  // Every error the host can answer is explained in all four languages.
+  for (const code of U.INSTALL_ERRORS) {
+    const key = U.installMessageKey(code);
+    assert.ok(MESSAGES[key], `${code} → ${key}`);
+  }
+  for (const code of U.INSTALL_BLOCKED) assert.equal(U.installFallsBack(code), true, code);
+  for (const code of ["ChecksumMismatch", "NoAsset", "BadPackage"]) assert.equal(U.installFallsBack(code), true, code);
+  for (const code of ["Network", "Stalled", "Cancelled", "Disk"]) assert.equal(U.installFallsBack(code), false, `${code} can be retried`);
+  assert.equal(U.installMessageKey("ReadOnlyLocation"), "update.readOnly");
+  assert.equal(U.installMessageKey("Translocated"), "update.translocated");
+  assert.equal(U.formatBytes(512 * 1024), "512 KB");
+  assert.equal(U.formatBytes(98.04 * 1024 * 1024), "98.0 MB");
+});
+
+await test("v5: a download reports progress until the host answers", async () => {
+  const seen = [];
+  let polls = 0;
+  let finish;
+  const download = (tag) => {
+    assert.equal(tag, "v5.1.0");
+    return new Promise((resolve) => (finish = resolve));
+  };
+  const status = async () => {
+    polls++;
+    const phase = polls < 3 ? "downloading" : polls < 4 ? "verifying" : "unpacking";
+    if (polls === 5) finish({ ok: true, phase: "ready", tag: "v5.1.0", asset: "x" });
+    return { ok: true, phase, tag: "v5.1.0", received: polls * 10, total: 100, canInstall: true };
+  };
+  const sleep = () => new Promise((r) => setImmediate(r));
+  const result = await U.downloadNow("v5.1.0", { download, status, sleep, onProgress: (s) => seen.push([s.phase, s.received]) });
+  assert.deepEqual(result, { ok: true, tag: "v5.1.0" });
+  assert.deepEqual(seen.slice(0, 4), [
+    ["downloading", 10],
+    ["downloading", 20],
+    ["verifying", 30],
+    ["unpacking", 40],
+  ]);
+  const failed = await U.downloadNow("v5.1.0", { download: async () => ({ ok: false, error: "Stalled" }), status, sleep });
+  assert.deepEqual(failed, { ok: false, error: "Stalled" });
+  const threw = await U.downloadNow("v5.1.0", {
+    download: async () => {
+      throw new Error("bridge");
+    },
+    status,
+    sleep,
+  });
+  assert.deepEqual(threw, { ok: false, error: "Network" });
+  assert.deepEqual(await U.applyNow({ apply: async () => ({ ok: true, phase: "installing" }) }), { ok: true });
+  assert.deepEqual(await U.applyNow({ apply: async () => ({ ok: false, error: "ReadOnlyLocation" }) }), { ok: false, error: "ReadOnlyLocation" });
+});
+
+await test("v5: the interface goes available → downloading → ready → installing through the host", async () => {
+  const calls = [];
+  let phase = "idle";
+  const host = {
+    "studio.checkUpdate": () => ({ ok: true, latest: "v99.0.0", url: "https://github.com/hxddh/goban-studio/releases/tag/v99.0.0", notes: "New", publishedAt: "" }),
+    "studio.updateStatus": () => ({ ok: true, phase, tag: "v99.0.0", received: 3, total: 6, error: "", canInstall: true, blocked: "", justUpdated: false, installFailed: false }),
+    "studio.updateDownload": async (p) => {
+      assert.deepEqual(p, { tag: "v99.0.0" }, "the page names only the tag, never a URL");
+      phase = "downloading";
+      await new Promise((r) => setTimeout(r, 30));
+      phase = "ready";
+      return { ok: true, phase: "ready", tag: "v99.0.0", asset: "GobanStudio-macOS-arm64.zip" };
+    },
+    "studio.updateCancel": () => ({ ok: true, phase: "idle" }),
+    "studio.updateApply": () => ({ ok: true, phase: "installing" }),
+  };
+  globalThis.zero = {
+    invoke: async (command, payload) => {
+      calls.push(command);
+      if (!host[command]) throw new Error(`unknown command ${command}`);
+      return host[command](payload);
+    },
+  };
+  try {
+    const store = await import("../src/web/js/app/store.js");
+    const C = await import("../src/web/js/app/update-ctl.js");
+    store.state.settings = { autoUpdateCheck: false };
+    const found = await C.checkForUpdates({ quiet: true });
+    assert.equal(found.status, "available");
+    assert.deepEqual(found.install, { can: true, blocked: "" });
+    const pending = C.downloadUpdate();
+    assert.equal(store.state.updateCheck.status, "downloading");
+    assert.equal(store.state.updateCheck.notes, "New", "the release notes stay on screen");
+    assert.equal((await pending).status, "ready");
+    assert.equal(store.state.updateCheck.latest, "v99.0.0");
+    // Discarding the download goes back to "available".
+    await C.cancelUpdate();
+    assert.equal(store.state.updateCheck.status, "available");
+    phase = "idle";
+    await C.downloadUpdate();
+    assert.equal(store.state.updateCheck.status, "ready");
+    await C.applyUpdate();
+    assert.equal(store.state.updateCheck.status, "installing");
+    assert.ok(calls.includes("studio.updateApply"));
+
+    // A read-only installation never downloads: it explains and falls back.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", tag: "", received: 0, total: 0, error: "", canInstall: false, blocked: "ReadOnlyLocation" });
+    store.state.updateCheck = null;
+    const ro = await C.checkForUpdates({ quiet: true });
+    assert.deepEqual(ro.install, { can: false, blocked: "ReadOnlyLocation" });
+    const before = calls.filter((c) => c === "studio.updateDownload").length;
+    await C.downloadUpdate();
+    assert.equal(calls.filter((c) => c === "studio.updateDownload").length, before);
+
+    // A failed download returns to "available" with the reason.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", canInstall: true, blocked: "" });
+    host["studio.updateDownload"] = async () => ({ ok: false, error: "ChecksumMismatch" });
+    store.state.updateCheck = null;
+    await C.checkForUpdates({ quiet: true });
+    const bad = await C.downloadUpdate();
+    assert.equal(bad.status, "available");
+    assert.equal(bad.installError, "ChecksumMismatch");
+
+    // After a restart: the new version says so; a rolled-back one says that.
+    host["studio.updateStatus"] = () => ({ ok: true, phase: "idle", canInstall: true, blocked: "", justUpdated: true });
+    const restored = await C.restoreUpdateState();
+    assert.equal(restored.justUpdated, true);
+    assert.ok(store.state.toasts.some((x) => x.message === t("update.installed", [APP_VERSION])));
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
+await test("v5: the native install commands are fixed to this repository's release downloads", () => {
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8").replace(/\r\n/g, "\n");
+  for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
+  assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
+  // The page's payload carries a tag and nothing else; no URL is ever read from it.
+  const payload = main.slice(main.indexOf("const DownloadPayload"), main.indexOf("fn updateDownload("));
+  assert.match(payload, /tag: \[\]const u8/);
+  assert.doesNotMatch(payload, /url|path/i);
+  // Every asset this app can install is one the release publishes.
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8").replace(/\r\n/g, "\n");
+  for (const asset of ["GobanStudio-macOS-arm64.zip", "GobanStudio-macOS-x64.zip", "GobanStudio-Windows-x64.zip", "SHA256SUMS"]) {
+    assert.ok(zig.includes(`"${asset}"`) || asset === "SHA256SUMS", asset);
+    assert.ok(release.includes(asset), `release.yml publishes ${asset}`);
+  }
+  // The helpers are embedded in the app, not downloaded.
+  assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
+  assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
+  for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
+});
+
+await test("v5: both platform builds test the update helpers, and an Intel Mac build is released", () => {
+  const mac = fs.readFileSync(path.join(root, ".github/workflows/build-macos.yml"), "utf8").replace(/\r\n/g, "\n");
+  const win = fs.readFileSync(path.join(root, ".github/workflows/build-windows.yml"), "utf8").replace(/\r\n/g, "\n");
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8").replace(/\r\n/g, "\n");
+  for (const y of [mac, win]) assert.match(y, /scripts\/test-updater\.mjs/);
+  assert.match(release, /macos-15-intel/);
+  assert.match(release, /GobanStudio-macOS-x64\.dmg/);
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(readme, /GobanStudio-macOS-x64\.dmg/);
+  assert.match(readme, /Windows on ARM/);
+  const status = { macos: Sign.normalizeStatus("macos", { mode: "adhoc" }), win: Sign.normalizeStatus("windows", {}) };
+  const table = Sign.firstLaunchTable(status.macos, status.win, status.macos);
+  assert.match(table, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg`/);
+  assert.equal(Sign.firstLaunchTable(status.macos, status.win).split("\n").length, 4, "without an Intel status the table keeps its v4 rows");
+});
+
+/* ------------------------------------------------------------ v5 models */
+
+await test("v5: model status replies normalize; the browser preview is unavailable", async () => {
+  const none = M.initialModels();
+  assert.equal(none.available, false);
+  assert.equal(none.human.status, "unavailable");
+  assert.equal(none.strong.total, M.MODELS.strong.bytes);
+  // No host: no call is made and both kinds are unavailable.
+  let called = 0;
+  const invoke = async () => {
+    called++;
+    return {};
+  };
+  assert.deepEqual(await M.fetchStatus({ hasHost: false, invoke }), none);
+  assert.equal((await M.download("human", { hasHost: false, invoke })).ok, false);
+  assert.equal(called, 0);
+  assert.equal(M.canDownload(), false);
+
+  const raw = {
+    available: true,
+    human: { status: "downloading", bytes: 49_533_115, total: 99_066_230, idleMs: 31_000, needed: 0, name: "b18c384nbt-humanv0", error: "" },
+    strong: { status: "failed", bytes: 0, total: 48_038_914, idleMs: 0, needed: 112_000_000, name: "g170e", error: "DiskFull" },
+  };
+  const st = M.normalizeStatus(raw);
+  assert.equal(st.available, true);
+  assert.equal(st.human.status, "downloading");
+  assert.equal(st.human.progress, 0.5);
+  assert.equal(st.human.stalled, true);
+  assert.equal(M.percent(st.human), 50);
+  assert.equal(st.strong.error, "DiskFull");
+  assert.equal(st.strong.needed, 112_000_000);
+  assert.equal(M.needsPolling(st), true);
+  assert.equal(M.isInstalled(st, "human"), false);
+  // An unknown status or a missing record is "unavailable", never "ready".
+  assert.equal(M.normalizeOne("human", { status: "hacked", bytes: 1 }).status, "unavailable");
+  assert.equal(M.normalizeStatus({ available: false, human: raw.human }).human.status, "unavailable");
+  // Bytes are clamped to the file size; ready is 100 %, nothing else is.
+  assert.equal(M.normalizeOne("strong", { status: "partial", bytes: 9e9, total: 100 }).bytes, 100);
+  assert.equal(M.percent(M.normalizeOne("strong", { status: "verifying", bytes: 100, total: 100 })), 99);
+  assert.equal(M.percent(M.normalizeOne("strong", { status: "ready", bytes: 100, total: 100 })), 100);
+});
+
+await test("v5: model actions name a kind only, and report what changed", async () => {
+  const calls = [];
+  const status = { available: true, human: { status: "downloading", bytes: 0, total: 1 }, strong: { status: "absent", bytes: 0, total: 1 } };
+  const invoke = async (command, payload) => {
+    calls.push([command, payload]);
+    return command === "studio.modelStatus" ? status : { ok: true, models: status };
+  };
+  const deps = { hasHost: true, invoke };
+  assert.equal((await M.download("human", deps)).ok, true);
+  await M.cancel("human", deps);
+  await M.remove("strong", deps);
+  await M.fetchStatus(deps);
+  assert.deepEqual(calls, [
+    ["studio.modelDownload", { kind: "human" }],
+    ["studio.modelCancel", { kind: "human" }],
+    ["studio.modelRemove", { kind: "strong" }],
+    ["studio.modelStatus", {}],
+  ]);
+  await assert.rejects(() => M.download("https://example.com/x.bin.gz", deps), /unknown model kind/);
+  // A failing host call is an error result, not an exception.
+  const broken = await M.download("human", { hasHost: true, invoke: async () => Promise.reject(new Error("x")) });
+  assert.deepEqual([broken.ok, broken.error], [false, "Unavailable"]);
+
+  const before = M.normalizeStatus({ available: true, human: { status: "downloading", bytes: 5, total: 10 }, strong: { status: "verifying", bytes: 10, total: 10 } });
+  const after = M.normalizeStatus({ available: true, human: { status: "failed", bytes: 5, total: 10, error: "Network" }, strong: { status: "ready", bytes: 10, total: 10 } });
+  assert.deepEqual(M.transitions(before, after), [
+    { kind: "human", event: "failed" },
+    { kind: "strong", event: "ready" },
+  ]);
+  assert.deepEqual(M.transitions(after, after), []);
+  assert.equal(M.errorKey("DiskFull"), "models.error.DiskFull");
+  assert.equal(M.errorKey("TlsInitializationFailed"), "models.error.generic");
+  for (const e of M.ERROR_KEYS) assert.ok(MESSAGES[`models.error.${e}`], e);
+  assert.equal(M.megabytes(99_066_230), "99");
+  assert.equal(M.megabytes(9_500_000), "9.5");
+});
+
+await test("v5: the opponent mode follows what is installed and the humanStyle setting", () => {
+  const none = { strong: false, human: false, humanStyle: true };
+  const human = { strong: false, human: true, humanStyle: true };
+  const off = { strong: true, human: true, humanStyle: false };
+  const strong = { strong: true, human: false, humanStyle: true };
+  for (const s of STRENGTHS) {
+    assert.equal(opponentMode(s.id, none), "standard", s.id);
+    assert.equal(opponentMode(s.id, human), "human", s.id);
+    assert.equal(opponentMode(s.id, off), s.strong ? "strong" : "standard", s.id);
+  }
+  // The stronger network plays only the top level; everything below keeps
+  // the network its label was measured with.
+  assert.deepEqual(STRENGTHS.filter((s) => opponentMode(s, strong) === "strong").map((s) => s.id), ["2d"]);
+  assert.equal(opponentMode("2d", { ...strong, strongUsable: false }), "standard");
+  assert.equal(DEFAULT_SETTINGS.humanStyle, true);
+  // Analysis uses the stronger network when installed, with fewer visits.
+  assert.equal(analysisEngine(none), "standard");
+  assert.equal(analysisEngine(strong), "strong");
+  assert.equal(scaledVisits(240, "strong"), Math.round(240 * STRONG_VISIT_SCALE));
+  assert.equal(scaledVisits(240, "standard"), 240);
+  assert.equal(scaledVisits(1, "strong"), 1);
+});
+
+await test("v5: every level has a valid human SL profile, in ladder order", () => {
+  // The same rule as engine.zig validProfile.
+  const valid = (p) => /^(rank|preaz)_([1-9]|1\d|20)k$|^(rank|preaz)_[1-9]d$/.test(p);
+  const strengthOf = (p) => {
+    const m = /_(\d+)([kd])$/.exec(p);
+    return m[2] === "k" ? -Number(m[1]) : Number(m[1]);
+  };
+  let prev = -Infinity;
+  let prevBlunder = Infinity;
+  for (const s of STRENGTHS) {
+    assert.ok(s.human && valid(s.human.profile), s.id);
+    assert.ok(!s.human.style || ["raw", "search"].includes(s.human.style), s.id);
+    const v = strengthOf(s.human.profile);
+    assert.ok(v >= prev, `${s.id}: profile weaker than the level below`);
+    const b = s.human.blunder ?? 0;
+    assert.ok(b <= prevBlunder, `${s.id}: more beginner moves than the level below`);
+    assert.ok(b < s.blunder || s.blunder === 0, `${s.id}: human style adds no beginner moves of its own`);
+    prev = v;
+    prevBlunder = b;
+    const req = humanRequest(s.human);
+    assert.equal(req.engine, "human");
+    assert.ok(req.visits >= 1 && req.visits <= 400, s.id);
+  }
+  assert.equal(humanRequest({ profile: "rank_10k" }).visits, HUMAN_VISITS);
+  assert.equal(humanRequest({ profile: "rank_10k", style: "bogus" }).humanStyle, "raw");
+  assert.deepEqual(enginePayload({ engine: "human", profile: "rank_12k", humanStyle: "search" }), { engine: "human", profile: "rank_12k", humanStyle: "search" });
+  assert.deepEqual(enginePayload({ engine: "strong", profile: "x" }), { engine: "strong" });
+  // The standard engine sends exactly the v4 request.
+  assert.deepEqual(enginePayload({}), {});
+});
+
+await test("v5: a human-style move is KataGo's human choice, legal, with beginner moves only below 20 kyu", () => {
+  const game = new Game({ size: 9, komi: 6.5 });
+  game.play(4, 4);
+  const analysis = {
+    moves: [{ x: 2, y: 2, visits: 10, scoreLead: 0.5, winrate: 0.5 }],
+    play: { x: 6, y: 2 },
+  };
+  assert.deepEqual(humanMoveFromAnalysis(game, analysis, { profile: "rank_12k" }), { x: 6, y: 2 });
+  // An illegal choice (occupied) falls back to KataGo's top candidate.
+  assert.deepEqual(humanMoveFromAnalysis(game, { ...analysis, play: { x: 4, y: 4 } }, { profile: "rank_12k" }), { x: 2, y: 2 });
+  // KataGo's pass (its search decides passes) is kept.
+  assert.deepEqual(humanMoveFromAnalysis(game, { moves: [{ pass: true, visits: 10, scoreLead: 0 }], play: { pass: true } }, { profile: "rank_20k", blunder: 1 }), { pass: true });
+  // blunder: 1 always plays a beginner's move when KataGo would not pass.
+  const rnd = mulberry32(7);
+  for (let i = 0; i < 20; i++) {
+    const m = humanMoveFromAnalysis(game, analysis, { profile: "rank_20k", blunder: 1 }, rnd);
+    assert.ok(m && !m.pass && game.canPlay(m.x, m.y).ok);
+  }
+});
+
+await test("v5: the downloader fetches only pinned KataGo release files, verified before use", () => {
+  const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8").replace(/\r\n/g, "\n");
+  const urls = [...zig.matchAll(/\.url = "([^"]+)"/g)].map((m) => m[1]);
+  // No other address is ever built: every http(s) literal outside the specs is a test value.
+  assert.equal([...zig.slice(0, zig.indexOf("// ------------------------------------------------------------------ tests")).matchAll(/"https?:\/\//g)].length, 2);
+  assert.deepEqual(urls, [
+    "https://github.com/lightvector/KataGo/releases/download/v1.15.0/b18c384nbt-humanv0.bin.gz",
+    "https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz",
+  ]);
+  assert.match(zig, /\.sha256 = "637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5"/);
+  assert.match(zig, /\.sha256 = "09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967"/);
+  assert.match(zig, /\.size = 99_066_230/);
+  assert.match(zig, /\.size = 48_038_914/);
+  assert.equal(M.MODELS.human.bytes, 99_066_230);
+  assert.equal(M.MODELS.strong.bytes, 48_038_914);
+  // Only the verified file is renamed into place, inside the models folder.
+  assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
+  assert.match(zig, /renameAbsolute\(part, final/);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
+  // The page names a kind; the payload has no URL or path field.
+  assert.match(main, /const ModelPayload = struct \{\n    kind: \[\]const u8 = "",\n\};/);
+  // The human process: the shipped config, KataGo's human recipe, Black's view.
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8").replace(/\r\n/g, "\n");
+  for (const line of ["humanSLChosenMoveProp = 1.0", "humanSLChosenMoveIgnorePass = true", "reportAnalysisWinratesAs = BLACK", "ignorePreRootHistory = false", "allowResignation = false", "ponderingEnabled = false"]) {
+    assert.ok(cfg.includes(line), line);
+  }
+  assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
+  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
+});
+
+await test("v5: the calibration harness sends the app's own human-style parameters", () => {
+  const p = humanStyleParams();
+  assert.equal(p.raw.length, 9);
+  assert.deepEqual(p.raw.map(([k]) => k), p.search.map(([k]) => k));
+  assert.deepEqual(Object.fromEntries(p.search).humanSLChosenMovePiklLambda, "0.08");
+  // The raw style is the shipped human.cfg's starting point.
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8").replace(/\r\n/g, "\n");
+  for (const [k, v] of p.raw) assert.equal(Number(new RegExp(`^${k} = (\\S+)`, "m").exec(cfg)?.[1]), Number(v), k);
+});
+
+await test("v5: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(src.split("// v5 models").length, 2);
+  const block = src.slice(src.indexOf("// v5 models"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("models."));
+  assert.ok(keys.length >= 30);
+  for (const k of keys) assert.ok(block.includes(`"${k}"`), `${k} outside the v5 block`);
+  for (const k of ["models.title", "models.download", "models.cancel", "models.remove", "models.humanStyle", "models.unavailable", "models.error.generic"]) {
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+  }
+  // Placeholders agree across languages.
+  for (const k of keys) {
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
+    const en = holes(MESSAGES[k].en);
+    for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), en, `${k} ${lang}`);
+  }
+});
+
+await test("v5: the packaged self-test checks the downloads only when the workflow asks", () => {
+  const st = fs.readFileSync(path.join(root, "src/web/js/selftest.js"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(st, /if \(cfg\.models\) await modelChecks\(checks, report, cfg\)/);
+  for (const k of ["modelsResume", "modelsHuman", "modelsStrong", "modelsRemove"]) assert.ok(st.includes(`checks.${k} =`), k);
+  const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);
+  assert.match(app, /fs\.rmSync\(modelsDir/);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(main, /GOBAN_SELFTEST_MODELS/);
+  assert.match(main, /GOBAN_MODELS_DIR/);
 });
 
 if (failures) {
@@ -1285,3 +2302,5 @@ if (failures) {
   process.exit(1);
 }
 console.log(`\n${count} tests passed.`);
+// Toast timers from the v5 interface test would keep Node alive for seconds.
+process.exit(0);

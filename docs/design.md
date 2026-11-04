@@ -159,8 +159,8 @@ group per screen region.
 | `--dur-3` | 320 ms | place change, sheets |
 
 Easing `--ease-out` (cubic-bezier(.16,1,.3,1)) for entrances; nothing
-bounces except a placed stone (140 ms settle). Captured stones fade in
-200 ms. Everything respects `prefers-reduced-motion`.
+bounces except a placed stone (140 ms settle). Captured stones lift off
+and drift towards the capturer's lid in 260 ms. Everything respects `prefers-reduced-motion`.
 
 ## 9. Sound
 

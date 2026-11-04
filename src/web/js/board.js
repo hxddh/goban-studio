@@ -63,12 +63,26 @@ export function materialName(name) {
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
 const DPR_LIMIT = 2;
+const wantCellsFor = (m) => (m.showCoords ? 1.25 : 0.8);
+const bandFor = (m) => (m.showCoords ? 34 : 14);
+
+/**
+ * Width / height of the board frame for a model: 1 for a whole board, the
+ * window's own proportion (clamped) for a problem window.
+ */
+export function frameAspect(model) {
+  const v = model?.view;
+  if (!v) return 1;
+  const m = model.showCoords ? 2.5 : 1.6;
+  const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
+  return Math.max(0.6, Math.min(1.7, r));
+}
 /** docs/design.md §4: the accent marks attention; good/bad are signals. */
 const ACCENT = "#34529A";
 const GOOD = "#2E7D4F";
 const BAD = "#B3402C";
 const PLACE_MS = 140;
-const FADE_MS = 200;
+const FADE_MS = 260;
 
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
@@ -240,19 +254,21 @@ export class BoardView {
     const win = this.window();
     const cols = win.x1 - win.x0;
     const rows = win.y1 - win.y0;
-    const span = Math.max(1, cols, rows);
-    const shortest = Math.max(1, Math.min(w, h));
+    // Each axis fits on its own: a problem window may be wider than tall.
+    const fit = (len, span) => {
+      const a = len / (span + wantCellsFor(this.model) * 2);
+      const b = (len - bandFor(this.model) * 2) / (span + 1);
+      return Math.max(a, b);
+    };
     // Margin in cells: room for coordinates outside the grid, or a quiet
     // border when they are hidden. Clamped so a hidden board stays positive.
     // On a small board the cells are large; the coordinate margin is capped
     // in pixels so the letters stay close to the grid.
     // Margin = min(wantCells × cell, half a stone + a fixed band): on large
     // cells the band (coordinates or a quiet edge) no longer grows with them.
-    const wantCells = this.model.showCoords ? 1.25 : 0.8;
-    const band = this.model.showCoords ? 34 : 14;
-    const cellA = shortest / (span + wantCells * 2);
-    const cellB = (shortest - band * 2) / (span + 1);
-    const cell = Math.max(0.001, cellA, cellB);
+    const wantCells = wantCellsFor(this.model);
+    const band = bandFor(this.model);
+    const cell = Math.max(0.001, Math.min(fit(w, Math.max(1, cols)), fit(h, Math.max(1, rows))));
     const marginCells = Math.min(wantCells, 0.5 + band / cell);
     const gridW = cell * cols;
     const gridH = cell * rows;
@@ -444,8 +460,13 @@ export class BoardView {
     // Fading captured stones.
     for (const f of this.fading) {
       if (!inWin(f.x, f.y)) continue;
+      // Captured stones lift off and drift a little towards the capturer's lid.
       const t = Math.min(1, (now - f.start) / FADE_MS);
-      this.stone(ctx, f.x, f.y, f.c, theme, { alpha: 1 - t, scale: 1 - t * 0.12 });
+      const e = t * t;
+      ctx.save();
+      ctx.translate(cell * 0.12 * e, (f.c === BLACK ? 1 : -1) * cell * 0.18 * e);
+      this.stone(ctx, f.x, f.y, f.c, theme, { alpha: 1 - t, scale: 1 - t * 0.18, shadow: t < 0.4 });
+      ctx.restore();
     }
 
     // Stones.
