@@ -5,7 +5,7 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { dailySet, markLesson, markMistake, markProblem, saveProgress, todayKey, touchStreak } from "../persist.js";
+import { dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE } from "../content/course.js";
@@ -533,11 +533,18 @@ function finishProblem(P) {
   if (state.practice.view === "lesson" && state.practice.lesson?.cur === P) scheduleAutoContinue();
 }
 
+/**
+ * The first answer of a visit decides the review schedule (a miss resets
+ * it); a later success in the same visit still marks the problem solved,
+ * not clean, and counts for today's five. P.recorded: "miss" | "solved".
+ */
 function recordAttempt(P, solved) {
-  if (P.recorded) return;
-  P.recorded = true;
+  if (P.recorded === "solved" || (P.recorded && !solved)) return;
+  const first = !P.recorded;
+  P.recorded = solved ? "solved" : "miss";
   if (state.practice.view === "problem" && P.def) {
-    markProblem(state.progress, P.def.id, { solved, clean: solved && !P.used });
+    if (first) markProblem(state.progress, P.def.id, { solved, clean: solved && !P.used });
+    else markSolvedLate(state.progress, P.def.id);
     const d = state.practice.daily;
     if (d && solved && !d.done.includes(P.def.id)) d.done.push(P.def.id);
   }

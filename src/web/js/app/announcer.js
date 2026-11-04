@@ -130,12 +130,14 @@ export function boardKey(e, bv) {
       return turnSentence(ctx, m);
     case "c":
       return capturesSentence(ctx);
+    // The part of the board on screen (a problem window is widened before
+    // it is drawn; see windowOf in board.js), not the problem's own view.
     case "r":
-      return cursor ? A.rowText(board, cursor.y, { size, view: m.view }) : t("a11y.noCursor");
+      return cursor ? A.rowText(board, cursor.y, { size, view: A.shownWindow(m, size) }) : t("a11y.noCursor");
     case "k":
-      return cursor ? A.columnText(board, cursor.x, { size, view: m.view }) : t("a11y.noCursor");
+      return cursor ? A.columnText(board, cursor.x, { size, view: A.shownWindow(m, size) }) : t("a11y.noCursor");
     case "b":
-      return A.boardText(board, { size, view: m.view });
+      return A.boardText(board, { size, view: A.shownWindow(m, size) });
     case ",":
     case ".":
       if (ctx?.kind !== "review") return null;

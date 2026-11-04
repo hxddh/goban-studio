@@ -68,6 +68,15 @@ import { PNG } from "pngjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+// Keys added after v6 live in src/web/js/messages/v7-*.js; the "one block"
+// checks of earlier versions accept them there.
+const LATER_KEYS = new Set(
+  fs
+    .readdirSync(path.join(root, "src/web/js/messages"))
+    .filter((f) => /^v\d+-.*\.js$/.test(f))
+    .flatMap((f) => [...fs.readFileSync(path.join(root, "src/web/js/messages", f), "utf8").matchAll(/^\s*"([^"]+)":\s*m\(/gm)].map((x) => x[1])),
+);
+
 let count = 0;
 let failures = 0;
 async function test(name, fn) {
@@ -2288,7 +2297,7 @@ await test("v5: the strings are one block in four languages", () => {
   const block = src.slice(src.indexOf("// v5 models"));
   const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("models."));
   assert.ok(keys.length >= 30);
-  for (const k of keys) assert.ok(block.includes(`"${k}"`), `${k} outside the v5 block`);
+  for (const k of keys) assert.ok(block.includes(`"${k}"`) || LATER_KEYS.has(k), `${k} outside the v5 block`);
   for (const k of ["models.title", "models.download", "models.cancel", "models.remove", "models.humanStyle", "models.unavailable", "models.error.generic"]) {
     for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
   }
@@ -2458,7 +2467,7 @@ await test("v6 report: the strings are one block in four languages", () => {
   const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("report."));
   assert.ok(keys.length >= 20);
   for (const k of keys) {
-    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    assert.ok(block.includes(`"${k}"`) || LATER_KEYS.has(k), `${k} outside the v6 block`);
     const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((x) => x[1]).sort().join();
     for (const lang of LANG_IDS) {
       assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
@@ -2879,7 +2888,7 @@ await test("v6 explorer: the strings are one block in four languages", () => {
   assert.ok(keys.length >= 40);
   const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
   for (const k of keys) {
-    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 explorer block`);
+    assert.ok(block.includes(`"${k}"`) || LATER_KEYS.has(k), `${k} outside the v6 explorer block`);
     for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang]?.trim(), `${k} ${lang}`);
     for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
   }
@@ -3089,7 +3098,7 @@ await test("v6 endgame: the strings are one block in four languages", () => {
   assert.ok(keys.length >= 35);
   for (const k of keys) {
     if (k === "phase.endgame" || k === "phaseIn.endgame") continue;
-    assert.ok(block.includes(`"${k}"`), `${k} outside the v6 block`);
+    assert.ok(block.includes(`"${k}"`) || LATER_KEYS.has(k), `${k} outside the v6 block`);
     for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
     const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
     for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
