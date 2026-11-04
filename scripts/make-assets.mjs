@@ -5,7 +5,7 @@
  *   node scripts/make-assets.mjs surfaces   # one group: surfaces | stones | sounds | brand
  *
  * Output (src/web/assets):
- *   surfaces/{kaya,katsura,paper,slate}.webp   2048² board surfaces
+ *   surfaces/kaya.webp                         2048² wood grain (v4 shows it at 25 %)
  *   stones/{white-0..7,black-0..3,flat-black,flat-white}.png   256² sprites
  *   sounds/*.wav                                 16-bit mono 44.1 kHz
  *   brand.svg                                    the mark
@@ -27,7 +27,7 @@ import * as Surf from "./assets/surfaces.mjs";
 import * as Stones from "./assets/stones.mjs";
 import * as Snd from "./assets/sounds.mjs";
 import { brandSVG, iconHTML, iconSVG } from "./assets/brand.mjs";
-import { THEME_COLORS } from "../src/web/js/materials.js";
+import { SURFACES, THEME_COLORS } from "../src/web/js/materials.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, "src/web/assets");
@@ -144,7 +144,7 @@ if (want("surfaces")) {
   console.log("surfaces");
   const p = await page();
   await p.goto("http://assets.invalid/");
-  for (const name of ["kaya", "katsura", "paper", "slate"]) {
+  for (const name of SURFACES) {
     const rgb = Surf[name](SIZE);
     write(`surfaces/${name}.webp`, await webp(p, rgb, SIZE, WEBP_QUALITY));
     note(`surfaces/${name}.webp`);

@@ -17,6 +17,7 @@ import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 
 export const PROBLEMS = ProblemContent.PROBLEMS;
 export const THEMES = ProblemContent.THEMES || [];
+export const SHAPES = ProblemContent.SHAPES || [];
 export { COURSE, GRADES };
 
 export const gradeOf = (id) => GRADES[id]?.grade || 1;
@@ -109,7 +110,7 @@ export function problemView(pz) {
 }
 
 function problemState(pz) {
-  return { st: S.initialState(pz), history: [], status: "open", feedback: null, busy: false, used: false, hintAt: null, answer: null, last: null };
+  return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null };
 }
 
 export function openLesson(lessonId, stepIndex = null) {
@@ -189,7 +190,16 @@ export function openTopic(topic, theme = null) {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "practice";
-    s.practice = { ...s.practice, view: "topic", topic, theme, problem: null, daily: null, mistake: null };
+    s.practice = { ...s.practice, view: "topic", topic, theme, shape: null, problem: null, daily: null, mistake: null };
+  });
+}
+
+/** A classic-shape collection, shown as a topic page. */
+export function openShape(shape) {
+  if (!isRestoring()) remember();
+  update((s) => {
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "topic", topic: "shapes", shape, theme: null, problem: null, daily: null, mistake: null };
   });
 }
 
@@ -199,6 +209,17 @@ export function problemsOfTopic(topic) {
 
 export function problemsOfTheme(theme) {
   return PROBLEMS.filter((p) => p.theme === theme).sort((a, b) => gradeOf(a.id) - gradeOf(b.id));
+}
+
+/** Problems built on one classic textbook shape (see SHAPES in problems.js). */
+export function problemsOfShape(shape) {
+  return PROBLEMS.filter((p) => p.shape === shape).sort((a, b) => gradeOf(a.id) - gradeOf(b.id) || a.id.localeCompare(b.id));
+}
+
+export function shapeName(id) {
+  const sh = SHAPES.find((x) => x.id === id);
+  if (sh) return sh.name?.[state.settings.lang] || sh.name?.en || id;
+  return t("shape." + id);
 }
 
 export function themeName(id) {
@@ -225,6 +246,26 @@ export function openProblem(id, { daily = null } = {}) {
  * Today's five: mistakes from your own games that are due, then problems on
  * your weakest theme, then due reviews and new problems at your level.
  */
+const GOAL_TOPICS = { capture: ["capture"], save: ["escape", "connect"], live: ["life"], kill: ["kill"] };
+
+/**
+ * New problems for today's five. Someone still working through the course
+ * only gets topics their finished lessons have taught (capturing from the
+ * start), so a beginner is never handed a vital-point kill on day two.
+ */
+export function dailyPool() {
+  const p = state.progress;
+  const lessons = allLessons();
+  const done = lessons.filter(({ lesson }) => p.lessons[lesson.id]?.done);
+  const beginner = state.settings.experience === "new" || (state.settings.playerRank ?? 30) >= 25;
+  if (!beginner || done.length >= lessons.length) return PROBLEMS;
+  const topics = new Set(["capture"]);
+  for (const { lesson } of done) for (const st of lesson.steps || []) for (const tp of GOAL_TOPICS[st.problem?.goal] || []) topics.add(tp);
+  if (done.length >= lessons.length * 0.75) topics.add("race").add("technique");
+  const pool = PROBLEMS.filter((x) => topics.has(x.topic));
+  return pool.length >= 5 ? pool : PROBLEMS;
+}
+
 export function buildDaily(now = Date.now()) {
   const p = state.progress;
   const items = [];
@@ -235,14 +276,25 @@ export function buildDaily(now = Date.now()) {
     const pool = problemsOfTheme(weak.theme).filter((x) => !p.problems[x.id]?.solved);
     for (const x of pool.slice(0, 2)) if (items.length < 4) items.push({ kind: "p", id: x.id, why: weak.theme });
   }
-  const rest = dailySet(p, PROBLEMS.filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
+  const rest = dailySet(p, dailyPool().filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
   for (const x of rest) items.push({ kind: "p", id: x.id });
   return items.slice(0, 5);
 }
 
 export function todaysDaily() {
   const d = state.progress.daily;
-  return d && d.date === todayKey() && Array.isArray(d.items) ? d : null;
+  if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
+  // A saved set may name a problem a later version removed: drop it, and
+  // keep the position in the set on the item the learner was at.
+  const known = (it) => it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id);
+  if (!d.items.every(known)) {
+    const before = d.items.slice(0, d.index || 0).filter(known).length;
+    d.items = d.items.filter(known);
+    d.index = Math.min(d.items.length, before);
+    if (Array.isArray(d.done)) d.done = d.done.filter((id) => d.items.some((it) => it.id === id));
+    if (!d.items.length) return null;
+  }
+  return d;
 }
 
 export function startDaily() {
@@ -348,6 +400,7 @@ function respond(P) {
  * without reaching for a button.
  */
 function lost(P, { ko = false } = {}) {
+  P.result = endResult(P);
   P.status = "lost";
   P.feedback = ko ? "ko" : "wrong";
   P.busy = false;
@@ -368,13 +421,50 @@ function lost(P, { ko = false } = {}) {
   }, 1900);
 }
 
+/**
+ * How the key stones ended up, for life-and-death problems: "seki" when the
+ * position on the board is a proved seki (see sekiInfo in solver.js), else
+ * null. Only checked where it changes the message: a defence that ends in
+ * seki, or a kill attempt that only reached seki.
+ */
+function endResult(P) {
+  const pz = P.pz;
+  if (!pz.lifeGoal) return null;
+  try {
+    return S.sekiInfo(pz, P.st, 100000).result === "seki" ? "seki" : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * The message key for the problem's feedback line, so the view can say
+ * "seki" where it matters:
+ *   solved, ended in seki         practice.solvedSeki
+ *   solved                        practice.solved
+ *   kill refuted by seki          practice.onlySeki
+ *   only a ko                     practice.onlyKo
+ *   other wrong move              practice.wrongExplained
+ * Returns null for the other feedback states (keep, retry, busy).
+ */
+export function feedbackKey(P) {
+  if (!P) return null;
+  if (P.feedback === "solved") return P.result === "seki" ? "practice.solvedSeki" : "practice.solved";
+  if (P.feedback === "ko") return "practice.onlyKo";
+  // The position resets by itself after a wrong move, so the message says so
+  // instead of pointing at buttons.
+  if (P.feedback === "wrong") return P.result === "seki" && P.pz.userColor === P.pz.attacker ? "practice.onlySeki" : "practice.resetting";
+  return null;
+}
+
 function finishProblem(P) {
+  P.result = endResult(P);
   P.status = "won";
   P.feedback = "solved";
   P.busy = false;
   Audio.correct ? Audio.correct() : Audio.win();
   recordAttempt(P, true);
-  announce(t("practice.solved"));
+  announce(t(feedbackKey(P)));
   update();
   if (state.practice.view === "lesson" && state.practice.lesson?.cur === P) scheduleAutoContinue();
 }

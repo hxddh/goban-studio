@@ -7,21 +7,21 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { ReviewView, rankLabel } from "./play.jsx";
 import { Button, Icon, MoreMenu, Segmented, Thumb } from "./parts.jsx";
+import { Toolbar } from "./chrome.jsx";
 
 export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
   const L = state.library;
   return (
+    <>
+    <Toolbar>
+      <Button size="sm" icon="upload" onClick={C.pickImport}>
+        {t("library.import")}
+      </Button>
+    </Toolbar>
     <div class="page">
-      <div class="drag" data-drag />
-      <header class="page-head row-head">
-        <div>
-          <h1>{t("nav.library")}</h1>
-          <p class="muted">{t("library.caption")}</p>
-        </div>
-        <Button icon="upload" onClick={C.pickImport}>
-          {t("library.import")}
-        </Button>
+      <header class="page-head">
+        <h1>{t("nav.library")}</h1>
       </header>
       <ContinueCard />
       <div class="tabs-row">
@@ -41,6 +41,7 @@ export function LibraryView() {
       {L.tab === "classics" && <Classics />}
       {L.tab === "openings" && <Openings />}
     </div>
+    </>
   );
 }
 
@@ -48,17 +49,20 @@ function ContinueCard() {
   const g = state.game;
   if (!g || g.game.moveNumber === 0 || g.game.current.result) return null;
   return (
-    <section class="card continue">
-      <Thumb thumb={Lib.thumbnail(g.game)} size={g.game.size} />
-      <div>
-        <span class="eyebrow">{t("library.inProgress")}</span>
-        <strong>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</strong>
-        <span class="muted">{g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.strength)]) : t("library.twoPlayers")}</span>
-      </div>
-      <Button kind="primary" onClick={C.continueCurrent}>
-        {t("library.continue")}
-      </Button>
-    </section>
+    <ul class="group">
+      <li class="group-row game-row">
+        <Thumb thumb={Lib.thumbnail(g.game)} size={g.game.size} />
+        <span class="gr-text">
+          <strong>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</strong>
+          <span>
+            {t("library.inProgress")} · {g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.strength)]) : t("library.twoPlayers")}
+          </span>
+        </span>
+        <Button size="sm" onClick={C.continueCurrent}>
+          {t("library.continue")}
+        </Button>
+      </li>
+    </ul>
   );
 }
 
@@ -122,20 +126,20 @@ function MyGames() {
       {games.length === 0 ? (
         <p class="muted center-text">{t("library.noMatch")}</p>
       ) : (
-        <ul class="game-grid">
+        <ul class="group games">
           {games.map((g) => {
             const o = outcome(g);
             return (
-              <li class="game-card">
-                <button type="button" class="game-open" onClick={() => C.openRecord(g.id)} aria-label={`${recordTitle(g)} · ${o.label}`}>
+              <li class="game-item">
+                <button type="button" class="group-row game-row" onClick={() => C.openRecord(g.id)} aria-label={`${recordTitle(g)} · ${o.label}`}>
                   <Thumb thumb={g.thumb} size={g.size} />
-                  <span class="game-text">
+                  <span class="gr-text">
                     <strong>{recordTitle(g)}</strong>
-                    <span class="muted">
-                      {fmtDate(g.updatedAt)} · {g.size}×{g.size} · {t("play.moveN", [g.moves])}
+                    <span>
+                      {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {t("play.moveN", [g.moves])}
                     </span>
-                    <span class={`outcome ${o.cls}`}>{o.label}</span>
                   </span>
+                  <span class={`outcome ${o.cls}`}>{o.label}</span>
                 </button>
                 <MoreMenu
                   id={"rec-" + g.id}
@@ -143,7 +147,7 @@ function MyGames() {
                     {
                       icon: "edit",
                       label: t("library.rename"),
-                      onClick: () => C.openSheet("rename", { id: g.id, name: g.name || "" }),
+                      onClick: () => C.openSheet("rename", { id: g.id, name: g.name || recordTitle(g) }),
                     },
                     { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportRecord(g.id) },
                     "-",
@@ -162,7 +166,7 @@ function MyGames() {
 function Classics() {
   const p = state.progress;
   return (
-    <ul class="collection">
+    <ul class="group collection">
       {C.CLASSICS.map((g) => (
         <li>
           <button type="button" class={`collection-row ${p.classics[g.id]?.done ? "done" : ""}`} onClick={() => C.openClassic(g.id)}>
@@ -173,7 +177,7 @@ function Classics() {
               </span>
             </span>
             <span class="fine">
-              {g.date} · {g.result}
+              {String(g.date).split("..")[0]} · {C.resultText(g.result)}
             </span>
             {p.classics[g.id]?.done && <Icon name="check" size={15} />}
           </button>
@@ -188,7 +192,7 @@ function Openings() {
   return (
     <>
       <p class="muted section-sub">{t("library.openingsHelp")}</p>
-      <ul class="collection">
+      <ul class="group collection">
         {C.OPENINGS.map((o, i) => (
           <li>
             <button type="button" class={`collection-row ${p.openings[o.id]?.done ? "done" : ""}`} onClick={() => C.openOpening(o.id)}>

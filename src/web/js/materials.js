@@ -21,7 +21,8 @@
  * the variant arrays), and callers keep their procedural fallback.
  */
 
-export const SURFACES = ["kaya", "katsura", "paper", "slate"];
+/** v4 ships one texture: the kaya grain behind the "wood" board (at 25 %). */
+export const SURFACES = ["kaya"];
 
 /** Older material names map onto the new surfaces. */
 export const MATERIAL_ALIASES = { wood: "kaya" };
@@ -76,7 +77,7 @@ let cache = null;
 
 /**
  * Load every surface and stone sprite once. Resolves to
- * `{ surfaces: {kaya, katsura, paper, slate}, black: [...], white: [...], flatBlack, flatWhite }`;
+ * `{ surfaces: {kaya}, black: [...], white: [...], flatBlack, flatWhite }`;
  * missing images are null (surfaces, flat stones) or omitted (variant arrays).
  */
 export function loadMaterials() {
@@ -93,7 +94,7 @@ export function loadMaterials() {
       flatBlack: f[0],
       flatWhite: f[1],
     }))
-    .catch(() => ({ surfaces: { kaya: null, katsura: null, paper: null, slate: null }, black: [], white: [], flatBlack: null, flatWhite: null }));
+    .catch(() => ({ surfaces: { kaya: null }, black: [], white: [], flatBlack: null, flatWhite: null }));
   return cache;
 }
 

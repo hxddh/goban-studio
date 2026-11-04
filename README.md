@@ -16,33 +16,44 @@ existing Gomoku app. It deliberately uses a different bundle ID
 
 | Platform | File | First launch |
 | --- | --- | --- |
-| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | Ad-hoc signed, not notarized. Right-click the app → Open once. If blocked: `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
-| Windows (x64) | `GobanStudio-Windows-x64.zip` | Not Authenticode-signed. If SmartScreen appears: More info → Run anyway. WebView2 is normally preinstalled. |
+| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | See the release notes. A build made with the project's Developer ID is signed and notarized and opens normally. A build made without it is ad-hoc signed and not notarized: right-click the app → Open once; if blocked, `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
+| Windows (x64) | `GobanStudio-Windows-x64.zip` | See the release notes. A build made without the code-signing certificate is not Authenticode-signed: if SmartScreen appears, More info → Run anyway. WebView2 is normally preinstalled. |
 
-`SHA256SUMS` is attached to every GitHub release. The v3.0.0 notes are in
-[`.github/release-notes/v3.0.0.md`](.github/release-notes/v3.0.0.md).
+Each release's notes (and the README inside the download) state how *that*
+build was signed: the release workflow writes the "First launch" text from
+what the signing steps actually did, not from a template. Until the
+certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
+are ad-hoc signed (macOS) and unsigned (Windows).
 
-## v3 at a glance
+`SHA256SUMS` is attached to every GitHub release. The v4.0.0 notes are in
+[`.github/release-notes/v4.0.0.md`](.github/release-notes/v4.0.0.md).
 
-- **Today** — one starting screen: continue, today's five (with your own
-  mistakes), the next lesson, a suggested game, your level over time and
-  what to work on.
-- **Playing** — KataGo on its own thread (the window never waits),
-  incremental positions, a human pace, resignation at stronger levels, an
-  offer to count, clocks, teaching mode, two-click placement, a three-point
-  summary and a rating after each game.
-- **Review** — free variations with live analysis, explained mistakes with
-  "practise this", a hover chart.
-- **Craft** — generated kaya/katsura/paper/slate boards, shell and slate
-  stones, modelled sounds, one icon family, a motion system, a native macOS
-  menu bar alongside the system Edit and Window menus.
-- **Quality** — real-browser interface checks with budgets and visual
-  comparison in CI; a four-language glossary; a usability protocol (not yet
-  run with people).
+## v4 at a glance
+
+- **A calm board** — no texture by default (Plain; Light wood at a quarter of
+  the old grain; Ink for dark rooms), lines snapped to whole pixels, star
+  points and stones to a written spec, coordinates on.
+- **The standard board** — 19×19 is the default everywhere (first launch,
+  onboarding, the suggested game with a handicap, New game, which remembers
+  your choice); 13×13 and 9×9 are the quicker games.
+- **One design system** — [`docs/design.md`](docs/design.md): system fonts,
+  an 8 px grid, neutral colours with one accent, one primary action per
+  screen, a sidebar and a toolbar with back/forward; a tall hidden title bar
+  on macOS.
+- **Review that explains** — what each key mistake cost and where (group
+  died, race or ko lost, territory, tempo), and the better line or the
+  refutation as clickable, described steps.
+- **Content proved on a real board** — seki, capturing races and classic
+  shapes; every problem re-proved with captured points playable again
+  ([`docs/problems-audit.md`](docs/problems-audit.md)).
+- **Release** — conditional Developer ID signing and notarization (macOS) and
+  Authenticode (Windows), a user-initiated update check, and native
+  screenshots of the packaged apps in CI.
 
 ## Places, one board
 
-- **Today** — see "v3 at a glance".
+- **Today** — one starting screen: continue (or the suggested game), today's
+  five, the next lesson, what to work on, your level over time.
 - **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
   dan), or two players on one board. Handicap is suggested from your level.
   The panel shows only the players, whose turn it is, **Pass** (with a
@@ -68,11 +79,17 @@ existing Gomoku app. It deliberately uses a different bundle ID
   record that declares a non-Japanese ruleset is rejected with an
   explanation rather than silently re-scored.
 - **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
-  wood/paper/slate board, coordinates, move numbers, sound, your level.
+  Plain / Light wood / Ink board, coordinates, move numbers, sound, your
+  level, and update checks.
 - **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
-  ⌘1/2/3 places, ←/→ through a review, and the board itself is playable with
+  ⌘1/2/3/4 places, ←/→ through a review, and the board itself is playable with
   Tab, the arrow keys and Space (⌘/ lists them all; Ctrl on Windows).
-- **Offline by design** — no account, no network request, no telemetry.
+- **Offline by design** — no account, no telemetry, and no network request
+  unless you ask for one: **Check for updates…** makes a single request to
+  GitHub for the latest release, and the weekly automatic check is off
+  until you turn it on in Settings. Nothing about you or your games is
+  sent; everything else (KataGo, lessons, your library) stays on your
+  computer.
 
 ## Honest content
 
@@ -86,8 +103,29 @@ The course and the problems are verified, not counted:
   proof size and number of tempting wrong moves).
 - `scripts/check-course.mjs` checks every lesson in four languages and proves
   every lesson problem the same way.
+- Every problem is proved under real-board rules: a captured point can be
+  played again (retake, throw back in, fill an eye), and the key stones of a
+  life or kill problem must be sealed in, so they can never live through a
+  liberty outside the problem area that nobody is allowed to fill. Both
+  checks run for the course too. Before v4, problems were proved with
+  captured points kept out of play and some lived through such outside
+  liberties; the v4 audit (`docs/problems-audit.md`) fixed 17 of those
+  problems and removed 37 that could not be fixed cleanly.
 - The solver treats a ko or an unsettled position as a failure for the
-  attacker, so a problem is only listed when its answer is unconditional.
+  attacker, so a problem is only listed when its answer is unconditional
+  (the 10 ko problems say so and are proved to be kos). Seki counts as life,
+  as under Japanese rules: a kill that only reaches seki fails.
+- Seki is recognised soundly: the defender survives even if the attacker
+  moves first, cannot reach independent life even moving first (both with
+  every ko counted against it), and lives alongside stones inside the fight
+  rather than through a point outside the problem. The 13 seki problems
+  (goal `seki`) are proved to have seki as their best result and to end in
+  one. Bent four in the corner is never accepted as life.
+- 262 problems: 28 capturing races (eye against no eye, big eye against
+  small eye, outside liberties), 13 seki problems and 20 classic textbook
+  shapes (straight and bent three, pyramid four, bulky and crossed five,
+  rabbity six, rectangular six, seven stones on the second line), each in
+  four languages and graded by measurement.
 
 v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
 with cyclic difficulty labels. v2 removed them.
@@ -130,8 +168,9 @@ shell serves.
 ```bash
 npm test
 npm run release-check
-npm run ui-test        # real Chromium: flows, budgets, four languages, visuals
+npm run ui-test        # real Chromium: flows, budgets, four languages, one primary per screen, visuals
 npm run ui-update      # rewrite tests/visual baselines after an intended change
+node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv for native-speaker review
 ```
 
 The suite covers Japanese rules and scoring, ko and suicide, SGF round trips
@@ -178,11 +217,22 @@ native gates, and only then creates the tag and GitHub Release. Release
 notes live in `.github/release-notes/<tag>.md`.
 
 ```bash
-gh workflow run release.yml -f tag=v3.0.0
+gh workflow run release.yml -f tag=v4.0.0
 ```
 
 Use `-f rehearse=true` to run every gate and both builds without tagging or
 publishing.
+
+Signing is conditional on repository secrets (see
+[`docs/signing.md`](docs/signing.md)): with them, the macOS app and its
+KataGo sidecar are signed with a Developer ID under the hardened runtime,
+notarized and stapled, and the Windows `goban-studio.exe` and `katago.exe`
+are Authenticode-signed and timestamped; without them the builds fall back
+to ad-hoc / unsigned and say so in the release notes. Both platform builds
+also run a native screenshot tour of the packaged app
+(`scripts/tour-app.mjs`: Today, a 19×19 game, its review, Practice,
+Settings) and upload the captures as `native-screenshots-macos` /
+`native-screenshots-windows`.
 
 ## Architecture
 
@@ -192,14 +242,20 @@ src/web/styles.css            design tokens, light/dark, every component
 src/web/js/main.jsx           entry
 src/web/js/app/store.js       one state object, update(), toasts, announcements
 src/web/js/app/controller.js  everything the app does (play, review, practice, library)
-src/web/js/app/*.jsx          views: shell, play + review, practice, library, sheets
+src/web/js/app/chrome.jsx     sidebar and toolbar (docs/design.md)
+src/web/js/app/*.jsx          views: play + review, today, practice, library, sheets
+src/web/js/app/story.js       step-by-step mistake stories (rules-derived descriptions)
+src/web/js/app/explain.js     key mistakes and loss attribution
 src/web/js/board.js           canvas renderer: zoom windows, overlays, keyboard cursor
 src/web/js/engine.js          one engine interface: strength ladder, hints, review, dead stones
 src/web/js/katago.js          native bridge client and KataGo report parser
 src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engine
 src/web/js/solver.js          life-and-death / capturing solver (nets, snapbacks, ko)
-src/web/js/materials.js       board textures and stone sprites (src/web/assets)
+src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
+src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
+src/web/js/update.js          update check: version compare, opt-in weekly schedule
+src/update.zig                the one network request: GitHub's latest-release API
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)

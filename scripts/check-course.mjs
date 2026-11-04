@@ -4,14 +4,17 @@
  *   node scripts/check-course.mjs            check everything, one-line summary
  *   node scripts/check-course.mjs --lines    also print every problem's solution line
  *
- * Every problem step is proved with the solver: it must parse, have between
- * one and three correct first moves found by an exact search, and its
- * solution line must reach a won position, all in under two seconds. Every
- * place step must have in-range, empty accept points. Text must exist in all
- * four languages. Exits non-zero on any failure.
+ * Every problem step is proved with the solver under real-board rules
+ * (captured points can be played again): it must parse, have between one and
+ * three correct first moves found by an exact search, and its solution line
+ * must reach a won position, all in under two seconds. A life or kill step's
+ * key stones must not be able to reach a liberty outside the problem area
+ * (see outsideReach() in solver.js). Every place step must have in-range,
+ * empty accept points. Text must exist in all four languages. Exits non-zero
+ * on any failure.
  */
 import { COURSE } from "../src/web/js/content/course.js";
-import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram } from "../src/web/js/solver.js";
+import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach } from "../src/web/js/solver.js";
 
 const LANGS = ["zh", "en", "ko", "ja"];
 const MIN_UNITS = 8;
@@ -163,6 +166,11 @@ for (const unit of COURSE) {
         } catch (e) {
           fail(sw, `createPuzzle failed: ${e.message}`);
           return;
+        }
+        if (prob.replay === false) fail(sw, "replay: false is not allowed (captured points are always back in play)");
+        if (pz.lifeGoal) {
+          const reach = outsideReach(pz);
+          if (reach.length) fail(sw, `the key stones can reach a liberty outside the problem area at ${reach.map(pointLabel).join(" ")}`);
         }
         const first = solveFirstMoves(pz);
         if (!first.exact) fail(sw, "solveFirstMoves is not exact");

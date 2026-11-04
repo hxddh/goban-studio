@@ -1,7 +1,7 @@
 /**
- * The shell: a slim rail with four places (Today, Play, Practice, Library),
- * back/forward history, the native menu bar, keyboard handling, and the
- * place itself.
+ * The shell: the sidebar with four places (Today, Play, Practice, Library),
+ * the native menu bar, keyboard handling, and the place itself. Each place
+ * starts with the shared toolbar (chrome.jsx).
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
@@ -11,54 +11,12 @@ import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeO
 import { state, update, useAppState, toast } from "./store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
-import { Icon, IconButton, MOD } from "./parts.jsx";
+import { SPACES, Sidebar, isFocus } from "./chrome.jsx";
 import { TodayView } from "./today.jsx";
 import { PlayView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryView } from "./library.jsx";
 import { Sheets } from "./sheets.jsx";
-
-const SPACES = [
-  { id: "today", icon: "today", key: "nav.today" },
-  { id: "play", icon: "play", key: "nav.play" },
-  { id: "practice", icon: "practice", key: "nav.practice" },
-  { id: "library", icon: "library", key: "nav.library" },
-];
-
-function Rail() {
-  return (
-    <nav class="rail" aria-label={t("nav.main")}>
-      <div class="rail-top" data-drag>
-        <img class="mark" src="assets/brand.svg" alt="" aria-hidden="true" width="28" height="28" />
-      </div>
-      <div class="history-btns">
-        <IconButton icon="back" label={`${t("nav.back")} (${MOD}[)`} onClick={C.back} disabled={!C.canGoBack()} />
-        <IconButton icon="forward" label={`${t("nav.forward")} (${MOD}])`} onClick={C.forward} disabled={!C.canGoForward()} />
-      </div>
-      <ul>
-        {SPACES.map((sp, i) => (
-          <li>
-            <button
-              type="button"
-              class={`rail-btn ${state.space === sp.id ? "on" : ""}`}
-              aria-current={state.space === sp.id ? "page" : undefined}
-              title={`${t(sp.key)} (${MOD}${i + 1})`}
-              onClick={() => C.goSpace(sp.id)}
-            >
-              <Icon name={sp.icon} size={20} />
-              <span>{t(sp.key)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div class="rail-foot">
-        <button type="button" class="rail-btn small" title={`${t("nav.settings")} (${MOD},)`} aria-label={t("nav.settings")} onClick={() => C.openSheet("settings")}>
-          <Icon name="gear" size={19} />
-        </button>
-      </div>
-    </nav>
-  );
-}
 
 function Toasts() {
   return (
@@ -79,11 +37,11 @@ function App() {
     document.title = "Goban Studio";
   });
   if (!s.ready) return null;
-  const focus = s.settings.focus && s.space === "play" && !C.playReviewing();
+  const focus = isFocus();
   const reviewKey = s.review ? "review-" + s.review.source : "";
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
-      {!focus && <Rail />}
+      {!focus && <Sidebar />}
       <main class="main" id="main">
         <div class="place" key={s.space + reviewKey + (s.space === "practice" ? s.practice.view : "")}>
           {s.space === "today" && <TodayView />}
@@ -118,6 +76,7 @@ function App() {
 const COMMANDS = {
   "app.settings": () => C.openSheet("settings"),
   "help.shortcuts": () => C.openSheet("shortcuts"),
+  "help.checkUpdates": () => C.checkForUpdates(),
   "file.new": () => C.openNewGame(),
   "file.import": () => C.pickImport(),
   "file.export": () => (C.playReviewing() || state.review ? C.exportSGF(state.review.game, state.review.meta.name) : C.exportSGF()),
@@ -192,6 +151,8 @@ function menuSpec() {
       items: [
         { label: t("nav.settings"), command: "app.settings", key: "," },
         { label: t("shortcuts.title"), command: "help.shortcuts", key: "/" },
+        { separator: true },
+        { label: t("update.check"), command: "help.checkUpdates" },
       ],
     },
   ];
@@ -271,6 +232,10 @@ function onKeyDown(e) {
   }
   if (state.sheet || typing || e.altKey) return;
   const reviewing = state.review && (state.review.meta.space || "play") === state.space;
+  if (reviewing && state.review.variation?.story && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    e.preventDefault();
+    return C.storyStep(e.key === "ArrowLeft" ? -1 : 1);
+  }
   if (reviewing && !state.review.guess) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
@@ -338,6 +303,8 @@ export function start() {
       if (++n >= 6) clearInterval(timer);
     }, 1500);
     setTimeout(() => import("../selftest.js").then((m) => m.runSelfTest({ state })), 900);
+    // v4 release checks: the screenshot tour, only when the host was launched with GOBAN_TOUR_OUT.
+    setTimeout(() => Host.selftestConfig().then((c) => c?.tour && import("../tour.js").then((m) => m.runTour(c))), 1200);
   }
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => {

@@ -95,6 +95,10 @@ in this table. Usage targets:
 | crossed five | 梅花五 | crossed five | 오궁도화 | 花五 | |
 | flower six (rabbity six) | 梅花六 / 葡萄六 | flower six / rabbity six | 매화육궁 | 花六 | |
 | rectangular six | 板六 | rectangular six | 판육궁 | 板六 | |
+| rabbity six (shape name) | 梅花六 | rabbity six | 매화육궁 | 花六 | v4 `shape.rabbity-six`: the same shape as flower six above; the English shape list uses the other common name |
+| seven stones on the second line ("six die, eight live") | 二路七子（六死八活） | seven stones on the second line (six die, eight live) | 2선의 일곱 점 (육사팔활) | 二線の七子（六死八活） | v4 `shape.second-line-seven` |
+| independent life (two eyes, as opposed to seki) | 净活 | independent life | 완생 | 完全な生き | used in docs and code comments; the UI says "live" / "seki" |
+| classic shapes (collection) | 基本死活形 | classic shapes | 사활의 기본형 | 死活の基本形 | v4 `practice.shapes` |
 
 ## Capturing races
 
@@ -107,7 +111,10 @@ in this table. Usage targets:
 | shared liberty | 公气 | shared liberty | 공동 공배 | 内ダメ | see decisions below; ja course v3 used 共通のダメ → 内ダメ |
 | neutral point (dame) | 单官 | neutral point | 공배 | ダメ | |
 | eye versus no eye | 有眼杀无眼 | eye versus no eye | 유가무가 | 眼あり眼なし | problem theme `race-eye` |
-| seki | 双活 | seki | 빅 | セキ | problem theme `seki` |
+| seki | 双活 | seki | 빅 | セキ | problem theme `seki` and goal `seki` (v4): "live in seki" = zh 做成双活, ko 빅으로 살다, ja セキで生きる |
+| semeai (= capturing race) | 对杀 | capturing race | 수상전 | 攻め合い | problem theme `race`; "semeai" is not used in UI strings |
+| big eye versus small eye | 大眼杀小眼 | big eye versus small eye | 큰 눈 대 작은 눈 | 大きい眼と小さい眼 | problem theme `race-big-eye` (v4); see review list |
+| liberties of a big eye (3 / 5 / 8 / 12) | 三目三气、四目五气、五目八气、六目十二气 | a big eye of 3, 4, 5, 6 points gives 3, 5, 8, 12 liberties | 3궁 3수, 4궁 5수, 5궁 8수, 6궁 12수 | 三目三手、四目五手、五目八手、六目十二手 | problem hint `bigEye` |
 
 ## Scoring and rules
 
@@ -228,3 +235,8 @@ The items I am least sure about:
    reviewer may prefer ダメ everywhere.
 7. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
    bank. I kept them as the author wrote them, but I have not confirmed them.
+8. v4: the big-eye race theme — ko **큰 눈 대 작은 눈** and ja
+   **大きい眼と小さい眼** are descriptive; an established short name may exist
+   (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
+   for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
+   collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.

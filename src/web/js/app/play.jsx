@@ -2,16 +2,18 @@
  * Play: the live game, scoring, the result; and the review layer over any
  * game (whole-game analysis, live analysis, variations, key mistakes).
  */
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { areaOf, rankParts, strengthById } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
+import { storyText } from "./story.js";
 import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
+import { Toolbar } from "./chrome.jsx";
 
 export function rankLabel(id) {
   const r = rankParts(id);
@@ -78,16 +80,39 @@ export function PlayView() {
     interactive: !g.thinking && !g.pending && (scoring ? true : game.phase === "playing" && !node.result && myTurn),
   };
   return (
-    <div class={`workspace ${scoring ? "is-scoring" : ""} ${node.result ? "is-over" : ""}`}>
-      <section class="stage" aria-label={t("nav.play")}>
-        <div class="drag" data-drag />
-        {focus && <FocusBar />}
-        <Board model={model} onPlay={C.humanPlay} onHover={(v) => (v ? C.canPlayHere(v.x, v.y) : true)} />
-        {g.proposal && !scoring && !node.result && <ProposalBar />}
-      </section>
-      {!focus && <PlayPanel />}
-    </div>
+    <>
+      <Toolbar title={t("nav.play")} sub={gameFacts(g)}>
+        {focus ? (
+          <FocusTools />
+        ) : (
+          <Button kind="secondary" size="sm" icon="plus" onClick={() => C.openNewGame()} title={`${t("common.newGame")} (${MOD}N)`}>
+            {t("common.newGame")}
+          </Button>
+        )}
+      </Toolbar>
+      <div class={`workspace ${focus ? "focus" : ""} ${scoring ? "is-scoring" : ""} ${node.result ? "is-over" : ""}`}>
+        <section class="stage" aria-label={t("nav.play")}>
+          <Board model={model} onPlay={C.humanPlay} onHover={(v) => (v ? C.canPlayHere(v.x, v.y) : true)} />
+          {g.proposal && !scoring && !node.result && <ProposalBar />}
+        </section>
+        {!focus && <PlayPanel />}
+      </div>
+    </>
   );
+}
+
+/** Size, komi, handicap, time and move: the game's facts, in one line. */
+function gameFacts(g) {
+  const game = g.game;
+  return [
+    `${game.size} × ${game.size}`,
+    t("play.komiN", [formatPoints(game.komi)]),
+    game.handicap ? t("play.handicapN", [game.handicap]) : null,
+    g.clock ? t("time." + g.clock.mode) : null,
+    game.moveNumber ? t("play.moveN", [game.moveNumber]) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function ProposalBar() {
@@ -123,17 +148,17 @@ function statusText(g) {
   return t("play.yourTurn");
 }
 
-function FocusBar() {
+function FocusTools() {
   const g = state.game;
   return (
-    <div class="focus-bar" role="toolbar" aria-label={t("play.focus")}>
+    <div class="focus-tools" role="toolbar" aria-label={t("play.focus")}>
       <span class="focus-status">
         <Stone color={g.game.turn} size={12} /> {statusText(g)}
       </span>
       {g.clock && <span class="clock mini">{formatClock(g.clock[g.game.turn === BLACK ? "b" : "w"])}</span>}
       <IconButton icon="pass" label={t("common.pass")} onClick={C.requestPass} />
       <IconButton icon="undo" label={t("common.undo")} onClick={C.undo} />
-      <IconButton icon="focus" label={t("play.exitFocus")} onClick={C.toggleFocus} />
+      <IconButton icon="focus" label={t("play.exitFocus")} active onClick={C.toggleFocus} />
     </div>
   );
 }
@@ -203,38 +228,38 @@ function EvalBar() {
 function MoveStrip() {
   const g = state.game;
   const game = g.game;
-  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const line = game.mainLine().slice(1);
-  if (!line.length) return <p class="muted moves-empty">{t("play.noMoves")}</p>;
-  const shown = open ? line : line.slice(-14);
-  const offset = line.length - shown.length;
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [line.length]);
   const peek = (i) => {
     C.reviewCurrentGame();
     C.reviewGoto(i);
   };
   return (
-    <section class={`moves ${open ? "open" : ""}`} aria-label={t("play.moveList")}>
-      <header>
-        <h2>{t("play.moveList")}</h2>
-        <button type="button" class="link" onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? t("play.collapse") : t("play.showAll", [line.length])}
-        </button>
-      </header>
-      <ol class="move-grid" start={offset + 1}>
-        {shown.map((n, k) => {
-          const i = offset + k + 1;
-          const m = n.move;
-          return (
-            <li>
-              <button type="button" onClick={() => peek(i)} title={t("play.peek")}>
-                <span class="mn">{i}</span>
-                <Stone color={m.color} size={9} />
-                <span>{m.pass ? t("common.pass") : coordLabel(m.x, m.y, game.size)}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+    <section class="moves" aria-label={t("play.moveList")}>
+      <h2 class="slot-title">{t("play.moveList")}</h2>
+      {line.length === 0 ? (
+        <p class="moves-empty">{t("play.noMoves")}</p>
+      ) : (
+        <ol class="move-grid" ref={ref}>
+          {line.map((n, k) => {
+            const i = k + 1;
+            const m = n.move;
+            return (
+              <li class={i === line.length ? "last" : ""}>
+                <button type="button" onClick={() => peek(i)} title={t("play.peek")}>
+                  <span class="mn">{i}</span>
+                  <Stone color={m.color} size={8} />
+                  <span>{m.pass ? t("common.pass") : coordLabel(m.x, m.y, game.size)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -271,15 +296,8 @@ function PlayPanel() {
   const playing = game.phase === "playing" && !over && !g.scoring;
   const myTurn = g.opponent === "human" || game.turn === g.humanColor;
   const canUndo = !!game.current.parent && !g.thinking;
-  const meta = [`${game.size} × ${game.size}`, t("play.komiN", [formatPoints(game.komi)]), game.handicap ? t("play.handicapN", [game.handicap]) : null, g.clock ? t("time." + g.clock.mode) : null].filter(Boolean);
   return (
     <aside class="panel" aria-label={t("play.panel")}>
-      <header class="panel-head" data-drag>
-        <h1>{t("nav.play")}</h1>
-        <Button kind="ghost" icon="plus" size="sm" onClick={() => C.openNewGame()} title={`${t("common.newGame")} (${MOD}N)`}>
-          {t("common.newGame")}
-        </Button>
-      </header>
       <section class="players" aria-label={t("play.players")}>
         <PlayerRow color={BLACK} />
         <PlayerRow color={WHITE} />
@@ -307,6 +325,7 @@ function PlayPanel() {
               items={[
                 { icon: "bulb", label: t("common.hint"), kbd: `${SHIFT}${MOD}H`, onClick: C.askHint, disabled: !myTurn || g.thinking },
                 { icon: "chart", label: t("play.reviewSoFar"), onClick: C.reviewCurrentGame, disabled: game.mainLine().length < 2 },
+                { icon: "check", label: t("play.countNow"), onClick: C.acceptCount, disabled: game.moveNumber < game.size * 2 },
                 "-",
                 { icon: "save", label: g.saved ? t("play.saveAgain") : t("play.save"), onClick: () => C.saveToLibrary(), disabled: game.moveNumber === 0 },
                 { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportSGF() },
@@ -325,11 +344,7 @@ function PlayPanel() {
         {g.ghost && <p class="fine">{t("play.confirmHint")}</p>}
       </div>
       <MoveStrip />
-      <footer class="panel-foot">
-        <span>{meta.join(" · ")}</span>
-        <span>{t("play.moveN", [game.moveNumber])}</span>
-      </footer>
-      {!state.engine.available && g.opponent === "ai" && <p class="fine">{t("play.offlineNote")}</p>}
+      {!state.engine.available && g.opponent === "ai" && <p class="fine panel-note">{t("play.offlineNote")}</p>}
     </aside>
   );
 }
@@ -349,14 +364,14 @@ function ScoringCard() {
           <strong>
             <CountUp value={pending ? 0 : s.black} format={formatPoints} />
           </strong>
-          <span>{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory])}</span>
+          <span class="score-detail">{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory]).split(" · ").map((x) => <i>{x}</i>)}</span>
         </div>
         <div>
           <Stone color={WHITE} size={14} />
           <strong>
             <CountUp value={pending ? 0 : s.white} format={formatPoints} />
           </strong>
-          <span>{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)])}</span>
+          <span class="score-detail">{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)]).split(" · ").map((x) => <i>{x}</i>)}</span>
         </div>
       </div>
       {!pending && <p class="score-result enter-fade">{C.resultText(s.result)}</p>}
@@ -478,15 +493,30 @@ export function ReviewView() {
         marks.push({ x: m.x, y: m.y, type: "candidate", rank: i, label: String(Math.round(wr * 100)) });
       });
   }
+  // A story step hides the stones its moves have captured.
+  let board = node.board.signMap;
+  let varMoves = r.variation ? r.variation.moves : null;
+  if (r.variation?.story) {
+    const km = r.keyMoves.find((k) => k.index === r.variation.index);
+    const steps = (km?.story?.[r.variation.kind] || []).slice(0, r.variation.step + 1);
+    const gone = new Set(steps.flatMap((st) => (st.captured || []).map((p) => p.x + "," + p.y)));
+    if (gone.size) {
+      board = board.map((row, y) => row.map((v, x) => (gone.has(x + "," + y) ? 0 : v)));
+      // A stone of the line itself can be captured later in the line.
+      const lastAt = new Map();
+      varMoves.forEach((m, i) => lastAt.set(m.x + "," + m.y, i));
+      varMoves = varMoves.filter((m, i) => lastAt.get(m.x + "," + m.y) === i && !steps.slice(m.n).some((st) => (st.captured || []).some((p) => p.x === m.x && p.y === m.y)));
+    }
+  }
   const model = {
     size: game.size,
-    board: node.board.signMap,
+    board,
     lastMove: node.move,
     marks,
     ownership: C.reviewOwnershipMap(),
     territory: null,
     deadStones: [],
-    variation: r.variation ? r.variation.moves : null,
+    variation: varMoves,
     moveNumbers: r.variation ? null : moveNumbers(game),
     showCoords: s.settings.coords,
     material: s.settings.board,
@@ -494,14 +524,51 @@ export function ReviewView() {
     hoverColor: r.guess?.done ? null : game.turn,
     interactive: !(r.guess && r.guess.done),
   };
+  const h = reviewHeading(r);
   return (
-    <div class="workspace review-layer">
-      <section class="stage" aria-label={t("review.title")}>
-        <div class="drag" data-drag />
-        <Board model={model} onPlay={C.reviewPlay} />
-        <ReviewNav />
-      </section>
-      <ReviewPanel />
+    <>
+      <Toolbar crumbs={h.crumbs} title={h.title} sub={h.sub}>
+        <ReviewTools />
+      </Toolbar>
+      <div class="workspace review-layer">
+        <section class="stage" aria-label={t("review.title")}>
+          <Board model={model} onPlay={C.reviewPlay} />
+          <ReviewNav />
+        </section>
+        <ReviewPanel />
+      </div>
+    </>
+  );
+}
+
+function reviewHeading(r) {
+  const meta = r.meta;
+  const line = r.game.mainLine();
+  const result = line[line.length - 1].result;
+  const space = meta.space || "play";
+  const crumbs = [{ label: t(space === "library" ? "nav.library" : space === "practice" ? "nav.practice" : "nav.play"), onClick: C.closeReview }];
+  let title = t("review.title");
+  let sub = result ? C.resultText(result) : "";
+  if (meta.classic) {
+    title = C.tx(meta.classic.title);
+    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
+  } else if (meta.opening) title = C.tx(meta.opening.title);
+  else if (meta.name) title = meta.name;
+  return { crumbs, title, sub };
+}
+
+/** Review tools live in the toolbar; Esc or × goes back. */
+function ReviewTools() {
+  const r = state.review;
+  const meta = r.meta;
+  return (
+    <div class="tool-group">
+      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis && !r.guess} onClick={C.toggleLive} />}
+      <IconButton icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
+      <IconButton icon="target" label={t("review.guess")} active={!!r.guess} onClick={C.toggleGuess} />
+      <IconButton icon="download" label={t("common.exportSgf")} onClick={() => C.exportSGF(r.game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
+      <span class="tool-sep" />
+      <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
     </div>
   );
 }
@@ -636,31 +703,70 @@ function sentenceFor(km, size) {
 function KeyMove({ km }) {
   const r = state.review;
   const size = r.game.size;
-  const active = r.variation?.index === km.index ? r.variation.kind : null;
+  const v = r.variation?.index === km.index ? r.variation : null;
+  const open = r.focus === km.index;
+  const story = km.story;
+  const line = v?.story ? v.kind : null;
+  const steps = line ? story?.[line] || [] : [];
+  const canBetter = story?.better?.length > 0;
+  const canPlayed = story?.played?.length > 0;
   return (
-    <li class={`key-move ${active ? "on" : ""}`}>
-      <button type="button" class="key-head" onClick={() => C.focusMistake(km)}>
+    <li class={`key-move ${open ? "on" : ""}`}>
+      <button type="button" class="key-head" aria-expanded={open} onClick={() => C.focusMistake(km)}>
         <Stone color={km.move.color} size={12} />
         <span>{t("review.moveLabel", [km.index, colorName(km.move.color), coordLabel(km.move.x, km.move.y, size)])}</span>
         <em>{t("review.lossN", [formatPoints(Math.round(km.loss * 2) / 2)])}</em>
       </button>
-      <p>{sentenceFor(km, size)}</p>
-      {km.theme && <span class="chip theme-chip">{t("explain.looksLike", [C.themeName(km.theme)])}</span>}
-      <div class="seg-mini">
-        <button type="button" class={active === "played" ? "on" : ""} onClick={() => C.showVariation(km, "played")}>
-          {t("review.showPlayed")}
-        </button>
-        {km.best && !km.best.pass && (
-          <button type="button" class={active === "better" ? "on" : ""} onClick={() => C.showVariation(km, "better")}>
-            {t("review.showBetter")}
-          </button>
-        )}
-        {km.best && !km.best.pass && (
-          <button type="button" onClick={() => C.practiceThis(km)}>
-            {t("review.practiceThis")}
-          </button>
-        )}
-      </div>
+      {open && (
+        <>
+          <p>{story?.summary ? storyText(story.summary) : sentenceFor(km, size)}</p>
+          <div class="seg-mini">
+            {km.attribution?.kind && <span class="chip theme-chip">{t("lossKind." + km.attribution.kind)}</span>}
+            {km.theme && <span class="chip theme-chip">{t("explain.looksLike", [C.themeName(km.theme)])}</span>}
+          </div>
+          <div class="seg-mini" role="group" aria-label={t("story.title")}>
+            {canBetter ? (
+              <button type="button" class={line === "better" ? "on" : ""} onClick={() => C.showStory(km, "better", 0)}>
+                {t("story.better")}
+              </button>
+            ) : (
+              km.best &&
+              !km.best.pass && (
+                <button type="button" class={v?.kind === "better" ? "on" : ""} onClick={() => C.showVariation(km, "better")}>
+                  {t("review.showBetter")}
+                </button>
+              )
+            )}
+            {canPlayed ? (
+              <button type="button" class={line === "played" ? "on" : ""} onClick={() => C.showStory(km, "played", 0)}>
+                {t("story.played")}
+              </button>
+            ) : (
+              <button type="button" class={v?.kind === "played" ? "on" : ""} onClick={() => C.showVariation(km, "played")}>
+                {t("review.showPlayed")}
+              </button>
+            )}
+            {km.best && !km.best.pass && (
+              <button type="button" onClick={() => C.practiceThis(km)}>
+                {t("review.practiceThis")}
+              </button>
+            )}
+          </div>
+          {steps.length > 0 && (
+            <ol class="story" aria-label={t("story.title")}>
+              {steps.map((st, i) => (
+                <li>
+                  <button type="button" class={i === v.step ? "on" : ""} aria-current={i === v.step ? "step" : undefined} onClick={() => C.showStory(km, line, i)}>
+                    <span class="sn">{st.n}</span>
+                    <span>{storyText(st)}</span>
+                  </button>
+                </li>
+              ))}
+              {line === "played" && story.playedFrom === "game" && <li class="fine">{t("story.playedGame")}</li>}
+            </ol>
+          )}
+        </>
+      )}
     </li>
   );
 }
@@ -677,7 +783,7 @@ function LiveLine() {
         <i style={{ width: `${b}%` }} />
       </div>
       <span class="fine">
-        {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
+        {t("review.estimateAt", [Math.max(0, C.reviewIndex())])} · {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
         {live && !r.live.done ? ` · ${t("review.liveSearching")}` : ""}
       </span>
       {live && !r.variation && !r.guess && <span class="fine">{t("review.candidatesLegend")}</span>}
@@ -689,7 +795,7 @@ function Variations() {
   const r = state.review;
   const inVar = !C.onMainLine();
   const branches = C.branchPoints();
-  if (!inVar && !branches.length) return <p class="fine">{t("review.tryHint")}</p>;
+  if (!inVar && !branches.length) return null;
   return (
     <section class="variations">
       {inVar && (
@@ -715,56 +821,45 @@ function Variations() {
           ))}
         </ul>
       )}
-      {!inVar && <p class="fine">{t("review.tryHint")}</p>}
       {void r}
     </section>
   );
 }
 
+/** No key mistakes: praise only a player who did not fall behind. */
+function noMistakesText(r) {
+  if (r.meta.classic || r.meta.opening || r.meta.source === "import") return t("review.noKeyMovesNeutral");
+  const line = r.game.mainLine();
+  const res = line[line.length - 1].result || "";
+  const pts = r.points.filter(Boolean);
+  const lead = pts.length ? pts[pts.length - 1].scoreLead : 0;
+  const me = r.meta.humanColor ?? (r.source === "current" && state.game?.opponent === "ai" ? state.game.humanColor : null);
+  if (me == null) return t("review.noKeyMovesNeutral");
+  const lost = res ? res.startsWith("B") !== (me === BLACK) : me * lead < -2;
+  return lost ? t("review.noKeyMovesBehind") : t("review.noKeyMoves");
+}
+
 function ReviewPanel() {
   const r = state.review;
   const meta = r.meta;
-  const game = r.game;
-  const line = game.mainLine();
-  let title = t("review.title");
-  let sub = "";
-  if (meta.classic) {
-    title = C.tx(meta.classic.title);
-    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
-  } else if (meta.opening) title = C.tx(meta.opening.title);
-  else if (meta.name) title = meta.name;
-  const result = line[line.length - 1].result;
+  const line = r.game.mainLine();
   const progress = r.analyzing ? Math.round((r.analyzed / line.length) * 100) : 100;
   return (
     <aside class="panel" aria-label={t("review.title")}>
-      <header class="panel-head layer-head" data-drag>
-        <span class="layer-tag">
-          <Icon name="chart" size={14} /> {t("review.title")}
-        </span>
-        <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
-      </header>
-      <div class="panel-title">
-        <h1>{title}</h1>
-        {sub && <p class="muted">{sub}</p>}
-        {result && <p class="muted">{C.resultText(result)}</p>}
-      </div>
-
       {r.guess ? (
         <GuessCard />
       ) : (
         <>
-          <LiveLine />
           <Chart />
-          <p class="fine" aria-live="polite">
-            {r.analyzing
-              ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress])
-              : r.engine === "katago"
-                ? t("review.analyzedBy", [state.engine.name || "KataGo"])
-                : t("review.estimateNote")}
-          </p>
-          <Variations />
+          <LiveLine />
+          {(r.analyzing || r.engine !== "katago") && (
+            <p class="fine" aria-live="polite">
+              {r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}
+            </p>
+          )}
           <section class="key-moves">
-            <h2>{t("review.keyMoves")}</h2>
+            <h2 class="slot-title">{t("review.keyMoves")}</h2>
+            {r.refining && <p class="fine">{t("story.refining")}</p>}
             {r.keyMoves.length ? (
               <ol>
                 {r.keyMoves.map((km) => (
@@ -772,32 +867,29 @@ function ReviewPanel() {
                 ))}
               </ol>
             ) : (
-              <p class="muted">{r.analyzing ? t("review.waiting") : t("review.noKeyMoves")}</p>
+              <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
             )}
           </section>
+          <Variations />
         </>
       )}
 
       {meta.classic && (
-        <section class="card quiet">
+        <section class="quiet-note">
           <p>{C.tx(meta.classic.note)}</p>
           {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
         </section>
       )}
       {meta.opening && !r.guess && (
-        <section class="card quiet">
+        <section class="quiet-note">
           <p>{C.tx(meta.opening.text)}</p>
         </section>
       )}
 
-      <div class="actions wrap panel-actions">
-        <Button kind="primary" icon="resume" onClick={C.playFromHere}>
+      <div class="panel-foot">
+        <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
           {t("review.playFromHere")}
         </Button>
-        {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis && !r.guess} onClick={C.toggleLive} />}
-        <IconButton icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
-        <IconButton icon="target" label={t("review.guess")} active={!!r.guess} onClick={C.toggleGuess} />
-        <IconButton icon="download" label={t("common.exportSgf")} onClick={() => C.exportSGF(game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
       </div>
     </aside>
   );

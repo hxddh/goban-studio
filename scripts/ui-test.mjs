@@ -63,8 +63,25 @@ function assert(cond, msg) {
 
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 
-async function fresh(locale = "en-US", viewport = { width: 1200, height: 860 }) {
-  const ctx = await browser.newContext({ viewport, locale, reducedMotion: "reduce", deviceScaleFactor: 1 });
+// v4 uses system fonts, which differ between machines. Visual baselines are
+// taken with one pinned font (Inter, tests/fonts, never shipped) so they
+// compare the layout rather than the font installed on the runner.
+const PINNED_FONT = fs.readFileSync(path.join(root, "tests/fonts/inter-latin-wght-normal.woff2")).toString("base64");
+const PIN_CSS = `@font-face{font-family:"Pinned";font-weight:100 900;src:url(data:font/woff2;base64,${PINNED_FONT}) format("woff2")}:root,:root:lang(zh),:root:lang(ja),:root:lang(ko){--font:"Pinned",sans-serif !important}`;
+
+async function fresh(locale = "en-US", viewport = { width: 1200, height: 860 }, { pinFont = false } = {}) {
+  const ctx = await browser.newContext({ viewport, locale, reducedMotion: "reduce", deviceScaleFactor: 1, bypassCSP: pinFont });
+  if (pinFont) {
+    await ctx.addInitScript((css) => {
+      const add = () => {
+        const st = document.createElement("style");
+        st.textContent = css;
+        document.head.appendChild(st);
+      };
+      if (document.head) add();
+      else document.addEventListener("DOMContentLoaded", add);
+    }, PIN_CSS);
+  }
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -151,9 +168,11 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=0");
+  await page.click(".preset >> nth=2");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
+  // Type once the new 9×9 board is on screen, as a person would.
+  await page.waitForFunction(() => window.__board?.model.size === 9);
   await page.focus("canvas.board");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
@@ -161,7 +180,17 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   const moves = await page.evaluate(() => window.__state.game.game.moveNumber);
-  assert(moves === 2, `expected 2 moves, got ${moves}`);
+  if (moves !== 2) {
+    const why = await page.evaluate(() => ({
+      size: window.__board.model.size,
+      cursor: window.__board.model.cursor,
+      interactive: window.__board.model.interactive,
+      focus: document.activeElement?.tagName + "." + document.activeElement?.className,
+      toasts: window.__state.toasts.map((x) => x.message),
+      moves: window.__state.game.game.mainLine().slice(1).map((n) => n.move && [n.move.x, n.move.y]),
+    }));
+    throw new Error(`expected 2 moves, got ${moves}: ${JSON.stringify(why)}`);
+  }
   for (let i = 0; i < 2; i++) {
     await page.keyboard.press("Control+Shift+P");
     await page.click(".sheet-foot .btn.primary");
@@ -177,7 +206,7 @@ await check("a board click paints within budget", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=2");
+  await page.click(".preset >> nth=0");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
   const p = await pointOf(page, 3, 3);
@@ -202,7 +231,7 @@ await check("review: a variation, back to the game, Esc closes the layer", async
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=0");
+  await page.click(".preset >> nth=2");
   await page.click(".sheet .segmented button >> nth=1");
   await page.click(".sheet-foot .btn.primary");
   await clickPoint(page, 4, 4);
@@ -286,9 +315,13 @@ await check("all four languages render every place without overflow or missing s
       const bad = await page.evaluate(() => {
         const text = document.body.innerText;
         const raw = text.match(/\b[a-z]+\.[a-zA-Z]+(\.[a-zA-Z]+)?\b/g)?.filter((s) => /^(nav|play|review|practice|library|settings|today|teach|summary|common|score|error|goal|grade|topic|mistakes|explain|time|newGame|menu)\./.test(s));
-        const over = [...document.querySelectorAll(".btn, .rail-btn, .chip, .segmented button")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim());
-        return { raw: raw || [], over };
+        const over = [...document.querySelectorAll(".btn, .sb-item, .chip, .segmented button")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim());
+        // docs/design.md §1: one primary action per screen.
+        const visible = (el) => el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+        const primaries = [...document.querySelectorAll(".btn.primary")].filter(visible).length;
+        return { raw: raw || [], over, primaries };
       });
+      assert(bad.primaries <= 1, `${locale} place ${k}: ${bad.primaries} primary buttons`);
       assert(!bad.raw.length, `${locale}: raw keys ${bad.raw.join(", ")}`);
       assert(!bad.over.length, `${locale}: clipped ${bad.over.join(", ")}`);
     }
@@ -305,11 +338,12 @@ for (const vp of [
   { width: 1920, height: 1080, tag: "1920" },
 ]) {
   await check(`visual: places at ${vp.tag}`, async () => {
-    const page = await fresh("en-US", { width: vp.width, height: vp.height });
+    const page = await fresh("en-US", { width: vp.width, height: vp.height }, { pinFont: true });
+    await page.evaluate(() => document.fonts.ready);
     await onboard(page, 1);
     // A fixed two-player position so the board is deterministic.
     await page.keyboard.press("Control+n");
-    await page.click(".preset >> nth=0");
+    await page.click(".preset >> nth=2");
     await page.click(".sheet .segmented button >> nth=1");
     await page.click(".sheet-foot .btn.primary");
     for (const [x, y] of [[2, 2], [6, 6], [6, 2], [2, 6], [4, 4]]) await clickPoint(page, x, y);
