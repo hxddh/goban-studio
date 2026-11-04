@@ -67,8 +67,10 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   that lost the most, each with the move played and KataGo's better line to
   play through on the board. Territory estimate, “guess the next move” and
   “play from here” are one click away.
-- **Practice** — a course that starts from zero (units → multi-step lessons
-  with explanation, placement exercises and live problems), problem
+- **Practice** — a course that starts from zero and goes on to intermediate
+  play (opening principles, basic joseki, shape, endgame, middle-game
+  fighting), in units of multi-step lessons with explanation, placement
+  exercises and live problems; problem
   collections by topic, and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
   refutation on the board, a right move with the most stubborn defence.

@@ -1,5 +1,6 @@
 /**
- * Verify the beginner course (src/web/js/content/course.js).
+ * Verify the course (src/web/js/content/course.js and the intermediate
+ * units in course-intermediate.js).
  *
  *   node scripts/check-course.mjs            check everything, one-line summary
  *   node scripts/check-course.mjs --lines    also print every problem's solution line
@@ -10,16 +11,20 @@
  * must reach a won position, all in under two seconds. A life or kill step's
  * key stones must not be able to reach a liberty outside the problem area
  * (see outsideReach() in solver.js). Every place step must have in-range,
- * empty accept points. Text must exist in all four languages. Exits non-zero
- * on any failure.
+ * empty accept points that are legal moves (not suicide), and no marks (the
+ * app draws marks on read steps only). A unit's `level` is absent (beginner)
+ * or "intermediate", and every intermediate unit comes after the beginner
+ * units. Text must exist in all four languages. Exits non-zero on any
+ * failure.
  */
 import { COURSE } from "../src/web/js/content/course.js";
 import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach } from "../src/web/js/solver.js";
 
 const LANGS = ["zh", "en", "ko", "ja"];
-const MIN_UNITS = 8;
-const MIN_LESSONS = 36;
-const MIN_STEPS = 150;
+const MIN_UNITS = 13;
+const MIN_LESSONS = 60;
+const MIN_STEPS = 240;
+const LEVELS = [undefined, "intermediate"];
 const MAX_PROBLEM_MS = 2000;
 const showLines = process.argv.includes("--lines");
 
@@ -59,11 +64,49 @@ function placeDiagram(where, spec) {
     return null;
   }
   const grid = spec.diagram.map((r) => r.replace(/\s+/g, "").split(""));
-  return { d, grid, size };
+  return { d, grid, size, x0, y0 };
 }
 
 function pointLabel(p) {
   return `(${p.x},${p.y})`;
+}
+
+/**
+ * Would a stone of `color` at diagram point (x, y) have a liberty, or
+ * capture something? Points of the board outside the diagram are empty.
+ */
+function legalPlacement({ grid, size, x0, y0 }, x, y, color) {
+  const at = (a, b) => {
+    const ch = grid[b]?.[a] ?? ",";
+    return ch === "X" || ch === "x" ? 1 : ch === "O" || ch === "o" ? -1 : 0;
+  };
+  const N = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const inside = (a, b) => a + x0 >= 0 && b + y0 >= 0 && a + x0 < size && b + y0 < size;
+  // Liberties of the chain at (a, b) with (x, y) occupied by `color`.
+  const libs = (a, b, c) => {
+    const seen = new Set([`${a},${b}`]);
+    const stack = [[a, b]];
+    let n = 0;
+    while (stack.length) {
+      const [p, q] = stack.pop();
+      for (const [dx, dy] of N) {
+        const nx = p + dx;
+        const ny = q + dy;
+        if (!inside(nx, ny) || seen.has(`${nx},${ny}`)) continue;
+        seen.add(`${nx},${ny}`);
+        const v = nx === x && ny === y ? color : at(nx, ny);
+        if (v === 0) n++;
+        else if (v === c) stack.push([nx, ny]);
+      }
+    }
+    return n;
+  };
+  for (const [dx, dy] of N) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (inside(nx, ny) && at(nx, ny) === -color && libs(nx, ny, -color) === 0) return true;
+  }
+  return libs(x, y, color) > 0;
 }
 
 let units = 0;
@@ -89,6 +132,8 @@ for (const unit of COURSE) {
   unitIds.add(unit.id);
   checkText(uw, "title", unit.title);
   checkText(uw, "summary", unit.summary);
+  if (!LEVELS.includes(unit.level)) fail(uw, `unknown level ${unit.level}`);
+  if (!unit.level && COURSE.slice(0, COURSE.indexOf(unit)).some((u) => u.level)) fail(uw, "a beginner unit comes after an intermediate unit");
   if (!Array.isArray(unit.lessons) || !unit.lessons.length) {
     fail(uw, "no lessons");
     continue;
@@ -135,6 +180,7 @@ for (const unit of COURSE) {
         }
         const placed = placeDiagram(sw, step.board);
         if (!placed) return;
+        if (step.board.marks?.length) fail(sw, "marks on a place step are not drawn");
         if (!Array.isArray(step.accept) || !step.accept.length) {
           fail(sw, "accept is empty");
           return;
@@ -150,6 +196,7 @@ for (const unit of COURSE) {
           }
           const ch = placed.grid[p.y][p.x] ?? ",";
           if (ch !== "." && ch !== ",") fail(sw, `accept point ${pointLabel(p)} is not empty ('${ch}')`);
+          else if (!legalPlacement(placed, p.x, p.y, step.toMove)) fail(sw, `accept point ${pointLabel(p)} is suicide`);
         }
       } else if (step.kind === "problem") {
         checkText(sw, "success", step.success);

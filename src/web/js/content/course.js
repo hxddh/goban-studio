@@ -1,5 +1,7 @@
 /**
- * The beginner course (v2): eight short units of multi-step lessons.
+ * The course: eight beginner units (v2), then the intermediate units of
+ * ./course-intermediate.js (v5), appended so that saved progress, which is
+ * keyed by lesson id, keeps working. Each lesson is a short list of steps.
  *
  * A lesson is a list of steps:
  *   read     a short explanation, optionally with an illustrated board
@@ -14,7 +16,17 @@
  * empty (inside the problem region), ',' empty outside the region.
  * Rules are Japanese with 6.5 komi. `scripts/check-course.mjs` proves every
  * problem with the solver and checks every place step.
+ *
+ * Schema. A unit is { id, title, summary, lessons, level? }; `level:
+ * "intermediate"` marks a unit past the basics (the beginner logic in
+ * practice-ctl.js ignores those). A board is { size = 19, diagram, corner |
+ * at, marks? }: a diagram smaller than the board is shown in a window
+ * framed around its '.' points, stones, marks and the step's accept points.
+ * Marks (circle, triangle, square, label) are drawn on read steps only; a
+ * label mark on a stone numbers it (joseki sequences).
  */
+
+import { INTERMEDIATE } from "./course-intermediate.js";
 
 const L = (zh, en, ko, ja) => ({ zh, en, ko, ja });
 
@@ -101,7 +113,7 @@ const OPEN_SIDE = b9({
   6: ". . O . . . O . .",
 });
 
-export const COURSE = [
+const BEGINNER = [
   /* ================================================================ UNIT 1 */
   {
     id: "stones",
@@ -2478,3 +2490,6 @@ export const COURSE = [
     ],
   },
 ];
+
+/** Every unit, beginner first. A unit with `level: "intermediate"` is past the basics. */
+export const COURSE = [...BEGINNER, ...INTERMEDIATE];
