@@ -1,4 +1,5 @@
 {
+  "r20kb12": { "human": { "profile": "rank_20k", "blunder": 0.12 } },
   "s12k24": { "human": { "profile": "rank_12k", "style": "search", "visits": 24 } },
   "s10k8": { "human": { "profile": "rank_10k", "style": "search", "visits": 8 } },
   "s10k16": { "human": { "profile": "rank_10k", "style": "search", "visits": 16 } },
