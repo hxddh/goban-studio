@@ -83,8 +83,10 @@ async function test(name, fn) {
 }
 
 function tempDir(name) {
-  // realpath: macOS /var → /private/var, as the app sees its own path.
-  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `goban-${name}-`)));
+  // The path as the app sees its own: realpath turns macOS /var into
+  // /private/var, and the native form expands Windows 8.3 short names
+  // (C:\Users\RUNNER~1 → C:\Users\runneradmin), which process paths use.
+  return fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), `goban-${name}-`)));
 }
 
 function copyTree(src, dst) {
