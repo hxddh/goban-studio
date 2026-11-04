@@ -107,11 +107,16 @@ function Wait-InstallProcesses([string]$Dir, [int]$Seconds) {
 
 function Start-App([string]$Dir, [string]$Argument) {
   $exe = Join-Path $Dir $exeRel
-  Start-Process -FilePath $exe -ArgumentList $Argument -WorkingDirectory (Split-Path $exe) | Out-Null
+  return Start-Process -FilePath $exe -ArgumentList $Argument -WorkingDirectory (Split-Path $exe) -PassThru
 }
 
 function Relaunch-Old {
-  try { Start-App $InstallDir "--goban-update-failed" } catch { Log "could not start the previous version: $($_.Exception.Message)" }
+  try {
+    $p = Start-App $InstallDir "--goban-update-failed"
+    Log "started the previous version again (pid $($p.Id))"
+    Start-Sleep -Seconds 3
+    if ($p.HasExited) { Log "the previous version exited at once (code $($p.ExitCode))" }
+  } catch { Log "could not start the previous version: $($_.Exception.Message)" }
 }
 
 # The player's WebView2 profile folders under bin\ (games, progress, settings).
@@ -216,7 +221,7 @@ if (-not (Move-Profiles $old $InstallDir)) { Rollback "could not move the WebVie
 # 5. Start the new app and wait for its acknowledgement.
 try { Remove-Item -LiteralPath $AckFile -Force -ErrorAction SilentlyContinue } catch { }
 try {
-  Start-App $InstallDir ('"--goban-update-ack=' + $AckFile + '"')
+  $null = Start-App $InstallDir ('"--goban-update-ack=' + $AckFile + '"')
 } catch {
   Rollback "the new app could not be started: $($_.Exception.Message)"
 }

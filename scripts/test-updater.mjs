@@ -219,6 +219,13 @@ function leftovers(dir) {
   return fs.readdirSync(dir).filter((n) => n.includes(".goban-"));
 }
 
+/** Every running Goban Studio process with its path (diagnostics). */
+function allAppProcesses() {
+  if (isMac) return spawnSync("/bin/ps", ["-axo", "pid=,comm="], { encoding: "utf8" }).stdout.split("\n").filter((l) => /Goban|goban/.test(l)).join("\n");
+  const script = "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'goban*' -or $_.Name -like 'msedgewebview2*' } | ForEach-Object { \"$($_.ProcessId) $($_.Name) $($_.ExecutablePath) :: $($_.CommandLine)\" }";
+  return spawnSync(powershell, ["-NoProfile", "-Command", script], { encoding: "utf8" }).stdout || "";
+}
+
 function showLog(log) {
   if (fs.existsSync(log)) console.error("--- helper log\n" + fs.readFileSync(log, "utf8"));
 }
@@ -318,7 +325,13 @@ if (!liveTag) {
       if (isWin) assert.ok(fs.existsSync(path.join(target, profileRel)), "the profile went back with the old version");
       assert.match(fs.readFileSync(log, "utf8"), /previous version restored/);
       // The old app is started again (with --goban-update-failed).
-      await waitFor(() => processesIn(target).length > 0, 30000, "the old app to start again");
+      try {
+        await waitFor(() => processesIn(target).length > 0, 30000, "the old app to start again");
+      } catch (e) {
+        showLog(log);
+        console.error("--- app processes anywhere\n" + allAppProcesses());
+        throw e;
+      }
     } finally {
       app.kill();
       await stopProcessesIn(target);
