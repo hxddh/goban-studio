@@ -382,6 +382,95 @@ to `20k`. A 9×9 game against `30k` and against `20k` feels much the same.
 | C:v3-1k | 4.87 | 3.09 … 8.03 | 845 | – | – | – |
 | C:v3-2d | 6.51 | 4.50 … 10.57 | 1131 | – | – | – |
 
+## v5: the human-style opponent and the stronger network
+
+Both are optional downloads (`src/models.zig`). Without them nothing
+above changes. The labels are **not** re-measured for the new modes: the
+measurement below is a short check (54 games, 46 game-minutes on a shared
+4-core Linux VM, KataGo 1.18.1 Eigen), enough to see order and gross
+mismatches, not to set labels.
+
+**Human-style levels** (`HL:<id>`, `STRENGTHS[].human`). A second KataGo
+process runs `-model` b6c96 `-human-model b18c384nbt-humanv0` with
+`engine/model/human.cfg` (KataGo's `gtp_human5k_example.cfg` recipe); the
+host sets the level's `humanSLProfile` and one of two move-choice styles:
+
+| ID | Label | Profile | Style | Visits | Beginner moves |
+| --- | --- | --- | --- | ---: | ---: |
+| `30k` | ≈30 kyu | `rank_20k` | raw | 40 | 0.9 |
+| `25k` | ≈29 kyu | `rank_20k` | raw | 40 | 0.7 |
+| `20k` | ≈23 kyu | `rank_20k` | raw | 40 | 0.35 |
+| `15k` | ≈18 kyu | `rank_20k` | raw | 40 | 0 |
+| `10k` | ≈12 kyu | `rank_12k` | raw | 40 | 0 |
+| `5k` | ≈7 kyu | `rank_7k` | search | 24 | 0 |
+| `1k` | ≈2 kyu | `rank_2k` | search | 64 | 0 |
+| `2d` | ≈4 dan | `rank_4d` | search | 200 | 0 |
+
+"raw" plays the human policy of the profile (one network evaluation,
+temperature 0.85 → 0.70 below 1% probability; the visits only decide when
+to pass). "search" is KataGo's `gtp_human9d_search_example.cfg` recipe:
+human-style candidates, but moves the search judges to lose are
+suppressed (`humanSLChosenMovePiklLambda` 0.08). The profiles follow the
+v4 anchor measurements above: against this ladder `rank_20k` measured
+about 17 kyu and `rank_15k` about 14 kyu, and no raw profile measured
+stronger than about 10 kyu, so the four strongest levels use the search
+style and the three weakest add the ladder's beginner's moves (the model
+has no profile below 20 kyu).
+
+9×9, human-style levels against each other (4 games per pair):
+
+| Pair (A vs B, A rated lower) | Games | A–B | B win % (95% CI) |
+| --- | ---: | ---: | ---: |
+| HL:30k vs HL:25k | 4 | 1–3 | 75 (30–95) |
+| HL:25k vs HL:20k | 4 | 1–3 | 75 (30–95) |
+| HL:20k vs HL:15k | 4 | 0–4 | 100 (51–100) |
+| HL:15k vs HL:10k | 4 | 2–2 | 50 (15–85) |
+| HL:10k vs HL:5k | 4 | 0–4 | 100 (51–100) |
+| HL:5k vs HL:1k | 4 | 0–4 | 100 (51–100) |
+| HL:1k vs HL:2d | 4 | 1–3 | 75 (30–95) |
+
+Every adjacent pair is won by the higher level except `15k`/`10k`, which
+split 2–2 on 9×9 (both are raw-policy levels, `rank_20k` and `rank_12k`;
+the human SL model is trained on 19×19 games). So the order holds on 9×9
+with one tie, from small samples.
+
+Human-style level against the standard level of the same ID (2 games each,
+HL wins–L wins):
+
+| Level | 9×9 | 19×19 |
+| --- | --- | --- |
+| `30k` | 2–0 | – |
+| `25k` | 1–1 | – |
+| `20k` | 2–0 | 1–1 |
+| `15k` | 2–0 | – |
+| `10k` | 1–1 | 0–2 |
+| `5k` | 2–0 | 2–0 |
+| `1k` | 2–0 | – |
+| `2d` | 2–0 | 1–1 |
+
+On 9×9 the human-style opponent is at least as strong as the standard one
+at every level (14–2 overall), most clearly at the bottom: the
+beginner's-move levels lose less on the small board when the rest of
+their moves are human rather than random candidates. On 19×19, in eight
+games, the two modes are even (4–4): `10k` human-style lost both, `5k`
+won both, `20k` and `2d` split. Read this as "the human-style levels are
+roughly at their labels on 19×19 and somewhat stronger on 9×9"; their
+labels are not separately calibrated, and a proper measurement (anchors,
+a few hundred games) is future work. Reproduce with
+`calibrate-strength.mjs play --human-model … --pairs "HL:10k-L:10k,…"`.
+
+**Stronger network** (`LS:2d`, `STRENGTHS[].strong`). With
+`g170e-b15c192-s1672170752-d466197061` installed the `2d` level searches
+64 visits on it instead of 160 on b6c96; it beat the standard `2d` 2–0 on
+9×9. Its label is then a lower bound. Analysis and review ask the larger
+network for half the visits they ask of b6c96
+(`STRONG_VISIT_SCALE`): on the test VM b15c192 ran 25 visits/s against
+b6c96's 140 (KataGo `benchmark`, 4 threads); b20c256 (4.9 visits/s) was
+rejected as too slow for a laptop CPU.
+
+The human-style process uses about 550 MB of memory (b18 human model plus
+b6c96), started only when a human-style game asks for its first move.
+
 ## Limitations
 
 - **The anchor is a model, not people.** No human played these games. The
