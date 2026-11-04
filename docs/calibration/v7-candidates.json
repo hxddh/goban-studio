@@ -7,6 +7,7 @@
   "s7k12": { "human": { "profile": "rank_7k", "style": "search", "visits": 12 } },
   "s7k24b5": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.05 } },
   "s7k24b8": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.08 } },
+  "s7k24b12": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.12 } },
   "s7k24b15": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.15 } },
   "s7k24b25": { "human": { "profile": "rank_7k", "style": "search", "visits": 24, "blunder": 0.25 } },
   "s5k24": { "human": { "profile": "rank_5k", "style": "search", "visits": 24 } },
