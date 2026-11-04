@@ -1078,4 +1078,14 @@ export const MESSAGES = {
     "それぞれの手の価値を数えましょう。黒が先に打つ場合と白が先に打つ場合の差です。一番大きい手から打ちます。",
   ),
   // end v6 endgame
+
+
+  // v6 strength
+  "strength.label": m("{0}（±{1}）", "{0} (±{1})", "{0} (±{1})", "{0}（±{1}）"),
+  "strength.about": m(
+    "根据你和各级电脑对手的胜负估计；± 表示大约三分之二的把握落在这个范围内。",
+    "Estimated from your results against the computer levels; ± is the range it falls in about two times out of three.",
+    "컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.",
+    "コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",
+  ),
 };

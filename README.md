@@ -43,7 +43,9 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 - **A report for every game** — result, the three phases, three key
   moments as small boards, *Practise this game* (your worst mistakes become
   drills), and an image export.
-- **Strength** — STRENGTH_PLACEHOLDER
+- **Strength** — your level as an estimate with an uncertainty
+  ("≈ 12 kyu (±1)") and its curve over time; the human-style levels
+  measured again in 426 games.
 - **Learning** — an advanced course for about 5 kyu to 1 dan (5 units, 15
   lessons: whole-board judgement, invasion and reduction, advanced life and
   death, combined tesuji, middle-game strategy); the leaning attack and

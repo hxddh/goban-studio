@@ -834,3 +834,5 @@
 "problem.endgame.doubleSenteFirst.hint","Find the point that is sente for both sides (whoever plays there gives atari) and play it before anything else.","找出对双方都是先手的那一点（谁下在那里就打吃对方），最先下。","","양쪽 모두에게 선수인 점(누가 두든 단수가 되는 곳)을 찾아 가장 먼저 두세요.","","両方にとって先手の点（どちらが打ってもアタリになる所）を見つけ、何より先に打ちましょう。",""
 "problem.endgame.biggest.title","The biggest move","哪一手最大","","가장 큰 수","","一番大きい手",""
 "problem.endgame.biggest.hint","Count what each move is worth: the difference between you and White playing there first. Play the biggest.","算一算每一手值多少：你先下与白棋先下的差。先下最大的那一手。","","각 수의 가치를 세어 보세요. 흑이 먼저 둘 때와 백이 먼저 둘 때의 차이입니다. 가장 큰 수부터 두세요.","","それぞれの手の価値を数えましょう。黒が先に打つ場合と白が先に打つ場合の差です。一番大きい手から打ちます。",""
+"strength.label","{0} (±{1})","{0}（±{1}）","","{0} (±{1})","","{0}（±{1}）",""
+"strength.about","Estimated from your results against the computer levels; ± is the range it falls in about two times out of three.","根据你和各级电脑对手的胜负估计；± 表示大约三分之二的把握落在这个范围内。","","컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.","","コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",""

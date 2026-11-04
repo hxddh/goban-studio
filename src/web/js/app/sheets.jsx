@@ -10,7 +10,8 @@ import * as U from "../update.js";
 import * as Models from "../models.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
-import { rankLabel, ratingLabel } from "./play.jsx";
+import { rankLabel } from "./play.jsx";
+import { estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 
@@ -377,7 +378,7 @@ function SettingsSheet({ pane: open }) {
                 {state.progress.rating && (
                   <div class="row">
                     <span>{t("settings.estimated")}</span>
-                    <strong>{ratingLabel(state.progress.rating.r)}</strong>
+                    <strong title={t("strength.about")}>{estimateLabel(state.progress.rating)}</strong>
                   </div>
                 )}
                 <div class="row">

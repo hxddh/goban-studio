@@ -19,7 +19,7 @@ import { OPENINGS } from "../content/openings.js";
 import { CLASSICS } from "../content/classics.js";
 import { state, update, toast } from "./store.js";
 import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, setSetting, syncMenus, tx } from "./ctl-core.js";
-import { startRating } from "./rating.js";
+import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
@@ -48,8 +48,13 @@ export function boot() {
   if (!settings.lang) settings.lang = detectLang();
   state.settings = settings;
   state.progress = loadProgress();
+  // v6: a v2–v5 rating becomes an estimate with an uncertainty (strength.js).
+  if (state.progress.rating && state.progress.rating.v !== 6) {
+    state.progress.rating = migrateEstimate(state.progress.rating);
+    saveProgress(state.progress);
+  }
   if (!state.progress.rating && settings.onboarded) {
-    state.progress.rating = startRating(settings.playerRank ?? 30);
+    state.progress.rating = startEstimate(settings.playerRank ?? 30);
     saveProgress(state.progress);
   }
   setLang(settings.lang);
@@ -330,9 +335,9 @@ export function finishOnboarding(choice, rank = null) {
   if (choice === "new") next.playerRank = 30;
   else if (choice === "rules") next.playerRank = 25;
   else next.playerRank = rank ?? 15;
-  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : Engine.STRENGTHS.reduce((best, st) => (Math.abs(st.rank - next.playerRank) < Math.abs(best.rank - next.playerRank) ? st : best)).id;
+  state.progress.rating = startEstimate(next.playerRank);
+  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : recommendStrength(state.progress.rating, { size: 19, modeOf: (st) => Engine.opponentMode(st) });
   next.strength = strength;
-  state.progress.rating = startRating(next.playerRank);
   saveProgress(state.progress);
   update((st) => {
     st.settings = next;
@@ -352,7 +357,7 @@ export function finishOnboarding(choice, rank = null) {
 /** Your level changed by hand in Settings: restart the rating from it. */
 export function setPlayerRank(rank) {
   setSetting("playerRank", rank);
-  state.progress.rating = startRating(rank ?? 30);
+  state.progress.rating = startEstimate(rank ?? 30);
   saveProgress(state.progress);
   update();
 }

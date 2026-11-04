@@ -646,8 +646,16 @@ for (const vp of [
     await page.waitForSelector(".scrim", { state: "detached" });
     const pts = [[2, 2], [6, 6], [6, 2], [2, 6], [4, 4]];
     for (let i = 0; i < pts.length; i++) {
-      await clickPoint(page, ...pts[i]);
-      await page.waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 3000 });
+      // A click right after the board appears can be swallowed; retry it.
+      for (let tries = 0; ; tries++) {
+        await clickPoint(page, ...pts[i]);
+        const ok = await page
+          .waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 1500 })
+          .then(() => true, () => false);
+        if (ok) break;
+        const n = await page.evaluate(() => window.__state.game?.game.moveNumber);
+        assert(tries < 3 && n === i, `move ${i + 1} did not land (moves: ${n})`);
+      }
     }
     const out = [];
     out.push(await snap(page, `play-${vp.tag}`));

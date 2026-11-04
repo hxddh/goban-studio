@@ -14,6 +14,11 @@ anchor, KataGo's human-imitation model playing as a 10-kyu human, and on
 the EGF rating formula for the spacing of ranks; that is the weak part of
 the method. Read the labels as "within a few ranks", not "to the rank".
 
+v6 measured the optional human-style levels and the stronger network
+(426 games, only 54 of them on 19×19) and moved three of their labels
+("v6: the human-style levels…" below). It also replaced the player's
+level with an estimate with an uncertainty ("v6: your strength").
+
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `30k` | ≈30 kyu | 8 | 2 | 40 | 0.3 | 1 | 0 (reference) | −1272 (−2154 to −933) | 34k (43k–30k) |
@@ -385,10 +390,10 @@ to `20k`. A 9×9 game against `30k` and against `20k` feels much the same.
 ## v5: the human-style opponent and the stronger network
 
 Both are optional downloads (`src/models.zig`). Without them nothing
-above changes. The labels are **not** re-measured for the new modes: the
-measurement below is a short check (54 games, 46 game-minutes on a shared
-4-core Linux VM, KataGo 1.18.1 Eigen), enough to see order and gross
-mismatches, not to set labels.
+above changes. The v5 measurement below was a short check (54 games, 46
+game-minutes on a shared 4-core Linux VM, KataGo 1.18.1 Eigen), enough to
+see order and gross mismatches, not to set labels; v6 measured the new
+modes properly (next section), and three of their labels moved.
 
 **Human-style levels** (`HL:<id>`, `STRENGTHS[].human`). A second KataGo
 process runs `-model` b6c96 `-human-model b18c384nbt-humanv0` with
@@ -471,6 +476,251 @@ rejected as too slow for a laptop CPU.
 The human-style process uses about 550 MB of memory (b18 human model plus
 b6c96), started only when a human-style game asks for its first move.
 
+## v6: the human-style levels and the stronger network, measured
+
+**Short version.** 426 games (372 on 9×9, 54 on 19×19; about 9.4
+game-hours on a 4-core Linux container, KataGo 1.18.1 Eigen AVX2, one
+search thread per process, four games at a time). Fewer 19×19 games were
+played than planned: a further ~230 were dropped to finish v6 on time, so
+the 19×19 sample is six games per level and can show direction, not
+size. Three labels moved, where both boards agreed and the 19×19 interval
+excluded the old label: human-style `5k` ≈7 kyu → **≈3 kyu**, human-style
+`1k` ≈2 kyu → **≈1 dan**, stronger-network `2d` ≈4 dan → **≈5 dan**. The
+other human-style levels keep their labels.
+
+**Method.** Every game is a human-style level (`HL:<id>`, exactly as
+shipped) or the stronger-network level (`LS:2d`) against a standard level
+(`L:<id>`) or another human-style level, with the harness and game rules
+described under Method above (komi 6.5, Japanese rules, colours
+alternating, 200-visit final scoring on 19×19). Instead of re-measuring
+the standard ladder, the fit holds it at its v4 values (`fit --fixed`:
+θ of each `L:` level fixed at the tables above, per board) and places only
+the new players in that frame, so all 426 games go to the new modes. On
+19×19 the v4 anchor map then turns θ into GoR and a rank. The intervals
+are 1000-game bootstraps of the v6 games only; they do **not** include
+the v4 ladder's own error or the anchor's (Limitations).
+
+- 9×9: twelve games for each of 31 pairs: every human-style level against
+  the standard level of the same ID and its two neighbours, against the
+  next human-style level, and `LS:2d` against `L:2d` and `HL:2d`.
+- 19×19: six games for each human-style level against the standard level
+  of the same ID, and six of `LS:2d` against `L:2d`. Of the 54 games, 33
+  ended by adjudication, 16 by two passes and 5 at the move cap; of the
+  372 9×9 games, 362 by two passes and 10 by adjudication. No game failed.
+
+**19×19** (A is the player the fit rates lower):
+
+| Pair (A vs B) | Games | A–B | B win % (95% CI) | Avg plies |
+| --- | ---: | ---: | ---: | ---: |
+| L:30k vs HL:30k | 6 | 3–3 | 50 (19–81) | 345 |
+| HL:25k vs L:25k | 6 | 1–5 | 83 (44–97) | 354 |
+| HL:20k vs L:20k | 6 | 1–5 | 83 (44–97) | 305 |
+| L:15k vs HL:15k | 6 | 1–5 | 83 (44–97) | 242 |
+| HL:10k vs L:10k | 6 | 3–3 | 50 (19–81) | 244 |
+| L:5k vs HL:5k | 6 | 0–6 | 100 (61–100) | 238 |
+| L:1k vs HL:1k | 6 | 0–6 | 100 (61–100) | 210 |
+| L:2d vs HL:2d | 6 | 0–6 | 100 (61–100) | 225 |
+| L:2d vs LS:2d | 6 | 0–6 | 100 (61–100) | 241 |
+
+**9×9:**
+
+| Pair (A vs B) | Games | A–B | B win % (95% CI) |
+| --- | ---: | ---: | ---: |
+| L:30k vs HL:30k | 12 | 3–9 | 75 (47–91) |
+| L:30k vs HL:25k | 12 | 4–8 | 67 (39–86) |
+| L:25k vs HL:30k | 12 | 6–6 | 50 (25–75) |
+| L:25k vs HL:25k | 12 | 3–9 | 75 (47–91) |
+| L:25k vs HL:20k | 12 | 2–10 | 83 (55–95) |
+| HL:30k vs HL:25k | 12 | 2–10 | 83 (55–95) |
+| HL:25k vs HL:20k | 12 | 2–10 | 83 (55–95) |
+| HL:25k vs L:20k | 12 | 3–9 | 75 (47–91) |
+| HL:20k vs L:20k | 12 | 5–7 | 58 (32–81) |
+| HL:20k vs L:15k | 12 | 2–10 | 83 (55–95) |
+| HL:20k vs HL:15k | 12 | 1–11 | 92 (65–99) |
+| L:20k vs HL:15k | 12 | 2–10 | 83 (55–95) |
+| L:15k vs HL:15k | 12 | 0–12 | 100 (76–100) |
+| L:15k vs HL:10k | 12 | 1–11 | 92 (65–99) |
+| HL:15k vs L:10k | 12 | 3–9 | 75 (47–91) |
+| HL:15k vs HL:10k | 12 | 4–8 | 67 (39–86) |
+| L:10k vs HL:10k | 12 | 4–8 | 67 (39–86) |
+| L:10k vs HL:5k | 12 | 0–12 | 100 (76–100) |
+| HL:10k vs L:5k | 12 | 5–7 | 58 (32–81) |
+| HL:10k vs HL:5k | 12 | 0–12 | 100 (76–100) |
+| L:5k vs HL:5k | 12 | 0–12 | 100 (76–100) |
+| L:5k vs HL:1k | 12 | 0–12 | 100 (76–100) |
+| L:1k vs HL:5k | 12 | 7–5 | 42 (19–68) |
+| L:1k vs HL:1k | 12 | 1–11 | 92 (65–99) |
+| L:1k vs HL:2d | 12 | 0–12 | 100 (76–100) |
+| HL:5k vs HL:1k | 12 | 5–7 | 58 (32–81) |
+| HL:1k vs L:2d | 12 | 2–10 | 83 (55–95) |
+| HL:1k vs HL:2d | 12 | 1–11 | 92 (65–99) |
+| L:2d vs HL:2d | 12 | 7–5 | 42 (19–68) |
+| L:2d vs LS:2d | 12 | 1–11 | 92 (65–99) |
+| HL:2d vs LS:2d | 12 | 2–10 | 83 (55–95) |
+
+**Fitted strengths.** θ in each board's v4 frame (`L:30k` = 0); "9×9 as
+19×19" carries the 9×9 θ over to 19×19 through the standard levels'
+measured (θ19, θ9) pairs (as the strength estimate does). It is only a
+cross-check: the human SL model is trained on 19×19 games and plays
+relatively better on 9×9 than the ladder does.
+
+| Level | Label before | θ 19×19 (95% CI) | 19×19 rank (95% CI) | θ 9×9 (95% CI) | 9×9 as 19×19 | Label now |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `HL:30k` | ≈30 kyu | 0.2 (−2.7 to 9.8) | 33k (41k–13k) | 0.40 (−0.32 to 1.06) | 29k | ≈30 kyu |
+| `HL:25k` | ≈29 kyu | 0.4 (−1.6 to 2.3) | 33k (38k–28k) | 1.12 (0.50 to 1.71) | 26k | ≈29 kyu |
+| `HL:20k` | ≈23 kyu | 3.1 (0.9 to 4.9) | 26k (31k–22k) | 1.98 (1.33 to 2.62) | 23k | ≈23 kyu |
+| `HL:15k` | ≈18 kyu | 8.6 (6.8 to 12.0) | 15k (18k–9k) | 5.23 (4.35 to 6.07) | 14k | ≈18 kyu |
+| `HL:10k` | ≈12 kyu | 10.2 (6.7 to 13.3) | 12k (18k–8k) | 6.57 (5.74 to 7.37) | 10k | ≈12 kyu |
+| `HL:5k` | ≈7 kyu | 17.3 (16.2 to 18.2)* | 3k (4k–2k)* | 12.25 (11.22 to 13.32) | 2k | **≈3 kyu** |
+| `HL:1k` | ≈2 kyu | 20.9 (19.4 to 21.8)* | 2d (1d–3d)* | 13.16 (12.41 to 13.95) | 1d | **≈1 dan** |
+| `HL:2d` | ≈4 dan | 25.9 (24.7 to 26.8)* | 6d (5d–7d)* | 15.03 (14.23 to 16.02) | 4d | ≈4 dan |
+| `LS:2d` | ≈4 dan | 25.9 (24.4 to 26.8)* | 6d (5d–7d)* | 16.85 (15.77 to 19.28) | 7d | **≈5 dan** |
+
+\* From a 6–0 sweep against one opponent: the likelihood alone has no
+upper end, so the point and the upper limit come from the fit's weak
+prior. Read these rows as "at least the lower limit".
+
+**How the labels were decided.** A label moved only where (1) the 19×19
+interval excludes the old label and (2) 9×9 points the same way. It
+moved to a rank both boards support, leaning to the lower (more cautious)
+one:
+
+- `HL:5k` (`rank_7k`, search style, 24 visits) beat `L:5k` 6–0 on 19×19
+  and 12–0 on 9×9, where it played even with `L:1k` (5–7). At least
+  4 kyu on 19×19, about 2 kyu by 9×9: **≈3 kyu**. The search style lets
+  this profile play far above its nominal 7 kyu against these programs.
+- `HL:1k` (`rank_2k`, 64 visits) beat `L:1k` 6–0 and 11–1 and sits between
+  `L:1k` and `L:2d` on 9×9. At least 1 dan on 19×19, about 1 dan by 9×9:
+  **≈1 dan**.
+- `LS:2d` (the stronger network, 64 visits) beat `L:2d` 6–0 and 11–1. At
+  least 5 dan on 19×19: **≈5 dan**. Above 4 dan the scale itself rests on
+  the furthest extrapolation from the 10-kyu anchor; treat it as "strong
+  amateur dan", a lower bound.
+- `HL:2d` also swept `L:2d` on 19×19 (6–0) but was even with it on 9×9
+  (5–7). The boards disagree, so the label stays ≈4 dan; it is probably
+  low on 19×19.
+- `HL:15k` measured about 15 kyu on 19×19 and 14 kyu by 9×9, stronger than
+  its ≈18 kyu label on both, but the 19×19 interval (18k–9k) still includes
+  the label. Unchanged; likely a few ranks stronger than shown.
+- `HL:25k` and `HL:20k` lost 1–5 to their standard levels on 19×19 (about
+  33 and 26 kyu) but were as strong or stronger on 9×9. The boards
+  disagree and the 19×19 intervals include the labels. Unchanged.
+- `HL:30k` and `HL:10k` measured at their labels on both boards.
+
+The order of the human-style levels is preserved on both boards except
+`HL:30k`/`HL:25k` on 19×19 (0.2 vs 0.4 nats, indistinguishable), so the
+slider still goes weaker to stronger. With the new labels the human-style
+ladder is no longer evenly spaced: from `10k` (≈12 kyu) it jumps to `5k`
+(≈3 kyu). That is a fact about the shipped profiles. Fixing it means new
+profile settings (for example `rank_10k` with the search style, or fewer
+visits at `5k`) and a new measurement, which v6 did not do.
+
+**What changed in the app.** `STRENGTHS[].human.rank` and
+`STRENGTHS[].strong.rank` hold the moved labels; `engine.js labelRank` and
+`rankParts` show the label of the mode the level plays in now (with the
+human-style switch on, the slider and the player panel say ≈3 kyu for
+`5k`), and `suggestHandicap` uses that label. The measured θ of every
+human-style level and of `LS:2d` feed the strength estimate
+(`strength.js MEASURED`), so a game against them is rated against what
+they actually play like. A saved game shows the label of the mode in use
+when it is displayed, not when it was played.
+
+**Limitations of this measurement.** Six 19×19 games per level are few:
+a 6–0 sweep says "clearly stronger", not how much, and a 3–3 split is
+consistent with a gap of a few ranks either way. 19×19 games were only
+played against the same-ID standard level, so a level that sweeps gets
+no upper bound. The frame is the v4 ladder: any error in its θ (or in the
+10-kyu anchor) passes to these numbers unchanged. 9×9 shows the human SL
+model in a different light than 19×19 (relatively stronger at the
+bottom, relatively weaker at the top), so it is a cross-check, not a
+substitute. The obvious next step is 19×19 games of each moved level
+against the next standard level up (`HL:5k`–`L:1k`, `HL:1k`–`L:2d`),
+which this run planned and dropped.
+
+## v6: your strength — the estimate
+
+Until v5 the player's level was an Elo-style number that moved by a fixed
+step after each game against the computer, judged against the level's
+*label*. Since v6 it is an estimate with an uncertainty
+(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" with a chart of
+the estimate and its band over time (`app/strength-chart.jsx`).
+
+**Units.** The estimate lives on the scale the levels were measured on:
+θ, Bradley–Terry strength in nats on 19×19, with the same EGF mapping and
+anchor as the labels (GoR(θ) = 4100 − K·e^(−θ/20), K fixed by
+`H:rank_10k` = 10 kyu at θ = 11.65). The player is N(μ, σ²) over θ.
+Opponents are the levels' **measured** θ (the tables above), not their
+rounded labels: on 19×19 `30k` is θ 0 (≈ 34 kyu), not "30 kyu".
+
+**Update.** Each rated game (against the computer, at least 12 moves, not
+a draw — unchanged from v5) is one Glicko step in natural units:
+
+- before the game, σ² grows by 0.2² (a learner gets stronger; without this
+  the estimate would freeze after a few dozen games), and by 0.1² per day
+  since the last game; σ never exceeds the prior's 2.5;
+- the expected score is E = 1 / (1 + e^(−g·(θ_board(μ) − θ_opp))), where
+  g = 1/√(1 + 3·0.5²/π²) accounts for a level's own measurement error
+  (0.5 nats, about one rank, relative to its neighbours);
+- σ'² = 1 / (1/σ² + s²g²E(1−E)) and μ' = μ + σ'²·s·g·(score − E), with s
+  the slope of θ_board at μ (1 on 19×19).
+
+**Board size.** The levels' gaps are smaller on 9×9 (the whole ladder
+spans 14.9 nats there against 23.4 on 19×19). A 9×9 game is compared on
+the 9×9 scale: the player's 19×19 θ is carried over through the levels'
+measured (θ19, θ9) pairs, joined piecewise linearly (beyond the ends, the
+overall slope 0.62). So a 9×9 win says less about 19×19 strength than a
+19×19 win, and the band narrows more slowly. 13×13 was never measured; it
+is taken halfway between the two. That is an assumption, not a result.
+
+**Opponent mode.** A game against a human-style level or the stronger
+network uses that mode's measured θ (v6 measurement above) where it
+exists, on the board it was measured on, otherwise the standard level's.
+Games against the offline engine (no KataGo) count as the standard level,
+as in v5; the offline engine is not calibrated.
+
+**Handicap.** As in v5, two or more stones make the level weaker by one
+rank per stone on 19×19 (2.5 ranks on 13×13 and 5 on 9×9, the ratios
+`suggestHandicap` uses); a single stone and komi are ignored. This is the
+conventional value of a stone, not something measured here.
+
+**Prior.** The rank chosen at onboarding or in Settings, ± 2.5 nats (about
+4 ranks around 15 kyu, 6 around 30 kyu). Changing the rank in Settings
+restarts the estimate, as it restarted the v5 rating.
+
+**What "±" means.** The label shows the rank nearest the GoR of μ and the
+half-width of μ ± σ in ranks, rounded, at least 1: the estimate is in that
+range about two times in three, *given the ladder's scale*. It does not
+include the anchor's own error (see Limitations: every label could move by
+a few ranks together), so it says how sure the app is about you relative
+to its levels. With σ ≈ 0.65 nats after 15–20 games on 19×19, that is
+"±1" at most kyu ranks; on 9×9 alone it stays at about ±2.
+
+**Game performance is not used.** The per-game report measures points
+lost per move and accuracy, and it is tempting to let them nudge the
+estimate. They are left out because nothing here calibrates them: the
+post-game analysis uses 32–48 visits of b6c96 and is noisy on single moves;
+how many points a player loses depends strongly on the opponent (the
+beginner's-move levels leave big mistakes unpunished and give big gifts)
+and on the board size; and there is no measurement relating a human's
+loss per move to rank on this scale. A nudge from an uncalibrated signal
+would bias the estimate in a way results cannot correct. Results against
+measured opponents are the only evidence the estimate uses.
+
+**Recommended opponent.** Today's suggested game and the New game sheet
+suggest the level the player is expected to score closest to 50% against,
+in the mode that level would play in (human-style when that is on), on
+19×19; the quick 9×9 game gets its own suggestion on the 9×9 scale.
+Handicap suggestions are unchanged (`suggestHandicap`, from the rank of
+the estimate).
+
+**Old data.** A v2–v5 rating (`{ r, games, history }`) is migrated on
+start: μ is the old rating, σ what that many fair games would leave from
+the prior, and every old history point keeps its time and value and gets
+the band of its game count. `progress.rating.r` (the GoR of μ) and
+`history[].r` keep their meaning, so the week summary and the trends
+view read old and new data alike. Rank labels round to the nearest rank
+since v6 (v5 rounded a rating towards the weaker rank).
+
 ## Limitations
 
 - **The anchor is a model, not people.** No human played these games. The
@@ -539,6 +789,21 @@ node scripts/calibrate-strength.mjs play --katago $KATAGO --candidates bridges.j
   --size 19 --games 10 --pairs "C:b97-L:30k,C:b97-L:25k,C:b85-L:25k,C:b85-L:20k,..." --out ladder-19.jsonl
 node scripts/calibrate-strength.mjs fit ladder-19.jsonl --anchor rank_10k --markdown
 node scripts/calibrate-strength.mjs fit ladder-9.jsonl --markdown
+```
+
+v6 (human-style levels and the stronger network; both optional networks
+from the URLs pinned in `src/models.zig`, checked against their SHA-256):
+
+```bash
+STRONG=/path/to/g170e-b15c192-s1672170752-d466197061.txt.gz
+# 9×9: each HL level vs L of the same ID and its neighbours, vs the next HL, and LS:2d
+node scripts/calibrate-strength.mjs play --katago $KATAGO --human-model $HUMAN --strong-model $STRONG \
+  --size 9 --games 12 --pairs "HL:30k-L:30k,HL:30k-L:25k,HL:30k-HL:25k,...,LS:2d-L:2d,LS:2d-HL:2d" --out v6-9.jsonl
+# 19×19: each HL level vs L of the same ID, and LS:2d vs L:2d
+node scripts/calibrate-strength.mjs play --katago $KATAGO --human-model $HUMAN --strong-model $STRONG \
+  --size 19 --games 6 --score-visits 200 --pairs "HL:30k-L:30k,...,HL:2d-L:2d,LS:2d-L:2d" --out v6-19.jsonl
+node scripts/calibrate-strength.mjs fit v6-9.jsonl --size 9 --fixed --markdown
+node scripts/calibrate-strength.mjs fit v6-19.jsonl --size 19 --fixed --markdown
 ```
 
 The published numbers pool several runs made while the ladder was being
