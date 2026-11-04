@@ -725,3 +725,6 @@ button.group-row:hover { background: var(--fill); }
 .trend-dir { font-style: normal; font: var(--t-caption); color: var(--text-3); }
 .trend-dir.better { color: var(--good); }
 .trend-dir.worse { color: var(--bad); }
+.update-block { display: flex; flex-direction: column; gap: var(--s-2); }
+.update-progress { display: flex; align-items: center; gap: var(--s-3); }
+.update-progress .progress { flex: 1; }

@@ -17,7 +17,14 @@ existing Gomoku app. It deliberately uses a different bundle ID
 | Platform | File | First launch |
 | --- | --- | --- |
 | macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` / `.zip` | See the release notes. A build made with the project's Developer ID is signed and notarized and opens normally. A build made without it is ad-hoc signed and not notarized: right-click the app → Open once; if blocked, `xattr -dr com.apple.quarantine /Applications/Goban\ Studio.app` |
+| macOS (Intel) | `GobanStudio-macOS-x64.dmg` / `.zip` | As for Apple Silicon. A native x86_64 build (app and KataGo), built and tested on an Intel Mac runner. |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | See the release notes. A build made without the code-signing certificate is not Authenticode-signed: if SmartScreen appears, More info → Run anyway. WebView2 is normally preinstalled. |
+
+**Windows on ARM:** use the x64 package. Windows 11 on ARM runs it, KataGo
+included, under its built-in x64 emulation; there is no native ARM64 build
+because KataGo publishes no ARM64 Windows binary, and analysis is slower
+than on a comparable x64 PC. The in-app updater keeps such an installation
+on the x64 package.
 
 Each release's notes (and the README inside the download) state how *that*
 build was signed: the release workflow writes the "First launch" text from
@@ -87,9 +94,48 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 - **Offline by design** — no account, no telemetry, and no network request
   unless you ask for one: **Check for updates…** makes a single request to
   GitHub for the latest release, and the weekly automatic check is off
-  until you turn it on in Settings. Nothing about you or your games is
-  sent; everything else (KataGo, lessons, your library) stays on your
-  computer.
+  until you turn it on in Settings. When a newer version is found you may
+  choose **Download and install**, which fetches that release's package for
+  your computer and its `SHA256SUMS` from GitHub — nothing else, and only
+  when you choose it. Nothing about you or your games is sent; everything
+  else (KataGo, lessons, your library) stays on your computer.
+
+## In-app updates (v5)
+
+After **Check for updates…** finds a newer release, **Download and install**
+does the rest:
+
+1. The app downloads this computer's package (`GobanStudio-macOS-arm64.zip`,
+   `GobanStudio-macOS-x64.zip` or `GobanStudio-Windows-x64.zip`) and the
+   release's `SHA256SUMS`, only from
+   `https://github.com/hxddh/goban-studio/releases/download/<tag>/`. The
+   address is built by the native code from the release tag; redirects are
+   followed only to GitHub's own download hosts, over HTTPS.
+2. The package must match its line in `SHA256SUMS`. It is unpacked into a
+   per-user temp folder and checked: the expected layout and bundle id, an
+   executable for this CPU, and on macOS `codesign --verify --deep --strict`.
+   The checksum catches a damaged, truncated or wrong download; it is not a
+   signature (the builds are ad-hoc signed / unsigned, and `SHA256SUMS`
+   comes from the same release), so the trust is in GitHub and HTTPS, as
+   for a manual download.
+3. **Restart to update** quits the app and hands over to a small helper the
+   app carries inside itself (`src/updater/`; nothing downloaded is run
+   except the verified new app). It waits for the app to exit, puts the new
+   version in place of the old one under the same name — keeping the old one
+   as a backup — and starts it. If the new version does not report that it
+   started within 90 seconds, the helper puts the old version back and
+   starts it, and the app says so.
+
+Your games, progress and settings are kept: on macOS they live outside the
+app; on Windows the helper moves the WebView2 profile
+(`bin\goban-studio.exe.WebView2`) into the new folder. Files the app
+downloads itself carry no quarantine flag, so macOS does not ask again.
+
+When the app cannot replace itself — it is in a folder you cannot write to
+(for example `/Applications` without administrator rights, or
+`C:\Program Files`), macOS is running it from a temporary "translocated"
+copy, or it is a development build — the app says why and offers **Open
+download page** instead.
 
 ## Honest content
 
@@ -234,6 +280,27 @@ also run a native screenshot tour of the packaged app
 Settings) and upload the captures as `native-screenshots-macos` /
 `native-screenshots-windows`.
 
+v5 adds an Intel Mac package: `build-macos.yml` takes `arch: x64` with the
+`macos-15-intel` runner, builds KataGo and the app natively for x86_64,
+and runs the same packaged self-test, updater tests and screenshot tour
+there (`native-screenshots-macos-x64`). The release publishes
+`GobanStudio-macOS-x64.dmg` / `.zip` beside the Apple Silicon package and
+lists all five files in `SHA256SUMS`.
+
+The updater is tested in three layers: Zig unit tests in
+`src/install.zig` (the download address and redirect allow-list,
+`SHA256SUMS` parsing and comparison, zip entry checks and extraction, CPU
+checks, and on macOS `ditto` + `codesign` + no quarantine flag on a real
+signed bundle) run in `native test` on every platform;
+`scripts/test-updater.mjs` runs the embedded helpers against temp installs
+of the packaged app on the real OS — a successful swap that starts the real
+new app (on Windows with a file held locked and the WebView2 profile
+carried over), a rollback when the new version does not start, nothing
+changed when the app does not quit, and the read-only fallback; and a
+non-blocking step downloads the newest published release for that platform
+from GitHub, verifies and unpacks it, and discards it. The download address
+is not configurable, so no test can point the app elsewhere.
+
 ## Architecture
 
 ```
@@ -255,7 +322,11 @@ src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
 src/web/js/update.js          update check: version compare, opt-in weekly schedule
-src/update.zig                the one network request: GitHub's latest-release API
+src/update.zig                the update check: GitHub's latest-release API
+src/install.zig               v5 update install: download, SHA256SUMS, unpack, checks, helper start
+src/updater/apply-macos.sh    v5 swap / relaunch / rollback helper (embedded in the app)
+src/updater/apply-windows.ps1 v5 swap / relaunch / rollback helper (embedded in the app)
+scripts/test-updater.mjs      v5 updater end-to-end tests on the packaged app
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
 src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)

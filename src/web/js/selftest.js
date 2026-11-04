@@ -23,7 +23,7 @@ import { Game } from "./rules.js";
 import * as Engine from "./engine.js";
 import * as KataGo from "./katago.js";
 import { APP_VERSION } from "./version.js";
-import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, writeTextFile } from "./host.js";
+import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, updateCancel, updateDownload, updateStatus, writeTextFile } from "./host.js";
 
 const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
 const MAX_FRAME_GAP_MS = 250;
@@ -70,9 +70,30 @@ function playAll(game, moves) {
 
 const validAnalysis = (a, size) => !!(a && Number.isFinite(a.winrate) && a.ownership?.length === size * size && a.moves.length > 0);
 
+/**
+ * v5 updater probe (scripts/test-updater.mjs): launched with
+ * GOBAN_UPDATE_PROBE_OUT, the page reports whether this installation can
+ * update itself; with GOBAN_UPDATE_PROBE_TAG as well, it downloads,
+ * verifies and unpacks that real release from GitHub, reports the outcome,
+ * and discards it. Nothing is installed.
+ */
+async function runUpdateProbe(cfg) {
+  const report = { version: APP_VERSION, status: await updateStatus({ probe: true }) };
+  if (cfg.updateProbeTag) {
+    const started = now();
+    report.download = await updateDownload(cfg.updateProbeTag);
+    report.downloadMs = Math.round(now() - started);
+    report.after = await updateStatus();
+    report.cancel = await updateCancel();
+  }
+  report.ok = report.status?.ok === true && (!cfg.updateProbeTag || report.download?.ok === true);
+  await writeTextFile(cfg.updateProbe, JSON.stringify(report, null, 2));
+}
+
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
   const cfg = await selftestConfig();
+  if (cfg?.updateProbe) return runUpdateProbe(cfg);
   if (!cfg?.enabled || !cfg.path) return;
   const checks = {
     webview: true,

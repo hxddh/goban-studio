@@ -6,6 +6,7 @@ import { BLACK, WHITE, RULESETS, defaultKomi, formatPoints, rulesetById } from "
 import { STRENGTHS, suggestHandicap } from "../engine.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
+import * as U from "../update.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
@@ -369,26 +370,65 @@ function SettingsSheet() {
 function UpdateRow() {
   const u = state.updateCheck;
   const can = C.canCheckUpdates();
+  const st = u?.status;
   let text = "";
-  if (u?.status === "checking") text = t("update.checking");
-  else if (u?.status === "available") text = t("update.available", [u.latest]);
-  else if (u?.status === "current") text = t("update.current", [u.current]);
-  else if (u?.status === "error") text = t("update.error");
+  if (st === "checking") text = t("update.checking");
+  else if (st === "available") text = t("update.available", [u.latest]);
+  else if (st === "downloading") text = t(u.step === "verify" ? "update.verifying" : u.step === "unpack" ? "update.unpacking" : "update.downloading", [u.latest]);
+  else if (st === "ready") text = t("update.ready", [u.latest]);
+  else if (st === "installing") text = t("update.installing");
+  else if (st === "current") text = t("update.current", [u.current]);
+  else if (st === "error") text = t("update.error");
   else if (!can) text = t("update.unavailable");
+  const canInstall = st === "available" && u.install?.can;
+  let action;
+  if (st === "available")
+    action = canInstall ? (
+      <Button size="sm" icon="download" onClick={C.downloadUpdate}>
+        {t("update.install")}
+      </Button>
+    ) : (
+      <Button size="sm" icon="download" onClick={C.openReleasePage}>
+        {t("update.download")}
+      </Button>
+    );
+  else if (st === "downloading")
+    action = (
+      <Button size="sm" kind="ghost" onClick={C.cancelUpdate}>
+        {t("update.cancel")}
+      </Button>
+    );
+  else if (st === "ready")
+    action = (
+      <Button size="sm" kind="primary" onClick={C.applyUpdate}>
+        {t("update.restart")}
+      </Button>
+    );
+  else if (st !== "installing")
+    action = (
+      <Button size="sm" onClick={() => C.checkForUpdates()} disabled={!can || st === "checking"}>
+        {t("update.check")}
+      </Button>
+    );
   return (
-    <div class="row update-row">
-      <span class={u?.status === "available" ? "" : "muted"} aria-live="polite">
-        {text}
-      </span>
-      {u?.status === "available" ? (
-        <Button size="sm" icon="download" onClick={C.openReleasePage}>
-          {t("update.download")}
-        </Button>
-      ) : (
-        <Button size="sm" onClick={() => C.checkForUpdates()} disabled={!can || u?.status === "checking"}>
-          {t("update.check")}
-        </Button>
+    <div class="update-block">
+      <div class="row update-row">
+        <span class={st === "available" || st === "ready" ? "" : "muted"} aria-live="polite">
+          {text}
+        </span>
+        {action}
+      </div>
+      {st === "downloading" && (
+        <div class="update-progress">
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round((u.progress || 0) * 100)}>
+            <i style={{ width: `${Math.round((u.progress || 0) * 100)}%` }} />
+          </div>
+          {u.total > 0 && <span class="fine">{t("update.progress", [U.formatBytes(u.received || 0), U.formatBytes(u.total)])}</span>}
+        </div>
       )}
+      {st === "ready" && <p class="fine">{t("update.restartHint")}</p>}
+      {st === "available" && !canInstall && u.install?.blocked && <p class="fine">{t(U.installMessageKey(u.install.blocked))}</p>}
+      {st === "available" && u.installError && <p class="fine">{t(U.installMessageKey(u.installError))}</p>}
     </div>
   );
 }
