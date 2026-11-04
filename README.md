@@ -161,19 +161,23 @@ The course and the problems are verified, not counted:
   problems and removed 37 that could not be fixed cleanly.
 - The solver treats a ko or an unsettled position as a failure for the
   attacker, so a problem is only listed when its answer is unconditional
-  (the 10 ko problems say so and are proved to be kos). Seki counts as life,
+  (the 19 ko problems say so and are proved to be kos). Seki counts as life,
   as under Japanese rules: a kill that only reaches seki fails.
 - Seki is recognised soundly: the defender survives even if the attacker
   moves first, cannot reach independent life even moving first (both with
   every ko counted against it), and lives alongside stones inside the fight
-  rather than through a point outside the problem. The 13 seki problems
+  rather than through a point outside the problem. The 23 seki problems
   (goal `seki`) are proved to have seki as their best result and to end in
   one. Bent four in the corner is never accepted as life.
-- 262 problems: 28 capturing races (eye against no eye, big eye against
-  small eye, outside liberties), 13 seki problems and 20 classic textbook
-  shapes (straight and bent three, pyramid four, bulky and crossed five,
-  rabbity six, rectangular six, seven stones on the second line), each in
-  four languages and graded by measurement.
+- 509 problems: 57 capturing races (16 big eye against small eye, eye
+  against no eye, outside liberties), 23 seki problems (from grade 1 up),
+  19 ko problems, 19 false-eye and 23 eye-space problems, 28 classic
+  textbook shapes (straight and bent three, pyramid four, bulky and crossed
+  five, rabbity six, rectangular six, seven stones on the second line) and
+  six kills at the 2-1 point of the corner, each in four languages and
+  graded by measurement into five grades of about 100 problems each. The
+  247 problems added in v5 came from shape generators and were proved,
+  filtered and reviewed the same way (`docs/problems-audit.md`, "v5").
 
 v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
 with cyclic difficulty labels. v2 removed them.

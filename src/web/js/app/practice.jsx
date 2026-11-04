@@ -227,6 +227,9 @@ function TopicPage() {
   const p = state.progress;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
   const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
+  // Grades fold away: the first grade with unsolved problems starts open.
+  const firstOpen = byGrade.find(({ items }) => items.some((x) => !p.problems[x.id]?.solved))?.g ?? byGrade[0]?.g;
+  const [openGrades, setOpenGrades] = useState([firstOpen]);
   return (
     <>
     <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
@@ -247,26 +250,34 @@ function TopicPage() {
           ))}
         </div>
       )}
-      {byGrade.map(({ g, items }) => (
-        <section class="section">
-          <h2 class="section-title">
-            <GradeDots grade={g} /> {t("grade." + g)}
-          </h2>
-          <div class="problem-grid">
-            {items.map((x) => {
-              const pr = p.problems[x.id];
-              const n = all.indexOf(x) + 1;
-              return (
-                <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
-                  <span class="problem-no">{n}</span>
-                  <span class="problem-title">{C.tx(x.title)}</span>
-                  {pr?.solved ? <Icon name="check" size={14} /> : pr ? <i class="dot tried" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {byGrade.map(({ g, items }) => {
+        const solved = items.filter((x) => p.problems[x.id]?.solved).length;
+        const isOpen = openGrades.includes(g);
+        return (
+          <section class="section grade-section">
+            <button type="button" class="section-title grade-head" aria-expanded={isOpen} onClick={() => setOpenGrades(isOpen ? openGrades.filter((x) => x !== g) : [...openGrades, g])}>
+              <Icon name={isOpen ? "down" : "next"} size={14} />
+              <GradeDots grade={g} /> {t("grade." + g)}
+              <span class="fine">{t("practice.ofN", [solved, items.length])}</span>
+            </button>
+            {isOpen && (
+              <div class="problem-grid">
+                {items.map((x) => {
+                  const pr = p.problems[x.id];
+                  const n = all.indexOf(x) + 1;
+                  return (
+                    <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
+                      <span class="problem-no">{n}</span>
+                      <span class="problem-title">{C.tx(x.title)}</span>
+                      {pr?.solved ? <Icon name="check" size={14} /> : pr ? <i class="dot tried" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
     </>
   );

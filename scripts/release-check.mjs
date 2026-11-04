@@ -32,7 +32,7 @@ assert.ok(steps.length >= 240, "at least 240 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);
 for (const lesson of lessons) assertLocalized(lesson, ["title"], lesson.id);
 
-assert.ok(PROBLEMS.length >= 250, "at least 250 problems");
+assert.ok(PROBLEMS.length >= 500, "at least 500 problems");
 for (const p of PROBLEMS) assertLocalized(p, ["title", "hint"], p.id);
 const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
 for (const p of PROBLEMS) assert.ok(grades[p.id]?.grade >= 1 && grades[p.id].grade <= 5, `${p.id} has a measured grade`);

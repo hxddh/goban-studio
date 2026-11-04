@@ -729,3 +729,6 @@ button.group-row:hover { background: var(--fill); }
 .update-progress { display: flex; align-items: center; gap: var(--s-3); }
 .update-progress .progress { flex: 1; }
 .units-heading { margin: var(--s-4) 0 var(--s-1); font: var(--t-caption); color: var(--text-3); letter-spacing: 0.02em; }
+.grade-head { display: flex; align-items: center; gap: var(--s-2); width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text); text-align: left; }
+.grade-head .fine { margin-left: auto; }
+.grade-section { margin-top: var(--s-5); }

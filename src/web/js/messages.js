@@ -732,4 +732,12 @@ export const MESSAGES = {
   "score.detailAreaHandicap": m("棋子 {0} · 地 {1} · 贴 {2} · 让子补偿 {3}", "Stones {0} · territory {1} · komi {2} · handicap {3}", "돌 {0} · 집 {1} · 덤 {2} · 치석 보상 {3}", "石 {0} · 地 {1} · コミ {2} · 置き石の補正 {3}"),
   "score.sekiTerritory": m("双活中的空点不算地。", "Points inside a seki are not territory.", "빅 안의 빈 점은 집이 아닙니다.", "セキの中の空点は地になりません。"),
   "score.sekiArea": m("双活的棋子和眼位都算，公气双方都不算。", "Stones in seki and their eyes count; the shared liberties count for neither side.", "빅의 돌과 눈은 세고, 공동 공배는 어느 쪽도 세지 않습니다.", "セキの石とその眼は数え、内ダメはどちらにも数えません。"),
+  // v5 problems
+  "problem.twoOne.title": m("二一路", "The 2-1 point", "2·1의 급소", "二の一"),
+  "problem.twoOne.hint": m(
+    "角上的二一路（一路上紧挨二二的那一点）常常是杀棋的要点。",
+    "In the corner, the 2-1 point (on the first line, next to the 2-2 point) is often the killing point.",
+    "귀에서는 2·1의 자리(1선에서 2·2 바로 옆)가 잡는 급소인 경우가 많습니다.",
+    "隅では二の一（一線で二の二のすぐ隣）が殺しの急所になることがよくあります。",
+  ),
 };
