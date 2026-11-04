@@ -1417,7 +1417,7 @@ await test("v5: removing a network retries while the engine is busy, without blo
   assert.equal(calls, 3);
   const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
-  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
+  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
 });
 
