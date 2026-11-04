@@ -259,6 +259,10 @@ against each other and against KataGo's human-imitation model on 19×19 and
 9×9 and fits Bradley–Terry ratings, mapped to kyu/dan with the EGF rating
 formula and a 10-kyu anchor. They run from ≈30 kyu to ≈4 dan, about five
 ranks apart; labels stay “≈” because the anchor is a model, not people.
+The human-style levels were measured again in v7 (708 games on 19×19 and
+824 on 9×9, played on GitHub's runners by `.github/workflows/calibrate.yml`)
+and run from ≈30 kyu to ≈6 dan without a gap; the stronger network's top
+level is ≈7 dan.
 Method, raw results and limitations: [docs/strength.md](docs/strength.md).
 In the browser preview there is no KataGo: 9×9 falls back to Moka v2.1 and
 other sizes to a small heuristic engine, and the interface says so

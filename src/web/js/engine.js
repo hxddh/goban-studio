@@ -57,19 +57,29 @@ import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
  *            search (the larger network is several times slower per visit
  *            and much stronger per visit).
  *
- * v6: `human.rank` / `strong.rank` is that mode's own label where the v6
- * measurement (426 games, docs/strength.md) placed it clearly away from
- * the level's label on both boards; labelRank() picks it.
+ * v6: `human.rank` / `strong.rank` is that mode's own label where the
+ * measurement placed it clearly away from the level's label; labelRank()
+ * picks it.
+ *
+ * v7 (docs/strength.md, "v7"; 708 games on 19×19 and 824 on 9×9 on
+ * GitHub's runners): the human-style ladder has no gap. v6's `5k`
+ * (≈3 kyu) left a nine-rank jump from `10k`; the search style plays far
+ * above the raw style whatever its profile or visits, so `5k` keeps it and
+ * adds 12% beginner's moves (≈7 kyu, as the standard `5k`). `15k` adds
+ * 12% to the raw `rank_20k` (≈18 kyu; it measured ≈15 without). `1k` is
+ * `rank_4k` at 32 visits (≈1 kyu; v6's `rank_2k` at 64 measured ≈1 dan).
+ * Above 4 dan a 400-visit bridge placed the top: human-style `2d` ≈6 dan,
+ * the stronger network ≈7 dan (both the lower ends of their intervals).
  */
 export const STRENGTHS = [
   { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1, human: { profile: "rank_20k", blunder: 0.9 } },
   { id: "25k", rank: 29, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1, human: { profile: "rank_20k", blunder: 0.7 } },
   { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2, human: { profile: "rank_20k", blunder: 0.35 } },
-  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3, human: { profile: "rank_20k" } },
+  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3, human: { profile: "rank_20k", blunder: 0.12 } },
   { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4, human: { profile: "rank_12k" } },
-  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24, rank: 3 } },
-  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_2k", style: "search", visits: 64, rank: 0 } },
-  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200 }, strong: { visits: 64, rank: -4 } },
+  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24, blunder: 0.12 } },
+  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_4k", style: "search", visits: 32, rank: 1 } },
+  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200, rank: -5 }, strong: { visits: 64, rank: -6 } },
 ];
 
 /** Search budget of a human-style move in "raw" style (passes only). */
