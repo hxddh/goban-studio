@@ -110,7 +110,7 @@ export function buildReport({ game, points, humanColor = null, refined = null, a
   const keyMoves = describeMistakes(game, pts, color, MOMENTS, refined).top;
   const summary = summarizeGame({ game, points: pts, meta: { humanColor: color }, keyMoves });
   const line = game.mainLine();
-  const result = line[line.length - 1]?.result || game.current.result || null;
+  const result = resultOf(game);
   const confidence = summary?.confidence || "none";
   const high = confidence === "high";
   const players = color ? [KEY[color]] : ["black", "white"];
@@ -152,9 +152,19 @@ export function buildReport({ game, points, humanColor = null, refined = null, a
   };
 }
 
-/** A stored report that still describes this game (same version and moves). */
+/** The game's result as a report stores it (null while unfinished). */
+function resultOf(game) {
+  const line = game.mainLine();
+  return line[line.length - 1]?.result || game.current.result || null;
+}
+
+/**
+ * A stored report that still describes this game: same version, same moves
+ * and the same result (a game resigned after its report was made has a new
+ * result but the same moves).
+ */
 export function reportFits(report, game) {
-  return !!report && report.v === REPORT_VERSION && report.lineKey === lineKey(game);
+  return !!report && report.v === REPORT_VERSION && report.lineKey === lineKey(game) && (report.result || null) === resultOf(game);
 }
 
 /** The moments worth practising: the costliest 1–3 with a better move, worst first. */

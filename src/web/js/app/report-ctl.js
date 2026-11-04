@@ -118,9 +118,18 @@ async function analyse(recordId, game, humanColor, job) {
     points = rv.points;
     refined = rv.refined;
   }
+  // With KataGo here, positions that fell back to the offline estimate are
+  // analysed again; only KataGo's own analyses are reused.
+  let existing = null;
+  if (points && state.engine.available && points.some((p) => p.source !== "katago")) {
+    existing = points.map((p) => (p.source === "katago" ? p : null));
+    points = null;
+    refined = null;
+  }
   if (!points) {
     const size = game.size;
     points = await analyzeLine(game, {
+      existing,
       visits: size === 19 ? 40 : size === 13 ? 56 : 80,
       onProgress: (k, total) => {
         if (k % 4 === 0 || k === total) setProgress(k / total);

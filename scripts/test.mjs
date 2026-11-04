@@ -2472,6 +2472,15 @@ await test("v6 report: the strings are one block in four languages", () => {
   assert.match(lib, /C\.openReport\(g\.id, \{ space: "library" \}\)/);
 });
 
+await test("v6 report: a stored report no longer fits once the result changes", () => {
+  const { game, points } = reportGame({ losses: { 25: 8 }, result: null });
+  const m = R.buildReport({ game, points, humanColor: BLACK, at: 1 });
+  assert.ok(R.reportFits(m, game), "the unfinished game");
+  game.setResult("W+R");
+  assert.ok(!R.reportFits(m, game), "resigned with no new move: the old report is stale");
+  assert.ok(R.reportFits(R.buildReport({ game, points, humanColor: BLACK, at: 2 }), game));
+});
+
 /* ------------------------------------------------------------ v6 a11y */
 
 // A small 9×9 position, rows as drawn (y = 0 is row 9 at the top):
