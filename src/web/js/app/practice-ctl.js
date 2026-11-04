@@ -478,7 +478,7 @@ function endResult(P) {
  */
 export function feedbackKey(P) {
   if (!P) return null;
-  if (P.pz?.counting && P.feedback === "solved") return P.pz.ask === "value" ? "practice.endgame.valueRight" : "practice.endgame.solved";
+  if (P.pz?.counting && P.feedback === "solved") return (P.pz.ask === "value" ? "practice.endgame.valueRight" : "practice.endgame.solved") + (endgameArgs(P)[0] === "1" ? "One" : "");
   if (P.pz?.counting && P.feedback === "wrong") return P.pz.ask === "value" ? "practice.endgame.valueWrong" : "practice.endgame.wrong";
   if (P.feedback === "solved") return P.result === "seki" ? "practice.solvedSeki" : "practice.solved";
   if (P.feedback === "ko") return "practice.onlyKo";

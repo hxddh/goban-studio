@@ -815,6 +815,11 @@ export const MESSAGES = {
   "practice.endgame.settled": m("这里已经定了，下在这里不会多得目数。", "That area is settled: a stone there gains nothing.", "그곳은 이미 정해졌습니다. 거기에 두어도 얻는 것이 없습니다.", "そこはもう決まっています。打っても得はありません。"),
   "practice.endgame.choices": m("目数", "Points", "집 수", "目数"),
   "practice.endgame.points": m("{0}目", "{0} points", "{0}집", "{0}目"),
+  // The same three lines and the chip when the number is 1 (English has no "1 points").
+  "practice.endgame.solvedOne": m("正确：这是最大的一手，比其他下法多1目。", "Right: this is the biggest move, 1 point more than any other choice.", "정답입니다. 가장 큰 수로, 다른 어떤 수보다 1집 큽니다.", "正解です。一番大きい手で、ほかのどの手より1目大きいです。"),
+  "practice.endgame.valueRightOne": m("正确：1目。棋盘上是黑先的下法。", "Right: 1 point. The board shows the line with Black first.", "정답입니다. 1집입니다. 판에는 흑이 먼저 두는 수순이 있습니다.", "正解です。1目です。盤上は黒が先に打つ手順です。"),
+  "practice.endgame.valueAnswerOne": m("这一手值1目。棋盘上是黑先的下法。", "This move is worth 1 point. The board shows the line with Black first.", "이 수는 1집입니다. 판에는 흑이 먼저 두는 수순이 있습니다.", "この手は1目です。盤上は黒が先に打つ手順です。"),
+  "practice.endgame.onePoint": m("1目", "1 point", "1집", "1目"),
   "theme.hane-connect": m("一路扳粘", "First-line hane and connect", "1선 젖혀 잇기", "一線のハネツギ"),
   "theme.sente-gote": m("先手与后手", "Sente and gote", "선수와 후수", "先手と後手"),
   "theme.reverse-sente": m("逆收", "Reverse sente", "역끝내기", "逆ヨセ"),

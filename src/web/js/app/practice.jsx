@@ -382,7 +382,7 @@ function puzzleModel(P, extra = {}) {
 function ProblemFeedback({ P, success }) {
   const counting = P.pz.counting;
   if (P.feedback === "solved" && counting) return <p class="feedback good">{t(C.feedbackKey(P), C.endgameArgs(P))}</p>;
-  if (P.answer) return <p class="feedback info">{counting && P.pz.ask === "value" ? t("practice.endgame.valueAnswer", C.endgameArgs(P)) : t("practice.answerShown")}</p>;
+  if (P.answer) return <p class="feedback info">{counting && P.pz.ask === "value" ? t(P.pz.value === 1 ? "practice.endgame.valueAnswerOne" : "practice.endgame.valueAnswer", C.endgameArgs(P)) : t("practice.answerShown")}</p>;
   if (P.feedback === "solved") return <p class="feedback good">{P.result === "seki" ? t(C.feedbackKey(P)) : success || t("practice.solved")}</p>;
   if (P.feedback === "ko" || P.feedback === "wrong") return <p class="feedback bad">{t(C.feedbackKey(P))}</p>;
   if (P.feedback === "keep") return <p class="feedback">{t("practice.keepGoing")}</p>;
@@ -405,7 +405,7 @@ function ValueChoices({ P }) {
         const right = done && v === pz.value;
         return (
           <button type="button" class={`chip ${right ? "on" : ""} ${wrong ? "off" : ""}`} aria-pressed={right} disabled={done || wrong} onClick={() => C.answerValue(v)}>
-            {t("practice.endgame.points", [String(v)])}
+            {v === 1 ? t("practice.endgame.onePoint") : t("practice.endgame.points", [String(v)])}
           </button>
         );
       })}

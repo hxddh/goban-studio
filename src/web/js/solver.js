@@ -3,7 +3,8 @@
  *
  * Every practice problem in Goban Studio is checked by this module, in the
  * test suite and live in the app. A problem is a small position plus a goal
- * (capture, save, kill, live). The solver searches every reply inside the
+ * (capture, save, kill, live). Endgame problems (v6, goal "endgame") are
+ * counted instead: see the counting section at the end of this file. The solver searches every reply inside the
  * problem's area, so:
  *
  *   - the test suite can prove each problem has a correct answer, list every
@@ -131,6 +132,8 @@ const DEFAULT_PUSHES = 2;
  *   x / o   black / white key stone (the stones the goal is about)
  *   .       empty point inside the problem region
  *   ,       empty point outside the region (play there is a tenuki)
+ *   :       (endgame problems only) empty point counted at the end but not
+ *           played: the inside of a territory
  * A problem without any ',' and without `region: "all"` treats every empty
  * point of the diagram as region.
  */
@@ -1338,34 +1341,39 @@ export function signMap(pz, st) {
  *
  * The solver proves an endgame answer by exact minimax counting of the
  * local position under Japanese counting: the score is territory plus
- * prisoners, Black's minus White's. The problem's region is its '.' points
- * (plus the points of any stone that is captured). It must be sealed: no
- * '.' point touches a ',' point, and every stone of the diagram belongs to
- * a chain with a liberty on a ',' point, so the walls can never be captured
- * and the search is finite. Several sealed areas in one diagram form one
- * sum game, so "which move is biggest" is answered by the same search, with
- * sente, gote and the value of every follow-up counted exactly.
+ * prisoners, Black's minus White's, and play goes on until both sides pass,
+ * so sente, gote and the value of every follow-up are read out. The play
+ * area is the diagram's '.' points, its ':' points (counted at the end but
+ * never played, except to capture: the inside of a territory) and the points
+ * of every stone that can be captured. It must be sealed: no '.' or ':'
+ * point touches a ',' point, so a wall (a chain with a liberty on a ','
+ * point) can never be captured. Several sealed areas in one diagram form
+ * one sum game, so "which move is biggest" is answered by the same search.
  *
  * The model:
  *
  *   - Black and White alternate; either may pass (tenuki: the rest of the
  *     board is settled). Two passes in a row end the play. Captures, no
- *     suicide, simple ko (neither side has ko threats) and positional
- *     superko along the line being read. A result that depends on a
- *     superko cut is inexact, and the problem check rejects it.
- *   - A player never plays into an empty area that stones of one colour
- *     alone enclose, unless the stone touches a chain (of either colour)
- *     with one or two liberties. In a sealed area that small an invading
- *     stone is dead, and under Japanese counting it only hands over a
- *     prisoner; filling your own sealed area only loses territory. The
- *     exception keeps captures, ataris and shortage of liberties in play.
- *   - When play ends, a chain in atari is removed as dead (a prisoner for
- *     the other side), as a Japanese count treats it: its owner chose not
- *     to save it. If chains of both colours are in atari, or taking a
- *     single stone would leave the capturing stone in atari (an open ko),
- *     the end is unsettled and the result inexact.
+ *     suicide, simple ko; neither side has ko threats. A point where a stone
+ *     was captured stays closed to that colour for the rest of the line
+ *     (state `closed`), so no line can repeat a position and every search
+ *     is finite without superko; it also makes taking a ko final.
+ *   - A player does not fill an area their own stones alone enclose, unless
+ *     a chain of theirs next to the point has one or two liberties, and
+ *     does not play into an area the opponent alone encloses, or on a ':'
+ *     point, unless the stone captures. In areas this small such a stone is
+ *     dead, and under Japanese counting it only hands over a prisoner.
+ *   - When play ends, dead stones come off as prisoners (countFinal()): a
+ *     chain the other colour alone encloses, with no way to its own wall,
+ *     and a chain in atari whose liberty the other side may play. Two
+ *     touching chains of different colours, both in atari, are a fight
+ *     still on: such an end is unsettled, and passing into it is not
+ *     allowed while a move is left.
  *   - Territory is an empty area enclosed by one colour alone; an area that
  *     touches both colours is neutral (dame).
+ *   - An unsettled end that cannot be avoided is scored as a huge win and
+ *     as a huge loss for Black in two more searches; a count is exact when
+ *     all three agree (countExact()), and the problem check requires it.
  *
  * A value is Black's future score from a position: the prisoners still to
  * be taken plus the territory at the end. Two questions are asked:
@@ -1575,6 +1583,7 @@ function countingCandidates(pz, st) {
 function countingPoints(pz, st, points = null) {
   const c = context(pz.size);
   const board = st.board;
+  countingArea(pz);
   points = points || pz._areaList;
   const areas = emptyAreas(pz, board, points);
   const closed = st.closed || [];

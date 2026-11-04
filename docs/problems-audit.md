@@ -280,3 +280,163 @@ number of each family and never reuse a removed id.
   teacher; a few labels (for instance `eye-space` for a live problem whose
   answer blocks a hane rather than widening the space) are approximate.
 - The review was done by a language model, not a strong human player.
+
+# v6: endgame problems and a counting solver
+
+v5 skipped endgame problems because the solver could only answer a yes/no
+question. v6 adds a counting mode to the solver (the counting section at the
+end of `src/web/js/solver.js`) and 34 endgame problems proved by it, in a new
+Practice topic, Endgame. No existing problem changed: the 509 kept their ids,
+diagrams, answers and stored grades (`problem-grades.json` only gained the 34
+new entries).
+
+## The counting mode
+
+An endgame problem (`goal: "endgame"`) is a sealed region and a question.
+The solver proves the answer by exact minimax counting of the region under
+Japanese counting: the score is territory plus prisoners, Black's minus
+White's, and play goes on until both sides pass, so sente, gote, reverse
+sente and the value of every follow-up are read out rather than estimated.
+
+- **The region.** '.' points are played; ':' points (new in v6) are counted
+  at the end but never played, except to capture: the inside of a
+  territory, where a stone could only be dead. ',' points are outside. No
+  '.' or ':' point may touch a ',' point, so every area is sealed, and the
+  walls (chains with a liberty on a ',' point) can never be captured.
+- **Moves.** Captures, no suicide, simple ko with no ko threats for either
+  side. A point where a stone has been captured stays closed to that colour
+  for the rest of the line, which keeps every line finite with no superko
+  bookkeeping (and makes taking a ko final). A player does not fill an area
+  their own stones alone enclose (unless a chain of theirs there has one or
+  two liberties), and does not play into one the opponent alone encloses
+  (unless the stone captures): in areas this small such a stone is dead,
+  and under Japanese counting it only hands over a prisoner.
+- **The end.** Two passes end the play. A chain that the other colour alone
+  encloses, with no connection to its own wall, is dead; so is a chain in
+  atari whose last liberty the other side may play (its owner chose not to
+  save it). Dead stones are prisoners. Empty areas enclosed by one colour
+  are its territory; areas touching both are neutral. Passing a second time
+  is not allowed while the end would be unsettled (two chains of different
+  colours in atari touching each other) and a move is left.
+- **Exactness.** An unsettled end that cannot be avoided is scored twice,
+  as a huge win and as a huge loss for Black. Minimax is monotone in the end
+  scores, so when both give the same value, no unsettled end can change it.
+  The check requires this for every count it uses.
+- **Speed.** Separate sealed areas never interact, so each is read once as a
+  graph of local positions with each colour's moves, and the search runs
+  over tuples of local positions with null-window tests and a bounds table.
+  The slowest endgame problem (a monkey jump) takes about 0.25 s.
+
+Two questions are asked. `ask: "move"`: Black to play, the rest of the board
+settled; the learner must play the biggest move and then keep playing until
+nothing is left to gain. `answer` lists the correct first moves and `margin`
+how many points the best move gains over the best other choice, passing
+included; the check proves both. `ask: "value"`: how many points is Black's
+best move here worth? `value` is the deiri count, Black's result with Black
+first minus Black's result with White first, as the course counts values
+(glossary: "the course does not use miai counting"); `choices` are the four
+values offered.
+
+The check (`scripts/check-problems.mjs`) also requires: topic, goal and an
+endgame theme go together; `theme: "deiri"` exactly for value questions; one
+to three correct first moves; the best move strictly better than passing;
+and the solution line legal and keeping the best count. The duplicate check
+keeps the stones' colours for endgame problems (Black always plays first).
+
+## Textbook values the solver reproduces
+
+Each area used in a problem was also proved with its ':' points turned into
+'.' points (every point playable). The value, the best move and the margin
+were the same every time:
+
+| area | value (deiri) | line, Black first / White first |
+| --- | --- | --- |
+| first-line hane and connect (3 widths) | 2, gote | hane, block, connect / the mirror |
+| sente first-line push (2 widths) | 1 | push, White blocks / White's move is gote |
+| reverse sente block (4 shapes) | 1 | Black's block is gote / White's push is sente |
+| atari on a first-line stone | 1 | atari, White connects / White's move is gote |
+| sente capture of a stone in atari (2 shapes) | 3 | capture, White blocks / White connects |
+| first-line descent | 1 | descent, White blocks |
+| double sente | 2 | atari, connect / atari, connect |
+| monkey jump (2 shapes) | 4 | the large knight's slide is the only best move |
+| two second-line boundaries | 4 and 5 | value questions only |
+
+The first three match the values the intermediate course already states
+(the hane and connection is gote and worth 2; the push is sente and worth
+1; double sente is worth 2). The monkey jump is worth 4 here because the
+areas are small; in a wider area it can be worth more, and the problems
+state only the solver's count. `scripts/test.mjs` checks the hane and connection,
+the push, the block, double sente, the dead-stone rules, and that the ':'
+points give the same proof as playing them out.
+
+## The 34 problems
+
+| theme | problems | kind |
+| --- | --- | --- |
+| hane-connect | 3 | find the hane |
+| sente-gote | 7 | four one-area sente moves; three "sente before gote" sums |
+| reverse-sente | 4 | block the opponent's sente push |
+| double-sente | 4 | one area; three sums where double sente comes first |
+| monkey-jump | 2 | the jump is the only best move |
+| endgame-compare | 4 | sums of two or three areas: the biggest move |
+| deiri | 10 | how many points (values 1 to 5) |
+
+Grades 1 to 5: 6 / 12 / 3 / 8 / 5, by the counting difficulty score
+(moves to find, tempting wrong moves, number of areas, how close the best
+other choice is, the size of the proof; for a value question, the value and
+the length of both lines), bucketed by the existing `GRADE_CUTS`. The cuts
+were not moved, so no v5 grade changed.
+
+How they were made: the areas above were drawn by hand and checked one by
+one; then sums of two or three of them were built along the edges of the
+board and kept only when the solver found a single best first move. The
+"sente before gote", "double sente first" and "biggest move" problems are
+those sums, and each theme was given only when the proved answer is that
+idea (the sente move, the double sente point, the largest move). Every
+problem was looked at as a diagram with its solution line.
+
+## Skipped, and why
+
+- **Reverse sente in a sum.** With these small areas a reverse sente of 1
+  and a gote of 2 come out exactly equal (as the textbook rule that reverse
+  sente is worth twice a gote move of the same count says), so no sum tried
+  had the reverse sente as its single best move. Reverse sente is taught by
+  four one-area problems instead.
+- **Second-line hane and connect, and other wide boundaries.** With the
+  inside of the territory counted but not played, several such shapes gave
+  a different count than with every point playable, so they were dropped.
+  Only the two second-line shapes whose counts agreed are used, as value
+  questions.
+- **The monkey jump in sums, and a third monkey jump.** Its area is large
+  (up to 18,000 local positions), and sums with it took 10 to 40 s; a third
+  shape took 1.2 s alone, too close to the per-problem limit.
+- **A one-point gote move** to compare with reverse sente: none of the
+  small shapes tried was cleanly gote for both sides.
+
+## Course: leaning attack and sabaki
+
+Two lessons were added to the fighting unit, after the three v5 lessons
+(no lesson id changed): `fight-leaning` and `fight-sabaki`. The solver cannot
+prove that the opponent must answer a leaning move (that is about stones
+other than the key stones), so the leaning lesson proves what the leaning
+gains: two capture problems where the stones Black gained by leaning on a
+white stone at the upper right make the capture of the cutting stone work.
+For each, the same position without those black stones was proved to fail.
+The sabaki lesson proves a sacrifice (save the main stones; running with
+the lone stone in atari does not save them, as the exact first-move search
+shows) and a quick life on the edge (straight three: the middle point). All
+four steps pass the course check; the course now has 67 lessons and 248
+steps.
+
+## Remaining limits
+
+- The model has no ko threats: a ko is won by whoever takes it first. No
+  line the app shows (the answer, Black first, White first) contains a ko;
+  one sum whose line did was replaced.
+- The counting is local: "the rest is settled" means no other move is
+  worth anything. With a hotter rest of the board, the best order of some
+  sums could change; the problems ask about the position as drawn.
+- The ':' points rest on judgement (nobody would play there); the areas
+  were checked against the fully playable version, the sums were not (too
+  slow to read with every point playable).
+- The review was done by a language model, not a strong human player.

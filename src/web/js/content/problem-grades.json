@@ -6288,11 +6288,11 @@
   },
   "endgame-biggest-03": {
     "grade": 5,
-    "score": 12,
+    "score": 12.3,
     "moves": 3,
     "correct": [
       {
-        "x": 13,
+        "x": 5,
         "y": 18
       }
     ]

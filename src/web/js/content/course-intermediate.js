@@ -1,6 +1,7 @@
 /**
  * The intermediate course (v5): units 9–13, appended to the beginner course
  * in ./course.js. Same step schema (read / place / problem; see course.js).
+ * v6 adds two lessons to the fighting unit: the leaning attack and sabaki.
  *
  * Opening and joseki steps are drawn on a 19×19 board: a whole-board
  * diagram shows the whole board, a smaller diagram in a corner shows a
@@ -1741,10 +1742,10 @@ export const INTERMEDIATE = [
     level: "intermediate",
     title: L("中盘战斗", "Middle-game fighting", "중반 전투", "中盤の戦い"),
     summary: L(
-      "吃掉切断的子，从远处攻击，把对方分开来攻。",
-      "Capture the cutting stones, attack from a distance, and split the opponent's stones apart.",
-      "끊은 돌 잡기, 멀리서 공격하기, 상대를 갈라서 공격하기.",
-      "切った石を取る、離れて攻める、相手を分断して攻める。",
+      "吃掉切断的子，从远处攻击，把对方分开来攻，借力攻击，以及在对方势力里腾挪。",
+      "Capture the cutting stones, attack from a distance, split the opponent's stones apart, lean on stones to attack, and make sabaki in the opponent's sphere.",
+      "끊은 돌 잡기, 멀리서 공격하기, 상대를 갈라서 공격하기, 기대어 공격하기, 상대 세력 안에서의 타개.",
+      "切った石を取る、離れて攻める、相手を分断して攻める、もたれ攻め、そして相手の勢力の中でのサバキ。",
     ),
     lessons: [
       {
@@ -1913,6 +1914,129 @@ export const INTERMEDIATE = [
               "백 두 점에 모두 닿는 빈 점을 찾으세요.",
               "白二子の両方に接する空点を探しましょう。",
             ),
+          },
+        ],
+      },
+      // v6: leaning attack and sabaki. The tactical steps are proved by the
+      // solver; the claims about the stones gained by leaning were checked
+      // too (without them, the capture fails).
+      {
+        id: "fight-leaning",
+        title: L("借力攻击", "Leaning attack", "기대어 공격하기", "もたれ攻め"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "想攻击的子不好直接攻时，可以先靠在旁边的对方棋子上。对方必须应的先手（先手便宜），会让你的子落在有用的位置；这些子随后就能帮你攻击真正的目标。三角标记的黑子就是这样得来的：它靠在右上的白子下面，白棋扳住应了。",
+              "When the stone you want to attack is hard to reach directly, lean on a nearby enemy stone first. Forcing moves that the opponent has to answer (kikashi) put your stones in useful places, and those stones then help the attack on the real target. The marked black stone came that way: it attached under the white stone at the upper right, and White answered with a hane.",
+              "공격하려는 돌을 직접 공격하기 어려울 때는 먼저 근처의 상대 돌에 기댑니다. 상대가 받아야 하는 수(선수 활용)로 흑돌을 쓸모 있는 자리에 놓고, 그 돌이 진짜 목표를 공격하는 데 힘이 됩니다. 세모로 표시한 흑돌이 그렇게 생긴 돌입니다. 오른쪽 위 백돌 아래에 붙였고, 백은 젖혀서 받았습니다.",
+              "攻めたい石を直接攻めにくいときは、まず近くの相手の石にもたれます。相手が受けるしかない利かしで黒石を役に立つ場所に置き、その石が本当の目標を攻める力になります。三角印の黒石はそうしてできた石です。右上の白石の下にツケて、白はハネて受けました。",
+            ),
+            board: win(9, 9, [[4, 3], [3, 4], [5, 5], [6, 3]], [[4, 4], [6, 2], [2, 7], [7, 3]], { marks: [{ x: 6, y: 3, type: "triangle" }] }),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "右上那颗靠出来的黑子要是不在，切断的白子就能逃掉；现在它正好挡在白子的去路上。吃掉切断的白子（三角标记）。",
+              "Without your leaning stone at the upper right, the cutting stone would escape; now it stands in its way. Capture the cutting stone (the triangle).",
+              "오른쪽 위에 기대어 둔 흑돌이 없으면 끊은 백돌은 도망갑니다. 지금은 그 흑돌이 길을 막고 있습니다. 끊은 백돌(세모)을 잡으세요.",
+              "右上でもたれた黒石がなければ、切った白石は逃げられます。今はその黒石が行く手をふさいでいます。切った白石（三角印）を取りましょう。",
+            ),
+            problem: {
+              goal: "capture",
+              corner: "tl",
+              diagram: [
+                ". . . . . . . . .",
+                ". . . . . . . . .",
+                ". . . . . . O . .",
+                ". . . . X . X O .",
+                ". . . X o . . . .",
+                ". . . . . X . . .",
+                ". . . . . . . . .",
+                ". . O . . . . . .",
+                ". . . . . . . . .",
+              ],
+            },
+            success: L("吃住了。靠出来的那颗子发挥了作用。", "Captured. The stone you gained by leaning did the work.", "잡았습니다. 기대어 얻은 돌이 제 몫을 했습니다.", "取りました。もたれて得た石が働きました。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "这里黑棋从下面和右边靠住了右上的白子，白棋向左长。切断的白子看起来很自由，但右边的黑子挡住了它的出路。吃掉它。",
+              "Here Black leaned on the white stone at the upper right from below and from the right, and White extended to the left. The cutting stone looks free, but your stones on the right block its way out. Capture it.",
+              "여기서는 흑이 오른쪽 위 백돌에 아래와 오른쪽에서 기댔고, 백은 왼쪽으로 뻗었습니다. 끊은 백돌은 자유로워 보이지만 오른쪽 흑돌이 나갈 길을 막고 있습니다. 잡으세요.",
+              "ここでは黒が右上の白石に下と右からもたれ、白は左へ伸びました。切った白石は自由に見えますが、右の黒石が出口をふさいでいます。取りましょう。",
+            ),
+            problem: {
+              goal: "capture",
+              corner: "tl",
+              diagram: [
+                ". . . . . . . . .",
+                ". . . . . . . . .",
+                ". . . . . O O X .",
+                ". . . . X . X . .",
+                ". . . X o . . . .",
+                ". . . . . X . . .",
+                ". . . . . . . . .",
+                ". . O . . . . . .",
+                ". . . . . . . . .",
+              ],
+            },
+            success: L("吃住了：靠压得来的力量派上了用场。", "Captured: the strength you gained by leaning paid off.", "잡았습니다. 기대어 얻은 힘이 효과를 냈습니다.", "取りました。もたれて得た力が生きました。"),
+          },
+        ],
+      },
+      {
+        id: "fight-sabaki",
+        title: L("腾挪", "Sabaki", "타개", "サバキ"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "在对方的势力里，要下得轻灵、有弹性，这叫腾挪。不必每颗子都救：已经完成任务的子可以放弃；碰、扳这类接触的手能帮你很快安定下来。目标是一块能活或能出头的棋，而不是一块必须拼命去救的重棋。",
+              "In the opponent's sphere, play light, flexible shape: that is sabaki. You do not have to save every stone. A stone that has done its job can be given up, and contact plays (attach, hane) help you settle quickly. The aim is a group that can live or get out, not a heavy group that must be rescued.",
+              "상대의 세력 안에서는 가볍고 탄력 있게 두어야 합니다. 이것을 타개라고 합니다. 모든 돌을 살릴 필요는 없습니다. 제 역할을 다한 돌은 버려도 되고, 붙이기와 젖히기 같은 접촉하는 수는 빨리 안정하는 데 도움이 됩니다. 목표는 살거나 빠져나갈 수 있는 돌이지, 억지로 구해야 하는 무거운 돌이 아닙니다.",
+              "相手の勢力の中では、軽く弾力のある形に打ちます。これがサバキです。すべての石を助ける必要はありません。役目を終えた石は捨ててよく、ツケやハネのように接触する手は早く安定するのに役立ちます。目標は生きるか出られる石で、無理に助けなければならない重い石ではありません。",
+            ),
+            board: win(8, 7, [[1, 1], [3, 2], [3, 3]], [[0, 1], [2, 1], [3, 1], [1, 2], [1, 3], [4, 3], [1, 4], [3, 4]], { marks: [{ x: 1, y: 1, type: "triangle" }] }),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "左上那颗孤立的黑子被打吃了。去救它也救不了你的两颗主力子。放弃它，把标记的两颗子轻快地走出来。",
+              "Your lone black stone at the upper left is in atari. Running with it will not save your two main stones. Give it up and move the two marked stones out.",
+              "왼쪽 위의 외톨이 흑돌이 단수입니다. 그 돌을 살리러 가도 주력인 두 점은 살릴 수 없습니다. 그 돌은 버리고 표시된 두 점을 가볍게 빠져나오게 하세요.",
+              "左上の孤立した黒石はアタリです。それを助けに行っても、主力の二子は助かりません。捨てて、印の二子を軽く脱出させましょう。",
+            ),
+            problem: {
+              goal: "save",
+              corner: "tl",
+              diagram: [
+                ". . . . . . . .",
+                "O X O O . . . .",
+                ". O . x . . . .",
+                ". O . x O . . .",
+                ". O . O . . . .",
+                ". . . . . . . .",
+                ". . . . . . . .",
+              ],
+            },
+            success: L("轻快地出头了：那颗子不值得救。", "Out and light: the lone stone was not worth saving.", "가볍게 빠져나왔습니다. 그 한 점은 살릴 가치가 없었습니다.", "軽く出られました。あの一子は助ける価値がありませんでした。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "在对方的地盘里，轻灵的下法常常就是快快做出一块小活棋。你的子在边上有一排三个眼位：下在中间，就有两只眼。",
+              "Inside the opponent's area, light play often means a small, quick life. Your stones on the edge have three points of eye space in a row: take the middle one and you have two eyes.",
+              "상대의 영역 안에서 가볍게 둔다는 것은 흔히 작게 빨리 사는 것입니다. 변의 흑돌에는 일렬로 세 칸의 궁도가 있습니다. 가운데에 두면 두 눈이 됩니다.",
+              "相手の地の中で軽く打つとは、多くの場合、小さく早く生きることです。辺の黒石には一列に三つの眼形があります。真ん中に打てば二眼になります。",
+            ),
+            problem: {
+              goal: "live",
+              corner: "bl",
+              diagram: [", , , , , , , ,", "O O O O O O O ,", "O X X x X X O ,", "O X . . . X O ,"],
+            },
+            success: L("两只眼，活了：在白棋的势力里安定下来。", "Two eyes and alive: a settled group in White's sphere.", "두 눈으로 살았습니다. 백의 세력 안에서 안정했습니다.", "二眼で生きました。白の勢力の中で安定しました。"),
           },
         ],
       },
