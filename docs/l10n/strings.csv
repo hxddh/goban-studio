@@ -836,3 +836,5 @@
 "problem.endgame.biggest.hint","Count what each move is worth: the difference between you and White playing there first. Play the biggest.","算一算每一手值多少：你先下与白棋先下的差。先下最大的那一手。","","각 수의 가치를 세어 보세요. 흑이 먼저 둘 때와 백이 먼저 둘 때의 차이입니다. 가장 큰 수부터 두세요.","","それぞれの手の価値を数えましょう。黒が先に打つ場合と白が先に打つ場合の差です。一番大きい手から打ちます。",""
 "strength.label","{0} (±{1})","{0}（±{1}）","","{0} (±{1})","","{0}（±{1}）",""
 "strength.about","Estimated from your results against the computer levels; ± is the range it falls in about two times out of three.","根据你和各级电脑对手的胜负估计；± 表示大约三分之二的把握落在这个范围内。","","컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.","","コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",""
+"report.phasesOf","The three phases for {0}","{0}的三个阶段","","{0}의 세 단계","","{0}の三つの局面",""
+"report.practiseSide","Practise the mistakes of","练习哪一方的失误","","누구의 실수를 연습할까요","","どちらの悪手を練習するか",""
