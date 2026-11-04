@@ -836,3 +836,11 @@ button.group-row:hover { background: var(--fill); }
 .row-analysis::before { content: " · "; }
 .page-head .report-rating { font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .report-stopped { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s-3); }
+
+/* v7 plan */
+.plan-focus .plan-empty { font: var(--t-small); }
+.plan-row .plan-lesson { flex: none; font: var(--t-small); }
+.plan-row .plan-links { display: flex; gap: var(--s-3); }
+.plan-row .plan-links .link { font: var(--t-small); }
+.topic-card.focus strong { display: flex; align-items: center; gap: var(--s-2); }
+.plan-mark { font: var(--t-caption); color: var(--text-2); background: var(--fill); border-radius: var(--r-1); padding: 1px 6px; }

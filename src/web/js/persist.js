@@ -216,7 +216,8 @@ function dayOf(at) {
  *     result, won, moves, confidence: "high" | "low" | null,
  *     phases: { opening|middle|endgame: { loss, mistakes, blunders, moves,
  *               accuracy } } | null,
- *     themes: { theme: count }, rating: { before, after, delta } | null }
+ *     themes: { theme: count }, themeLoss?: { theme: points } (v7),
+ *     rating: { before, after, delta } | null }
  */
 export function normalizeGameRecord(r) {
   if (!r || typeof r !== "object") return null;
@@ -233,6 +234,12 @@ export function normalizeGameRecord(r) {
   }
   const themes = {};
   if (r.themes && typeof r.themes === "object") for (const [k, v] of Object.entries(r.themes)) if (num(v, 0) > 0) themes[k] = num(v);
+  // v7 plan: the points each theme cost (app/plan.js themeLosses); older records have none.
+  let themeLoss = null;
+  if (r.themeLoss && typeof r.themeLoss === "object") {
+    themeLoss = {};
+    for (const [k, v] of Object.entries(r.themeLoss)) if (num(v, -1) >= 0) themeLoss[k] = num(v);
+  }
   const rt = r.rating && typeof r.rating === "object" && num(r.rating.after) != null ? { before: num(r.rating.before), after: num(r.rating.after), delta: num(r.rating.delta, 0) } : null;
   return {
     v: 1,
@@ -251,6 +258,7 @@ export function normalizeGameRecord(r) {
     confidence: phases ? (r.confidence === "high" ? "high" : "low") : null,
     phases,
     themes,
+    ...(themeLoss ? { themeLoss } : {}),
     rating: rt,
   };
 }

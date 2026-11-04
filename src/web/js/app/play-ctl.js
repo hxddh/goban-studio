@@ -20,6 +20,7 @@ import { estimateNow, rateGame, recommendStrength, startEstimate } from "./stren
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
 import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { notePoints, queueReport } from "./report-ctl.js";
+import { themeLosses } from "./plan.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -743,8 +744,10 @@ async function summarizeAnalysis(g, recordId) {
   // themes of up to ten explained mistakes.
   if (g.trendId) {
     const summary = summarizeGame({ game: g.game, points, meta: { humanColor: g.humanColor }, keyMoves: mistakes.top });
-    const themes = themeCounts(describeMistakes(g.game, points, g.humanColor, 10).top, g.humanColor);
-    updateGameRecord(state.progress, g.trendId, recordAnalysis(summary, g.humanColor, themes), { save: false });
+    const ten = describeMistakes(g.game, points, g.humanColor, 10).top;
+    const themes = themeCounts(ten, g.humanColor);
+    // v7 plan: also what each theme cost, for "this week's focus".
+    updateGameRecord(state.progress, g.trendId, { ...recordAnalysis(summary, g.humanColor, themes), themeLoss: themeLosses(ten, g.humanColor) }, { save: false });
   }
   // Record weaknesses and keep the two costliest mistakes as drills.
   let weak = state.progress.weakness;
