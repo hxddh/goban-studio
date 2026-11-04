@@ -193,12 +193,19 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
   if (warnings.length) toast(warnings[0], "warn");
 }
 
+/** v5: a record under rules the app cannot score names those rules. */
+function importErrorText(e) {
+  if (e?.code !== "unsupported-rules") return t("library.importError");
+  const name = String(e.rules || "").replace(/\s+/g, " ").trim().slice(0, 40) || "?";
+  return t("rules.unsupported", [name]);
+}
+
 export async function importFromFile(file) {
   if (!file) return;
   try {
     await importSGFText(await file.text(), file.name);
   } catch (e) {
-    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
+    toast(importErrorText(e), "error");
   }
 }
 
@@ -209,7 +216,7 @@ export async function importFromPath(path) {
     await importSGFText(text, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
-    toast(t(e?.code === "unsupported-rules" ? "library.rulesUnsupported" : "library.importError"), "error");
+    toast(importErrorText(e), "error");
   }
 }
 

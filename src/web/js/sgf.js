@@ -8,7 +8,7 @@
  *
  * Export lives on Game.toSGF(); this module only reads.
  */
-import { BLACK, WHITE, Game, EMPTY, starPoints } from "./rules.js";
+import { BLACK, WHITE, Game, EMPTY, rulesFromSgf, rulesetById, starPoints } from "./rules.js";
 
 let nodeSeq = 1;
 
@@ -206,20 +206,30 @@ export function loadSGF(text) {
   if (!roots.length) throw new Error("SGF has no root node");
   const root = roots[0];
   const data = root.data || {};
-  const rules = first(data, "RU").trim();
-  if (rules && !/^(japanese|uchikomi|日本|日本ルール)$/i.test(rules)) {
-    const error = new Error(`Unsupported rules in SGF: ${rules}`);
+  // v5: Japanese, Chinese and Korean records are read under their own
+  // rules (spellings and the rulesets that stay rejected are listed at
+  // rulesFromSgf). No RU means Japanese, as every record before v5.
+  const rulesRaw = first(data, "RU").trim();
+  const rules = rulesFromSgf(rulesRaw);
+  if (!rules) {
+    const error = new Error(`Unsupported rules in SGF: ${rulesRaw}`);
     error.code = "unsupported-rules";
-    error.rules = rules;
+    error.rules = rulesRaw;
     throw error;
   }
   const size = parseSize(first(data, "SZ"));
   const komiRaw = first(data, "KM");
-  const komi = komiRaw === "" ? 6.5 : Number(komiRaw);
+  // A missing KM takes the ruleset's even-game komi (6.5 before v5).
+  const fallbackKomi = rulesetById(rules).komi;
+  const komi = komiRaw === "" ? fallbackKomi : Number(komiRaw);
   const ab = expandPoints(data.AB, size);
   const aw = expandPoints(data.AW, size);
-  const ha = parseInt(first(data, "HA") || "0", 10) || 0;
-  const handicap = ab.length ? Math.min(9, ab.length) : Math.max(0, Math.min(9, ha));
+  const ha = Math.max(0, Math.min(9, parseInt(first(data, "HA") || "0", 10) || 0));
+  // Black setup stones alone are handicap stones. A setup with White stones
+  // too is a position, not a handicap game, unless HA says otherwise; this
+  // matters for the Chinese handicap compensation (and matches how KataGo
+  // reads the same root: see setupStones in katago.js).
+  const handicap = aw.length ? ha : ab.length ? Math.min(9, ab.length) : ha;
   const dt = first(data, "DT");
   const dateMatch = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(dt);
   const date = dateMatch
@@ -227,7 +237,8 @@ export function loadSGF(text) {
     : new Date();
   const game = new Game({
     size,
-    komi: Number.isFinite(komi) ? komi : 6.5,
+    rules,
+    komi: Number.isFinite(komi) ? komi : fallbackKomi,
     handicap,
     date,
     playerBlack: first(data, "PB") || "Black",

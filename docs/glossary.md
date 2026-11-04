@@ -129,6 +129,15 @@ in this table. Usage targets:
 | handicap game, N stones | 让 N 子 | N handicap stones | N점 접바둑 | N子局 | |
 | even game | 分先 | even game | 호선 | 互先 | |
 | Japanese rules | 日本规则 | Japanese rules | 일본 규칙 | 日本ルール | |
+| Chinese rules | 中国规则 | Chinese rules | 중국 규칙 | 中国ルール | v5 `rules.chinese` |
+| Korean rules | 韩国规则 | Korean rules | 한국 규칙 | 韓国ルール | v5 `rules.korean` |
+| rules (ruleset) | 规则 | rules | 규칙 | ルール | v5 `rules.title` |
+| territory scoring | 数目（数目法） | territory scoring | 계지 | 計地 | v5 `rules.territory`; Japanese and Korean rules. zh 数目 is also "counting" in general (`score.title`) |
+| area scoring | 数子（数子法） | area scoring | 계자 | 計子 | v5 `rules.area`; Chinese rules. See review list |
+| counting under area scoring | 数子 | counting | 계가 | 計算 | v5 `score.titleArea`; ja 整地 is the Japanese-rules procedure, so the area card says 計算 |
+| stones (in an area count) | 棋子 | stones | 돌 | 石 | v5 `score.detailArea*` |
+| handicap compensation (Chinese rules) | 让子补偿（还子） | handicap (points White receives) | 치석 보상 | 置き石の補正 | v5: White receives N points for N handicap stones (Black returns half a stone per handicap stone) |
+| shared liberties of a seki | 公气 | shared liberties | 공동 공배 | 内ダメ | v5 `score.sekiArea`; same terms as in capturing races |
 | byo-yomi | 读秒 | byo-yomi | 초읽기 | 秒読み | UI shows "10 min + 3×30 s" in every language |
 | main time | 基本用时 | main time | 제한 시간 | 持ち時間 | |
 | kyu / dan | 级 / 段 | kyu / dan | 급 / 단 | 級 / 段 | |
@@ -240,3 +249,12 @@ The items I am least sure about:
    (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
    for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
    collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.
+9. v5 rules: ko **계자 / 계지** and ja **計子 / 計地** for area / territory
+   scoring. zh 数子 / 数目 are standard; the ko and ja pairs are the
+   Sino-Korean / Sino-Japanese readings of the same idea and appear in rules
+   discussions, but everyday writing more often says "중국식 계산 / 일본식
+   계산" or "中国ルールの数え方 / 日本ルールの数え方". The ruleset notes
+   (`rules.*Note`) describe the method in plain words, so the label never
+   stands alone. Also ja **計算** as the title of an area count, ja
+   **置き石の補正** and ko **치석 보상** for the Chinese handicap
+   compensation, and zh **让子补偿**.

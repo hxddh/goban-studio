@@ -630,6 +630,9 @@ const AnalyzePayload = struct {
     id: []const u8 = "",
     size: u32 = 19,
     komi: f64 = 6.5,
+    /// v5: "japanese" | "chinese" | "korean". A page without the field
+    /// (before v5) means Japanese, the only ruleset it knew.
+    rules: []const u8 = "japanese",
     setup: []const u8 = "",
     moves: []const u8 = "",
     color: []const u8 = "B",
@@ -656,6 +659,7 @@ fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request
     const size: u8 = @intCast(p.size);
     req.position.size = size;
     req.position.komi = p.komi;
+    req.position.rules = engine_mod.Rules.parse(p.rules) orelse return error.InvalidRequest;
     req.position.setup_len = try engine_mod.parseMoves(p.setup, size, false, &req.position.setup);
     req.position.moves_len = try engine_mod.parseMoves(p.moves, size, true, &req.position.moves);
     req.color = p.color[0];
@@ -1193,4 +1197,20 @@ test "jsonUnescape plain path unchanged" {
     var buf: [64]u8 = undefined;
     const got = jsonUnescape("/tmp/goban-studio.sgf", &buf) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqualStrings("/tmp/goban-studio.sgf", got);
+}
+
+test "analyze payload rules default to japanese and accept only the three presets" {
+    const cases = [_]struct { json: []const u8, want: ?engine_mod.Rules }{
+        .{ .json = "{\"size\":9}", .want = .japanese },
+        .{ .json = "{\"rules\":\"japanese\"}", .want = .japanese },
+        .{ .json = "{\"rules\":\"chinese\"}", .want = .chinese },
+        .{ .json = "{\"rules\":\"korean\"}", .want = .korean },
+        .{ .json = "{\"rules\":\"aga\"}", .want = null },
+        .{ .json = "{\"rules\":\"chinese\\nquit\"}", .want = null },
+    };
+    for (cases) |c| {
+        const parsed = try std.json.parseFromSlice(AnalyzePayload, std.testing.allocator, c.json, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        try std.testing.expectEqual(c.want, engine_mod.Rules.parse(parsed.value.rules));
+    }
 }

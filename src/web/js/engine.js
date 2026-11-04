@@ -308,7 +308,11 @@ export async function analyzeNode(game, node, visits = 48, { signal } = {}) {
 
 /** Offline stand-in for analyzeNode: a heuristic score estimate. */
 export function estimateNode(game, node) {
-  const lead = evaluateLocal(node.board, BLACK, game.size) - game.komi;
+  // White's points for nothing on the board: komi, plus the handicap
+  // compensation under Chinese rules (0 otherwise). The board heuristic is
+  // a rough balance either way; area and territory scores differ by little
+  // more than the captures.
+  const lead = evaluateLocal(node.board, BLACK, game.size) - game.komi - (game.handicapCompensation || 0);
   return { source: "estimate", winrate: 1 / (1 + Math.exp(-lead / 8)), scoreLead: lead, best: null, pv: [], ownership: null };
 }
 
