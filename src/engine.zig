@@ -266,6 +266,12 @@ pub const Engine = struct {
     }
 
     pub fn validateLine(line: []const u8) bool {
+        // `kata-set-rules` takes exactly one of the three rulesets the app
+        // plays (v5); any other preset or a rules string is rejected.
+        const rules_prefix = "kata-set-rules ";
+        if (std.mem.startsWith(u8, line, rules_prefix)) {
+            return Rules.parse(line[rules_prefix.len..]) != null;
+        }
         const allowed = [_][]const u8{
             "clear_board",
             "undo",
@@ -273,7 +279,6 @@ pub const Engine = struct {
             "komi ",
             "play ",
             "kata-set-param ",
-            "kata-set-rules ",
             "time_settings ",
         };
         for (allowed) |prefix| {
@@ -450,17 +455,42 @@ pub fn parseMoves(list: []const u8, size: u8, allow_pass: bool, out: []Move) err
     return n;
 }
 
+/// The rulesets the page can ask for (v5). Each maps to one KataGo
+/// `kata-set-rules` preset; anything else is an invalid request.
+pub const Rules = enum {
+    japanese,
+    chinese,
+    korean,
+
+    /// Exact, lower-case names only: the page sends what rules.js lists.
+    pub fn parse(text: []const u8) ?Rules {
+        if (std.mem.eql(u8, text, "japanese")) return .japanese;
+        if (std.mem.eql(u8, text, "chinese")) return .chinese;
+        if (std.mem.eql(u8, text, "korean")) return .korean;
+        return null;
+    }
+
+    pub fn command(self: Rules) []const u8 {
+        return switch (self) {
+            .japanese => "kata-set-rules japanese",
+            .chinese => "kata-set-rules chinese",
+            .korean => "kata-set-rules korean",
+        };
+    }
+};
+
 pub const Position = struct {
     size: u8 = 19,
     komi: f64 = 6.5,
+    rules: Rules = .japanese,
     setup: [max_setup]Move = undefined,
     setup_len: usize = 0,
     moves: [max_moves]Move = undefined,
     moves_len: usize = 0,
 
-    /// Same board, komi and root stones: only the move list may differ.
+    /// Same board, komi, rules and root stones: only the move list may differ.
     pub fn sameBase(a: *const Position, b: *const Position) bool {
-        if (a.size != b.size or a.komi != b.komi or a.setup_len != b.setup_len) return false;
+        if (a.size != b.size or a.komi != b.komi or a.rules != b.rules or a.setup_len != b.setup_len) return false;
         for (a.setup[0..a.setup_len], b.setup[0..b.setup_len]) |x, y| {
             if (!x.eql(y)) return false;
         }
@@ -851,8 +881,8 @@ pub const Worker = struct {
 
     /// Bring KataGo's board to `target`, reusing what it already has:
     /// `undo` back to the common prefix of the move lists, then `play`
-    /// forward. A different size, komi or set of root stones (or a fresh
-    /// process) starts over from `clear_board`.
+    /// forward. A different size, komi, ruleset or set of root stones (or a
+    /// fresh process) starts over from `clear_board`.
     fn syncPosition(self: *Worker, target: *const Position) !SyncStats {
         var stats = SyncStats{};
         const reusable = self.sent_valid and self.sent_generation == self.engine.generation and self.sent.sameBase(target);
@@ -887,7 +917,7 @@ pub const Worker = struct {
             _ = try self.engine.command(std.fmt.bufPrint(&buf, "boardsize {d}", .{target.size}) catch return error.InvalidRequest);
             _ = try self.engine.command("clear_board");
             _ = try self.engine.command(std.fmt.bufPrint(&buf, "komi {d}", .{target.komi}) catch return error.InvalidRequest);
-            _ = try self.engine.command("kata-set-rules japanese");
+            _ = try self.engine.command(target.rules.command());
             // GTP `play` need not alternate, so root stones are simply
             // placed one by one before the game's own moves.
             for (target.setup[0..target.setup_len]) |*move| try self.playMove(move);
@@ -946,6 +976,23 @@ test "incremental sync reuses the common prefix" {
     try std.testing.expectEqual(@as(usize, 2), a.commonPrefix(b));
     b.komi = 0.5;
     try std.testing.expect(!a.sameBase(b));
+    // A different ruleset starts over, so `kata-set-rules` is sent again.
+    b.komi = a.komi;
+    try std.testing.expect(a.sameBase(b));
+    b.rules = .chinese;
+    try std.testing.expect(!a.sameBase(b));
+}
+
+test "rules are one of three presets" {
+    try std.testing.expectEqual(Rules.japanese, Rules.parse("japanese").?);
+    try std.testing.expectEqual(Rules.chinese, Rules.parse("chinese").?);
+    try std.testing.expectEqual(Rules.korean, Rules.parse("korean").?);
+    try std.testing.expect(Rules.parse("aga") == null);
+    try std.testing.expect(Rules.parse("Chinese") == null);
+    try std.testing.expect(Rules.parse("chinese ") == null);
+    try std.testing.expect(Rules.parse("") == null);
+    try std.testing.expectEqualStrings("kata-set-rules chinese", Rules.chinese.command());
+    try std.testing.expect(Engine.validateLine(Rules.korean.command()));
 }
 
 test "engine script vocabulary is narrow" {
@@ -953,6 +1000,12 @@ test "engine script vocabulary is narrow" {
     try std.testing.expect(Engine.validateLine("boardsize 19"));
     try std.testing.expect(Engine.validateLine("kata-set-param maxVisits 200"));
     try std.testing.expect(Engine.validateLine("undo"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules japanese"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules chinese"));
+    try std.testing.expect(Engine.validateLine("kata-set-rules korean"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules tromp-taylor"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules koRule:POSITIONAL"));
+    try std.testing.expect(!Engine.validateLine("kata-set-rules "));
     try std.testing.expect(!Engine.validateLine("genmove B"));
     try std.testing.expect(!Engine.validateLine("kata-genmove_analyze B"));
     try std.testing.expect(!Engine.validateLine("quit"));

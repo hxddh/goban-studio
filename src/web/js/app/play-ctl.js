@@ -2,7 +2,7 @@
  * Playing a game: the live board, the computer's replies and how they feel,
  * teaching aids, clocks, scoring, the end of the game and what follows it.
  */
-import { BLACK, WHITE, Game, coordLabel } from "../rules.js";
+import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
@@ -61,7 +61,9 @@ export function restoreCurrent() {
       /* fall through */
     }
   }
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, komi: 6.5 }), { opponent: "ai", strength: state.settings.strength });
+  // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
+  // brand-new board takes the default ruleset and its komi.
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", strength: state.settings.strength });
 }
 
 export function persistCurrent() {
@@ -142,8 +144,13 @@ export function newGame(opts = {}) {
   const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : state.settings.boardSize || 19;
   if (opts.rememberSize && size !== state.settings.boardSize) setSetting("boardSize", size);
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
-  const komi = opts.komi !== undefined && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : handicap > 0 ? 0.5 : 6.5;
-  const game = new Game({ size, komi, handicap });
+  // v5: the sheet's choice, else the `defaultRules` setting (Japanese).
+  const rules = normalizeRules(opts.rules ?? state.settings.defaultRules);
+  if (opts.rememberRules && opts.rules && rules !== state.settings.defaultRules) setSetting("defaultRules", rules);
+  // Komi: the sheet's, else the ruleset's (6.5 / 7.5 / 6.5; 0.5 with
+  // handicap stones, plus N points at the count under Chinese rules).
+  const komi = opts.komi !== undefined && opts.komi !== null && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : defaultKomi(rules, handicap > 0 ? Math.max(2, handicap) : 0);
+  const game = new Game({ size, rules, komi, handicap });
   let humanColor = opts.color === WHITE ? WHITE : BLACK;
   if (opts.color === "random") humanColor = Math.random() < 0.5 ? BLACK : WHITE;
   const opponent = opts.opponent === "human" ? "human" : "ai";

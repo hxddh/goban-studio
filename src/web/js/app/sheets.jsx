@@ -2,7 +2,7 @@
  * Modal sheets: new game, settings, onboarding, shortcuts, confirm, rename.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BLACK, WHITE, formatPoints } from "../rules.js";
+import { BLACK, WHITE, RULESETS, defaultKomi, formatPoints, rulesetById } from "../rules.js";
 import { STRENGTHS, suggestHandicap } from "../engine.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
@@ -81,10 +81,11 @@ function NewGameSheet({ prefill }) {
   const [advanced, setAdvanced] = useState(false);
   const [handicap, setHandicap] = useState(null);
   const [komi, setKomi] = useState(null);
+  const [rules, setRules] = useState(prefill?.rules || s.defaultRules || "japanese");
   const h = handicap ?? (color === BLACK ? suggested : 0);
-  const k = komi ?? (h > 0 ? 0.5 : 6.5);
+  const k = komi ?? defaultKomi(rules, h);
   const start = () =>
-    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, timeControl: tc, rememberSize: true });
+    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, rules, timeControl: tc, rememberSize: true });
   return (
     <Modal
       title={t("common.newGame")}
@@ -171,7 +172,9 @@ function NewGameSheet({ prefill }) {
 
         <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
           <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
-          <span class="fine">{t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}</span>
+          <span class="fine">
+            {t(rulesetById(rules).labelKey)} · {t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}
+          </span>
         </button>
         {advanced && (
           <>
@@ -207,7 +210,19 @@ function NewGameSheet({ prefill }) {
               <span>{t("common.komi")}</span>
               <Stepper label={t("common.komi")} value={k} min={0} max={9.5} step={0.5} onChange={setKomi} format={formatPoints} />
             </div>
-            <p class="fine">{t("newGame.rules")}</p>
+            <div class="row">
+              <span>{t("rules.title")}</span>
+              <Segmented
+                label={t("rules.title")}
+                value={rules}
+                onChange={(v) => {
+                  setRules(v);
+                  setKomi(null);
+                }}
+                options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))}
+              />
+            </div>
+            <p class="fine">{t(rulesetById(rules).noteKey)}</p>
           </>
         )}
       </div>
@@ -288,6 +303,10 @@ function SettingsSheet() {
         <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
         <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
         <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
+        <div class="row">
+          <span>{t("rules.default")}</span>
+          <Segmented label={t("rules.default")} value={s.defaultRules || "japanese"} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
+        </div>
       </section>
       <section class="settings-group">
         <h3>{t("settings.you")}</h3>

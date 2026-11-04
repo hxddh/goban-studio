@@ -151,7 +151,6 @@ export const MESSAGES = {
   "newGame.suggested": m("按你的棋力，建议让 {0} 子。可以在“更多选项”里修改。", "For your level we suggest {0} handicap stones. Change it under More options.", "기력에 맞춰 {0}점 접바둑을 권합니다. 추가 옵션에서 바꿀 수 있습니다.", "棋力差から{0}子局をおすすめします。詳細設定で変更できます。"),
   "newGame.advanced": m("更多选项", "More options", "추가 옵션", "詳細設定"),
   "newGame.advancedSummary": m("让子 {0} · 贴目 {1}", "Handicap {0} · komi {1}", "접바둑 {0} · 덤 {1}", "置き石 {0} · コミ {1}"),
-  "newGame.rules": m("日本规则：数地加提子。让子棋贴目 0.5。", "Japanese rules: territory plus captures. Handicap games use 0.5 komi.", "일본 규칙: 집과 사석으로 계산합니다. 접바둑은 덤 0.5입니다.", "日本ルール：地とアゲハマで数えます。置き碁はコミ0.5目です。"),
   "newGame.start": m("开始", "Start", "시작", "開始"),
 
   "practice.caption": m("一套从零开始的课程，和经过验证的死活题。", "A course that starts from zero, and verified problems.", "처음부터 배우는 과정과 검증된 문제.", "ゼロから始める講座と、検証済みの問題。"),
@@ -249,7 +248,6 @@ export const MESSAGES = {
   "library.rename": m("重命名", "Rename", "이름 바꾸기", "名前を変更"),
   "library.deleteConfirm": m("删除这盘棋谱？", "Delete this game?", "이 기보를 삭제할까요?", "この棋譜を削除しますか？"),
   "library.importError": m("无法读取这个 SGF 文件。", "This SGF file could not be read.", "이 SGF 파일을 읽을 수 없습니다.", "このSGFファイルを読み込めません。"),
-  "library.rulesUnsupported": m("这个 SGF 使用的是其他规则。Goban Studio 只支持日本规则，因此没有导入。", "This SGF uses another ruleset. Goban Studio supports Japanese rules only, so it was not imported.", "이 SGF는 다른 규칙을 사용합니다. Goban Studio는 일본 규칙만 지원하므로 가져오지 않았습니다.", "このSGFは別のルールを使用しています。Goban Studioは日本ルールのみ対応のため、読み込みませんでした。"),
   "library.onlySgf": m("只能打开 .sgf 棋谱文件。", "Only .sgf game records can be opened.", ".sgf 기보 파일만 열 수 있습니다.", ".sgf の棋譜ファイルのみ開けます。"),
 
   "settings.language": m("语言", "Language", "언어", "言語"),
@@ -552,9 +550,9 @@ export const MESSAGES = {
   "shape.second-line-seven": m("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
 
   // v5 ui
-  "tip.opening1": m("开局先占角：角上最容易围空，星位和小目都是好点。", "Start in the corners: they are the easiest place to make territory. The 4-4 and 3-4 points are good first moves.", "포석은 귀부터: 귀가 집을 짓기 가장 쉽습니다. 화점과 소목이 좋은 첫 수입니다.", "布石はまず隅から。隅は地を作りやすく、星と小目がよい第一手です。"),
-  "tip.opening2": m("占完角，再沿边拆开或守角；中腹最后再说。", "After the corners, approach, enclose or extend along the sides; the centre comes last.", "귀를 차지한 뒤에는 걸치거나 굳히고 변으로 벌립니다. 중앙은 마지막입니다.", "隅を打ったら、カカリ・シマリ・辺への開きへ。中央は最後です。"),
-  "tip.opening3": m("对方逼近时先看自己的棋是否安全，再找大场。", "When the opponent comes close, check your own groups are safe before taking the next big point.", "상대가 다가오면 내 돌이 안전한지 먼저 살핀 뒤 큰 자리를 찾으세요.", "相手が近づいてきたら、まず自分の石の安全を確かめてから大場を探しましょう。"),
+  "tip.opening.1": m("开局先占角：角上最容易围空，星位和小目都是好点。", "Start in the corners: they are the easiest place to make territory. The 4-4 and 3-4 points are good first moves.", "포석은 귀부터: 귀가 집을 짓기 가장 쉽습니다. 화점과 소목이 좋은 첫 수입니다.", "布石はまず隅から。隅は地を作りやすく、星と小目がよい第一手です。"),
+  "tip.opening.2": m("占完角，再沿边拆开或守角；中腹最后再说。", "After the corners, approach, enclose or extend along the sides; the centre comes last.", "귀를 차지한 뒤에는 걸치거나 굳히고 변으로 벌립니다. 중앙은 마지막입니다.", "隅を打ったら、カカリ・シマリ・辺への開きへ。中央は最後です。"),
+  "tip.opening.3": m("对方逼近时先看自己的棋是否安全，再找大场。", "When the opponent comes close, check your own groups are safe before taking the next big point.", "상대가 다가오면 내 돌이 안전한지 먼저 살핀 뒤 큰 자리를 찾으세요.", "相手が近づいてきたら、まず自分の石の安全を確かめてから大場を探しましょう。"),
   "practice.difficulty": m("难度", "Difficulty", "난이도", "難易度"),
   "practice.record": m("记录", "Your record", "기록", "記録"),
   "practice.recordNew": m("第一次做", "First try", "처음 풉니다", "初挑戦"),
@@ -575,4 +573,22 @@ export const MESSAGES = {
   "backup.error.notBackup": m("这不是 Goban Studio 的备份文件。", "That isn't a Goban Studio backup.", "Goban Studio 백업 파일이 아닙니다.", "Goban Studio のバックアップではありません。"),
   "backup.error.newerFormat": m("这份备份来自更新的版本，请先更新 Goban Studio。", "This backup is from a newer version. Update Goban Studio first.", "더 새 버전에서 만든 백업입니다. 먼저 Goban Studio를 업데이트하세요.", "新しいバージョンのバックアップです。先に Goban Studio を更新してください。"),
   "backup.error.damaged": m("备份文件已损坏，无法恢复。", "The backup file is damaged and can't be restored.", "백업 파일이 손상되어 복원할 수 없습니다.", "バックアップが壊れているため復元できません。"),
+  // v5 rules
+  "rules.title": m("规则", "Rules", "규칙", "ルール"),
+  "rules.default": m("新对局的规则", "Rules for new games", "새 대국의 규칙", "新しい対局のルール"),
+  "rules.japanese": m("日本规则", "Japanese rules", "일본 규칙", "日本ルール"),
+  "rules.chinese": m("中国规则", "Chinese rules", "중국 규칙", "中国ルール"),
+  "rules.korean": m("韩国规则", "Korean rules", "한국 규칙", "韓国ルール"),
+  "rules.japaneseNote": m("数目：地加提子。贴 6.5 目，让子棋贴 0.5 目。", "Territory scoring: territory plus prisoners. Komi 6.5; 0.5 in handicap games.", "계지: 집과 사석을 셉니다. 덤 6.5, 접바둑은 덤 0.5입니다.", "計地：地とアゲハマを数えます。コミ6.5目、置き碁はコミ0.5目です。"),
+  "rules.chineseNote": m("数子：盘上活子加围住的空点，提子不计。贴 7.5 目（3¾ 子）。让子棋贴 0.5 目，白方另得让子数的目数。", "Area scoring: your stones on the board plus the points they surround; prisoners don't count. Komi 7.5. In handicap games komi is 0.5 and White gets 1 point per handicap stone.", "계자: 판 위의 살아 있는 돌과 둘러싼 빈 점을 셉니다. 따낸 돌은 세지 않습니다. 덤 7.5. 접바둑은 덤 0.5에 치석 한 점마다 백이 1집을 더 받습니다.", "計子：盤上の生き石と囲んだ空点を数えます。アゲハマは数えません。コミ7.5目。置き碁はコミ0.5目で、置き石1子につき白に1目を加えます。"),
+  "rules.koreanNote": m("数目，算法与日本规则相同。贴 6.5 目，让子棋贴 0.5 目。", "Territory scoring, counted as under Japanese rules. Komi 6.5; 0.5 in handicap games.", "계지: 일본 규칙과 같은 방식으로 셉니다. 덤 6.5, 접바둑은 덤 0.5입니다.", "計地：日本ルールと同じ方法で数えます。コミ6.5目、置き碁はコミ0.5目です。"),
+  "rules.territory": m("数目法", "Territory scoring", "계지", "計地"),
+  "rules.area": m("数子法", "Area scoring", "계자", "計子"),
+  "rules.unsupported": m("这个 SGF 使用的是 {0} 规则，Goban Studio 无法按这个规则正确数棋，因此没有导入。支持的规则：日本、中国、韩国。", "This SGF uses {0} rules, which Goban Studio cannot score correctly, so it was not imported. Supported: Japanese, Chinese and Korean rules.", "이 SGF는 {0} 규칙을 사용합니다. Goban Studio는 이 규칙으로 정확히 계가할 수 없어 가져오지 않았습니다. 지원 규칙: 일본, 중국, 한국 규칙.", "このSGFは{0}ルールを使用しています。Goban Studioではこのルールで正しく計算できないため、読み込みませんでした。対応ルール：日本・中国・韓国ルール。"),
+  "score.titleArea": m("数子", "Counting", "계가", "計算"),
+  "score.detailArea": m("棋子 {0} · 地 {1}", "Stones {0} · territory {1}", "돌 {0} · 집 {1}", "石 {0} · 地 {1}"),
+  "score.detailAreaKomi": m("棋子 {0} · 地 {1} · 贴 {2}", "Stones {0} · territory {1} · komi {2}", "돌 {0} · 집 {1} · 덤 {2}", "石 {0} · 地 {1} · コミ {2}"),
+  "score.detailAreaHandicap": m("棋子 {0} · 地 {1} · 贴 {2} · 让子补偿 {3}", "Stones {0} · territory {1} · komi {2} · handicap {3}", "돌 {0} · 집 {1} · 덤 {2} · 치석 보상 {3}", "石 {0} · 地 {1} · コミ {2} · 置き石の補正 {3}"),
+  "score.sekiTerritory": m("双活中的空点不算地。", "Points inside a seki are not territory.", "빅 안의 빈 점은 집이 아닙니다.", "セキの中の空点は地になりません。"),
+  "score.sekiArea": m("双活的棋子和眼位都算，公气双方都不算。", "Stones in seki and their eyes count; the shared liberties count for neither side.", "빅의 돌과 눈은 세고, 공동 공배는 어느 쪽도 세지 않습니다.", "セキの石とその眼は数え、内ダメはどちらにも数えません。"),
 };

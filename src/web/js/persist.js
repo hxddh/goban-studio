@@ -50,6 +50,8 @@ export const DEFAULT_SETTINGS = {
   boardSize: 19, // the size you last chose for a new game
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
   v4: true, // settings have been through the v4 migration
+  // v5
+  defaultRules: "japanese", // japanese | chinese | korean: new games use it unless the New game sheet chooses
 };
 
 /** v3 surfaces → v4 materials. */
@@ -174,6 +176,8 @@ export function loadSettings() {
   }
   if (!["plain", "wood", "ink"].includes(out.board)) out.board = "plain";
   if (![9, 13, 19].includes(out.boardSize)) out.boardSize = 19;
+  // v5: anything but the three rulesets (missing, old, corrupt) is Japanese.
+  if (!["japanese", "chinese", "korean"].includes(out.defaultRules)) out.defaultRules = "japanese";
   return out;
 }
 

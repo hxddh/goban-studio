@@ -10,13 +10,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap } from "../src/web/js/rules.js";
+import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap, RULESETS, DEFAULT_RULES, defaultKomi, handicapCompensation, normalizeRules, findSeki, rulesFromSgf } from "../src/web/js/rules.js";
 import { loadSGF } from "../src/web/js/sgf.js";
 import { execFileSync } from "node:child_process";
 import { chooseMove } from "../src/web/js/ai.js";
 import { STRENGTHS, beginnerMove, moveFromAnalysis, pickCandidate, rankParts, strengthById, suggestHandicap } from "../src/web/js/engine.js";
 import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
-import { parseInfo, parseVertex } from "../src/web/js/katago.js";
+import { parseInfo, parseVertex, positionPayload, katagoRules } from "../src/web/js/katago.js";
 import * as S from "../src/web/js/solver.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
@@ -168,7 +168,10 @@ await test("Japanese territory scoring counts territory, prisoners and komi", ()
   assert.equal(js.black, 1);
   assert.equal(js.white, 6.5);
   assert.equal(js.result, "W+5.5");
-  assert.equal(js.blackStones, undefined);
+  assert.equal(js.method, "territory");
+  assert.equal(js.rules, "japanese");
+  assert.equal(js.blackStones, null);
+  assert.equal(js.blackPrisoners, 0);
 });
 
 await test("dead stones are removed before scoring", () => {
@@ -275,11 +278,299 @@ await test("SGF columns skip I on import and export", () => {
   assert.match(sgf, /;W\[qd\]/);
 });
 
-await test("a Chinese-rules SGF is rejected instead of silently scored as Japanese", () => {
-  assert.throws(
-    () => loadSGF("(;GM[1]FF[4]SZ[9]KM[7.5]RU[Chinese];B[ee])"),
-    (error) => error.code === "unsupported-rules" && error.rules === "Chinese",
-  );
+/* ------------------------------------------------------------ v5 rules */
+
+/** A 9×9 board from rows of "X" (black), "O" (white) and "." (empty). */
+function fromRows(rows, options = {}) {
+  const game = new Game({ size: 9, ...options });
+  const stones = [];
+  rows.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c === "X") stones.push({ x, y, color: BLACK });
+    else if (c === "O") stones.push({ x, y, color: WHITE });
+  }));
+  game.setup(stones, BLACK);
+  return game;
+}
+
+// Black wall on column E, White wall on column F: 36 / 27 points of
+// territory, 9 stones each, no dame. A white stone sits dead at B8.
+const WALLS = [
+  "....XO...",
+  ".O..XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+  "....XO...",
+];
+
+// Eye-versus-eye seki in the top-left corner: Black A9 B9 A8 (eye at the
+// corner), White's group around it (eye at A6), one shared liberty at C9.
+// Black's outer wall reaches column F, White's wall is column G.
+const SEKI_BOARD = [
+  ".X.OX.O..",
+  "XXOOX.O..",
+  "OOOXX.O..",
+  ".OXX..O..",
+  "OOX...O..",
+  "XXX...O..",
+  "......O..",
+  "......O..",
+  "......O..",
+];
+// Fill column F with black stones so the board is closed.
+const SEKI_BOARD_CLOSED = SEKI_BOARD.map((row) => row.slice(0, 5) + "X" + row.slice(6));
+
+await test("v5 rules: rulesets, defaults and handicap compensation", () => {
+  assert.deepEqual(RULESETS.map((r) => r.id), ["japanese", "chinese", "korean"]);
+  assert.deepEqual(RULESETS.map((r) => r.method), ["territory", "area", "territory"]);
+  assert.deepEqual(RULESETS.map((r) => r.katago), ["japanese", "chinese", "korean"]);
+  for (const r of RULESETS) {
+    assert.ok(MESSAGES[r.labelKey], r.labelKey);
+    assert.ok(MESSAGES[r.noteKey], r.noteKey);
+  }
+  assert.equal(DEFAULT_RULES, "japanese");
+  assert.equal(defaultKomi("japanese"), 6.5);
+  assert.equal(defaultKomi("chinese"), 7.5);
+  assert.equal(defaultKomi("korean"), 6.5);
+  for (const r of ["japanese", "chinese", "korean"]) assert.equal(defaultKomi(r, 4), 0.5);
+  assert.equal(handicapCompensation("chinese", 4), 4);
+  assert.equal(handicapCompensation("chinese", 1), 0);
+  assert.equal(handicapCompensation("japanese", 4), 0);
+  assert.equal(handicapCompensation("korean", 9), 0);
+  assert.equal(normalizeRules("Chinese"), "chinese");
+  assert.equal(normalizeRules("aga"), "japanese");
+  assert.equal(normalizeRules(undefined), "japanese");
+  // A Game without rules is Japanese with komi 6.5, as before v5.
+  const g = new Game({ size: 9 });
+  assert.equal(g.rules, "japanese");
+  assert.equal(g.komi, 6.5);
+  const c = new Game({ size: 19, rules: "chinese" });
+  assert.equal(c.komi, 7.5);
+  const ch = new Game({ size: 19, rules: "chinese", handicap: 4 });
+  assert.equal(ch.komi, 0.5);
+  assert.equal(ch.handicapCompensation, 4);
+  assert.equal(new Game({ rules: "nonsense" }).rules, "japanese");
+});
+
+await test("v5 rules: area and territory scores of the same position", () => {
+  const dead = [{ x: 1, y: 1 }];
+  const jp = fromRows(WALLS).score(dead);
+  assert.equal(jp.method, "territory");
+  assert.equal(jp.blackTerritory, 36);
+  assert.equal(jp.whiteTerritory, 27);
+  assert.equal(jp.blackPrisoners, 1);
+  assert.equal(jp.whitePrisoners, 0);
+  assert.equal(jp.black, 37);
+  assert.equal(jp.white, 33.5);
+  assert.equal(jp.result, "B+3.5");
+  assert.equal(jp.neutral, 0);
+
+  const cn = fromRows(WALLS, { rules: "chinese" }).score(dead);
+  assert.equal(cn.method, "area");
+  assert.equal(cn.komi, 7.5);
+  assert.equal(cn.blackStones, 9);
+  assert.equal(cn.whiteStones, 9);
+  assert.equal(cn.blackTerritory, 36);
+  assert.equal(cn.whiteTerritory, 27);
+  assert.equal(cn.blackPrisoners, null);
+  assert.equal(cn.handicapCompensation, 0);
+  assert.equal(cn.black, 45);
+  assert.equal(cn.white, 43.5);
+  assert.equal(cn.result, "B+1.5");
+  assert.equal(cn.dead.length, 1);
+
+  const kr = fromRows(WALLS, { rules: "korean" }).score(dead);
+  assert.equal(kr.method, "territory");
+  assert.equal(kr.result, jp.result);
+
+  // Captures made during play count under territory scoring only.
+  const cap = new Game({ size: 9, rules: "chinese" });
+  const capJ = new Game({ size: 9 });
+  for (const g of [cap, capJ]) {
+    g.setup([{ x: 0, y: 1, color: BLACK }, { x: 0, y: 0, color: WHITE }], BLACK);
+    g.play(1, 0); // captures A9
+    assert.equal(g.score().captures.black, 1);
+  }
+  assert.equal(capJ.score().blackPrisoners, 1);
+  assert.equal(cap.score().blackPrisoners, null);
+  assert.equal(cap.score().black, cap.score().blackStones + cap.score().blackTerritory);
+});
+
+await test("v5 rules: Chinese handicap games give White N points for N stones", () => {
+  const cn = fromRows(WALLS, { rules: "chinese", handicap: 4 });
+  assert.equal(cn.komi, 0.5);
+  const s = cn.score([{ x: 1, y: 1 }]);
+  assert.equal(s.handicap, 4);
+  assert.equal(s.handicapCompensation, 4);
+  assert.equal(s.black, 45);
+  assert.equal(s.white, 9 + 27 + 0.5 + 4);
+  assert.equal(s.result, "B+4.5");
+  // The same game under Japanese rules: komi 0.5, no compensation.
+  const jp = fromRows(WALLS, { handicap: 4 }).score([{ x: 1, y: 1 }]);
+  assert.equal(jp.handicapCompensation, 0);
+  assert.equal(jp.white, 27.5);
+  assert.equal(jp.result, "B+9.5");
+});
+
+await test("v5 rules: seki has no territory under Japanese and Korean rules, and counts under Chinese", () => {
+  const board = fromRows(SEKI_BOARD_CLOSED).board;
+  const seki = findSeki(board);
+  assert.deepEqual(seki.points, [{ x: 2, y: 0 }]);
+  // Black's corner group (3 stones) and White's inner group (9 stones).
+  assert.equal(seki.stones.filter((s) => s.color === BLACK).length, 3);
+  assert.equal(seki.stones.filter((s) => s.color === WHITE).length, 9);
+
+  for (const rules of ["japanese", "korean"]) {
+    const s = fromRows(SEKI_BOARD_CLOSED, { rules }).score();
+    assert.equal(s.method, "territory");
+    // A9 (Black's eye) and A6 (White's eye) are not territory.
+    assert.equal(s.territory[0][0], EMPTY);
+    assert.equal(s.territory[3][0], EMPTY);
+    assert.equal(s.blackTerritory, 20);
+    assert.equal(s.whiteTerritory, 18);
+    assert.equal(s.neutral, 3);
+    assert.equal(s.result, "W+4.5");
+    assert.equal(s.seki.length, 12);
+  }
+  const c = fromRows(SEKI_BOARD_CLOSED, { rules: "chinese" }).score();
+  assert.equal(c.method, "area");
+  // The seki eyes count for their owners; the shared liberty for nobody.
+  assert.equal(c.territory[0][0], BLACK);
+  assert.equal(c.territory[3][0], WHITE);
+  assert.equal(c.blackTerritory, 21);
+  assert.equal(c.whiteTerritory, 19);
+  assert.equal(c.blackStones, 22);
+  assert.equal(c.whiteStones, 18);
+  assert.equal(c.neutral, 1);
+  assert.equal(c.black, 43);
+  assert.equal(c.white, 44.5);
+  assert.equal(c.result, "W+1.5");
+});
+
+await test("v5 rules: unfilled dame between living groups is not seki", () => {
+  const open = fromRows(WALLS.map((row) => row.slice(0, 3) + "X." + row.slice(5)));
+  const seki = findSeki(open.board);
+  assert.deepEqual(seki.points, []);
+  const s = open.score([{ x: 1, y: 1 }]);
+  assert.equal(s.neutral, 9);
+  assert.equal(s.blackTerritory, 27);
+  assert.equal(s.whiteTerritory, 27);
+  // A group in atari next to the dame is a capture, not seki.
+  const atari = setup([
+    { x: 0, y: 0, color: WHITE },
+    { x: 1, y: 0, color: BLACK },
+    { x: 1, y: 1, color: BLACK },
+  ]);
+  assert.deepEqual(findSeki(atari.board).points, []);
+});
+
+await test("v5 rules: SGF round trip keeps RU, komi and handicap for each ruleset", () => {
+  for (const [rules, ru, komi] of [["japanese", "Japanese", 6.5], ["chinese", "Chinese", 7.5], ["korean", "Korean", 6.5]]) {
+    const g = new Game({ size: 9, rules });
+    g.play(4, 4);
+    const sgf = g.toSGF();
+    assert.match(sgf, new RegExp(`RU\\[${ru}\\]`));
+    assert.match(sgf, new RegExp(`KM\\[${komi}\\]`));
+    const back = loadSGF(sgf).game;
+    assert.equal(back.rules, rules);
+    assert.equal(back.komi, komi);
+    assert.equal(back.toSGF(), sgf);
+  }
+  const h = new Game({ size: 19, rules: "chinese", handicap: 4 });
+  h.play(16, 16);
+  const back = loadSGF(h.toSGF()).game;
+  assert.equal(back.handicap, 4);
+  assert.equal(back.komi, 0.5);
+  assert.equal(back.handicapCompensation, 4);
+  // Setup with White stones is a position, not a handicap.
+  const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
+  assert.equal(pos.handicap, 0);
+  assert.equal(pos.handicapCompensation, 0);
+  // No RU (records before v5) is Japanese; a missing KM takes the ruleset's komi.
+  const old = loadSGF("(;GM[1]FF[4]SZ[9];B[ee])").game;
+  assert.equal(old.rules, "japanese");
+  assert.equal(old.komi, 6.5);
+  assert.equal(loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese];B[ee])").game.komi, 7.5);
+});
+
+await test("v5 rules: SGF import accepts Japanese, Chinese and Korean spellings and rejects the rest", () => {
+  const ru = (v) => loadSGF(`(;GM[1]FF[4]SZ[9]KM[7]RU[${v}];B[ee])`).game.rules;
+  for (const v of ["Japanese", "japanese", "JP", "jp", "uchikomi", "日本", "日本ルール", "日本规则"]) assert.equal(ru(v), "japanese", v);
+  for (const v of ["Chinese", "chinese", "CN", "cn", "China", "中国", "中国规则"]) assert.equal(ru(v), "chinese", v);
+  for (const v of ["Korean", "korean", "KR", "kr", "한국", "韩国规则"]) assert.equal(ru(v), "korean", v);
+  assert.equal(rulesFromSgf(""), "japanese");
+  for (const v of ["AGA", "BGA", "NZ", "Ing", "GOE", "Tromp-Taylor", "French", "Chinese/Japanese", "AGA (Japanese)"]) {
+    assert.equal(rulesFromSgf(v), null, v);
+    assert.throws(
+      () => loadSGF(`(;GM[1]FF[4]SZ[9]KM[7.5]RU[${v}];B[ee])`),
+      (error) => error.code === "unsupported-rules" && error.rules === v,
+      v,
+    );
+  }
+  assert.ok(MESSAGES["rules.unsupported"].en.includes("{0}"));
+});
+
+await test("v5 rules: KataGo is told the game's rules on both bridge paths", async () => {
+  // Async (structured) payload.
+  const cn = new Game({ size: 9, rules: "chinese", handicap: 2 });
+  cn.play(4, 4);
+  const payload = positionPayload(cn);
+  assert.equal(payload.rules, "chinese");
+  // Komi is the game's own; KataGo adds the handicap compensation itself.
+  assert.equal(payload.komi, 0.5);
+  assert.equal(payload.setup, "B G7 B C3");
+  assert.equal(positionPayload(new Game({ size: 9, rules: "korean" })).rules, "korean");
+  assert.equal(positionPayload(new Game({ size: 9 })).rules, "japanese");
+  assert.equal(katagoRules({}), "japanese");
+  // White setup stones go first, so a set-up position is not read as a handicap.
+  const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
+  assert.equal(positionPayload(pos).setup, "W C7 B A9 B B8");
+
+  // Sync (GTP script) path.
+  const scripts = [];
+  globalThis.zero = {
+    invoke: async (command, payload) => {
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test" };
+      if (command === "studio.katagoAnalyze") {
+        scripts.push(Buffer.from(payload.b64, "base64").toString("utf8"));
+        return { ok: true, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3" };
+      }
+      throw new Error("unexpected command " + command);
+    },
+  };
+  try {
+    const K = await import("../src/web/js/katago.js?bridge-rules");
+    for (const rules of ["japanese", "chinese", "korean"]) {
+      await K.analyze(new Game({ size: 9, rules }), { visits: 8 });
+      const script = scripts.at(-1);
+      assert.match(script, new RegExp(`^kata-set-rules ${rules}$`, "m"));
+      assert.equal(script.match(/kata-set-rules/g).length, 1);
+      assert.match(script, new RegExp(`^komi ${defaultKomi(rules)}$`, "m"));
+    }
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
+await test("v5 rules: the defaultRules setting and library records", () => {
+  assert.equal(DEFAULT_SETTINGS.defaultRules, "japanese");
+  removeKey(KEYS.settings);
+  assert.equal(loadSettings().defaultRules, "japanese");
+  writeJSON(KEYS.settings, { defaultRules: "chinese" });
+  assert.equal(loadSettings().defaultRules, "chinese");
+  writeJSON(KEYS.settings, { defaultRules: "aga" });
+  assert.equal(loadSettings().defaultRules, "japanese");
+  removeKey(KEYS.settings);
+  const g = new Game({ size: 9, rules: "korean" });
+  g.play(4, 4);
+  assert.equal(Lib.describeGame(g).rules, "korean");
+  assert.equal(Lib.recordRules({}), "japanese");
+  assert.equal(Lib.recordRules({ rules: "chinese" }), "chinese");
+  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  assert.equal(messages.match(/\/\/ v5 rules\r?\n/g)?.length, 1);
 });
 
 await test("an empty SGF is rejected, not silently accepted", () => {
@@ -319,6 +610,7 @@ await test("every key the interface uses is in the string table", () => {
     "library.kind.": ["all", "won", "lost", "imported"],
     "settings.material.": ["plain", "wood", "ink"],
     "newGame.": ["quick", "medium", "full"],
+    "tip.opening.": ["1", "2", "3"],
   };
   for (const [prefix, list] of Object.entries(dynamic)) for (const v of list) used.add(prefix + v);
   for (const topic of new Set(PROBLEMS.map((p) => p.topic))) {

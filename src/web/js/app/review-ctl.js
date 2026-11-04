@@ -522,7 +522,9 @@ export function playFromHere() {
   if (!r) return;
   const src = r.game;
   const node = src.current;
-  const game = new Game({ size: src.size, komi: src.komi });
+  // v5: the record's rules and handicap carry over (the handicap is what
+  // the Chinese count compensates); the root stones are set up below.
+  const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap });
   const root = src.root.board.signMap;
   const setup = [];
   for (let y = 0; y < src.size; y++) for (let x = 0; x < src.size; x++) if (root[y][x]) setup.push({ x, y, c: root[y][x] });

@@ -3,7 +3,7 @@
  * game (whole-game analysis, live analysis, variations, key mistakes).
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
+import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
 import { areaOf, rankParts, strengthById } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
@@ -106,6 +106,7 @@ function gameFacts(g) {
   const game = g.game;
   return [
     `${game.size} × ${game.size}`,
+    t(rulesetById(game.rules).labelKey),
     t("play.komiN", [formatPoints(game.komi)]),
     game.handicap ? t("play.handicapN", [game.handicap]) : null,
     g.clock ? t("time." + g.clock.mode) : null,
@@ -242,7 +243,7 @@ function MoveStrip() {
     <section class="moves" aria-label={t("play.moveList")}>
       <h2 class="slot-title">{t("play.moveList")}</h2>
       {line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13 && (
-        <p class="quiet-note opening-tip">{t("tip.opening" + (Math.floor(line.length / 4) + 1))}</p>
+        <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>
       )}
       {line.length === 0 ? (
         <p class="moves-empty">{t("play.noMoves")}</p>
@@ -359,7 +360,7 @@ function ScoringCard() {
   const pending = sc.source === "pending";
   return (
     <section class="card score-card enter-up" aria-live="polite">
-      <h2>{t("score.title")}</h2>
+      <h2>{t(s.method === "area" ? "score.titleArea" : "score.title")}</h2>
       <p class="muted">{pending ? t("score.judging") : sc.source === "katago" ? t("score.engineMarked") : t("score.manual")}</p>
       <div class="score-pair">
         <div>
@@ -367,16 +368,25 @@ function ScoringCard() {
           <strong>
             <CountUp value={pending ? 0 : s.black} format={formatPoints} />
           </strong>
-          <span class="score-detail">{t("score.detail", [s.blackTerritory, s.black - s.blackTerritory]).split(" · ").map((x) => <i>{x}</i>)}</span>
+          <span class="score-detail">{lines(s.method === "area" ? t("score.detailArea", [s.blackStones, s.blackTerritory]) : t("score.detail", [s.blackTerritory, s.blackPrisoners]))}</span>
         </div>
         <div>
           <Stone color={WHITE} size={14} />
           <strong>
             <CountUp value={pending ? 0 : s.white} format={formatPoints} />
           </strong>
-          <span class="score-detail">{t("score.detailKomi", [s.whiteTerritory, s.white - s.whiteTerritory - g.game.komi, formatPoints(g.game.komi)]).split(" · ").map((x) => <i>{x}</i>)}</span>
+          <span class="score-detail">
+            {lines(
+              s.method === "area"
+                ? s.handicapCompensation > 0
+                  ? t("score.detailAreaHandicap", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi), s.handicapCompensation])
+                  : t("score.detailAreaKomi", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi)])
+                : t("score.detailKomi", [s.whiteTerritory, s.whitePrisoners, formatPoints(s.komi ?? g.game.komi)]),
+            )}
+          </span>
         </div>
       </div>
+      {!pending && s.seki?.length > 0 && <p class="fine">{t(s.method === "area" ? "score.sekiArea" : "score.sekiTerritory")}</p>}
       {!pending && <p class="score-result enter-fade">{C.resultText(s.result)}</p>}
       <div class="actions">
         <Button kind="primary" onClick={C.confirmScore} disabled={pending}>
@@ -388,6 +398,11 @@ function ScoringCard() {
       </div>
     </section>
   );
+}
+
+/** "a · b · c" → one fact per line. */
+function lines(text) {
+  return text.split(" · ").map((x) => <i>{x}</i>);
 }
 
 function SummaryBlock() {
