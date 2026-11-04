@@ -145,6 +145,12 @@ group per screen region.
   problem topics as a grid of quiet tiles.
 * **Library.** Toolbar holds Import. Segmented tabs; games as rows with a
   thumbnail; classics and openings as rows.
+* **Report (v6).** A list-page column: the result as the page title with
+  the facts (result, rules, komi, size) under it; the three phases as one
+  table (only from KataGo — with the offline estimate a single plain
+  sentence instead); three key moments as small boards; then one card whose
+  button is the only primary action (*Practise this game*). *Export image*
+  is a quiet button in the toolbar.
 * **New game.** The recommended game is pre-selected and *Start* is the
   only primary action; size cards (19×19 first and standard; 13×13 and 9×9
   as quicker games); opponent, strength and colour on one row each; time,

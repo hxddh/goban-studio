@@ -473,10 +473,22 @@ function ResultCard() {
       )}
       {aids.length > 0 && <span class="fine">{aids.join(" · ")}</span>}
       <SummaryBlock />
-      <div class="actions center">
-        <Button kind="primary" icon="chart" onClick={C.reviewCurrentGame}>
-          {t("play.reviewGame")}
-        </Button>
+      <div class={`actions center ${g.ratingDelta != null ? "wrap" : ""}`}>
+        {/* v6: after a rated game against the computer, the report is the next step. */}
+        {g.ratingDelta != null ? (
+          <>
+            <Button kind="primary" icon="chart" class="block" onClick={C.openCurrentReport}>
+              {t("report.open")}
+            </Button>
+            <Button kind="ghost" onClick={C.reviewCurrentGame}>
+              {t("play.reviewGame")}
+            </Button>
+          </>
+        ) : (
+          <Button kind="primary" icon="chart" onClick={C.reviewCurrentGame}>
+            {t("play.reviewGame")}
+          </Button>
+        )}
         <Button kind="ghost" onClick={() => C.openNewGame()}>
           {t("play.playAgain")}
         </Button>

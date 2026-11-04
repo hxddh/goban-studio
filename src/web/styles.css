@@ -742,3 +742,23 @@ button.group-row:hover { background: var(--fill); }
 .model-status.failed { color: var(--bad); }
 .model-text .progress { margin-top: 4px; }
 .sheet:focus-visible, .sheet:focus { outline: none; }
+
+/* ------------------------------------------------------------ v6 report */
+
+.report-pending { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-5); }
+.report-section { margin-bottom: var(--s-6); }
+.report-note { font: var(--t-read); color: var(--text-2); max-width: 640px; }
+.report-phases { font: var(--t-body); }
+.report-phases + .report-phases { margin-top: var(--s-4); }
+.report-phases th:first-child .fine { margin-left: var(--s-1); }
+.report-phases .stone { vertical-align: -1px; }
+.report-takeaways { font: var(--t-body); margin-top: var(--s-4); }
+.report-moments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
+.report-moment { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; height: 100%; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: inherit; text-align: left; cursor: pointer; font: var(--t-small); color: var(--text-2); }
+.report-moment:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text)); }
+.report-moment strong { font: var(--t-head); color: var(--text); margin-top: var(--s-2); }
+.report-lost { color: var(--bad); font-weight: 500; font-variant-numeric: tabular-nums; }
+.report-board { display: block; width: 100%; aspect-ratio: 1; border-radius: 4px; }
+.report-practise { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.report-practise p { font: var(--t-read); color: var(--text-2); max-width: 520px; }
+.report-practise .actions { flex: none; flex-direction: row-reverse; }

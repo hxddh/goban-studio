@@ -46,6 +46,21 @@ export async function writeTextFile(path, text) {
   }
 }
 
+/** v6: write bytes (a Uint8Array) through the same native file command. */
+export async function writeBinaryFile(path, bytes) {
+  if (!hasNative()) return false;
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  try {
+    await invoke("studio.writeTextFile", { path, b64: btoa(bin) });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function readTextFile(path) {
   if (!hasNative()) return null;
   try {

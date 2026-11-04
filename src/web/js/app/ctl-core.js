@@ -112,6 +112,8 @@ export function locationNow() {
       daily: !!p.daily,
     },
     library: { ...state.library },
+    // v6
+    report: state.report ? { recordId: state.report.recordId, space: state.report.space } : null,
     review: r
       ? {
           source: r.source,

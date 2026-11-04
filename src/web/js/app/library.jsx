@@ -149,6 +149,7 @@ function MyGames() {
                       label: t("library.rename"),
                       onClick: () => C.openSheet("rename", { id: g.id, name: g.name || recordTitle(g) }),
                     },
+                    ...(C.hasReport(g) ? [{ icon: "chart", label: t("report.title"), onClick: () => C.openReport(g.id, { space: "library" }) }] : []),
                     { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportRecord(g.id) },
                     "-",
                     { icon: "trash", label: t("common.delete"), danger: true, onClick: () => C.deleteRecord(g.id) },
