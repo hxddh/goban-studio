@@ -10,6 +10,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.click(".topic-card >> nth=0");
     await page.click(".problem-card >> nth=0");
     await page.waitForFunction(() => window.__state.practice.view === "problem");
+    // The view switches before the board mounts; wait for the problem's own board.
+    await page.waitForFunction(() => {
+      const P = window.__state.practice.problem;
+      const b = window.__board;
+      return P?.pz && b?.model?.size === P.pz.size && !!b.model.view && b.geom?.cell > 0;
+    });
     return page.evaluate(() => {
       const P = window.__state.practice.problem;
       const S = window.__solver;
