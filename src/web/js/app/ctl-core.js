@@ -19,6 +19,7 @@ export function applyAppearance() {
   const dark = s.appearance === "dark" || (s.appearance === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
+  root.dataset.board = s.board || "plain";
 }
 
 export function setSetting(key, value) {
@@ -29,7 +30,10 @@ export function setSetting(key, value) {
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
   if (key === "appearance") applyAppearance();
-  if (key === "board") Audio.setMaterial?.(value);
+  if (key === "board") {
+    Audio.setMaterial?.(value);
+    applyAppearance();
+  }
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval") syncMenus();
 }
 

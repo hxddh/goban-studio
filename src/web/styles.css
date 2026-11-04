@@ -88,7 +88,6 @@
   --good-soft: rgba(108, 192, 143, 0.13);
   --bad: #e58a74;
   --bad-soft: rgba(229, 138, 116, 0.13);
-  --thumb-board: #c9b080;
   --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.7);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px -16px rgba(0, 0, 0, 0.7);
@@ -681,3 +680,9 @@ button.group-row:hover { background: var(--fill); }
 .unit.done .unit-no { background: var(--good-soft); color: var(--good); }
 .unit.now .unit-no { background: var(--text); color: var(--on-primary); }
 .unit.todo .unit-text h3 { color: var(--text-2); }
+
+/* v5: thumbnails and mini boards follow the board material */
+:root { --thumb-line: rgba(60, 40, 20, 0.35); }
+:root[data-board="ink"] { --thumb-board: #2d2e2c; --thumb-line: rgba(232, 228, 218, 0.35); }
+:root[data-board="ink"] .empty-board line, :root[data-board="ink"] .mini-grid line { stroke: rgba(232, 228, 218, 0.45); }
+:root[data-board="ink"] .empty-board circle { fill: rgba(232, 228, 218, 0.6); }
