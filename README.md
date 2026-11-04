@@ -51,6 +51,9 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   that is no longer needed is cancelled.
 - **Strength** — the human-style ladder measured again on GitHub's build
   machines (1,532 new games): no gap any more between ≈12 kyu and ≈3 kyu.
+- **Opening book 2.0** — 3,874 positions evaluated with the 15-block
+  network at 2,000 visits on GitHub's build machines (v6: 1,400 with the
+  small network); corner joseki zoom into the corner.
 - **SGF coordinates** — records from other programs are read correctly
   (FF[4] uses the letter *i*; earlier versions skipped it); records saved by
   earlier versions of the app keep reading as they were.
