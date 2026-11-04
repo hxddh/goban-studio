@@ -75,15 +75,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.click(".preset >> nth=2");
     await page.click(".sheet .segmented button >> nth=1");
     await page.click(".sheet-foot .btn.primary");
-    await page.waitForSelector(".scrim", { state: "detached" });
+    await page.waitForFunction(() => window.__board?.model.size === 9 && window.__board.geom?.cell > 40);
     const pts = [[2, 2], [6, 6], [6, 2], [2, 6], [4, 4], [4, 2], [2, 4], [6, 4], [4, 6], [3, 3]];
     for (let i = 0; i < pts.length; i++) {
-      for (let tries = 0; ; tries++) {
-        await clickPoint(page, ...pts[i]);
-        const ok = await page.waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 1500 }).then(() => true, () => false);
-        if (ok) break;
-        assert(tries < 3, `move ${i + 1} did not land`);
-      }
+      await clickPoint(page, ...pts[i]);
+      await page.waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 3000 });
     }
     // End it: two passes, accept the count; the finished game is saved to the Library.
     for (let i = 0; i < 2; i++) {

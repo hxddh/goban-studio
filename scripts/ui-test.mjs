@@ -648,21 +648,13 @@ for (const vp of [
     await page.click(".preset >> nth=2");
     await page.click(".sheet .segmented button >> nth=1");
     await page.click(".sheet-foot .btn.primary");
-    // The sheet's scrim must be gone, and every click must land, or the
-    // position (and the colours) shift by one move.
-    await page.waitForSelector(".scrim", { state: "detached" });
+    // The canvas is reused across games: wait until it shows the new 9×9
+    // board, or the clicks are placed with the previous board's geometry.
+    await page.waitForFunction(() => window.__board?.model.size === 9 && window.__board.geom?.cell > 40);
     const pts = [[2, 2], [6, 6], [6, 2], [2, 6], [4, 4]];
     for (let i = 0; i < pts.length; i++) {
-      // A click right after the board appears can be swallowed; retry it.
-      for (let tries = 0; ; tries++) {
-        await clickPoint(page, ...pts[i]);
-        const ok = await page
-          .waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 1500 })
-          .then(() => true, () => false);
-        if (ok) break;
-        const n = await page.evaluate(() => window.__state.game?.game.moveNumber);
-        assert(tries < 3 && n === i, `move ${i + 1} did not land (moves: ${n})`);
-      }
+      await clickPoint(page, ...pts[i]);
+      await page.waitForFunction((n) => window.__state.game?.game.moveNumber === n, i + 1, { timeout: 3000 });
     }
     const out = [];
     out.push(await snap(page, `play-${vp.tag}`));
