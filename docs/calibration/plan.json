@@ -1,0 +1,16 @@
+{
+  "note": "v7 stage 6: a human-style 1k between the old 5k and 1k settings (rank_4k, search style, 32 visits) on 19x19 (docs/strength.md, v7)",
+  "runs": [
+    {
+      "id": "v7-19e",
+      "size": 19,
+      "games": 16,
+      "pairs": "CH:s4k32-L:1k,CH:s4k32-L:2d,CH:s4k32-HL:5k,CH:s4k32-HL:1k",
+      "shards": 8,
+      "workers": 4,
+      "scoreVisits": 200,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v7"
+    }
+  ]
+}
