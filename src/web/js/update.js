@@ -1,5 +1,6 @@
 /**
- * Update checks — the app's only network request, and only when asked.
+ * Update checks — a network request only when asked (the only other one is
+ * an optional model download the player starts, models.js).
  *
  * The page never talks to the network itself (CSP `connect-src 'self'`).
  * The native host does one HTTPS GET of GitHub's "latest release" document

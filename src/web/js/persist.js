@@ -49,6 +49,8 @@ export const DEFAULT_SETTINGS = {
   // v4
   boardSize: 19, // the size you last chose for a new game
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
+  // v5
+  humanStyle: true, // with the optional human SL model installed, the opponent plays human-style
   v4: true, // settings have been through the v4 migration
   // v5
   defaultRules: "japanese", // japanese | chinese | korean: new games use it unless the New game sheet chooses

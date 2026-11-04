@@ -175,6 +175,7 @@ function PlayerRow({ color }) {
   if (g.opponent === "ai" && color !== g.humanColor) {
     name = state.engine.available ? "KataGo" : t("play.offlineEngine");
     sub = rankLabel(g.strength);
+    if (g.opponentMode === "human" || g.opponentMode === "strong") sub += " · " + t("models.mode." + g.opponentMode);
   } else if (g.opponent === "ai") {
     name = t("play.you");
     const r = state.progress.rating?.r;

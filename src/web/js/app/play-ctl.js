@@ -321,6 +321,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   if (state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
   if (a) g.eval = a;
+  if (result.mode) g.opponentMode = result.mode; // v5: "human" | "strong" | "standard" | "offline"
 
   // Teaching: a big drop after the player's move pauses the reply.
   if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {

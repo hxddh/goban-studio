@@ -7,6 +7,7 @@ import { STRENGTHS, suggestHandicap } from "../engine.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
 import * as U from "../update.js";
+import * as Models from "../models.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel, ratingLabel } from "./play.jsx";
@@ -328,6 +329,7 @@ function SettingsSheet() {
         </div>
         <p class="fine">{t("settings.rankHelp")}</p>
       </section>
+      <ModelsGroup />
       <section class="settings-group">
         <h3>{t("backup.title")}</h3>
         <p class="fine">{t("backup.help")}</p>
@@ -363,6 +365,65 @@ function SettingsSheet() {
         </div>
       </section>
     </Modal>
+  );
+}
+
+/** Optional downloads: the human-style opponent and the stronger network. */
+function ModelsGroup() {
+  useEffect(() => {
+    C.refreshModels?.();
+  }, []);
+  const ms = state.models;
+  const s = state.settings;
+  return (
+    <section class="settings-group">
+      <h3>{t("models.title")}</h3>
+      <p class="fine">{t("models.intro")}</p>
+      {["human", "strong"].map((kind) => (
+        <ModelRow kind={kind} one={ms?.[kind]} />
+      ))}
+      {ms?.human?.status === "ready" && (
+        <>
+          <Switch label={t("models.humanStyle")} checked={s.humanStyle !== false} onChange={(v) => C.setHumanStyle(v)} />
+          <p class="fine">{t("models.humanStyleHelp")}</p>
+        </>
+      )}
+      <p class="fine">{t("models.source")}</p>
+    </section>
+  );
+}
+
+function ModelRow({ kind, one }) {
+  const mb = Models.megabytes(Models.MODELS[kind].bytes);
+  const st = one?.status || "unavailable";
+  const busy = st === "downloading" || st === "verifying";
+  let line = "";
+  if (st === "unavailable") line = t("models.unavailable");
+  else if (st === "ready") line = t("models.ready");
+  else if (st === "verifying") line = t("models.verifying");
+  else if (st === "downloading") line = one.stalled ? t("models.stalled") : t("models.downloading", [Models.percent(one)]);
+  else if (st === "partial") line = t("models.partial", [Models.percent(one)]);
+  else if (st === "failed") line = C.modelErrorText(one);
+  let action = null;
+  if (st === "absent") action = <Button size="sm" icon="download" onClick={() => C.downloadModel(kind)}>{t("models.download", [mb])}</Button>;
+  else if (st === "partial") action = <Button size="sm" onClick={() => C.downloadModel(kind)}>{t("models.resume")}</Button>;
+  else if (st === "failed") action = <Button size="sm" onClick={() => C.downloadModel(kind)}>{t("models.retry")}</Button>;
+  else if (busy) action = <Button size="sm" kind="ghost" onClick={() => C.cancelModelDownload(kind)}>{t("models.cancel")}</Button>;
+  else if (st === "ready") action = <Button size="sm" kind="ghost" onClick={() => C.removeModel(kind)}>{t("models.remove")}</Button>;
+  return (
+    <div class="model-row">
+      <div class="model-text">
+        <strong>{t(`models.${kind}.name`)}</strong>
+        <span class="fine">{t(`models.${kind}.desc`, [mb])}</span>
+        {line && <span class={`model-status ${st}`} aria-live="polite">{line}</span>}
+        {busy && (
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Models.percent(one)}>
+            <i style={{ width: `${Models.percent(one)}%` }} />
+          </div>
+        )}
+      </div>
+      {action}
+    </div>
   );
 }
 

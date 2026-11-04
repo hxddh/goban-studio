@@ -5,6 +5,7 @@ const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
 const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
+const models_mod = @import("models.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -48,6 +49,8 @@ const Job = struct {
     /// The page cancelled or superseded it: reply `cancelled` whatever
     /// KataGo says (it may have finished in the same instant).
     cancelled: bool = false,
+    /// The KataGo process that serves it (echoed as `engine`).
+    slot: engine_mod.Slot = .standard,
 
     fn idText(self: *const Job) []const u8 {
         return self.id[0..self.id_len];
@@ -128,9 +131,11 @@ const App = struct {
     install_target: install_mod.Target = .{},
     install_target_known: bool = false,
     staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
-    handlers: [14]native_sdk.BridgeHandler = undefined,
+    /// Optional networks (v5, models.zig): the page polls their state.
+    models: *models_mod.Manager = undefined,
+    handlers: [18]native_sdk.BridgeHandler = undefined,
     async_handlers: [4]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [18]native_sdk.BridgeCommandPolicy = undefined,
+    policies: [22]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -273,6 +278,26 @@ const App = struct {
             .context = self,
             .invoke_fn = openReleasePage,
         };
+        self.handlers[12] = .{
+            .name = "studio.modelStatus",
+            .context = self,
+            .invoke_fn = modelStatus,
+        };
+        self.handlers[13] = .{
+            .name = "studio.modelDownload",
+            .context = self,
+            .invoke_fn = modelDownload,
+        };
+        self.handlers[14] = .{
+            .name = "studio.modelCancel",
+            .context = self,
+            .invoke_fn = modelCancel,
+        };
+        self.handlers[15] = .{
+            .name = "studio.modelRemove",
+            .context = self,
+            .invoke_fn = modelRemove,
+        };
         self.async_handlers[0] = .{
             .name = "studio.katagoAnalyzeAsync",
             .context = self,
@@ -283,12 +308,12 @@ const App = struct {
             .context = self,
             .invoke_fn = checkUpdate,
         };
-        self.handlers[12] = .{
+        self.handlers[16] = .{
             .name = "studio.updateStatus",
             .context = self,
             .invoke_fn = updateStatus,
         };
-        self.handlers[13] = .{
+        self.handlers[17] = .{
             .name = "studio.updateCancel",
             .context = self,
             .invoke_fn = updateCancel,
@@ -606,7 +631,7 @@ fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, out
     _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
-    const move = self.katago.engine.move(script_buf[0..script_len], color) catch |err| switch (err) {
+    const move = self.katago.standard().move(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
@@ -633,7 +658,7 @@ fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     _ = cancelJobs(self, null);
     self.katago.lockExclusive();
     defer self.katago.unlockExclusive();
-    const result = self.katago.engine.analyze(script_buf[0..script_len], color) catch |err| switch (err) {
+    const result = self.katago.standard().analyze(script_buf[0..script_len], color) catch |err| switch (err) {
         error.InvalidRequest => return error.InvalidRequest,
         else => return error.HandlerFailed,
     };
@@ -654,7 +679,7 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     const self: *App = @ptrCast(@alignCast(context));
     var n: usize = 0;
     if (!jsonAppend(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"version\":")) return error.HandlerFailed;
+    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
     if (!jsonAppendString(output, &n, self.katago_version)) return error.HandlerFailed;
     if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
@@ -682,6 +707,12 @@ const AnalyzePayload = struct {
     visits: u32 = 64,
     maxTime: f64 = 6.0,
     stream: bool = false,
+    /// v5: "standard" (default), "strong" or "human".
+    engine: []const u8 = "standard",
+    /// v5, human engine only: a KataGo human SL profile ("rank_12k").
+    profile: []const u8 = "",
+    /// v5, human engine only: "raw" or "search".
+    humanStyle: []const u8 = "raw",
 };
 
 fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request, job: *Job) !void {
@@ -709,6 +740,18 @@ fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request
     req.visits = p.visits;
     req.max_time = p.maxTime;
     req.stream = p.stream;
+    req.slot = engine_mod.Slot.parse(p.engine) orelse return error.InvalidRequest;
+    job.slot = req.slot;
+    req.profile_len = 0;
+    req.style = .raw;
+    if (req.slot == .human) {
+        if (!engine_mod.validProfile(p.profile)) return error.InvalidRequest;
+        @memcpy(req.profile[0..p.profile.len], p.profile);
+        req.profile_len = p.profile.len;
+        if (std.mem.eql(u8, p.humanStyle, "search")) {
+            req.style = .search;
+        } else if (!std.mem.eql(u8, p.humanStyle, "raw")) return error.InvalidRequest;
+    }
 }
 
 fn findJob(self: *App, seq: u64) ?*Job {
@@ -766,6 +809,8 @@ fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, re
             const r = result.?;
             ok = jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and
                 jsonAppendString(buf, &n, job.idText()) and
+                jsonAppend(buf, &n, ",\"engine\":") and
+                jsonAppendString(buf, &n, @tagName(job.slot)) and
                 jsonAppend(buf, &n, ",\"play\":") and
                 jsonAppendString(buf, &n, r.play()) and
                 jsonAppend(buf, &n, ",\"info\":") and
@@ -840,6 +885,19 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     if (!self.katago_available) {
         respondJob(&job, .failed, "EngineMissing", null);
         return;
+    }
+    // An optional network that is not installed: answer at once, the page
+    // falls back to the standard engine.
+    const needs: ?models_mod.Kind = switch (req.slot) {
+        .standard => null,
+        .strong => .strong,
+        .human => .human,
+    };
+    if (needs) |kind| {
+        if (!self.models.isReady(kind)) {
+            respondJob(&job, .failed, "ModelMissing", null);
+            return;
+        }
     }
     var slot: ?*Job = null;
     for (&self.jobs) |*candidate| {
@@ -1231,6 +1289,103 @@ fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation, re
     };
 }
 
+// ------------------------------------------------------------ models
+//
+// Optional networks (v5). The page names a kind, never an address: the
+// URLs, sizes and SHA-256 hashes are pinned in models.zig. Downloads run on
+// their own thread and write only under the app's data directory; the page
+// polls `studio.modelStatus` for progress.
+
+const ModelPayload = struct {
+    kind: []const u8 = "",
+};
+
+fn modelKind(self: *App, payload: []const u8) !models_mod.Kind {
+    const parsed = std.json.parseFromSlice(ModelPayload, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    return models_mod.parseKind(parsed.value.kind) orelse error.InvalidRequest;
+}
+
+fn modelSlot(kind: models_mod.Kind) engine_mod.Slot {
+    return switch (kind) {
+        .human => .human,
+        .strong => .strong,
+    };
+}
+
+/// `studio.modelStatus` {}: `{available, human:{status, bytes, total,
+/// idleMs, needed, name, error}, strong:{…}}`. `available` is false when
+/// the app has no data directory (downloads impossible).
+fn modelStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    return models_mod.statusJson(self.models, output) orelse error.HandlerFailed;
+}
+
+fn modelReply(self: *App, output: []u8, ok: bool, error_name: []const u8) ![]const u8 {
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, if (ok) "{\"ok\":true" else "{\"ok\":false")) return error.HandlerFailed;
+    if (error_name.len > 0) {
+        if (!jsonAppend(output, &n, ",\"error\":")) return error.HandlerFailed;
+        if (!jsonAppendString(output, &n, error_name)) return error.HandlerFailed;
+    }
+    if (!jsonAppend(output, &n, ",\"models\":")) return error.HandlerFailed;
+    const status = models_mod.statusJson(self.models, output[n..]) orelse return error.HandlerFailed;
+    n += status.len;
+    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    return output[0..n];
+}
+
+/// `studio.modelDownload` {kind: "human"|"strong"}: start or resume the
+/// download and return at once; `{ok, error?, models}`. Errors: NoDataDir,
+/// Busy, ThreadFailed. Transfer errors arrive later in the status
+/// (DiskFull, Network, HttpStatus, SizeMismatch, ChecksumMismatch, …).
+fn modelDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    self.models.start(kind) catch |err| return modelReply(self, output, false, @errorName(err));
+    return modelReply(self, output, true, "");
+}
+
+/// `studio.modelCancel` {kind}: stop a download (its partial file stays for
+/// a later resume). `{ok, models}`; ok is false when nothing was running.
+fn modelCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    const cancelled = self.models.cancel(kind);
+    return modelReply(self, output, cancelled, "");
+}
+
+/// `studio.modelRemove` {kind}: stop the KataGo process that uses the
+/// network, then delete the file and any partial download. `{ok, models}`.
+fn modelRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const kind = try modelKind(self, invocation.request.payload);
+    _ = cancelJobs(self, null);
+    self.katago.stopSlot(modelSlot(kind));
+    self.models.remove(kind) catch |err| return modelReply(self, output, false, @errorName(err));
+    return modelReply(self, output, true, "");
+}
+
+/// `<app data>/models`, or GOBAN_MODELS_DIR (self-test, development).
+fn resolveModelsDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
+    if (env_map.get("GOBAN_MODELS_DIR")) |dir| {
+        if (dir.len > 0 and dir.len <= out.len and std.fs.path.isAbsolute(dir)) {
+            @memcpy(out[0..dir.len], dir);
+            return out[0..dir.len];
+        }
+    }
+    var data_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const data = native_sdk.app_dirs.resolveOne(
+        .{ .name = bundle_id },
+        native_sdk.app_dirs.currentPlatform(),
+        native_sdk.debug.envFromMap(env_map),
+        .data,
+        &data_buf,
+    ) catch return "";
+    return std.fmt.bufPrint(out, "{s}{c}models", .{ data, std.fs.path.sep }) catch "";
+}
+
 // ------------------------------------------------------------ native menus
 
 const MenuItemSpec = struct {
@@ -1368,6 +1523,12 @@ fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
         if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
     }
+    // v5: also exercise the optional downloads (GOBAN_MODELS_DIR should
+    // point at an empty temporary folder).
+    const models = self.env_map.get("GOBAN_SELFTEST_MODELS") orelse "";
+    if (path.len > 0 and std.mem.eql(u8, models, "1")) {
+        if (!jsonAppend(output, &n, ",\"models\":true")) return error.HandlerFailed;
+    }
     if (tour.len > 0) {
         if (!jsonAppend(output, &n, ",\"tour\":")) return error.HandlerFailed;
         if (!jsonAppendString(output, &n, tour)) return error.HandlerFailed;
@@ -1401,18 +1562,30 @@ fn installPlatformOpenHandler(self: *App) void {
     }
 }
 
+const bundle_id = "dev.hxddh.gobanstudio";
+
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
     defer app_state.deinit();
+    // Optional networks (v5). Not freed at exit: a download thread may
+    // still be running.
+    var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const models = try std.heap.page_allocator.create(models_mod.Manager);
+    models.init(init.io, resolveModelsDir(init.environ_map, &models_dir_buf));
+    app_state.models = models;
+    var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const strong_model = models.modelPath(.strong, &strong_buf) orelse "";
+    const human_model = models.modelPath(.human, &human_buf) orelse "";
     // Not freed at exit: the detached worker thread may still be unwinding.
     const katago = try std.heap.page_allocator.create(engine_mod.Worker);
-    katago.init(init.io, init.environ_map);
+    katago.init(init.io, init.environ_map, strong_model, human_model);
     defer katago.shutdown();
     app_state.katago = katago;
     app_state.request_scratch = try std.heap.page_allocator.create(engine_mod.Request);
     app_state.request_scratch.* = .{};
-    app_state.katago_available = katago.engine.available();
-    app_state.katago_version = katago.engine.versionText(&app_state.katago_version_buf);
+    app_state.katago_available = katago.standard().available();
+    app_state.katago_version = katago.standard().versionText(&app_state.katago_version_buf);
     // Not freed at exit either: a check thread may still be finishing.
     const updater = try std.heap.page_allocator.create(update_mod.Checker);
     updater.init(init.io);
@@ -1427,7 +1600,7 @@ pub fn main(init: std.process.Init) !void {
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "Goban Studio",
         .window_title = "Goban Studio",
-        .bundle_id = "dev.hxddh.gobanstudio",
+        .bundle_id = bundle_id,
         .icon_path = "assets/icon.png",
         .js_window_api = true,
         .bridge = app_state.bridge(),
@@ -1442,6 +1615,7 @@ test {
     std.testing.refAllDecls(engine_mod);
     std.testing.refAllDecls(update_mod);
     std.testing.refAllDecls(install_mod);
+    std.testing.refAllDecls(models_mod);
 }
 
 test "production source uses frontend assets" {

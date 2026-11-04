@@ -14,9 +14,25 @@ import { BLACK, WHITE, EMPTY, Game, coordLabel, formatPoints, territoryMap, tree
 import { loadSGF } from "../src/web/js/sgf.js";
 import { execFileSync } from "node:child_process";
 import { chooseMove } from "../src/web/js/ai.js";
-import { STRENGTHS, beginnerMove, moveFromAnalysis, pickCandidate, rankParts, strengthById, suggestHandicap } from "../src/web/js/engine.js";
-import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
-import { parseInfo, parseVertex, positionPayload, katagoRules } from "../src/web/js/katago.js";
+import {
+  HUMAN_VISITS,
+  STRENGTHS,
+  STRONG_VISIT_SCALE,
+  analysisEngine,
+  beginnerMove,
+  humanMoveFromAnalysis,
+  humanRequest,
+  moveFromAnalysis,
+  opponentMode,
+  pickCandidate,
+  rankParts,
+  scaledVisits,
+  strengthById,
+  suggestHandicap,
+} from "../src/web/js/engine.js";
+import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, humanStyleParams, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
+import { enginePayload, parseInfo, parseVertex, positionPayload, katagoRules } from "../src/web/js/katago.js";
+import * as M from "../src/web/js/models.js";
 import * as S from "../src/web/js/solver.js";
 import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
@@ -2010,6 +2026,231 @@ await test("v5: both platform builds test the update helpers, and an Intel Mac b
   const table = Sign.firstLaunchTable(status.macos, status.win, status.macos);
   assert.match(table, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg`/);
   assert.equal(Sign.firstLaunchTable(status.macos, status.win).split("\n").length, 4, "without an Intel status the table keeps its v4 rows");
+});
+
+/* ------------------------------------------------------------ v5 models */
+
+await test("v5: model status replies normalize; the browser preview is unavailable", async () => {
+  const none = M.initialModels();
+  assert.equal(none.available, false);
+  assert.equal(none.human.status, "unavailable");
+  assert.equal(none.strong.total, M.MODELS.strong.bytes);
+  // No host: no call is made and both kinds are unavailable.
+  let called = 0;
+  const invoke = async () => {
+    called++;
+    return {};
+  };
+  assert.deepEqual(await M.fetchStatus({ hasHost: false, invoke }), none);
+  assert.equal((await M.download("human", { hasHost: false, invoke })).ok, false);
+  assert.equal(called, 0);
+  assert.equal(M.canDownload(), false);
+
+  const raw = {
+    available: true,
+    human: { status: "downloading", bytes: 49_533_115, total: 99_066_230, idleMs: 31_000, needed: 0, name: "b18c384nbt-humanv0", error: "" },
+    strong: { status: "failed", bytes: 0, total: 48_038_914, idleMs: 0, needed: 112_000_000, name: "g170e", error: "DiskFull" },
+  };
+  const st = M.normalizeStatus(raw);
+  assert.equal(st.available, true);
+  assert.equal(st.human.status, "downloading");
+  assert.equal(st.human.progress, 0.5);
+  assert.equal(st.human.stalled, true);
+  assert.equal(M.percent(st.human), 50);
+  assert.equal(st.strong.error, "DiskFull");
+  assert.equal(st.strong.needed, 112_000_000);
+  assert.equal(M.needsPolling(st), true);
+  assert.equal(M.isInstalled(st, "human"), false);
+  // An unknown status or a missing record is "unavailable", never "ready".
+  assert.equal(M.normalizeOne("human", { status: "hacked", bytes: 1 }).status, "unavailable");
+  assert.equal(M.normalizeStatus({ available: false, human: raw.human }).human.status, "unavailable");
+  // Bytes are clamped to the file size; ready is 100 %, nothing else is.
+  assert.equal(M.normalizeOne("strong", { status: "partial", bytes: 9e9, total: 100 }).bytes, 100);
+  assert.equal(M.percent(M.normalizeOne("strong", { status: "verifying", bytes: 100, total: 100 })), 99);
+  assert.equal(M.percent(M.normalizeOne("strong", { status: "ready", bytes: 100, total: 100 })), 100);
+});
+
+await test("v5: model actions name a kind only, and report what changed", async () => {
+  const calls = [];
+  const status = { available: true, human: { status: "downloading", bytes: 0, total: 1 }, strong: { status: "absent", bytes: 0, total: 1 } };
+  const invoke = async (command, payload) => {
+    calls.push([command, payload]);
+    return command === "studio.modelStatus" ? status : { ok: true, models: status };
+  };
+  const deps = { hasHost: true, invoke };
+  assert.equal((await M.download("human", deps)).ok, true);
+  await M.cancel("human", deps);
+  await M.remove("strong", deps);
+  await M.fetchStatus(deps);
+  assert.deepEqual(calls, [
+    ["studio.modelDownload", { kind: "human" }],
+    ["studio.modelCancel", { kind: "human" }],
+    ["studio.modelRemove", { kind: "strong" }],
+    ["studio.modelStatus", {}],
+  ]);
+  await assert.rejects(() => M.download("https://example.com/x.bin.gz", deps), /unknown model kind/);
+  // A failing host call is an error result, not an exception.
+  const broken = await M.download("human", { hasHost: true, invoke: async () => Promise.reject(new Error("x")) });
+  assert.deepEqual([broken.ok, broken.error], [false, "Unavailable"]);
+
+  const before = M.normalizeStatus({ available: true, human: { status: "downloading", bytes: 5, total: 10 }, strong: { status: "verifying", bytes: 10, total: 10 } });
+  const after = M.normalizeStatus({ available: true, human: { status: "failed", bytes: 5, total: 10, error: "Network" }, strong: { status: "ready", bytes: 10, total: 10 } });
+  assert.deepEqual(M.transitions(before, after), [
+    { kind: "human", event: "failed" },
+    { kind: "strong", event: "ready" },
+  ]);
+  assert.deepEqual(M.transitions(after, after), []);
+  assert.equal(M.errorKey("DiskFull"), "models.error.DiskFull");
+  assert.equal(M.errorKey("TlsInitializationFailed"), "models.error.generic");
+  for (const e of M.ERROR_KEYS) assert.ok(MESSAGES[`models.error.${e}`], e);
+  assert.equal(M.megabytes(99_066_230), "99");
+  assert.equal(M.megabytes(9_500_000), "9.5");
+});
+
+await test("v5: the opponent mode follows what is installed and the humanStyle setting", () => {
+  const none = { strong: false, human: false, humanStyle: true };
+  const human = { strong: false, human: true, humanStyle: true };
+  const off = { strong: true, human: true, humanStyle: false };
+  const strong = { strong: true, human: false, humanStyle: true };
+  for (const s of STRENGTHS) {
+    assert.equal(opponentMode(s.id, none), "standard", s.id);
+    assert.equal(opponentMode(s.id, human), "human", s.id);
+    assert.equal(opponentMode(s.id, off), s.strong ? "strong" : "standard", s.id);
+  }
+  // The stronger network plays only the top level; everything below keeps
+  // the network its label was measured with.
+  assert.deepEqual(STRENGTHS.filter((s) => opponentMode(s, strong) === "strong").map((s) => s.id), ["2d"]);
+  assert.equal(opponentMode("2d", { ...strong, strongUsable: false }), "standard");
+  assert.equal(DEFAULT_SETTINGS.humanStyle, true);
+  // Analysis uses the stronger network when installed, with fewer visits.
+  assert.equal(analysisEngine(none), "standard");
+  assert.equal(analysisEngine(strong), "strong");
+  assert.equal(scaledVisits(240, "strong"), Math.round(240 * STRONG_VISIT_SCALE));
+  assert.equal(scaledVisits(240, "standard"), 240);
+  assert.equal(scaledVisits(1, "strong"), 1);
+});
+
+await test("v5: every level has a valid human SL profile, in ladder order", () => {
+  // The same rule as engine.zig validProfile.
+  const valid = (p) => /^(rank|preaz)_([1-9]|1\d|20)k$|^(rank|preaz)_[1-9]d$/.test(p);
+  const strengthOf = (p) => {
+    const m = /_(\d+)([kd])$/.exec(p);
+    return m[2] === "k" ? -Number(m[1]) : Number(m[1]);
+  };
+  let prev = -Infinity;
+  let prevBlunder = Infinity;
+  for (const s of STRENGTHS) {
+    assert.ok(s.human && valid(s.human.profile), s.id);
+    assert.ok(!s.human.style || ["raw", "search"].includes(s.human.style), s.id);
+    const v = strengthOf(s.human.profile);
+    assert.ok(v >= prev, `${s.id}: profile weaker than the level below`);
+    const b = s.human.blunder ?? 0;
+    assert.ok(b <= prevBlunder, `${s.id}: more beginner moves than the level below`);
+    assert.ok(b < s.blunder || s.blunder === 0, `${s.id}: human style adds no beginner moves of its own`);
+    prev = v;
+    prevBlunder = b;
+    const req = humanRequest(s.human);
+    assert.equal(req.engine, "human");
+    assert.ok(req.visits >= 1 && req.visits <= 400, s.id);
+  }
+  assert.equal(humanRequest({ profile: "rank_10k" }).visits, HUMAN_VISITS);
+  assert.equal(humanRequest({ profile: "rank_10k", style: "bogus" }).humanStyle, "raw");
+  assert.deepEqual(enginePayload({ engine: "human", profile: "rank_12k", humanStyle: "search" }), { engine: "human", profile: "rank_12k", humanStyle: "search" });
+  assert.deepEqual(enginePayload({ engine: "strong", profile: "x" }), { engine: "strong" });
+  // The standard engine sends exactly the v4 request.
+  assert.deepEqual(enginePayload({}), {});
+});
+
+await test("v5: a human-style move is KataGo's human choice, legal, with beginner moves only below 20 kyu", () => {
+  const game = new Game({ size: 9, komi: 6.5 });
+  game.play(4, 4);
+  const analysis = {
+    moves: [{ x: 2, y: 2, visits: 10, scoreLead: 0.5, winrate: 0.5 }],
+    play: { x: 6, y: 2 },
+  };
+  assert.deepEqual(humanMoveFromAnalysis(game, analysis, { profile: "rank_12k" }), { x: 6, y: 2 });
+  // An illegal choice (occupied) falls back to KataGo's top candidate.
+  assert.deepEqual(humanMoveFromAnalysis(game, { ...analysis, play: { x: 4, y: 4 } }, { profile: "rank_12k" }), { x: 2, y: 2 });
+  // KataGo's pass (its search decides passes) is kept.
+  assert.deepEqual(humanMoveFromAnalysis(game, { moves: [{ pass: true, visits: 10, scoreLead: 0 }], play: { pass: true } }, { profile: "rank_20k", blunder: 1 }), { pass: true });
+  // blunder: 1 always plays a beginner's move when KataGo would not pass.
+  const rnd = mulberry32(7);
+  for (let i = 0; i < 20; i++) {
+    const m = humanMoveFromAnalysis(game, analysis, { profile: "rank_20k", blunder: 1 }, rnd);
+    assert.ok(m && !m.pass && game.canPlay(m.x, m.y).ok);
+  }
+});
+
+await test("v5: the downloader fetches only pinned KataGo release files, verified before use", () => {
+  const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8");
+  const urls = [...zig.matchAll(/\.url = "([^"]+)"/g)].map((m) => m[1]);
+  // No other address is ever built: every http(s) literal outside the specs is a test value.
+  assert.equal([...zig.slice(0, zig.indexOf("// ------------------------------------------------------------------ tests")).matchAll(/"https?:\/\//g)].length, 2);
+  assert.deepEqual(urls, [
+    "https://github.com/lightvector/KataGo/releases/download/v1.15.0/b18c384nbt-humanv0.bin.gz",
+    "https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz",
+  ]);
+  assert.match(zig, /\.sha256 = "637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5"/);
+  assert.match(zig, /\.sha256 = "09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967"/);
+  assert.match(zig, /\.size = 99_066_230/);
+  assert.match(zig, /\.size = 48_038_914/);
+  assert.equal(M.MODELS.human.bytes, 99_066_230);
+  assert.equal(M.MODELS.strong.bytes, 48_038_914);
+  // Only the verified file is renamed into place, inside the models folder.
+  assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
+  assert.match(zig, /renameAbsolute\(part, final/);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
+  // The page names a kind; the payload has no URL or path field.
+  assert.match(main, /const ModelPayload = struct \{\n    kind: \[\]const u8 = "",\n\};/);
+  // The human process: the shipped config, KataGo's human recipe, Black's view.
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8");
+  for (const line of ["humanSLChosenMoveProp = 1.0", "humanSLChosenMoveIgnorePass = true", "reportAnalysisWinratesAs = BLACK", "ignorePreRootHistory = false", "allowResignation = false", "ponderingEnabled = false"]) {
+    assert.ok(cfg.includes(line), line);
+  }
+  assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
+  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
+  assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
+});
+
+await test("v5: the calibration harness sends the app's own human-style parameters", () => {
+  const p = humanStyleParams();
+  assert.equal(p.raw.length, 9);
+  assert.deepEqual(p.raw.map(([k]) => k), p.search.map(([k]) => k));
+  assert.deepEqual(Object.fromEntries(p.search).humanSLChosenMovePiklLambda, "0.08");
+  // The raw style is the shipped human.cfg's starting point.
+  const cfg = fs.readFileSync(path.join(root, "engine/model/human.cfg"), "utf8");
+  for (const [k, v] of p.raw) assert.equal(Number(new RegExp(`^${k} = (\\S+)`, "m").exec(cfg)?.[1]), Number(v), k);
+});
+
+await test("v5: the strings are one block in four languages", () => {
+  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
+  assert.equal(src.split("// v5 models").length, 2);
+  const block = src.slice(src.indexOf("// v5 models"));
+  const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("models."));
+  assert.ok(keys.length >= 30);
+  for (const k of keys) assert.ok(block.includes(`"${k}"`), `${k} outside the v5 block`);
+  for (const k of ["models.title", "models.download", "models.cancel", "models.remove", "models.humanStyle", "models.unavailable", "models.error.generic"]) {
+    for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
+  }
+  // Placeholders agree across languages.
+  for (const k of keys) {
+    const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
+    const en = holes(MESSAGES[k].en);
+    for (const lang of LANG_IDS) assert.equal(holes(MESSAGES[k][lang]), en, `${k} ${lang}`);
+  }
+});
+
+await test("v5: the packaged self-test checks the downloads only when the workflow asks", () => {
+  const st = fs.readFileSync(path.join(root, "src/web/js/selftest.js"), "utf8");
+  assert.match(st, /if \(cfg\.models\) await modelChecks\(checks, report\)/);
+  for (const k of ["modelsResume", "modelsHuman", "modelsStrong", "modelsRemove"]) assert.ok(st.includes(`checks.${k} =`), k);
+  const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8");
+  assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);
+  assert.match(app, /fs\.rmSync\(modelsDir/);
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  assert.match(main, /GOBAN_SELFTEST_MODELS/);
+  assert.match(main, /GOBAN_MODELS_DIR/);
 });
 
 if (failures) {
