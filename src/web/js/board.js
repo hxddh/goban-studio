@@ -686,6 +686,37 @@ export class BoardView {
       }
       return;
     }
+    if (mark.type === "book") {
+      // v6 explorer: book continuations in the accent (a filled disc for
+      // book moves, a ring for KataGo's other candidates); mistakes in
+      // --bad. The letter matches the row in the panel.
+      const bad = mark.tag === "mistake";
+      const col = bad ? BAD : ACCENT;
+      const rr = g.cell * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      if (mark.inBook && !bad) {
+        ctx.globalAlpha = mark.tag === "joseki" ? 0.9 : 0.62;
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff";
+      } else {
+        ctx.fillStyle = theme.base;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.2, g.cell * 0.06);
+        ctx.strokeStyle = col;
+        ctx.stroke();
+        ctx.fillStyle = col;
+      }
+      if (mark.label) {
+        ctx.font = `600 ${Math.max(9, g.cell * 0.4)}px ${this.font}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(mark.label, cx, cy + 0.5);
+      }
+      return;
+    }
     if (mark.type === "area") {
       ctx.fillStyle = mark.tone === "good" ? "rgba(63,138,90,0.28)" : "rgba(192,69,47,0.26)";
       const h = g.cell * 0.5;

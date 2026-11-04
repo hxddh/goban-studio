@@ -14,6 +14,7 @@ import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
+import { BookExitNote } from "./explorer.jsx";
 
 export function rankLabel(id) {
   const r = rankParts(id);
@@ -876,6 +877,7 @@ function ReviewPanel() {
         <>
           <Chart />
           <LiveLine />
+          <BookExitNote game={r.game} onGoto={C.reviewGoto} />
           {(r.analyzing || r.engine !== "katago") && (
             <p class="fine" aria-live="polite">
               {r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}

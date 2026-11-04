@@ -809,6 +809,78 @@ await test("every key the v3 views use is in the string table", () => {
   for (const [key, v] of Object.entries(MESSAGES)) for (const l of ["zh", "en", "ko", "ja"]) assert.ok(v[l]?.trim(), `${key} ${l}`);
 });
 
+await test("v6 explorer: book moves, out of the book, back/forward, reset and play from here", async () => {
+  const esbuild = await import("esbuild");
+  const out = await esbuild.build({
+    stdin: {
+      contents: ['export * as X from "./src/web/js/app/explorer-ctl.js";', 'export { state } from "./src/web/js/app/store.js";', 'export * as P from "./src/web/js/persist.js";', 'export { loadSGF } from "./src/web/js/sgf.js";'].join("\n"),
+      resolveDir: root,
+      loader: "js",
+    },
+    bundle: true,
+    format: "esm",
+    platform: "neutral",
+    mainFields: ["module", "main"],
+    loader: { ".json": "json" },
+    write: false,
+    logLevel: "error",
+  });
+  const { X, state, P, loadSGF } = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  state.settings = { ...P.DEFAULT_SETTINGS };
+  state.progress = P.loadProgress();
+  state.engine = { available: false };
+  X.openExplorer("whole");
+  assert.equal(state.space, "library");
+  assert.equal(state.library.explorer, "whole");
+  assert.ok(X.explorerBook(), "the empty board is in the book");
+  const first = X.explorerCandidates();
+  assert.ok(first.length >= 4 && first.every((c) => c.label), "candidates carry letters");
+  // Q16 is a book move; the verdict comes from the book.
+  X.explorerPlay(15, 3);
+  assert.ok(X.explorerBook());
+  const v = X.lastMoveVerdict();
+  assert.ok(v && v.inBook && v.tag === "joseki", JSON.stringify(v));
+  assert.ok(X.explorerEval().source === "book");
+  // A first-line move leaves the book: no candidates offline.
+  X.explorerPlay(0, 0);
+  assert.equal(X.explorerBook(), null);
+  assert.deepEqual(X.explorerCandidates(), []);
+  X.explorerStep(-1);
+  assert.equal(X.explorerMoveCount(), 1);
+  X.explorerStep(1);
+  assert.equal(X.explorerMoveCount(), 2);
+  X.explorerReset();
+  assert.equal(X.explorerMoveCount(), 0);
+  X.explorerStep(1);
+  X.explorerStep(1);
+  assert.equal(X.explorerMoveCount(), 2, "forward follows the line after a reset");
+  X.explorerStep(-1);
+  // The corner tree keeps its own position; the whole board is kept too.
+  X.setExplorerMode("corner");
+  assert.equal(X.explorerMoveCount(), 0);
+  assert.equal(state.explorer.game.root.board.signMap.flat().filter(Boolean).length, 4, "the corner setup");
+  X.explorerPlay(15, 3);
+  X.explorerPlay(16, 5);
+  assert.ok(X.explorerBook(), "star point, small knight's approach");
+  X.setExplorerMode("whole");
+  assert.equal(X.explorerMoveCount(), 1);
+  X.setExplorerMode("corner");
+  // Play from here: a game against the computer with the setup and the line.
+  X.explorerPlayFromHere();
+  assert.equal(state.space, "play");
+  const g = state.game.game;
+  assert.equal(g.mainLine().length, 3);
+  assert.equal(g.root.board.signMap.flat().filter(Boolean).length, 4);
+  assert.equal(state.game.humanColor, BLACK);
+  assert.equal(state.game.opponent, "ai");
+  // Review: where a game leaves the whole-board book (this SGF reader skips "i" in columns).
+  const { game } = loadSGF("(;GM[1]SZ[19];B[qd];W[dp];B[qp];W[aa];B[dd])");
+  assert.equal(X.bookExit(game), 3);
+  assert.equal(X.bookExit(loadSGF("(;GM[1]SZ[9];B[ee])").game), null);
+  X.closeExplorer();
+  assert.equal(state.library.explorer, null);
+});
+
 if (failures) {
   console.error(`\n${count} passed; ${failures} failed.`);
   process.exit(1);

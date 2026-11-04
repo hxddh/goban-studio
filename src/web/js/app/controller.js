@@ -25,6 +25,7 @@ import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
+import { closeExplorer } from "./explorer-ctl.js";
 
 export * from "./ctl-core.js";
 export * from "./play-ctl.js";
@@ -32,6 +33,7 @@ export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
+export * from "./explorer-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -85,6 +87,8 @@ export function goSpace(space) {
       dropReview();
       return update();
     }
+    // v6 explorer: Library again closes the explorer.
+    if (space === "library" && state.library.explorer) return closeExplorer();
     return;
   }
   remember();
