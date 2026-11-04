@@ -135,7 +135,7 @@ export function openRecord(id) {
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", startAt: 0 });
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
@@ -148,7 +148,7 @@ export function openClassic(id) {
   try {
     const { game } = loadSGF(c.sgf);
     markClassic(state.progress, c.id);
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: 0, space: "library", back: "library" });
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moment, autoJump: c.moment == null, space: "library", back: "library" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }
@@ -199,7 +199,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
     setSetting("onboarded", true);
     update({ sheet: null });
   }
-  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", startAt: 0 });
+  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
   if (warnings.length) toast(warnings[0], "warn");
 }
 

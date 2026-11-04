@@ -230,6 +230,15 @@ function WeekStrip() {
     { n: w.solved, key: "week.problems" },
     { n: w.lessons, key: "week.lessons" },
   ];
+  // Nothing yet this week: one quiet line instead of a row of zeros.
+  if (!w.played && !w.solved && !w.lessons && !w.delta) {
+    return (
+      <section class="section week enter-up" aria-label={t("week.title")}>
+        <h2 class="section-title">{t("week.title")}</h2>
+        <p class="muted week-empty">{t("week.empty")}</p>
+      </section>
+    );
+  }
   return (
     <section class="section week enter-up" aria-label={t("week.title")}>
       <h2 class="section-title">{t("week.title")}</h2>

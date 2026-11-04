@@ -1406,6 +1406,20 @@ await test("v5: a backup carries every stored key and restores it", async () => 
   assert.equal(P.checkBackup({ ...doc, data: { ...doc.data, settings: "x" } }).error, "damaged");
 });
 
+await test("v6 ui: a tight problem window widens towards the open side", async () => {
+  const { windowOf } = await import("../src/web/js/board.js");
+  // A bottom-right corner problem on 19×19: grows up and left only.
+  assert.deepEqual(windowOf({ x0: 13, y0: 13, x1: 18, y1: 18 }, 19), { x0: 10, y0: 10, x1: 18, y1: 18 });
+  // A centred window grows on both sides.
+  const w = windowOf({ x0: 8, y0: 8, x1: 10, y1: 10 }, 19);
+  assert.equal(w.x1 - w.x0, 8);
+  assert.ok(w.x0 >= 4 && w.x1 <= 14);
+  // A wide window keeps its width; a 9×9 board never goes past its edges.
+  assert.deepEqual(windowOf({ x0: 0, y0: 14, x1: 18, y1: 18 }, 19), { x0: 0, y0: 10, x1: 18, y1: 18 });
+  assert.deepEqual(windowOf({ x0: 2, y0: 2, x1: 4, y1: 4 }, 9), { x0: 0, y0: 0, x1: 8, y1: 8 });
+  assert.deepEqual(windowOf(null, 13), { x0: 0, y0: 0, x1: 12, y1: 12 });
+});
+
 await test("v5: a restore that cannot write leaves the old data in place", async () => {
   const P = await import("../src/web/js/persist.js");
   const doc = { app: "goban-studio", format: 1, version: "5.0.0", exportedAt: "2026-11-04T00:00:00.000Z", data: { settings: { lang: "ja" }, library: { v: 2, games: [{ id: "new" }] } } };

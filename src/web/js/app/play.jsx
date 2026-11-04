@@ -12,7 +12,7 @@ import { ataris } from "./insight.js";
 import { storyText } from "./story.js";
 import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
-import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
+import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 
 export function rankLabel(id) {
@@ -247,7 +247,19 @@ function MoveStrip() {
         <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>
       )}
       {line.length === 0 ? (
-        <p class="moves-empty">{t("play.noMoves")}</p>
+        <div class="moves-empty">
+          <p>{t("play.noMoves")}</p>
+          <dl class="key-hints">
+            <dt>{t("play.hint.click")}</dt>
+            <dd>{t("play.hint.place")}</dd>
+            <dt>{`${MOD}${SHIFT}P`}</dt>
+            <dd>{t("common.pass")}</dd>
+            <dt>{`${MOD}Z`}</dt>
+            <dd>{t("common.undo")}</dd>
+            <dt>{`${MOD}${SHIFT}R`}</dt>
+            <dd>{t("review.title")}</dd>
+          </dl>
+        </div>
       ) : (
         <ol class="move-grid" ref={ref}>
           {line.map((n, k) => {
@@ -863,13 +875,29 @@ function noMistakesText(r) {
   return lost ? t("review.noKeyMovesBehind") : t("review.noKeyMoves");
 }
 
+/** Which review tab is open; remembered for the session, not saved. */
+let reviewTab = "analysis";
+
 function ReviewPanel() {
   const r = state.review;
   const meta = r.meta;
   const line = r.game.mainLine();
   const progress = r.analyzing ? Math.round((r.analyzed / line.length) * 100) : 100;
+  // The summary only says what the analysis can back: never for the
+  // offline estimate, which can only point at turning points.
+  const hasSummary = r.summary?.confidence === "high" && r.summary.phases?.length > 0;
+  const tabs = [
+    { value: "analysis", label: t("review.tab.analysis") },
+    ...(hasSummary ? [{ value: "summary", label: t("review.tab.summary") }] : []),
+    { value: "notes", label: t("review.tab.notes") },
+  ];
+  const tab = tabs.some((x) => x.value === reviewTab) ? reviewTab : "analysis";
+  const setTab = (v) => {
+    reviewTab = v;
+    update();
+  };
   return (
-    <aside class="panel" aria-label={t("review.title")}>
+    <aside class="panel review-panel" aria-label={t("review.title")}>
       {r.guess ? (
         <GuessCard />
       ) : (
@@ -881,36 +909,45 @@ function ReviewPanel() {
               {r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}
             </p>
           )}
-          <section class="key-moves">
-            <h2 class="slot-title">{t("review.keyMoves")}</h2>
-            {r.refining && <p class="fine">{t("story.refining")}</p>}
-            {r.keyMoves.length ? (
-              <ol>
-                {r.keyMoves.map((km) => (
-                  <KeyMove km={km} />
-                ))}
-              </ol>
-            ) : (
-              <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
+          <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
+          <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
+            {tab === "analysis" && (
+              <>
+                <section class="key-moves">
+                  {r.refining && <p class="fine">{t("story.refining")}</p>}
+                  {r.keyMoves.length ? (
+                    <ol>
+                      {r.keyMoves.map((km) => (
+                        <KeyMove km={km} />
+                      ))}
+                    </ol>
+                  ) : (
+                    <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
+                  )}
+                </section>
+                <Variations />
+                {meta.classic && (
+                  <section class="quiet-note">
+                    <p>{C.tx(meta.classic.note)}</p>
+                    {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
+                  </section>
+                )}
+                {meta.opening && (
+                  <section class="quiet-note">
+                    <p>{C.tx(meta.opening.text)}</p>
+                  </section>
+                )}
+              </>
             )}
-          </section>
-          <GameSummary />
-          <Variations />
-          <TreeView />
-          <EditSection />
+            {tab === "summary" && <GameSummary />}
+            {tab === "notes" && (
+              <>
+                <EditSection />
+                <TreeView />
+              </>
+            )}
+          </div>
         </>
-      )}
-
-      {meta.classic && (
-        <section class="quiet-note">
-          <p>{C.tx(meta.classic.note)}</p>
-          {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
-        </section>
-      )}
-      {meta.opening && !r.guess && (
-        <section class="quiet-note">
-          <p>{C.tx(meta.opening.text)}</p>
-        </section>
       )}
 
       <div class="panel-foot">
@@ -932,7 +969,6 @@ function GameSummary() {
   const fmt = (v) => (v == null ? "—" : formatPoints(Math.round(v * 2) / 2));
   return (
     <section class="game-summary">
-      <h2 class="slot-title">{t("gameSummary.title")}</h2>
       <table class="phase-table">
         <thead>
           <tr>
