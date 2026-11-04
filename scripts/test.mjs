@@ -2459,6 +2459,29 @@ await test("v6 strength: the calibration fit can hold the measured ladder and pl
   assert.equal(Math.round(row("L:c").gor), Math.round(SE.thetaToGoR(9)));
 });
 
+await test("v6 strength: human-style and stronger-network labels follow the v6 measurement", async () => {
+  const E = await import("../src/web/js/engine.js");
+  // Moved only where both boards agreed (docs/strength.md).
+  assert.equal(E.labelRank("5k", "human"), 3);
+  assert.equal(E.labelRank("1k", "human"), 0);
+  assert.equal(E.labelRank("2d", "strong"), -4);
+  for (const id of ["30k", "25k", "20k", "15k", "10k", "2d"]) assert.equal(E.labelRank(id, "human"), strengthById(id).rank, id);
+  for (const s of STRENGTHS) assert.equal(E.labelRank(s.id, "standard"), s.rank);
+  assert.deepEqual(rankParts("5k", "human"), { n: 3, unit: "kyu" });
+  assert.deepEqual(rankParts("2d", "strong"), { n: 5, unit: "dan" });
+  assert.deepEqual(rankParts("5k", "standard"), { n: 7, unit: "kyu" });
+  // Every mode's measured strength is ordered as its labels are, on 19×19.
+  for (const mode of ["standard", "human"]) {
+    for (let i = 1; i < STRENGTHS.length; i++) {
+      const a = SE.levelTheta(STRENGTHS[i - 1].id, { mode });
+      const b = SE.levelTheta(STRENGTHS[i].id, { mode });
+      assert.ok(b > a, `${mode} ${STRENGTHS[i].id}`);
+    }
+  }
+  assert.ok(SE.levelTheta("2d", { mode: "strong" }) > SE.levelTheta("2d"));
+  assert.ok(SE.levelTheta("2d", { mode: "strong", size: 9 }) > SE.levelTheta("2d", { size: 9 }));
+});
+
 await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {
   const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
   const block = src.slice(src.indexOf("// v6 strength"));

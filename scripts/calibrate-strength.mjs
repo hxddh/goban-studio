@@ -16,6 +16,7 @@
  *          node scripts/calibrate-strength.mjs play ... --size 19 --pairs "L:10k-L:5k,L:5k-H:rank_5k" \
  *            --human-model b18c384nbt-humanv0.bin.gz
  *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [--size 19] [--anchor rank_10k] [--boot 1000]
+ *            [--fixed]   (v6: hold the L: ladder at its v4 measurement; needs --size 9 or 19)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
  * Players:
