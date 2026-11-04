@@ -131,3 +131,152 @@ drops it and keeps the learner's place (`todaysDaily()` in
   old ones are dead on a real board.
 - Ko is still decided by the ko-master model. Every ko counts against the
   learner unless the problem says `ko: "ok"`.
+
+# v5: 509 problems
+
+v5 adds 247 problems to the 262 that passed the v4 audit, for 509. Every
+one is proved by the same check as before (`scripts/check-problems.mjs`):
+real-board rules (`replay`), sealed life and death (`outsideReach()`), one
+to three correct first moves, an answer line that wins, a measured grade, no
+duplicate under the 8 symmetries or colour swap, and the per-problem time
+limit. No existing problem changed: the 262 kept their ids, diagrams,
+answers and scores.
+
+## Themes
+
+| theme | v4 | v5 | | theme | v4 | v5 |
+| --- | --- | --- | --- | --- | --- | --- |
+| vital-point | 65 | 93 | | net | 11 | 23 |
+| placement | 28 | 54 | | escape | 9 | 21 |
+| eye-space | 5 | 23 | | cut | 6 | 18 |
+| seki | 13 | 23 | | connect-and-die | 6 | 18 |
+| race | 10 | 22 | | atari | 7 | 17 |
+| ladder | 19 | 22 | | connect | 6 | 16 |
+| capture-eye | 16 | 21 | | capture-to-save | 5 | 15 |
+| false-eye | 4 | 19 | | double-atari | 6 | 15 |
+| ko | 10 | 19 | | throw-in | 6 | 15 |
+| race-big-eye | 3 | 16 | | snapback | 6 | 14 |
+| race-outside | 10 | 12 | | race-eye | 5 | 7 |
+| shortage | 6 | 6 | | | | |
+
+The thin themes are filled: eye-space 23, false-eye 19 (15 new, 2 of them
+"keep the eye real" life problems), ko 19 (5 kill and 4 live with a ko;
+`ko: "ok"` only on these, as the check enforces), seki 23 (10 new, 9 of
+them in grades 1 to 3, so seki no longer starts at grade 4) and big eye
+against small eye 16. Topics: kill 143, life 109, capture 76, race 57,
+technique 53, escape 38, connect 33.
+
+## Grades
+
+The grade cuts (`GRADE_CUTS` in `problems.js`) are again the quintiles of the
+set's measured scores: 6.1 / 7.6 / 9.1 / 10.8 (v4: 6.1 / 7.7 / 9.5 / 11.6).
+Grades 1 to 5 hold 100 / 103 / 98 / 103 / 105 problems (the new problems:
+47 / 52 / 47 / 61 / 40). With the lower cuts, 33 v4 problems moved up one
+grade; none moved down. The largest theme share of any grade is 24%
+(vital-point in grade 5), under the 40% limit.
+
+## How the new problems were made
+
+They were not written one by one. Small generators built candidate
+positions in a canonical frame (the top-left corner or the top edge), the
+solver proved them, and the survivors were filtered, placed on the board
+and reviewed:
+
+- **Life and death.** A random eye space along the edge or in the corner
+  (three to eight points on the first two or three lines), a solid defender
+  wall around it and an attacker wall outside that, so the region is sealed
+  by construction. Variants open one first-line end, cut the wall at one
+  point (the source of the false-eye problems), or place up to three stones
+  of either colour inside the eye space; every placement was tried, not
+  sampled. Themes come from the answer: a kill inside the eye space is
+  `placement`, a move against the outer wall is `eye-space` (reduce or
+  widen), a capture that makes an eye is `capture-eye`, a learner move that
+  takes or protects the diagonal point of an eye whose stones are not
+  connected is `false-eye`. A named shape tag is given only when the
+  defender's whole eye space is exactly that shape and the answer is its
+  vital point.
+- **Seki and ko.** The same frames with attacker stones inside, under goal
+  `seki`, or with the learner as ko master (`ko: "ok"`). The check then
+  proves there is no independent life (seki) or no unconditional answer
+  (ko).
+- **Races.** Two blocks racing along the edge, with the walls of both
+  colours outside, outside liberties grown from the closing row, shared
+  liberty columns and eyes of 1 to 5 points (straight and bent three,
+  square and pyramid four, bulky five). `race-eye` is only used when Black
+  has the eye and White has none, since that is what its hint says; `race-
+  outside` only when every correct move is an outside liberty.
+- **Tesuji.** A white key chain of one to three stones near the edge with a
+  few stones of each colour around it (or the mirror for escape problems),
+  on an open diagram as in v2. The answer line is replayed to name the idea:
+  a first stone that White captures and Black retakes on the same point
+  (snapback), a sacrificed first stone (throw-in), two chains in atari at
+  once, a first move that does not touch the key stones (net), a run of
+  ataris (ladder), an atari that White extends into a bigger capture
+  (connect and die), a move between two white chains (cut), and for escape
+  problems a capture, a connection or an extension.
+
+Filters before review: a unique answer (two at most for life and death;
+three only in a few races), a solver score of at least 3 (no "the stones are
+already in atari" positions), no attacker stones stranded on the first line
+inside the group, no near-copies (two or fewer points different from an
+earlier pick of the same kind), and a proof under 0.4 s when generated and
+under 0.6 s on the board. Life, live-ko, seki and escape positions were
+generated with White to play and were colour-swapped, so Black is always the
+learner. Each problem was then placed in one of the four corners or on one
+of the four sides; proof time depends on move order, which follows the
+coordinates, so a slow orientation was swapped for a fast one. The slowest
+new problem takes 0.31 s on a loaded 4-core machine (the slowest overall is
+still a v4 ladder at about 0.55 s), and the whole check takes about 17 s.
+
+Every pick was looked at as a diagram with its answer and line; 30 were
+rejected by eye (odd stones inside the wall, three near-identical false-eye
+shapes, trivial races) and replaced. One new id, `life-capture-eye-18`, had
+been used by a problem removed in v4, so the new problem is
+`life-capture-eye-23`; new ids otherwise continue after the highest v4
+number of each family and never reuse a removed id.
+
+## What was added beyond themes
+
+- 8 more classic-shape problems (straight three, bent three, bulky five,
+  rabbity six; 28 in all). The shapes are now defined point by point in the
+  comment above `SHAPES`.
+- `kill-two-one-01` … `-06`: corner kills whose answer is the 2-1 point,
+  with their own title and hint (`problem.twoOne.*` in `messages.js`).
+
+## Skipped, and why
+
+- **Endgame (yose).** The solver answers a yes/no question (are the key
+  stones captured?). A sound endgame problem needs a scoring search to the
+  end of every line, a choice of counting (Japanese territory counting and
+  area counting differ by a point in exactly the small sealed regions such a
+  problem uses), and a different result in the app (a score, not
+  "solved"/"lost"). That is a new solver mode and new practice screens, not
+  content, so no endgame topic was added.
+- **L-group, J-group, carpenter's square, comb shape.** I could not pin down
+  their exact textbook diagrams with certainty, and the one reconstruction
+  tried (the carpenter's square) was killed outright instead of giving its
+  known ko, so naming any of them could mislabel a problem.
+- **Bent four in the corner.** Still not accepted as life or as a kill: the
+  solver resolves it as a ko, while Japanese rules call it dead.
+- **Under the stones.** The solver handles it (captured points are back in
+  play), but no problem is built on it. Replaying every answer line, the
+  only ones where the learner plays on a point from which two or more of
+  their own stones were just captured, and captures, are `race-55` (filling
+  White's three-point eye, the usual way a big eye is filled) and the v4
+  `life-ko-06`; neither is the tesuji. I did not hand-make one I could check
+  move by move.
+- **Ladder breakers.** A capture problem's chase is bounded by its diagram,
+  so a ladder breaker has to sit inside it; only three new ladders were
+  added, none built around a breaker. Grade 5 already holds most ladders.
+- **Shortage of liberties, eye versus no eye, outside liberties.** These
+  grew little or not at all (6, 7, 12): the generators found few clean
+  cases, and the thin themes named above came first.
+
+## Remaining limits
+
+- The tesuji positions are small and open, like the v2 ones: a key chain and
+  a handful of stones on an otherwise empty edge or corner.
+- Themes of generated problems come from the rules above, not from a
+  teacher; a few labels (for instance `eye-space` for a live problem whose
+  answer blocks a hane rather than widening the space) are approximate.
+- The review was done by a language model, not a strong human player.

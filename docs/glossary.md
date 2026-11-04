@@ -99,6 +99,7 @@ in this table. Usage targets:
 | seven stones on the second line ("six die, eight live") | 二路七子（六死八活） | seven stones on the second line (six die, eight live) | 2선의 일곱 점 (육사팔활) | 二線の七子（六死八活） | v4 `shape.second-line-seven` |
 | independent life (two eyes, as opposed to seki) | 净活 | independent life | 완생 | 完全な生き | used in docs and code comments; the UI says "live" / "seki" |
 | classic shapes (collection) | 基本死活形 | classic shapes | 사활의 기본형 | 死活の基本形 | v4 `practice.shapes` |
+| 2-1 point (corner: first line, next to the 2-2 point) | 二一路 | the 2-1 point | 2·1의 급소 / 2의 1 | 二の一 | v5 `problem.twoOne.title`: problem title for corner kills whose answer is the 2-1 point; see review list |
 
 ## Capturing races
 
@@ -240,3 +241,6 @@ The items I am least sure about:
    (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
    for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
    collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.
+9. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
+   **二一路** and ko **2·1의 급소** (also written 2의 1) follow the same pattern,
+   but a native reviewer should confirm them.
