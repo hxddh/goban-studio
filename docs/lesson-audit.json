@@ -1,0 +1,8703 @@
+{
+ "network": "g170e-b15c192-s1672170752-d466197061",
+ "rootVisits": 1600,
+ "moveVisits": 600,
+ "runId": "41957657141",
+ "generated": "2026-11-05",
+ "summary": {
+  "placeSteps": 107,
+  "judged": 94,
+  "ruleSteps": 13,
+  "losing": [
+   "connect-hanging#1",
+   "life-eye#1",
+   "game-territory#1",
+   "game-score#2",
+   "game-order#2",
+   "game-order#3",
+   "game-opening#3",
+   "game-dead#1",
+   "game-dead#2",
+   "opening-extension#2",
+   "joseki-33-white#3",
+   "shape-empty-triangle#1",
+   "shape-empty-triangle#2",
+   "shape-bamboo#1",
+   "shape-bamboo#2",
+   "shape-ponnuki#1",
+   "endgame-sente-gote#1",
+   "endgame-sente-gote#2",
+   "endgame-sente-gote#3",
+   "endgame-reverse-sente#2",
+   "adv-judge-toward-thickness#1"
+  ],
+  "doubtful": [
+   "game-opening#1",
+   "game-opening#2",
+   "opening-extension#3",
+   "opening-big-urgent#1",
+   "opening-big-urgent#3",
+   "joseki-attach#3",
+   "endgame-order#1"
+  ],
+  "topMissing": [
+   "connect-hanging#1",
+   "life-eye#1",
+   "life-false-eye#1",
+   "game-territory#1",
+   "game-score#2",
+   "game-order#2",
+   "game-order#3",
+   "game-opening#2",
+   "game-opening#3",
+   "game-dead#1",
+   "game-dead#2",
+   "opening-extension#1",
+   "opening-extension#2",
+   "opening-extension#3",
+   "opening-big-urgent#2",
+   "opening-big-urgent#3",
+   "joseki-33-invasion#2",
+   "joseki-33-white#3",
+   "joseki-approach#2",
+   "joseki-approach#3",
+   "joseki-why#2",
+   "shape-empty-triangle#1",
+   "shape-empty-triangle#2",
+   "shape-bamboo#1",
+   "shape-bamboo#2",
+   "shape-peep#1",
+   "shape-peep#2",
+   "shape-head-two#1",
+   "shape-head-two#2",
+   "shape-ponnuki#1",
+   "shape-jump#1",
+   "shape-jump#2",
+   "endgame-sente-gote#1",
+   "endgame-sente-gote#2",
+   "endgame-sente-gote#3",
+   "endgame-reverse-sente#2",
+   "endgame-order#0",
+   "endgame-order#1",
+   "fight-attack-distance#2",
+   "fight-split#1",
+   "adv-judge-toward-thickness#1",
+   "adv-judge-away#1",
+   "adv-invade-where#1",
+   "adv-invade-where#2",
+   "adv-invade-33#1",
+   "adv-reduce-shoulder#1",
+   "adv-reduce-shoulder#2"
+  ],
+  "equalAlternatives": [
+   "connect-hanging#1",
+   "connect-cut#0",
+   "life-eye#1",
+   "life-eye#2",
+   "life-false-eye#1",
+   "game-territory#1",
+   "game-score#1",
+   "game-score#2",
+   "game-order#1",
+   "game-order#2",
+   "game-order#3",
+   "game-opening#2",
+   "game-opening#3",
+   "game-end#2",
+   "game-dead#1",
+   "game-dead#2",
+   "opening-enclose-approach#1",
+   "opening-enclose-approach#2",
+   "opening-enclose-approach#3",
+   "opening-extension#1",
+   "opening-extension#2",
+   "opening-extension#3",
+   "opening-pincer#1",
+   "opening-pincer#2",
+   "opening-big-urgent#2",
+   "opening-big-urgent#3",
+   "opening-review#1",
+   "opening-review#2",
+   "joseki-33-invasion#1",
+   "joseki-33-invasion#2",
+   "joseki-33-invasion#3",
+   "joseki-33-invasion#4",
+   "joseki-33-white#0",
+   "joseki-33-white#3",
+   "joseki-approach#1",
+   "joseki-approach#2",
+   "joseki-approach#3",
+   "joseki-attach#1",
+   "joseki-attach#2",
+   "joseki-why#2",
+   "shape-empty-triangle#1",
+   "shape-empty-triangle#2",
+   "shape-bamboo#1",
+   "shape-bamboo#2",
+   "shape-peep#1",
+   "shape-peep#2",
+   "shape-head-two#1",
+   "shape-head-two#2",
+   "shape-ponnuki#1",
+   "shape-jump#1",
+   "shape-jump#2",
+   "endgame-sente-gote#1",
+   "endgame-sente-gote#2",
+   "endgame-sente-gote#3",
+   "endgame-first-line#3",
+   "endgame-double-sente#2",
+   "endgame-reverse-sente#2",
+   "endgame-order#0",
+   "endgame-order#1",
+   "fight-attack-distance#2",
+   "fight-split#1",
+   "fight-split#2",
+   "adv-judge-bigger#1",
+   "adv-judge-bigger#2",
+   "adv-judge-toward-thickness#1",
+   "adv-judge-away#1",
+   "adv-invade-where#1",
+   "adv-invade-where#2",
+   "adv-invade-33#1",
+   "adv-reduce-shoulder#1",
+   "adv-reduce-shoulder#2",
+   "adv-middle-attack-gain#1",
+   "adv-middle-attack-gain#2"
+  ],
+  "readSteps": 51,
+  "claimsChecked": 16,
+  "claimsFailed": [
+   "game-score#0",
+   "game-dead#0",
+   "opening-big-urgent#0",
+   "endgame-sente-gote#0",
+   "endgame-reverse-sente#0"
+  ],
+  "review": 37,
+  "errors": []
+ },
+ "results": [
+  {
+   "id": "stones-board#0",
+   "kind": "read",
+   "text": "Go is played on the points where the lines cross, not inside the squares. Black plays first, then the players take turns placing one stone. Stones never move once they are placed.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "stones-board#1",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "Try it: put your first black stone on the point in the very middle of the board.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.1,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -0.2,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.1,
+     "gain": 0.1
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -0.3,
+     "gain": 0
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -0.2,
+     "gain": 0.1
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": -0.2,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "stones-board#2",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "Stones of one colour that touch along a line are joined into one group. Place a stone right next to your black stone.",
+   "rootLead": -0.3,
+   "bestWhole": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C6",
+    "value": -0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C6",
+    "value": -0.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -2,
+     "loss": 1.8,
+     "lossWhole": 1.8,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -0.8,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -2.2,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -2.4,
+     "loss": 2.2,
+     "lossWhole": 2.2,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": -0.3,
+     "gain": 0.5
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": -0.5,
+     "gain": 0.3
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C6",
+     "value": -0.2,
+     "gain": 0.6
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -0.3,
+     "gain": 0.6
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -0.3,
+     "gain": 0.5
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": -0.8,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "stones-board#3",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "These two black stones only touch diagonally, so they are not joined yet. Join them with one stone.",
+   "rootLead": 9.9,
+   "bestWhole": {
+    "x": 5,
+    "y": 6,
+    "vertex": "F3",
+    "value": 10.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 6,
+    "vertex": "F3",
+    "value": 10.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": 2.1,
+     "loss": 8.4,
+     "lossWhole": 8.4,
+     "verdict": "loses"
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 2,
+     "loss": 8.5,
+     "lossWhole": 8.5,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": 10.5,
+     "gain": 8.4
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 10.5,
+     "gain": 8.4
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": 9.5,
+     "gain": 7.4
+    },
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": 9.1,
+     "gain": 7
+    },
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": 9,
+     "gain": 6.9
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 9.4,
+     "gain": 7.3
+    },
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 9.4,
+     "gain": 7.3
+    }
+   ]
+  },
+  {
+   "id": "stones-liberties#0",
+   "kind": "read",
+   "text": "The empty points right next to a stone are its liberties. A stone in the middle has four, a stone on the edge three, and a stone in the corner only two.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "stones-liberties#1",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "Playing on a liberty of an enemy stone takes it away. Play right next to the white stone to take one of its liberties.",
+   "rootLead": -12,
+   "bestWhole": {
+    "x": 6,
+    "y": 3,
+    "vertex": "G6",
+    "value": -11.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 3,
+    "vertex": "G6",
+    "value": -11.9,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -14.3,
+     "loss": 2.5,
+     "lossWhole": 2.5,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -14,
+     "loss": 2.1,
+     "lossWhole": 2.1,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -14.1,
+     "loss": 2.2,
+     "lossWhole": 2.2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -14.2,
+     "loss": 2.3,
+     "lossWhole": 2.3,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": -11.9,
+     "gain": 2
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -11.9,
+     "gain": 2
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": -12,
+     "gain": 2
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": -12,
+     "gain": 1.9
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": -11.9,
+     "gain": 2.1
+    },
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": -11.9,
+     "gain": 2.1
+    }
+   ]
+  },
+  {
+   "id": "stones-liberties#2",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "This white stone on the edge started with three liberties and Black has taken one. Take another.",
+   "rootLead": -0.1,
+   "bestWhole": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": -0.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 2,
+    "vertex": "D7",
+    "value": -0.3,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 0,
+     "vertex": "F9",
+     "value": -7,
+     "loss": 6.8,
+     "lossWhole": 6.9,
+     "verdict": "loses"
+    },
+    {
+     "x": 4,
+     "y": 1,
+     "vertex": "E8",
+     "value": -0.5,
+     "loss": 0.3,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": -0.3,
+     "gain": 0.3
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": -0.4,
+     "gain": 0.1
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -0.5,
+     "gain": 0
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": -0.3,
+     "gain": 0.2
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": -0.6,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "stones-capture#0",
+   "kind": "read",
+   "text": "When stones lose their last liberty they are captured: lifted off and kept as prisoners. The white stone here has one liberty left, the marked point. It is in atari.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "stones-suicide#0",
+   "kind": "read",
+   "text": "You may not play where your stone would have no liberties, unless the move captures. The marked point is surrounded by white stones; a black stone there would have no liberties and capture nothing, so Black cannot play it.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "stones-suicide#1",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "Black wants the three white stones in the corner. Playing in the corner point is still forbidden, because White has one more liberty outside. Fill that outside liberty first.",
+   "rootLead": 2.7,
+   "bestWhole": {
+    "x": 2,
+    "y": 1,
+    "vertex": "C8",
+    "value": 2.9,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 1,
+    "vertex": "C8",
+    "value": 2.9,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C8",
+     "value": 2.9,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "stones-ko#0",
+   "kind": "read",
+   "text": "This shape is a ko: after Black captures one stone, White could capture straight back, forever. So the rule says that after a single-stone capture in a ko, the other side may not retake at once and must play elsewhere first.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "stones-ko#1",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "The white stone in the middle has one liberty left. Capture it.",
+   "rootLead": 6.3,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": 6.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": 6.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 5,
+     "loss": 1.5,
+     "lossWhole": 1.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 6.5,
+     "gain": 1.5
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 5.5,
+     "gain": 0.5
+    }
+   ]
+  },
+  {
+   "id": "stones-ko#2",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "Suppose White made a threat elsewhere, you answered, and White took the ko back. Now you may not retake at once either. First play a move White must answer: atari the white stone at the upper right. This is a ko threat.",
+   "rootLead": 6.3,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": 6.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F7",
+    "value": 3.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J6",
+     "value": -1.6,
+     "loss": 5.1,
+     "lossWhole": 8.4,
+     "verdict": "loses"
+    },
+    {
+     "x": 7,
+     "y": 4,
+     "vertex": "H5",
+     "value": 2.3,
+     "loss": 1.2,
+     "lossWhole": 4.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": 3.5,
+     "gain": 1.2
+    }
+   ]
+  },
+  {
+   "id": "stones-ko#3",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "White answered your threat. A move has passed, so now you may take the ko back.",
+   "rootLead": 15,
+   "bestWhole": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": 16.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": 16.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 11.2,
+     "loss": 4.9,
+     "lossWhole": 4.9,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 16.1,
+     "gain": 4.9
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 13.9,
+     "gain": 2.7
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": 11.1,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "stones-ko#4",
+   "kind": "place",
+   "view": "rule",
+   "size": 9,
+   "toMove": 1,
+   "text": "This time White found no threat and played elsewhere. Connect at the ko to end it.",
+   "rootLead": 26.6,
+   "bestWhole": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": 26.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": 26.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": 24.9,
+     "loss": 1.8,
+     "lossWhole": 1.8,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 26.7,
+     "gain": 1.8
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 25,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "capture-direction#0",
+   "kind": "read",
+   "text": "When you give atari, choose the side. Drive the stone toward the edge or toward your own stones, where it cannot gain liberties. Drive it toward open space and it escapes.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "capture-ladder#0",
+   "kind": "read",
+   "text": "A ladder is a chase of ataris that drives the stones in a zig-zag. After each escape they still have only two liberties, until they hit the edge and are captured.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "capture-net#0",
+   "kind": "read",
+   "text": "If an enemy stone waits in the ladder's path, the ladder fails. Then use a net: instead of giving atari, cover the escape route from one step away.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "capture-snapback#0",
+   "kind": "read",
+   "text": "Sometimes you deliberately put a stone where it will be captured: a throw-in. If capturing it leaves the opponent with one liberty, you take back more stones at once: a snapback.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "escape-ladder#0",
+   "kind": "read",
+   "text": "When you are chased in a ladder, look along its path. If one of your stones waits there, you reach it and the ladder fails. That stone is a ladder breaker.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "connect-solid#0",
+   "kind": "read",
+   "text": "If one empty point separates two of your groups, the opponent can play there and split them: a cutting point. Playing on it yourself makes a solid connection.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "connect-solid#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White has stones above and below, waiting to cut between your stones. Connect your two stones.",
+   "rootLead": 16.4,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": 16.1,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": 16.1,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 16.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "connect-hanging#0",
+   "kind": "read",
+   "text": "Three stones around one point, open on one side, make a tiger's mouth. An enemy stone played inside has a single liberty and is captured at once, so a tiger's mouth is a connection too, and often a more efficient one.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "connect-hanging#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "There is a cutting point between your stones. This time do not fill it: play one step away so it becomes a tiger's mouth.",
+   "rootLead": 10.8,
+   "bestWhole": {
+    "x": 4,
+    "y": 6,
+    "vertex": "E3",
+    "value": 11.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 6,
+    "vertex": "E3",
+    "value": 11.3,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D6",
+     "value": 6.3,
+     "loss": 5,
+     "lossWhole": 5,
+     "verdict": "loses"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": 7.4,
+     "loss": 3.9,
+     "lossWhole": 3.9,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 11.3,
+     "gain": 3.9
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": 11,
+     "gain": 3.6
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 11,
+     "gain": 3.6
+    },
+    {
+     "x": 4,
+     "y": 7,
+     "vertex": "E2",
+     "value": 10.3,
+     "gain": 2.9
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": 10.5,
+     "gain": 3.1
+    },
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 10.3,
+     "gain": 2.9
+    }
+   ]
+  },
+  {
+   "id": "connect-cut#0",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Two white stones are linked diagonally, and Black already holds one of the two linking points. The other one is the cutting point. Cut.",
+   "rootLead": -1.8,
+   "bestWhole": {
+    "x": 2,
+    "y": 4,
+    "vertex": "C5",
+    "value": -1.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 4,
+    "vertex": "C5",
+    "value": -1.4,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -1.6,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -1.4,
+     "gain": 0.3
+    }
+   ]
+  },
+  {
+   "id": "connect-cut#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "These three white stones look connected, but there is one cutting point. Find it.",
+   "rootLead": -0.6,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.4,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.4,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.4,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "life-eye#0",
+   "kind": "read",
+   "text": "An empty point completely surrounded by your own stones is an eye. Your opponent cannot play there: a stone inside would have no liberties and capture nothing.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "life-eye#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This black group touches several empty points, but only one of them is an eye. Tap it.",
+   "rootLead": 5.7,
+   "bestWhole": {
+    "x": 2,
+    "y": 4,
+    "vertex": "C5",
+    "value": 6.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": 0.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G7",
+     "value": -9.1,
+     "loss": 9.7,
+     "lossWhole": 15.5,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 0.7,
+     "gain": 9.7
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": 0.2,
+     "gain": 9.3
+    },
+    {
+     "x": 4,
+     "y": 1,
+     "vertex": "E8",
+     "value": -0.5,
+     "gain": 8.6
+    },
+    {
+     "x": 5,
+     "y": 0,
+     "vertex": "F9",
+     "value": -6.2,
+     "gain": 2.8
+    },
+    {
+     "x": 8,
+     "y": 0,
+     "vertex": "J9",
+     "value": -8.2,
+     "gain": 0.9
+    },
+    {
+     "x": 4,
+     "y": 0,
+     "vertex": "E9",
+     "value": -3.8,
+     "gain": 5.3
+    }
+   ]
+  },
+  {
+   "id": "life-eye#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "The empty point on the top edge is one stone short of an eye. Complete the eye.",
+   "rootLead": -19.3,
+   "bestWhole": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": -18.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 1,
+    "vertex": "C8",
+    "value": -22.7,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C8",
+     "value": -22.7,
+     "loss": 0,
+     "lossWhole": 4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": -22.9,
+     "gain": -0.3
+    }
+   ]
+  },
+  {
+   "id": "life-two-eyes#0",
+   "kind": "read",
+   "text": "A group with two separate eyes can never be captured. To capture it White would have to fill both eyes at once, and each one alone is a forbidden move.",
+   "claims": [
+    {
+     "what": "the black group with two eyes is alive",
+     "type": "owner",
+     "ownership": 1,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "life-false-eye#0",
+   "kind": "read",
+   "text": "A point can look like an eye, yet if White can put a neighbouring stone in atari and force you to fill it, it is a false eye. On the edge both diagonal points must be yours; the triangle marks a false eye.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "life-false-eye#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This black group at the lower right has two eye-shaped points, but one is false. Tap the real eye.",
+   "rootLead": -32.6,
+   "bestWhole": {
+    "x": 3,
+    "y": 2,
+    "vertex": "D7",
+    "value": -31.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 8,
+    "vertex": "G1",
+    "value": -55.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 8,
+     "vertex": "J1",
+     "value": -55.9,
+     "loss": 0.4,
+     "lossWhole": 24,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 8,
+     "vertex": "G1",
+     "value": -55.5,
+     "gain": 0.4
+    }
+   ]
+  },
+  {
+   "id": "kill-straight-three#0",
+   "kind": "read",
+   "text": "The point that makes life is the point that kills. When White has only a straight three, Black plays its middle first and White is left with one eye.",
+   "claims": [
+    {
+     "what": "after Black's middle point White is dead",
+     "type": "owner",
+     "ownership": 1,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "race-outside#0",
+   "kind": "read",
+   "text": "A liberty both groups share is a shared liberty; one that belongs only to the opponent is an outside liberty. Filling a shared liberty costs you one too, so fill the outside ones first.",
+   "review": "a tactical idea that the lesson's problem steps prove with the solver"
+  },
+  {
+   "id": "game-territory#0",
+   "kind": "read",
+   "text": "At the end of the game, the empty points your stones surround are your territory, one point each. In this game Black has walled off the left and White the right.",
+   "claims": [
+    {
+     "what": "the left side is Black's",
+     "type": "owner",
+     "ownership": 0.9,
+     "pass": true
+    },
+    {
+     "what": "the right side is White's",
+     "type": "owner",
+     "ownership": 1,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "game-territory#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Black's wall has a hole near the bottom, and White could walk in through it. Close it.",
+   "rootLead": -16.9,
+   "bestWhole": {
+    "x": 2,
+    "y": 6,
+    "vertex": "C3",
+    "value": -15.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 6,
+    "vertex": "C3",
+    "value": -15.3,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 7,
+     "vertex": "E2",
+     "value": -22.4,
+     "loss": 7.1,
+     "lossWhole": 7.1,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": -16.3,
+     "gain": 6.1
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": -15.3,
+     "gain": 7.1
+    },
+    {
+     "x": 2,
+     "y": 7,
+     "vertex": "C2",
+     "value": -16.4,
+     "gain": 6
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -21.7,
+     "gain": 0.6
+    }
+   ]
+  },
+  {
+   "id": "game-territory#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This time White's wall has a gap near the top. Push in and make White's territory smaller.",
+   "rootLead": 1.2,
+   "bestWhole": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": 1.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 1,
+    "vertex": "F8",
+    "value": -0.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 1,
+     "vertex": "F8",
+     "value": -0.3,
+     "loss": 0,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "game-score#0",
+   "kind": "read",
+   "text": "Under Japanese rules your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 33 points and White 29 + 6.5 = 35.5: White wins by 2.5.",
+   "claims": [
+    {
+     "what": "White wins by 2.5",
+     "type": "lead",
+     "lead": -4,
+     "leadOther": -21.7,
+     "pass": false
+    }
+   ]
+  },
+  {
+   "id": "game-score#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Two white stones have slipped into Black's area and have one liberty left. Capture them: each prisoner is worth a point, and the points become Black territory again.",
+   "rootLead": -5.5,
+   "bestWhole": {
+    "x": 1,
+    "y": 3,
+    "vertex": "B6",
+    "value": -4.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 6,
+    "vertex": "D3",
+    "value": -4.4,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": -4.4,
+     "loss": 0,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": -4.4,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "D2",
+     "value": -4.5,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "game-score#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "With komi, games are often decided by a few points. Black's wall near the top is missing a stone. Fill it before White pushes in.",
+   "rootLead": -16.1,
+   "bestWhole": {
+    "x": 2,
+    "y": 2,
+    "vertex": "C7",
+    "value": -14.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 2,
+    "vertex": "C7",
+    "value": -14.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 1,
+     "vertex": "E8",
+     "value": -22.2,
+     "loss": 7.5,
+     "lossWhole": 7.5,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": -16.2,
+     "gain": 6
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C7",
+     "value": -14.7,
+     "gain": 7.5
+    },
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C8",
+     "value": -15.9,
+     "gain": 6.3
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C6",
+     "value": -21.8,
+     "gain": 0.4
+    }
+   ]
+  },
+  {
+   "id": "game-order#0",
+   "kind": "read",
+   "text": "Territory is easiest to make in a corner, where two edges help you; then on the sides; the centre is hardest. So open in the corners, extend along the sides, and turn to the centre last.",
+   "review": "states a rule; the board only illustrates it"
+  },
+  {
+   "id": "game-order#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "An empty board. Play your first move in a corner, on the third or fourth line from both edges.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.2,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C7",
+     "value": -1.6,
+     "loss": 1.5,
+     "lossWhole": 1.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": -0.6,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C6",
+     "value": -0.5,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D6",
+     "value": -0.2,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": -0.5,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G7",
+     "value": -1.4,
+     "loss": 1.2,
+     "lossWhole": 1.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": -0.2,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": -0.8,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -0.6,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": -1.6,
+     "loss": 1.4,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": -0.6,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": -0.2,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": -0.7,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": -0.6,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 6,
+     "y": 6,
+     "vertex": "G3",
+     "value": -1.1,
+     "loss": 0.9,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -0.3,
+     "gain": -0.1
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -0.2,
+     "gain": -0.1
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -0.2,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "game-order#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Both upper corners are Black's. Extend along the side between them to claim the whole top.",
+   "rootLead": -0.3,
+   "bestWhole": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": -0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": -0.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": -4.3,
+     "loss": 4,
+     "lossWhole": 4,
+     "verdict": "loses"
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": -2.5,
+     "loss": 2.2,
+     "lossWhole": 2.2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": -4.1,
+     "loss": 3.9,
+     "lossWhole": 3.9,
+     "verdict": "loses"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -1,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": -0.3,
+     "gain": 0.8
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -0.2,
+     "gain": 0.8
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -1.3,
+     "gain": -0.3
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -0.9,
+     "gain": 0.1
+    },
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": -0.7,
+     "gain": 0.3
+    }
+   ]
+  },
+  {
+   "id": "game-order#3",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Corners and sides are all taken. Now the centre matters most. Take it.",
+   "rootLead": -1.5,
+   "bestWhole": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": -1.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": -1.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -4.2,
+     "loss": 2.6,
+     "lossWhole": 2.6,
+     "verdict": "loses"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -5.8,
+     "loss": 4.2,
+     "lossWhole": 4.2,
+     "verdict": "loses"
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -3.6,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -3.8,
+     "loss": 2.1,
+     "lossWhole": 2.1,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": -1.7,
+     "gain": 2
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -1.9,
+     "gain": 1.8
+    },
+    {
+     "x": 7,
+     "y": 5,
+     "vertex": "H4",
+     "value": -2.5,
+     "gain": 1.1
+    },
+    {
+     "x": 1,
+     "y": 5,
+     "vertex": "B4",
+     "value": -2.4,
+     "gain": 1.2
+    },
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": -2.2,
+     "gain": 1.5
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -2.1,
+     "gain": 1.5
+    },
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": -2.8,
+     "gain": 0.8
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -2.8,
+     "gain": 0.9
+    }
+   ]
+  },
+  {
+   "id": "game-opening#0",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "A 9×9 board is small, so a stone near the middle reaches every side. Play your first move on the centre point or right around it.",
+   "rootLead": -0.3,
+   "bestWhole": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": -0.2,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": -0.2,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D6",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": -0.2,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "game-opening#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Three corners are taken; only the lower left is empty. Take it.",
+   "rootLead": 11,
+   "bestWhole": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": 11.3,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": 11.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": 10.1,
+     "loss": 1.2,
+     "lossWhole": 1.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": 11.3,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": 9.5,
+     "loss": 1.8,
+     "lossWhole": 1.8,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": 10,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "game-opening#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Two white stones are linked through a single point. Cut them apart: two weak groups are easier to attack than one strong one.",
+   "rootLead": -10.3,
+   "bestWhole": {
+    "x": 6,
+    "y": 5,
+    "vertex": "G4",
+    "value": -9.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 5,
+    "vertex": "G4",
+    "value": -9.9,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": -11.9,
+     "loss": 1.9,
+     "lossWhole": 1.9,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": -9.9,
+     "gain": 1.9
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -10.1,
+     "gain": 1.7
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": -10.9,
+     "gain": 0.9
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": -11.2,
+     "gain": 0.7
+    }
+   ]
+  },
+  {
+   "id": "game-opening#3",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "White is pressing against your stones and eyeing your cutting point. Protect it, with a solid or a hanging connection.",
+   "rootLead": 3.4,
+   "bestWhole": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": 2.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": 2.9,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 0.3,
+     "loss": 2.6,
+     "lossWhole": 2.6,
+     "verdict": "loses"
+    },
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C5",
+     "value": 0.1,
+     "loss": 2.9,
+     "lossWhole": 2.9,
+     "verdict": "loses"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -0.4,
+     "loss": 3.3,
+     "lossWhole": 3.3,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": 2.9,
+     "gain": 2.6
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": 1.8,
+     "gain": 1.5
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": 1.5,
+     "gain": 1.2
+    },
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": 2.7,
+     "gain": 2.4
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": 1.4,
+     "gain": 1.1
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 2.2,
+     "gain": 1.9
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 1.5,
+     "gain": 1.2
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 0.6,
+     "gain": 0.3
+    }
+   ]
+  },
+  {
+   "id": "game-end#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Before you pass, check the borders. There is a hole in the middle of Black's wall. Close it.",
+   "rootLead": -22.3,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -22.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -22.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -22.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "game-end#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This empty point sits between the black and white walls and belongs to no one: a neutral point. It is worth nothing, but fill it before the end so every border is complete.",
+   "rootLead": -1.9,
+   "bestWhole": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E6",
+    "value": -1.7,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E6",
+    "value": -1.7,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -1.7,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": -1.7,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "game-dead#0",
+   "kind": "read",
+   "text": "At the end, stones that cannot live inside the opponent's area are dead. Once both players agree, they are simply removed and counted as prisoners; there is no need to capture them. The marked white stone is dead.",
+   "claims": [
+    {
+     "what": "the marked white stone is dead",
+     "type": "owner",
+     "ownership": -0.6,
+     "pass": false
+    }
+   ]
+  },
+  {
+   "id": "game-dead#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "That white stone is already dead, so do not spend a move capturing it. Close the gap at the bottom of your wall instead.",
+   "rootLead": -17.9,
+   "bestWhole": {
+    "x": 2,
+    "y": 2,
+    "vertex": "C7",
+    "value": -17.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 6,
+    "vertex": "C3",
+    "value": -25.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 7,
+     "vertex": "E2",
+     "value": -29.4,
+     "loss": 4.3,
+     "lossWhole": 11.6,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": -25.4,
+     "gain": 4
+    },
+    {
+     "x": 2,
+     "y": 7,
+     "vertex": "C2",
+     "value": -25.5,
+     "gain": 3.9
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": -25.1,
+     "gain": 4.3
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -29.3,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "game-dead#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Your stone inside White's area on the right cannot live; it is dead. Do not add more stones there. Close the gap at the top of your wall.",
+   "rootLead": -15.7,
+   "bestWhole": {
+    "x": 3,
+    "y": 2,
+    "vertex": "D7",
+    "value": -15.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 2,
+    "vertex": "D7",
+    "value": -15.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 1,
+     "vertex": "E8",
+     "value": -23.4,
+     "loss": 8.2,
+     "lossWhole": 8.2,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": -15.2,
+     "gain": 8.2
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C7",
+     "value": -15.5,
+     "gain": 7.9
+    },
+    {
+     "x": 3,
+     "y": 1,
+     "vertex": "D8",
+     "value": -23.3,
+     "gain": 0.1
+    },
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C8",
+     "value": -16.3,
+     "gain": 7.1
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C6",
+     "value": -20.5,
+     "gain": 2.9
+    }
+   ]
+  },
+  {
+   "id": "opening-corner-points#0",
+   "kind": "read",
+   "text": "On a 19×19 board the first stones go in the corners. A is the star point (4-4), B a 3-4 point, C the 3-3 point. The 3-3 point secures the corner at once but sits low. The star point is quick and faces both sides and the centre, but leaves the 3-3 point open for an invasion. The 3-4 point is in between and usually wants a second move to complete the corner.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "opening-corner-points#1",
+   "kind": "place",
+   "view": "rule",
+   "size": 19,
+   "toMove": 1,
+   "text": "The lower right corner is still empty. Play its star point: the fourth line from both edges.",
+   "rootLead": 39.2,
+   "bestWhole": {
+    "x": 15,
+    "y": 15,
+    "vertex": "Q4",
+    "value": 39.8,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 15,
+    "y": 15,
+    "vertex": "Q4",
+    "value": 39.8,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 15,
+     "y": 15,
+     "vertex": "Q4",
+     "value": 39.8,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 16,
+     "y": 15,
+     "vertex": "R4",
+     "value": 39.7,
+     "gain": 0
+    },
+    {
+     "x": 15,
+     "y": 16,
+     "vertex": "Q3",
+     "value": 39.7,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "opening-corner-points#2",
+   "kind": "place",
+   "view": "rule",
+   "size": 19,
+   "toMove": 1,
+   "text": "The upper left corner is empty. Play a 3-4 point there: the third line from one edge and the fourth from the other. Either of the two is fine.",
+   "rootLead": 12.2,
+   "bestWhole": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C16",
+    "value": 12.3,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C16",
+    "value": 12.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": 12.3,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": 12.2,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D16",
+     "value": 12.2,
+     "gain": -0.2
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": 12.1,
+     "gain": -0.2
+    }
+   ]
+  },
+  {
+   "id": "opening-corner-points#3",
+   "kind": "place",
+   "view": "rule",
+   "size": 19,
+   "toMove": 1,
+   "text": "This time take the 3-3 point of the lower right corner: the third line from both edges.",
+   "rootLead": 12.4,
+   "bestWhole": {
+    "x": 15,
+    "y": 16,
+    "vertex": "Q3",
+    "value": 12.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 15,
+    "y": 16,
+    "vertex": "Q3",
+    "value": 12.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 16,
+     "y": 16,
+     "vertex": "R3",
+     "value": 12.3,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 15,
+     "y": 16,
+     "vertex": "Q3",
+     "value": 12.5,
+     "gain": 0.2
+    },
+    {
+     "x": 15,
+     "y": 15,
+     "vertex": "Q4",
+     "value": 12.4,
+     "gain": 0.1
+    },
+    {
+     "x": 16,
+     "y": 15,
+     "vertex": "R4",
+     "value": 12.5,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "opening-enclose-approach#0",
+   "kind": "read",
+   "text": "A 3-4 stone usually wants one more move to secure the corner: the small knight's enclosure (A), the one-space enclosure (B) or the large knight's enclosure (C). Two stones working together make the corner hard to break into. The opponent, to stop you, approaches first, and the usual approaches are these same points.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "opening-enclose-approach#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Secure the corner of this 3-4 stone with any of the three enclosures you just saw.",
+   "rootLead": 12.2,
+   "bestWhole": {
+    "x": 16,
+    "y": 15,
+    "vertex": "R4",
+    "value": 12.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F17",
+    "value": 11.6,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E17",
+     "value": 11.3,
+     "loss": 0.3,
+     "lossWhole": 1.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E16",
+     "value": 11.4,
+     "loss": 0.1,
+     "lossWhole": 1,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 11.6,
+     "loss": 0,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": 11.4,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "opening-enclose-approach#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Now you are White. Approach before Black can enclose: play a small knight's move from the black stone, on the third line.",
+   "rootLead": -0.1,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 3,
+    "vertex": "D16",
+    "value": -0.3,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E17",
+     "value": -0.4,
+     "loss": 0.1,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E16",
+     "value": -0.4,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D16",
+     "value": -0.3,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": -0.5,
+     "gain": -0.1
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.6,
+     "gain": -0.2
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": -0.7,
+     "gain": -0.3
+    }
+   ]
+  },
+  {
+   "id": "opening-enclose-approach#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Black has the star point. Approach it with a small knight's move on the third line. Either side is fine.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 15,
+    "vertex": "D4",
+    "value": 0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 2,
+    "vertex": "C17",
+    "value": -0.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": -0.8,
+     "loss": 0.2,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.8,
+     "loss": 0.2,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -0.5,
+     "gain": 0.2
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": -0.8,
+     "gain": -0.1
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": -0.9,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "opening-extension#0",
+   "kind": "read",
+   "text": "Stones on the side need a base, and an extension along the third line makes one. From one stone, extend two spaces; from two stones standing out from the edge, three; from three, four. The taller the wall, the wider the extension. Here Black's two standing stones extend three spaces to the marked stone.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "opening-extension#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Your stone on the left side is on its own. Give it a base: a two-space extension along the third line, away from White's corner.",
+   "rootLead": -12.8,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": -12.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 16,
+    "vertex": "D3",
+    "value": -12.6,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": -13.9,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 16,
+     "vertex": "D3",
+     "value": -12.6,
+     "gain": 1.3
+    },
+    {
+     "x": 3,
+     "y": 15,
+     "vertex": "D4",
+     "value": -12.7,
+     "gain": 1.2
+    },
+    {
+     "x": 2,
+     "y": 15,
+     "vertex": "C4",
+     "value": -12.9,
+     "gain": 1
+    },
+    {
+     "x": 2,
+     "y": 16,
+     "vertex": "C3",
+     "value": -13,
+     "gain": 0.9
+    },
+    {
+     "x": 4,
+     "y": 16,
+     "vertex": "E3",
+     "value": -13.4,
+     "gain": 0.5
+    },
+    {
+     "x": 3,
+     "y": 14,
+     "vertex": "D5",
+     "value": -13.4,
+     "gain": 0.5
+    }
+   ]
+  },
+  {
+   "id": "opening-extension#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Two black stones stand out from the edge. Stand two, extend three: extend three spaces down the third line.",
+   "rootLead": -3.5,
+   "bestWhole": {
+    "x": 3,
+    "y": 16,
+    "vertex": "D3",
+    "value": -3.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 16,
+    "vertex": "D3",
+    "value": -3.3,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": -6.3,
+     "loss": 3,
+     "lossWhole": 3,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 16,
+     "vertex": "D3",
+     "value": -3.3,
+     "gain": 3
+    },
+    {
+     "x": 3,
+     "y": 15,
+     "vertex": "D4",
+     "value": -3.5,
+     "gain": 2.8
+    },
+    {
+     "x": 2,
+     "y": 15,
+     "vertex": "C4",
+     "value": -3.7,
+     "gain": 2.6
+    },
+    {
+     "x": 2,
+     "y": 16,
+     "vertex": "C3",
+     "value": -3.6,
+     "gain": 2.7
+    },
+    {
+     "x": 4,
+     "y": 16,
+     "vertex": "E3",
+     "value": -5.6,
+     "gain": 0.8
+    },
+    {
+     "x": 4,
+     "y": 15,
+     "vertex": "E4",
+     "value": -4.6,
+     "gain": 1.7
+    }
+   ]
+  },
+  {
+   "id": "opening-extension#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Now three stones stand out from the edge. Stand three, extend four: four spaces down the third line.",
+   "rootLead": 2,
+   "bestWhole": {
+    "x": 3,
+    "y": 15,
+    "vertex": "D4",
+    "value": 2.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 15,
+    "vertex": "D4",
+    "value": 2.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": 0.2,
+     "loss": 1.9,
+     "lossWhole": 1.9,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 15,
+     "vertex": "C4",
+     "value": 2,
+     "gain": 1.8
+    },
+    {
+     "x": 3,
+     "y": 15,
+     "vertex": "D4",
+     "value": 2.1,
+     "gain": 1.9
+    },
+    {
+     "x": 2,
+     "y": 16,
+     "vertex": "C3",
+     "value": 1.9,
+     "gain": 1.7
+    },
+    {
+     "x": 3,
+     "y": 16,
+     "vertex": "D3",
+     "value": 1.7,
+     "gain": 1.5
+    },
+    {
+     "x": 3,
+     "y": 14,
+     "vertex": "D5",
+     "value": 0.7,
+     "gain": 0.5
+    },
+    {
+     "x": 2,
+     "y": 14,
+     "vertex": "C5",
+     "value": 1.3,
+     "gain": 1.1
+    }
+   ]
+  },
+  {
+   "id": "opening-pincer#0",
+   "kind": "read",
+   "text": "When the opponent approaches, you need not answer it directly: you can pincer. Play on the far side of the approaching stone, on the third or fourth line, one to three spaces away. A pincer takes away the room it needs to extend. The circled points are the usual pincers.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "opening-pincer#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has approached your star point. Instead of answering, pincer it.",
+   "rootLead": 0.8,
+   "bestWhole": {
+    "x": 3,
+    "y": 15,
+    "vertex": "D4",
+    "value": 0.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F16",
+    "value": 0.2,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": -0.2,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 3,
+     "vertex": "H16",
+     "value": -0.2,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 2,
+     "vertex": "J17",
+     "value": -0.2,
+     "loss": 0.4,
+     "lossWhole": 1,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": -0.1,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 2,
+     "vertex": "K17",
+     "value": -0.1,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 3,
+     "vertex": "K16",
+     "value": -0.1,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E17",
+     "value": 0.1,
+     "gain": 0.3
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": 0.2,
+     "gain": 0.3
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G16",
+     "value": -0.2,
+     "gain": -0.1
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.1,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "opening-pincer#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "You are White and your approaching stone has been pincered. One answer is to jump toward the centre: a one-space jump from that stone.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 0.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 5,
+    "vertex": "C14",
+    "value": -0.1,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F15",
+     "value": -0.2,
+     "loss": 0.1,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.1,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.2,
+     "gain": -0.1
+    },
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": -0.4,
+     "gain": -0.2
+    }
+   ]
+  },
+  {
+   "id": "opening-big-urgent#0",
+   "kind": "read",
+   "text": "Big points are large open areas: empty corners first, then enclosures and approaches, then extensions along the sides. An urgent point decides whether a group is strong or weak. Urgent points come before big points: if your stones are in danger, take care of them first, and the empty corner can wait. Here the lower right corner is a big point; the triangle marks a cutting point in Black's stones.",
+   "claims": [
+    {
+     "what": "the urgent cutting point comes before the big empty corner",
+     "type": "better",
+     "a": 12.8,
+     "b": 13.4,
+     "pass": false
+    }
+   ]
+  },
+  {
+   "id": "opening-big-urgent#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "No group is in danger. Take the biggest point: the empty lower right corner.",
+   "rootLead": 12.4,
+   "bestWhole": {
+    "x": 15,
+    "y": 16,
+    "vertex": "Q3",
+    "value": 12.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 15,
+    "y": 16,
+    "vertex": "Q3",
+    "value": 12.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 14,
+     "y": 14,
+     "vertex": "P5",
+     "value": 10.5,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 15,
+     "y": 14,
+     "vertex": "Q5",
+     "value": 11.8,
+     "loss": 0.7,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 14,
+     "vertex": "R5",
+     "value": 11.6,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    },
+    {
+     "x": 14,
+     "y": 15,
+     "vertex": "P4",
+     "value": 11.8,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 15,
+     "vertex": "Q4",
+     "value": 12.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 15,
+     "vertex": "R4",
+     "value": 12.4,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 14,
+     "y": 16,
+     "vertex": "P3",
+     "value": 11.6,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 16,
+     "vertex": "Q3",
+     "value": 12.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 16,
+     "vertex": "R3",
+     "value": 12.2,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "opening-big-urgent#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "The lower right corner is still empty, but on the top side White threatens to cut your two stones apart, and the cut would put one of them in atari. Connect first; the corner can wait.",
+   "rootLead": 13.5,
+   "bestWhole": {
+    "x": 10,
+    "y": 2,
+    "vertex": "L17",
+    "value": 13.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 10,
+    "y": 2,
+    "vertex": "L17",
+    "value": 13.9,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": 12.8,
+     "loss": 1.1,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 10,
+     "y": 2,
+     "vertex": "L17",
+     "value": 13.9,
+     "gain": 1.1
+    },
+    {
+     "x": 15,
+     "y": 15,
+     "vertex": "Q4",
+     "value": 13.3,
+     "gain": 0.5
+    },
+    {
+     "x": 15,
+     "y": 16,
+     "vertex": "Q3",
+     "value": 13.5,
+     "gain": 0.7
+    },
+    {
+     "x": 16,
+     "y": 15,
+     "vertex": "R4",
+     "value": 13.4,
+     "gain": 0.6
+    },
+    {
+     "x": 10,
+     "y": 4,
+     "vertex": "L15",
+     "value": 12.9,
+     "gain": 0.1
+    },
+    {
+     "x": 9,
+     "y": 4,
+     "vertex": "K15",
+     "value": 12.6,
+     "gain": -0.1
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 13.1,
+     "gain": 0.3
+    }
+   ]
+  },
+  {
+   "id": "opening-big-urgent#3",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black has an enclosure in the upper left, White one in the lower left, and the left side between them is open. Its middle is the key point for both sides: split the side there.",
+   "rootLead": 9.8,
+   "bestWhole": {
+    "x": 15,
+    "y": 5,
+    "vertex": "Q14",
+    "value": 10.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 12,
+    "vertex": "D7",
+    "value": 9.4,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 8,
+     "vertex": "C11",
+     "value": 7.8,
+     "loss": 2.3,
+     "lossWhole": 2.3,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 3,
+     "y": 8,
+     "vertex": "D11",
+     "value": 8.2,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 2,
+     "y": 9,
+     "vertex": "C10",
+     "value": 8.1,
+     "loss": 2.1,
+     "lossWhole": 2.1,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 3,
+     "y": 9,
+     "vertex": "D10",
+     "value": 8.3,
+     "loss": 1.8,
+     "lossWhole": 1.8,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 2,
+     "y": 10,
+     "vertex": "C9",
+     "value": 8.1,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 3,
+     "y": 10,
+     "vertex": "D9",
+     "value": 8.3,
+     "loss": 1.9,
+     "lossWhole": 1.9,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 15,
+     "y": 5,
+     "vertex": "Q14",
+     "value": 10.1,
+     "gain": 1.8
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": 9.9,
+     "gain": 1.6
+    },
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": 9.4,
+     "gain": 1.1
+    },
+    {
+     "x": 13,
+     "y": 3,
+     "vertex": "O16",
+     "value": 10,
+     "gain": 1.7
+    },
+    {
+     "x": 16,
+     "y": 4,
+     "vertex": "R15",
+     "value": 9.9,
+     "gain": 1.6
+    },
+    {
+     "x": 3,
+     "y": 12,
+     "vertex": "D7",
+     "value": 9.4,
+     "gain": 1.1
+    },
+    {
+     "x": 2,
+     "y": 12,
+     "vertex": "C7",
+     "value": 8.8,
+     "gain": 0.5
+    },
+    {
+     "x": 1,
+     "y": 13,
+     "vertex": "B6",
+     "value": 8.7,
+     "gain": 0.4
+    }
+   ]
+  },
+  {
+   "id": "opening-review#0",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "An empty board and you are Black. Start in a corner: the 3-3 point, a 3-4 point or the star point.",
+   "rootLead": -0.1,
+   "bestWhole": {
+    "x": 15,
+    "y": 2,
+    "vertex": "Q17",
+    "value": -0.1,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 15,
+    "y": 2,
+    "vertex": "Q17",
+    "value": -0.1,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -0.4,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D16",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 2,
+     "vertex": "Q17",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 2,
+     "vertex": "R17",
+     "value": -0.4,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 3,
+     "vertex": "Q16",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 3,
+     "vertex": "R16",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 15,
+     "vertex": "C4",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 15,
+     "vertex": "D4",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 16,
+     "vertex": "C3",
+     "value": -0.4,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 16,
+     "vertex": "D3",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 15,
+     "vertex": "Q4",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 15,
+     "vertex": "R4",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 16,
+     "vertex": "Q3",
+     "value": -0.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 16,
+     "vertex": "R3",
+     "value": -0.4,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "opening-review#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "All four corners are taken. Enclose your star point in the upper right: a small knight's move, a one-space jump or a large knight's move, toward either side.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": 2,
+    "y": 5,
+    "vertex": "C14",
+    "value": -0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 13,
+    "y": 2,
+    "vertex": "O17",
+    "value": -0.4,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": -0.4,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": -0.4,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 13,
+     "y": 3,
+     "vertex": "O16",
+     "value": -0.7,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 5,
+     "vertex": "Q14",
+     "value": -0.7,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": -0.5,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 6,
+     "vertex": "R13",
+     "value": -0.5,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 16,
+     "y": 16,
+     "vertex": "R3",
+     "value": -0.2,
+     "gain": 0.1
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -0.2,
+     "gain": 0.1
+    },
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": -0.2,
+     "gain": 0.1
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.2,
+     "gain": 0.2
+    },
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": -0.3,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "opening-review#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "This time approach one of White's corners, the star point in the upper left or the lower right, with a small knight's move, a large knight's move or a one-space high approach.",
+   "rootLead": 10.9,
+   "bestWhole": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F17",
+    "value": 11.1,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F17",
+    "value": 11.1,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 11.1,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": 11,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": 10.7,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C13",
+     "value": 10.6,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": 10.2,
+     "loss": 0.9,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": 10.1,
+     "loss": 1.1,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": 11,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": 11,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 12,
+     "y": 16,
+     "vertex": "N3",
+     "value": 10.6,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 12,
+     "vertex": "R7",
+     "value": 10.6,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 13,
+     "y": 15,
+     "vertex": "O4",
+     "value": 10,
+     "loss": 1.1,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 13,
+     "vertex": "Q6",
+     "value": 10.1,
+     "loss": 1,
+     "lossWhole": 1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 16,
+     "y": 16,
+     "vertex": "R3",
+     "value": 10.9,
+     "gain": -0.2
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": 10.9,
+     "gain": -0.2
+    },
+    {
+     "x": 5,
+     "y": 16,
+     "vertex": "F3",
+     "value": 11,
+     "gain": -0.1
+    },
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": 11,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-invasion#0",
+   "kind": "read",
+   "text": "A joseki is a standard sequence in a corner that gives both sides a fair result. Learn why each move is played rather than the order. This is the most basic one: White 1 invades at the 3-3 point and Black 2 blocks. In the end White lives in the corner and keeps sente, and Black gets a strong wall facing outward.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "joseki-33-invasion#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has invaded the 3-3 point under your star point. Block it on the top side: play right next to the white stone, on its right.",
+   "rootLead": 0.6,
+   "bestWhole": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C16",
+    "value": 0.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C16",
+    "value": 0.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": 0.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": 0.5,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-invasion#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White crawls down the left side. Hane in front of White's stones to stop it.",
+   "rootLead": 0.5,
+   "bestWhole": {
+    "x": 2,
+    "y": 5,
+    "vertex": "C14",
+    "value": 0.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 5,
+    "vertex": "C14",
+    "value": 0.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 4,
+     "vertex": "C15",
+     "value": -0.3,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": 0.5,
+     "gain": 0.8
+    },
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D15",
+     "value": 0.4,
+     "gain": 0.7
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.5,
+     "gain": -0.3
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-invasion#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White hanes on the second line. Block it.",
+   "rootLead": -0.3,
+   "bestWhole": {
+    "x": 16,
+    "y": 3,
+    "vertex": "R16",
+    "value": -0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 1,
+    "y": 3,
+    "vertex": "B16",
+    "value": -0.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 1,
+     "y": 5,
+     "vertex": "B14",
+     "value": -0.7,
+     "loss": 0.2,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 1,
+     "y": 3,
+     "vertex": "B16",
+     "value": -0.5,
+     "gain": 0.2
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.5,
+     "gain": 0.1
+    },
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C18",
+     "value": -0.7,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.7,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-invasion#4",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has connected. Now protect your own cutting point, with a solid or a hanging connection. Then Black's wall has no weakness.",
+   "rootLead": 5.1,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D15",
+    "value": 5.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D15",
+    "value": 5.3,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": 5.1,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": 4.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D15",
+     "value": 5.3,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-white#0",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Another corner, and this time you are White. Invade at the 3-3 point under Black's star point.",
+   "rootLead": -0.2,
+   "bestWhole": {
+    "x": -7,
+    "y": 5,
+    "vertex": "D4",
+    "value": 0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 6,
+    "vertex": "R3",
+    "value": -0.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 6,
+     "y": 6,
+     "vertex": "R3",
+     "value": -0.5,
+     "loss": 0,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "O3",
+     "value": -0.7,
+     "gain": -0.2
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "R6",
+     "value": -0.8,
+     "gain": -0.2
+    }
+   ]
+  },
+  {
+   "id": "joseki-33-white#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Black has blocked on the bottom side. Crawl up the right side, next to your stone and to Black's star-point stone.",
+   "rootLead": 0.6,
+   "bestWhole": {
+    "x": 6,
+    "y": 5,
+    "vertex": "R4",
+    "value": -0.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 5,
+    "vertex": "R4",
+    "value": -0.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "R4",
+     "value": -0.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "joseki-33-white#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Black has played the hane in front of you. Hane on the second line.",
+   "rootLead": -0.3,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "S5",
+    "value": 0.2,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 7,
+    "y": 4,
+    "vertex": "S5",
+    "value": 0.2,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 7,
+     "y": 4,
+     "vertex": "S5",
+     "value": 0.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "joseki-33-white#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "Black has blocked, and your second-line stone could be cut off. Connect it.",
+   "rootLead": -0.7,
+   "bestWhole": {
+    "x": 6,
+    "y": 3,
+    "vertex": "R6",
+    "value": 0.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 3,
+    "vertex": "R6",
+    "value": 0.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 7,
+     "y": 5,
+     "vertex": "S4",
+     "value": -5.1,
+     "loss": 5.8,
+     "lossWhole": 5.8,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "R6",
+     "value": 0.7,
+     "gain": 5.8
+    },
+    {
+     "x": 5,
+     "y": 7,
+     "vertex": "Q2",
+     "value": -0.7,
+     "gain": 4.4
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "Q5",
+     "value": -4.9,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "O2",
+     "value": -3.8,
+     "gain": 1.3
+    },
+    {
+     "x": 4,
+     "y": 7,
+     "vertex": "P2",
+     "value": -2.1,
+     "gain": 3
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "P3",
+     "value": -3.8,
+     "gain": 1.3
+    }
+   ]
+  },
+  {
+   "id": "joseki-approach#0",
+   "kind": "read",
+   "text": "White 1 approaches the star point with a small knight's move. Black 2 answers with a small knight's move on the other side, securing the corner. White 3 makes a two-space extension along the top side, giving the approaching stone a base. Black gets the corner and sente; White is settled on the top side. This is one common way, not the only answer.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "joseki-approach#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "You are White. Approach Black's star point with a small knight's move.",
+   "rootLead": -0.1,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 0.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 2,
+    "vertex": "C17",
+    "value": -0.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": -0.8,
+     "loss": 0.2,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.8,
+     "loss": 0.2,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -0.5,
+     "gain": 0.2
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": -0.9,
+     "gain": -0.1
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": -0.8,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.9,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-approach#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has approached on the top side. Answer with a small knight's move on the left side: from your star point, a knight's move down to the third line.",
+   "rootLead": 0.8,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 0.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F16",
+    "value": 0.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": -0.1,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": 0.2,
+     "gain": 0.3
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E17",
+     "value": 0.1,
+     "gain": 0.2
+    },
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G16",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C13",
+     "value": -0.2,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-approach#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "You are White. Your approaching stone still has no base: extend two spaces to the right along the third line.",
+   "rootLead": -0.1,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 0.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D15",
+    "value": -0.6,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 2,
+     "vertex": "J17",
+     "value": -1.1,
+     "loss": 0.5,
+     "lossWhole": 1.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D15",
+     "value": -0.6,
+     "gain": 0.5
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D17",
+     "value": -0.6,
+     "gain": 0.4
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C13",
+     "value": -0.7,
+     "gain": 0.3
+    },
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -1.1,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 1,
+     "vertex": "D18",
+     "value": -1,
+     "gain": 0.1
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F15",
+     "value": -1.1,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "joseki-attach#0",
+   "kind": "read",
+   "text": "Black has a 3-4 point and White 1 approaches with a small knight's move. Black 2 attaches above the white stone, on the corner side; White 3 hanes and Black 4 draws back, joining the corner stones. Next White must protect its own cutting point. Black gets the corner territory, White gets strength facing outward.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "joseki-attach#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has approached your 3-4 stone. Attach directly above the white stone, on the corner side.",
+   "rootLead": 0.4,
+   "bestWhole": {
+    "x": 15,
+    "y": 2,
+    "vertex": "Q17",
+    "value": 0.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F16",
+    "value": -0.2,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": -0.2,
+     "loss": 0,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E16",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": -0.2,
+     "gain": 0
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C13",
+     "value": -0.4,
+     "gain": -0.1
+    },
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D13",
+     "value": -0.3,
+     "gain": -0.1
+    },
+    {
+     "x": 2,
+     "y": 7,
+     "vertex": "C12",
+     "value": -0.3,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "joseki-attach#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White hanes. Draw back toward the corner, joining your attaching stone to your 3-4 stone.",
+   "rootLead": 0.3,
+   "bestWhole": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E16",
+    "value": 0.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E16",
+    "value": 0.4,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": 0.2,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E16",
+     "value": 0.4,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "joseki-attach#3",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": -1,
+   "text": "You are White. Your two stones touch only diagonally, and there is a cutting point between them. Protect it, with a solid or a hanging connection.",
+   "rootLead": 0.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 15,
+    "vertex": "D4",
+    "value": -0.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D15",
+    "value": -0.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D15",
+     "value": -0.5,
+     "loss": 0,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E15",
+     "value": -2.1,
+     "loss": 1.6,
+     "lossWhole": 1.9,
+     "verdict": "doubtful"
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D14",
+     "value": -0.9,
+     "loss": 0.4,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "joseki-why#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "The same joseki, but Black blocked on the left side this time, so everything is turned around. White has just connected. Protect Black's cutting point.",
+   "rootLead": 5.3,
+   "bestWhole": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E16",
+    "value": 5.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 3,
+    "vertex": "E16",
+    "value": 5.4,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 5.1,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": 4.9,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E16",
+     "value": 5.4,
+     "gain": 0.3
+    }
+   ]
+  },
+  {
+   "id": "shape-empty-triangle#0",
+   "kind": "read",
+   "text": "The three black stones in the upper left bend around an empty point (the triangle): an empty triangle, the classic bad shape. Three stones do the work of two and have fewer liberties. On the right the same bend is fine: the fourth point holds a white stone, so nothing is wasted.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-empty-triangle#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Your two stones touch diagonally and White has taken one of the linking points, threatening to cut. Connect: the bend you make is not an empty triangle, because the corner of it is White's stone.",
+   "rootLead": 3.3,
+   "bestWhole": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": 3.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 3,
+    "vertex": "F6",
+    "value": 3.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 0.2,
+     "loss": 3,
+     "lossWhole": 3,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": 3.1,
+     "gain": 3
+    },
+    {
+     "x": 3,
+     "y": 2,
+     "vertex": "D7",
+     "value": 1.7,
+     "gain": 1.5
+    },
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": 1.7,
+     "gain": 1.5
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 2.4,
+     "gain": 2.2
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 0.8,
+     "gain": 0.6
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 0.5,
+     "gain": 0.4
+    }
+   ]
+  },
+  {
+   "id": "shape-empty-triangle#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": -1,
+   "text": "You are White, and it is the same situation: your two stones touch diagonally and Black has taken one linking point. Connect.",
+   "rootLead": -15.9,
+   "bestWhole": {
+    "x": 5,
+    "y": 6,
+    "vertex": "F3",
+    "value": 16.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 6,
+    "vertex": "F3",
+    "value": 16.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 13.4,
+     "loss": 3.1,
+     "lossWhole": 3.1,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 16.5,
+     "gain": 3.1
+    },
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": 16.3,
+     "gain": 3
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 15.4,
+     "gain": 2
+    },
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": 15.5,
+     "gain": 2.2
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": 14.4,
+     "gain": 1
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F7",
+     "value": 14.1,
+     "gain": 0.7
+    }
+   ]
+  },
+  {
+   "id": "shape-bamboo#0",
+   "kind": "read",
+   "text": "Two pairs of stones side by side with two empty points between them (the circles) form a bamboo joint. It cannot be cut: if the opponent plays one of the points, you play the other. It is as safe as a solid connection, with the stones spread a little wider.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-bamboo#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Add one stone to make a bamboo joint.",
+   "rootLead": 3.3,
+   "bestWhole": {
+    "x": 6,
+    "y": 5,
+    "vertex": "G4",
+    "value": 3.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 5,
+    "vertex": "G4",
+    "value": 3.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 3,
+     "vertex": "E6",
+     "value": -1.3,
+     "loss": 4.4,
+     "lossWhole": 4.4,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 5,
+     "vertex": "G4",
+     "value": 3.1,
+     "gain": 4.4
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G6",
+     "value": 2.6,
+     "gain": 3.8
+    },
+    {
+     "x": 6,
+     "y": 4,
+     "vertex": "G5",
+     "value": 1.5,
+     "gain": 2.8
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 1.2,
+     "gain": 2.4
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 0.4,
+     "gain": 1.7
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G7",
+     "value": 0.8,
+     "gain": 2.1
+    }
+   ]
+  },
+  {
+   "id": "shape-bamboo#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White has played into one point of your bamboo joint. Play the other and stay connected.",
+   "rootLead": 19.6,
+   "bestWhole": {
+    "x": 4,
+    "y": 6,
+    "vertex": "E3",
+    "value": 19.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": 18.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D6",
+     "value": 8.9,
+     "loss": 9.3,
+     "lossWhole": 11,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 18.2,
+     "gain": 9.3
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": 18,
+     "gain": 9.1
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": 16.4,
+     "gain": 7.5
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 15.4,
+     "gain": 6.5
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": 14.2,
+     "gain": 5.3
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 12.2,
+     "gain": 3.3
+    }
+   ]
+  },
+  {
+   "id": "shape-peep#0",
+   "kind": "read",
+   "text": "A one-space jump leaves an empty point between two stones. White's stone next to that point (the triangle) threatens to cut next move: a peep. Usually you answer with a solid connection. A hanging connection fails here, because the peeping stone touches the cutting point, so a white stone played there would not be left with one liberty.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-peep#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White peeps at your one-space jump. Connect.",
+   "rootLead": 1.6,
+   "bestWhole": {
+    "x": 6,
+    "y": 4,
+    "vertex": "G5",
+    "value": 1.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 5,
+    "vertex": "C4",
+    "value": 1.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.2,
+     "loss": 1.4,
+     "lossWhole": 1.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 1.1,
+     "gain": 1.4
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C6",
+     "value": 0.5,
+     "gain": 0.7
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": -0.4,
+     "gain": -0.2
+    },
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 0.8,
+     "gain": 1
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": 1.2,
+     "gain": 1.4
+    }
+   ]
+  },
+  {
+   "id": "shape-peep#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This time White peeps from below. Connect again.",
+   "rootLead": 0.5,
+   "bestWhole": {
+    "x": 4,
+    "y": 2,
+    "vertex": "E7",
+    "value": 0.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 2,
+    "vertex": "E7",
+    "value": 0.4,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.4,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 2,
+     "vertex": "E7",
+     "value": 0.4,
+     "gain": 0.8
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -0.1,
+     "gain": 0.3
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 0.2,
+     "gain": 0.6
+    },
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C4",
+     "value": -0.2,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "shape-head-two#0",
+   "kind": "read",
+   "text": "When two stones face two stones side by side, the point in front of the opponent's pair is its head. A hane there (the circle) holds the opponent down and strengthens you. The proverb says: hane at the head of two stones.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-head-two#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Hane at the head of White's two stones.",
+   "rootLead": -7.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 3,
+    "vertex": "D6",
+    "value": -6.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 3,
+    "vertex": "D6",
+    "value": -6.9,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -7.8,
+     "loss": 0.9,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 3,
+     "vertex": "D6",
+     "value": -6.9,
+     "gain": 0.9
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -7.3,
+     "gain": 0.5
+    }
+   ]
+  },
+  {
+   "id": "shape-head-two#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": -1,
+   "text": "You are White. Hane at the head of Black's two stones.",
+   "rootLead": -4.5,
+   "bestWhole": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": 3.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 5,
+    "vertex": "F4",
+    "value": 3.8,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": 2.9,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 3.8,
+     "gain": 0.8
+    },
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": 3.4,
+     "gain": 0.5
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F6",
+     "value": 2.8,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "shape-ponnuki#0",
+   "kind": "read",
+   "text": "Capturing a single stone with four stones in the open leaves a diamond around the empty point (the circle): a ponnuki. It has no weaknesses and radiates strength in every direction. The proverb says a ponnuki is worth thirty points.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-ponnuki#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "The white stone has one liberty left. Capture it and make a ponnuki.",
+   "rootLead": 14.2,
+   "bestWhole": {
+    "x": 3,
+    "y": 6,
+    "vertex": "D3",
+    "value": 14.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 6,
+    "vertex": "D3",
+    "value": 14.8,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": 11.6,
+     "loss": 3.2,
+     "lossWhole": 3.2,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": 14.8,
+     "gain": 3.2
+    },
+    {
+     "x": 4,
+     "y": 6,
+     "vertex": "E3",
+     "value": 14.6,
+     "gain": 3
+    },
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": 14.3,
+     "gain": 2.6
+    },
+    {
+     "x": 5,
+     "y": 5,
+     "vertex": "F4",
+     "value": 13.1,
+     "gain": 1.5
+    },
+    {
+     "x": 5,
+     "y": 6,
+     "vertex": "F3",
+     "value": 12.4,
+     "gain": 0.7
+    },
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": 13.3,
+     "gain": 1.7
+    }
+   ]
+  },
+  {
+   "id": "shape-ponnuki#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": -1,
+   "text": "You are White in the same position. Do not let Black make a ponnuki: extend your stone.",
+   "rootLead": 0.3,
+   "bestWhole": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.3,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 4,
+    "vertex": "D5",
+    "value": -0.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 4,
+     "vertex": "D5",
+     "value": -0.3,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "shape-jump#0",
+   "kind": "read",
+   "text": "To move out into the centre, the one-space jump is fast and hard to cut. The proverb says the one-space jump is never a bad move. A pincered stone often escapes this way.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "shape-jump#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Your stone on the left side is pincered from above and below. Jump one space toward the centre.",
+   "rootLead": -38.3,
+   "bestWhole": {
+    "x": 15,
+    "y": 15,
+    "vertex": "Q4",
+    "value": -37.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 12,
+    "vertex": "D7",
+    "value": -38.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 9,
+     "vertex": "E10",
+     "value": -38.5,
+     "loss": 0.3,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D13",
+     "value": -38.4,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 12,
+     "vertex": "D7",
+     "value": -38.2,
+     "gain": 0.3
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "D12",
+     "value": -38.5,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 11,
+     "vertex": "D8",
+     "value": -38.5,
+     "gain": 0
+    },
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E11",
+     "value": -38.8,
+     "gain": -0.3
+    }
+   ]
+  },
+  {
+   "id": "shape-jump#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White presses from above again. Keep going: another one-space jump toward the centre.",
+   "rootLead": -38.2,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": -37.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 12,
+    "vertex": "D7",
+    "value": -38.1,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 6,
+     "y": 9,
+     "vertex": "G10",
+     "value": -38.7,
+     "loss": 0.6,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 12,
+     "vertex": "D7",
+     "value": -38.1,
+     "gain": 0.6
+    },
+    {
+     "x": 4,
+     "y": 12,
+     "vertex": "E7",
+     "value": -38.4,
+     "gain": 0.3
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "D12",
+     "value": -38.9,
+     "gain": -0.1
+    },
+    {
+     "x": 6,
+     "y": 8,
+     "vertex": "G11",
+     "value": -38.4,
+     "gain": 0.4
+    },
+    {
+     "x": 4,
+     "y": 7,
+     "vertex": "E12",
+     "value": -38.9,
+     "gain": -0.2
+    }
+   ]
+  },
+  {
+   "id": "endgame-sente-gote#0",
+   "kind": "read",
+   "text": "A move the opponent has to answer is sente: after the answer it is your turn again. A move after which the opponent can play elsewhere is gote. The basic order in the endgame: sente moves first, gote moves after. Here the hane at the top ends with your own connection, so it is gote; the push along the first line at the bottom must be blocked by White, so it is Black's sente.",
+   "claims": [
+    {
+     "what": "White must block Black's push on the first line",
+     "type": "answer",
+     "reply": "G2",
+     "pass": false
+    }
+   ]
+  },
+  {
+   "id": "endgame-sente-gote#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White has pushed along the first line into your area and threatens to push again. Block it.",
+   "rootLead": -22.6,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "H5",
+    "value": -21.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 1,
+    "y": 7,
+    "vertex": "B2",
+    "value": -22.4,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 2,
+     "y": 8,
+     "vertex": "C1",
+     "value": -27.2,
+     "loss": 4.8,
+     "lossWhole": 5.4,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 1,
+     "y": 7,
+     "vertex": "B2",
+     "value": -22.4,
+     "gain": 4.8
+    },
+    {
+     "x": 2,
+     "y": 7,
+     "vertex": "C2",
+     "value": -22.7,
+     "gain": 4.5
+    },
+    {
+     "x": 1,
+     "y": 8,
+     "vertex": "B1",
+     "value": -24.6,
+     "gain": 2.7
+    },
+    {
+     "x": 1,
+     "y": 6,
+     "vertex": "B3",
+     "value": -24.3,
+     "gain": 2.9
+    },
+    {
+     "x": 0,
+     "y": 7,
+     "vertex": "A2",
+     "value": -25.6,
+     "gain": 1.6
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C3",
+     "value": -26.1,
+     "gain": 1.1
+    }
+   ]
+  },
+  {
+   "id": "endgame-sente-gote#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Your wall reaches the first line, White's stops on the second. Push along the first line: White has to block, and your stone is already connected, so you need nothing more.",
+   "rootLead": -1.9,
+   "bestWhole": {
+    "x": 6,
+    "y": 7,
+    "vertex": "G2",
+    "value": -1.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 7,
+    "vertex": "G2",
+    "value": -1.3,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -9.4,
+     "loss": 8.1,
+     "lossWhole": 8.1,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 7,
+     "vertex": "G2",
+     "value": -1.3,
+     "gain": 8.1
+    },
+    {
+     "x": 6,
+     "y": 6,
+     "vertex": "G3",
+     "value": -9.3,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "endgame-sente-gote#3",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Two endgame moves: the hane at the top is gote, the push at the bottom is sente. Play the sente move first.",
+   "rootLead": 3.3,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "H5",
+    "value": 1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 7,
+    "vertex": "G2",
+    "value": -2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -7.1,
+     "loss": 5.1,
+     "lossWhole": 8.1,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 7,
+     "vertex": "G2",
+     "value": -2,
+     "gain": 5.1
+    },
+    {
+     "x": 6,
+     "y": 6,
+     "vertex": "G3",
+     "value": -6.9,
+     "gain": 0.2
+    },
+    {
+     "x": 5,
+     "y": 7,
+     "vertex": "F2",
+     "value": -4.8,
+     "gain": 2.3
+    }
+   ]
+  },
+  {
+   "id": "endgame-first-line#0",
+   "kind": "read",
+   "text": "When both walls stop on the second line, there is a hane and connection on the first line: Black 1 hanes, White 2 blocks, Black 1 is in atari, and Black 3 connects. Then it is White's turn, so it is gote. Compared with White doing the same from the other side, the difference is 2 points.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "endgame-first-line#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Both walls stop on the second line. Hane on the first line.",
+   "rootLead": -13.6,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "H5",
+    "value": -13.1,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 8,
+    "vertex": "E1",
+    "value": -13.7,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -13.7,
+     "loss": 0,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-first-line#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White has blocked and your hane stone is in atari. Connect it.",
+   "rootLead": -13.9,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "H5",
+    "value": -13.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 8,
+    "vertex": "D1",
+    "value": -13.7,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 8,
+     "vertex": "D1",
+     "value": -13.7,
+     "loss": 0,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-first-line#3",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This time White has played the first-line hane. Block it.",
+   "rootLead": -18,
+   "bestWhole": {
+    "x": 7,
+    "y": 4,
+    "vertex": "H5",
+    "value": -17.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 8,
+    "vertex": "C1",
+    "value": -18.1,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 8,
+     "vertex": "C1",
+     "value": -18.1,
+     "loss": 0,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -18.2,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "endgame-double-sente#0",
+   "kind": "read",
+   "text": "The marked point is special. If Black plays there, a white stone is in atari and White must connect; if White plays there, a black stone is in atari and Black must connect. It is sente for both sides: double sente. Double sente comes before everything else.",
+   "claims": [
+    {
+     "what": "after Black plays the marked point White must connect",
+     "type": "answer",
+     "reply": "F5",
+     "pass": true
+    },
+    {
+     "what": "after White plays the marked point Black must connect",
+     "type": "answer",
+     "reply": "D3",
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "endgame-double-sente#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Take the double sente point: the liberty shared by the two stones sticking out, one black and one white.",
+   "rootLead": -7.4,
+   "bestWhole": {
+    "x": 4,
+    "y": 5,
+    "vertex": "E4",
+    "value": -7.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 5,
+    "vertex": "E4",
+    "value": -7.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -7.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-double-sente#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": -1,
+   "text": "You are White. Black has just taken the double sente point and your stone is in atari. Connect to save it.",
+   "rootLead": -7.5,
+   "bestWhole": {
+    "x": 1,
+    "y": 5,
+    "vertex": "B4",
+    "value": 7.9,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 4,
+    "vertex": "F5",
+    "value": 7.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 5,
+     "y": 4,
+     "vertex": "F5",
+     "value": 7.5,
+     "loss": 0,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": 7.5,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "endgame-double-sente#3",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "This time White took the double sente point first and your stone is in atari. Connect.",
+   "rootLead": -9.4,
+   "bestWhole": {
+    "x": 3,
+    "y": 6,
+    "vertex": "D3",
+    "value": -9.2,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 6,
+    "vertex": "D3",
+    "value": -9.2,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 6,
+     "vertex": "D3",
+     "value": -9.2,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-reverse-sente#0",
+   "kind": "read",
+   "text": "At the bottom, Black's push along the first line is Black's sente. If White plays there first, it is gote for White, but White will never have to answer that push. Taking away the opponent's sente move like this is called reverse sente, and it is often bigger than it looks.",
+   "claims": [
+    {
+     "what": "White must answer Black's push on the first line",
+     "type": "answer",
+     "reply": "G2",
+     "pass": false
+    }
+   ]
+  },
+  {
+   "id": "endgame-reverse-sente#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": -1,
+   "text": "You are White. Play first where Black wants to push and take away Black's sente move.",
+   "rootLead": -16.1,
+   "bestWhole": {
+    "x": 4,
+    "y": 8,
+    "vertex": "E1",
+    "value": 16.3,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 8,
+    "vertex": "E1",
+    "value": 16.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": 16.3,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-reverse-sente#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "At the top White has a sente push along the first line; at the bottom you have a sente push of the same size. Play your sente first; after White blocks, come back and take the reverse sente at the top.",
+   "rootLead": -6,
+   "bestWhole": {
+    "x": 6,
+    "y": 7,
+    "vertex": "G2",
+    "value": -5.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 6,
+    "y": 7,
+    "vertex": "G2",
+    "value": -5.5,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -11.1,
+     "loss": 5.6,
+     "lossWhole": 5.6,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 7,
+     "vertex": "G2",
+     "value": -5.5,
+     "gain": 5.6
+    }
+   ]
+  },
+  {
+   "id": "endgame-japanese-counting#0",
+   "kind": "read",
+   "text": "Under Japanese rules, after both players pass, dead stones are removed, prisoners are placed in the opponent's territory, and the territory is counted. Neutral points are worth nothing, but they are all filled. Be careful: filling one can put your stones in atari, and then you must add a defensive stone inside your own territory, which costs you a point.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "endgame-japanese-counting#1",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "Two neutral points are left. One of them matters: if White fills it, one of your stones will be in atari. Fill that one yourself.",
+   "rootLead": -9.3,
+   "bestWhole": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": -8.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 4,
+    "vertex": "E5",
+    "value": -8.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 4,
+     "vertex": "E5",
+     "value": -8.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-japanese-counting#2",
+   "kind": "place",
+   "view": "local",
+   "size": 9,
+   "toMove": 1,
+   "text": "White filled that neutral point and your stone is in atari. Connect inside your own territory: a point lost is better than a stone lost.",
+   "rootLead": -9.4,
+   "bestWhole": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": -9.3,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 3,
+    "y": 5,
+    "vertex": "D4",
+    "value": -9.3,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 3,
+     "y": 5,
+     "vertex": "D4",
+     "value": -9.3,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "endgame-order#0",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Three endgame moves are left: the double sente point in the middle, your sente push at the bottom and the gote hane at the top. Play them in order, double sente first.",
+   "rootLead": -8.4,
+   "bestWhole": {
+    "x": 4,
+    "y": 8,
+    "vertex": "E1",
+    "value": -8.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 5,
+    "vertex": "E4",
+    "value": -9.2,
+    "accepted": true
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 5,
+     "vertex": "E4",
+     "value": -9.2,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -8.4,
+     "gain": 0.8
+    },
+    {
+     "x": 4,
+     "y": 0,
+     "vertex": "E9",
+     "value": -8.5,
+     "gain": 0.7
+    },
+    {
+     "x": 3,
+     "y": 0,
+     "vertex": "D9",
+     "value": -8.5,
+     "gain": 0.7
+    }
+   ]
+  },
+  {
+   "id": "endgame-order#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Next, the sente push at the bottom.",
+   "rootLead": -6.8,
+   "bestWhole": {
+    "x": 3,
+    "y": 0,
+    "vertex": "D9",
+    "value": -6.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 8,
+    "vertex": "E1",
+    "value": -8.5,
+    "accepted": true
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 4,
+     "y": 8,
+     "vertex": "E1",
+     "value": -8.5,
+     "loss": 2,
+     "lossWhole": 2,
+     "verdict": "doubtful"
+    }
+   ],
+   "equal": [
+    {
+     "x": 4,
+     "y": 0,
+     "vertex": "E9",
+     "value": -6.7,
+     "gain": 1.8
+    },
+    {
+     "x": 3,
+     "y": 0,
+     "vertex": "D9",
+     "value": -6.5,
+     "gain": 2
+    },
+    {
+     "x": 2,
+     "y": 0,
+     "vertex": "C9",
+     "value": -8.4,
+     "gain": 0.2
+    },
+    {
+     "x": 2,
+     "y": 1,
+     "vertex": "C8",
+     "value": -8.1,
+     "gain": 0.4
+    }
+   ]
+  },
+  {
+   "id": "endgame-order#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 9,
+   "toMove": 1,
+   "text": "Last, the gote move at the top: the first-line hane.",
+   "rootLead": -5.7,
+   "bestWhole": {
+    "x": 4,
+    "y": 0,
+    "vertex": "E9",
+    "value": -5.5,
+    "accepted": true
+   },
+   "bestLocal": {
+    "x": 4,
+    "y": 0,
+    "vertex": "E9",
+    "value": -5.5,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 4,
+     "y": 0,
+     "vertex": "E9",
+     "value": -5.5,
+     "loss": 0,
+     "lossWhole": 0,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "fight-cutting-stones#0",
+   "kind": "read",
+   "text": "Stones that split your groups apart are the cutting stones (the triangle). Capture them and your groups become one; the fight is often over. Stones that cut nothing matter much less.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "fight-attack-distance#0",
+   "kind": "read",
+   "text": "To attack a weak stone, do not usually touch it: a contact play lets it hane and extend into good shape. It is better to stay a little apart, taking away the room it needs for a base or blocking its way to the centre.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "fight-attack-distance#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "White has invaded your left side. Your enclosure above leaves it no room upward. Do not touch it: play below it, with one to three empty points between, on the third or fourth line, where it would extend for a base.",
+   "rootLead": 25.6,
+   "bestWhole": {
+    "x": 15,
+    "y": 3,
+    "vertex": "Q16",
+    "value": 26,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 12,
+    "vertex": "C7",
+    "value": 25.8,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 11,
+     "vertex": "C8",
+     "value": 25.5,
+     "loss": 0.4,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 11,
+     "vertex": "D8",
+     "value": 24.7,
+     "loss": 1.2,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 12,
+     "vertex": "C7",
+     "value": 25.8,
+     "loss": 0,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 12,
+     "vertex": "D7",
+     "value": 25,
+     "loss": 0.9,
+     "lossWhole": 1,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": 25.3,
+     "loss": 0.6,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 13,
+     "vertex": "D6",
+     "value": 24.6,
+     "loss": 1.2,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": []
+  },
+  {
+   "id": "fight-attack-distance#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "The white stone sits between two of yours and wants to head for the centre. Cap it: play one space away from it on its centre side.",
+   "rootLead": 13.2,
+   "bestWhole": {
+    "x": 13,
+    "y": 16,
+    "vertex": "O3",
+    "value": 13.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 12,
+    "y": 2,
+    "vertex": "N17",
+    "value": 13.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 9,
+     "y": 5,
+     "vertex": "K14",
+     "value": 12,
+     "loss": 1.2,
+     "lossWhole": 1.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": 13.2,
+     "gain": 1.2
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": 13.1,
+     "gain": 1.2
+    },
+    {
+     "x": 12,
+     "y": 3,
+     "vertex": "N16",
+     "value": 12.9,
+     "gain": 0.9
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G16",
+     "value": 12.9,
+     "gain": 0.9
+    },
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": 13,
+     "gain": 1
+    },
+    {
+     "x": 11,
+     "y": 2,
+     "vertex": "M17",
+     "value": 12.9,
+     "gain": 1
+    }
+   ]
+  },
+  {
+   "id": "fight-split#0",
+   "kind": "read",
+   "text": "When the opponent has two weak groups, do not let them join. Play between them: an attack on one is also an attack on the other, and it is hard to look after both. The strength you gain while chasing them will also help in the fights that follow.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "fight-split#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "There is a lone white stone on the top side and another on the bottom side, both inside Black's sphere. Play between them, around the centre point, so they cannot join.",
+   "rootLead": 27.6,
+   "bestWhole": {
+    "x": 6,
+    "y": 16,
+    "vertex": "G3",
+    "value": 27.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 10,
+    "vertex": "F9",
+    "value": 26.8,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 8,
+     "vertex": "J11",
+     "value": 26.5,
+     "loss": 1.4,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 8,
+     "vertex": "K11",
+     "value": 26.5,
+     "loss": 1.4,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 8,
+     "vertex": "L11",
+     "value": 26.5,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 9,
+     "vertex": "J10",
+     "value": 26.4,
+     "loss": 1.4,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 9,
+     "vertex": "K10",
+     "value": 26.5,
+     "loss": 1.4,
+     "lossWhole": 1.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 9,
+     "vertex": "L10",
+     "value": 26.5,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 10,
+     "vertex": "J9",
+     "value": 26.5,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 10,
+     "vertex": "K9",
+     "value": 26.4,
+     "loss": 1.5,
+     "lossWhole": 1.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 10,
+     "vertex": "L9",
+     "value": 26.6,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": 27.8,
+     "gain": 1.3
+    },
+    {
+     "x": 12,
+     "y": 16,
+     "vertex": "N3",
+     "value": 27.7,
+     "gain": 1.2
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": 27.8,
+     "gain": 1.2
+    },
+    {
+     "x": 6,
+     "y": 16,
+     "vertex": "G3",
+     "value": 27.8,
+     "gain": 1.3
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 27.7,
+     "gain": 1.1
+    },
+    {
+     "x": 12,
+     "y": 9,
+     "vertex": "N10",
+     "value": 26.6,
+     "gain": 0.1
+    },
+    {
+     "x": 6,
+     "y": 9,
+     "vertex": "G10",
+     "value": 26.7,
+     "gain": 0.1
+    },
+    {
+     "x": 13,
+     "y": 8,
+     "vertex": "O11",
+     "value": 26.7,
+     "gain": 0.1
+    },
+    {
+     "x": 13,
+     "y": 10,
+     "vertex": "O9",
+     "value": 26.7,
+     "gain": 0.1
+    },
+    {
+     "x": 5,
+     "y": 8,
+     "vertex": "F11",
+     "value": 26.7,
+     "gain": 0.1
+    },
+    {
+     "x": 5,
+     "y": 10,
+     "vertex": "F9",
+     "value": 26.8,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "fight-split#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Two white stones are linked through a single point. Cut there, so that they become two weak groups.",
+   "rootLead": 41.1,
+   "bestWhole": {
+    "x": 11,
+    "y": 9,
+    "vertex": "M10",
+    "value": 41.7,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 11,
+    "y": 9,
+    "vertex": "M10",
+    "value": 41.7,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 9,
+     "y": 9,
+     "vertex": "K10",
+     "value": 41.6,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 11,
+     "y": 9,
+     "vertex": "M10",
+     "value": 41.7,
+     "gain": 0.2
+    },
+    {
+     "x": 9,
+     "y": 7,
+     "vertex": "K12",
+     "value": 41.6,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "fight-leaning#0",
+   "kind": "read",
+   "text": "When the stone you want to attack is hard to reach directly, lean on a nearby enemy stone first. Forcing moves that the opponent has to answer (kikashi) put your stones in useful places, and those stones then help the attack on the real target. The marked black stone came that way: it attached under the white stone at the upper right, and White answered with a hane.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "fight-sabaki#0",
+   "kind": "read",
+   "text": "In the opponent's sphere, play light, flexible shape: that is sabaki. You do not have to save every stone. A stone that has done its job can be given up, and contact plays (attach, hane) help you settle quickly. The aim is a group that can live or get out, not a heavy group that must be rescued.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "adv-judge-bigger#0",
+   "kind": "read",
+   "text": "All four corners are enclosed. The left side lies between Black's two corners, the right side between White's, and the top and bottom between a black and a white corner. A point like A extends from your corner and also stops the opponent extending from theirs: one move does two jobs. B only adds to a side where Black is already stronger; a white stone there would sit between two solid black corners and have a hard time, so Black can usually leave B for later. As a rule, the side that both players want to extend along is the biggest.",
+   "claims": [
+    {
+     "what": "A is bigger than B",
+     "type": "better",
+     "a": -0.5,
+     "b": -0.6,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-bigger#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Play on a side that both players want to extend along.",
+   "rootLead": -0.4,
+   "bestWhole": {
+    "x": 13,
+    "y": 16,
+    "vertex": "O3",
+    "value": -0.3,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 13,
+    "y": 16,
+    "vertex": "O3",
+    "value": -0.3,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": -0.3,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 2,
+     "vertex": "J17",
+     "value": -0.4,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 2,
+     "vertex": "K17",
+     "value": -0.6,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 2,
+     "vertex": "L17",
+     "value": -0.7,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 2,
+     "vertex": "M17",
+     "value": -0.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 3,
+     "vertex": "H16",
+     "value": -0.5,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": -0.4,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 3,
+     "vertex": "K16",
+     "value": -0.5,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 3,
+     "vertex": "L16",
+     "value": -0.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 3,
+     "vertex": "M16",
+     "value": -0.7,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 15,
+     "vertex": "H4",
+     "value": -1.2,
+     "loss": 1,
+     "lossWhole": 1,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 15,
+     "vertex": "J4",
+     "value": -0.9,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 15,
+     "vertex": "K4",
+     "value": -0.7,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 15,
+     "vertex": "L4",
+     "value": -0.7,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 15,
+     "vertex": "M4",
+     "value": -0.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 16,
+     "vertex": "H3",
+     "value": -1.6,
+     "loss": 1.3,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 16,
+     "vertex": "J3",
+     "value": -1.1,
+     "loss": 0.9,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 16,
+     "vertex": "K3",
+     "value": -0.9,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 16,
+     "vertex": "L3",
+     "value": -0.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 16,
+     "vertex": "M3",
+     "value": -0.8,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": -0.3,
+     "gain": 0.1
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": -0.4,
+     "gain": -0.1
+    },
+    {
+     "x": 12,
+     "y": 3,
+     "vertex": "N16",
+     "value": -0.5,
+     "gain": -0.2
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": -0.4,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-bigger#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": -1,
+   "text": "Black has taken the top. Now it is White's turn: where should White play?",
+   "rootLead": -0.5,
+   "bestWhole": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F17",
+    "value": 0.6,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 11,
+    "y": 16,
+    "vertex": "M3",
+    "value": 0.6,
+    "accepted": true
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 7,
+     "y": 15,
+     "vertex": "H4",
+     "value": 0.2,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 15,
+     "vertex": "J4",
+     "value": 0.2,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 15,
+     "vertex": "K4",
+     "value": 0.4,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 15,
+     "vertex": "L4",
+     "value": 0.5,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 15,
+     "vertex": "M4",
+     "value": 0.4,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 16,
+     "vertex": "H3",
+     "value": 0.2,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 16,
+     "vertex": "J3",
+     "value": 0.2,
+     "loss": 0.4,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 16,
+     "vertex": "K3",
+     "value": 0.3,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 16,
+     "vertex": "L3",
+     "value": 0.5,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 16,
+     "vertex": "M3",
+     "value": 0.6,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 0.6,
+     "gain": 0.1
+    },
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": 0.6,
+     "gain": 0.1
+    },
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": 0.5,
+     "gain": -0.1
+    },
+    {
+     "x": 6,
+     "y": 15,
+     "vertex": "G4",
+     "value": 0.4,
+     "gain": -0.2
+    },
+    {
+     "x": 12,
+     "y": 16,
+     "vertex": "N3",
+     "value": 0.5,
+     "gain": 0
+    },
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": 0.4,
+     "gain": -0.1
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-toward-thickness#0",
+   "kind": "read",
+   "text": "Black has a thick wall on the left side, and White has lived low inside it. There is a white stone on the top side. If Black presses it from the wall's side (B), White extends into the open space to the right. If Black pincers from the other side (A), the white stone is caught between the wall and the pincer, with no room for a base. Thickness is best used for attacking, and an attack usually drives the opponent toward your thickness.",
+   "claims": [
+    {
+     "what": "the pincer A is better than the press B",
+     "type": "better",
+     "a": 20.5,
+     "b": 18.7,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-toward-thickness#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Attack the white stone on the top side and drive it toward your wall.",
+   "rootLead": 26.3,
+   "bestWhole": {
+    "x": 1,
+    "y": 6,
+    "vertex": "B13",
+    "value": 27.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 10,
+    "y": 2,
+    "vertex": "L17",
+    "value": 23,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 11,
+     "y": 2,
+     "vertex": "M17",
+     "value": 21.6,
+     "loss": 5.8,
+     "lossWhole": 5.8,
+     "verdict": "loses"
+    },
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": 21.2,
+     "loss": 6.2,
+     "lossWhole": 6.2,
+     "verdict": "loses"
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 20.6,
+     "loss": 6.8,
+     "lossWhole": 6.8,
+     "verdict": "loses"
+    },
+    {
+     "x": 11,
+     "y": 3,
+     "vertex": "M16",
+     "value": 21,
+     "loss": 6.4,
+     "lossWhole": 6.4,
+     "verdict": "loses"
+    },
+    {
+     "x": 12,
+     "y": 3,
+     "vertex": "N16",
+     "value": 20.5,
+     "loss": 6.9,
+     "lossWhole": 6.9,
+     "verdict": "loses"
+    },
+    {
+     "x": 13,
+     "y": 3,
+     "vertex": "O16",
+     "value": 19.8,
+     "loss": 7.6,
+     "lossWhole": 7.6,
+     "verdict": "loses"
+    }
+   ],
+   "equal": [
+    {
+     "x": 1,
+     "y": 6,
+     "vertex": "B13",
+     "value": 27.4,
+     "gain": 5.8
+    },
+    {
+     "x": 1,
+     "y": 5,
+     "vertex": "B14",
+     "value": 25.5,
+     "gain": 3.9
+    },
+    {
+     "x": 1,
+     "y": 7,
+     "vertex": "B12",
+     "value": 25.3,
+     "gain": 3.7
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "D12",
+     "value": 24.6,
+     "gain": 2.9
+    },
+    {
+     "x": 10,
+     "y": 3,
+     "vertex": "L16",
+     "value": 22.5,
+     "gain": 0.8
+    },
+    {
+     "x": 10,
+     "y": 2,
+     "vertex": "L17",
+     "value": 23,
+     "gain": 1.4
+    },
+    {
+     "x": 9,
+     "y": 3,
+     "vertex": "K16",
+     "value": 22.9,
+     "gain": 1.2
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-away#0",
+   "kind": "read",
+   "text": "This time White has thickness on the bottom side. If Black extends from the lower right corner along the bottom (B), the new stone is close to White's wall, and White can attack it while making territory. Extending up the right side (A) keeps away from the wall and works with Black's upper right corner. As a rule, do not play close to the opponent's thickness unless your stones can live or connect safely there.",
+   "claims": [
+    {
+     "what": "extending up the right side (A) is better than along the bottom (B)",
+     "type": "better",
+     "a": -1,
+     "b": -1.6,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "adv-judge-away#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Extend from the lower right corner, away from White's thickness.",
+   "rootLead": -0.5,
+   "bestWhole": {
+    "x": 2,
+    "y": 3,
+    "vertex": "C16",
+    "value": -0.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 16,
+    "y": 5,
+    "vertex": "R14",
+    "value": -0.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 15,
+     "y": 7,
+     "vertex": "Q12",
+     "value": -1.2,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 7,
+     "vertex": "R12",
+     "value": -1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 8,
+     "vertex": "Q11",
+     "value": -1.2,
+     "loss": 0.7,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 8,
+     "vertex": "R11",
+     "value": -1.1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 9,
+     "vertex": "Q10",
+     "value": -1,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 9,
+     "vertex": "R10",
+     "value": -1.1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 10,
+     "vertex": "Q9",
+     "value": -1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 10,
+     "vertex": "R9",
+     "value": -1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 15,
+     "y": 11,
+     "vertex": "Q8",
+     "value": -1.2,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 11,
+     "vertex": "R8",
+     "value": -1,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 2,
+     "vertex": "C17",
+     "value": -0.5,
+     "gain": 0.5
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": -0.5,
+     "gain": 0.5
+    },
+    {
+     "x": 2,
+     "y": 3,
+     "vertex": "C16",
+     "value": -0.4,
+     "gain": 0.5
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": -0.5,
+     "gain": 0.5
+    },
+    {
+     "x": 2,
+     "y": 8,
+     "vertex": "C11",
+     "value": -0.5,
+     "gain": 0.5
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": -0.7,
+     "gain": 0.3
+    },
+    {
+     "x": 16,
+     "y": 6,
+     "vertex": "R13",
+     "value": -0.8,
+     "gain": 0.2
+    },
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": -0.8,
+     "gain": 0.2
+    },
+    {
+     "x": 15,
+     "y": 5,
+     "vertex": "Q14",
+     "value": -0.8,
+     "gain": 0.2
+    },
+    {
+     "x": 15,
+     "y": 6,
+     "vertex": "Q13",
+     "value": -1,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "adv-invade-where#0",
+   "kind": "read",
+   "text": "White has an enclosure in the upper right and a wide extension down the right side. A wide extension can be invaded: on the third line, where there is room for a two-space extension on either side (A), the invader can usually make a base while pressing the stones around it. A gap of two spaces or less is usually too narrow; an invader there is easily captured, and reducing from outside is usually better.",
+   "review": "a general principle (opening, shape, joseki, strategy) that a single position cannot prove"
+  },
+  {
+   "id": "adv-invade-where#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Invade the wide extension on the right side.",
+   "rootLead": 1.3,
+   "bestWhole": {
+    "x": 16,
+    "y": 13,
+    "vertex": "R6",
+    "value": 1.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 13,
+    "y": 3,
+    "vertex": "O16",
+    "value": 1.2,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 16,
+     "y": 6,
+     "vertex": "R13",
+     "value": 0.3,
+     "loss": 1.1,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 7,
+     "vertex": "R12",
+     "value": 0.5,
+     "loss": 0.9,
+     "lossWhole": 0.9,
+     "verdict": "ok"
+    },
+    {
+     "x": 16,
+     "y": 8,
+     "vertex": "R11",
+     "value": 0.8,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": 1.4,
+     "gain": 0.6
+    },
+    {
+     "x": 16,
+     "y": 12,
+     "vertex": "R7",
+     "value": 1.3,
+     "gain": 0.4
+    },
+    {
+     "x": 15,
+     "y": 3,
+     "vertex": "Q16",
+     "value": 0.9,
+     "gain": 0
+    },
+    {
+     "x": 13,
+     "y": 3,
+     "vertex": "O16",
+     "value": 1.2,
+     "gain": 0.3
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 1.1,
+     "gain": 0.3
+    },
+    {
+     "x": 17,
+     "y": 3,
+     "vertex": "S16",
+     "value": 0.9,
+     "gain": 0
+    },
+    {
+     "x": 16,
+     "y": 4,
+     "vertex": "R15",
+     "value": 0.7,
+     "gain": -0.2
+    },
+    {
+     "x": 15,
+     "y": 9,
+     "vertex": "Q10",
+     "value": 0.9,
+     "gain": 0.1
+    },
+    {
+     "x": 15,
+     "y": 10,
+     "vertex": "Q9",
+     "value": 0.9,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "adv-invade-where#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "The same idea on the bottom side. Black to play: invade.",
+   "rootLead": 13.1,
+   "bestWhole": {
+    "x": 16,
+    "y": 5,
+    "vertex": "R14",
+    "value": 13.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 10,
+    "y": 15,
+    "vertex": "L4",
+    "value": 12.8,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 7,
+     "y": 16,
+     "vertex": "H3",
+     "value": 12.2,
+     "loss": 1.2,
+     "lossWhole": 1.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 8,
+     "y": 16,
+     "vertex": "J3",
+     "value": 12.3,
+     "loss": 1.1,
+     "lossWhole": 1.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 16,
+     "vertex": "K3",
+     "value": 12.7,
+     "loss": 0.7,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 2,
+     "y": 5,
+     "vertex": "C14",
+     "value": 13.3,
+     "gain": 0.6
+    },
+    {
+     "x": 2,
+     "y": 13,
+     "vertex": "C6",
+     "value": 13,
+     "gain": 0.4
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": 13.4,
+     "gain": 0.7
+    },
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": 13.1,
+     "gain": 0.4
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 13.3,
+     "gain": 0.7
+    },
+    {
+     "x": 11,
+     "y": 15,
+     "vertex": "M4",
+     "value": 12.8,
+     "gain": 0.1
+    },
+    {
+     "x": 6,
+     "y": 15,
+     "vertex": "G4",
+     "value": 12.8,
+     "gain": 0.2
+    },
+    {
+     "x": 10,
+     "y": 15,
+     "vertex": "L4",
+     "value": 12.8,
+     "gain": 0.2
+    },
+    {
+     "x": 11,
+     "y": 13,
+     "vertex": "M6",
+     "value": 12.5,
+     "gain": -0.2
+    },
+    {
+     "x": 10,
+     "y": 14,
+     "vertex": "L5",
+     "value": 12.4,
+     "gain": -0.3
+    }
+   ]
+  },
+  {
+   "id": "adv-invade-33#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. White's upper right star point stone is still alone, and its other stones are far away. Invade at the 3-3 point.",
+   "rootLead": 13.3,
+   "bestWhole": {
+    "x": 2,
+    "y": 12,
+    "vertex": "C7",
+    "value": 13.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 13,
+    "y": 2,
+    "vertex": "O17",
+    "value": 13.4,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 16,
+     "y": 2,
+     "vertex": "R17",
+     "value": 13.1,
+     "loss": 0.3,
+     "lossWhole": 0.4,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 13.4,
+     "gain": 0.3
+    },
+    {
+     "x": 13,
+     "y": 3,
+     "vertex": "O16",
+     "value": 13.3,
+     "gain": 0.2
+    },
+    {
+     "x": 16,
+     "y": 3,
+     "vertex": "R16",
+     "value": 13,
+     "gain": -0.1
+    },
+    {
+     "x": 16,
+     "y": 5,
+     "vertex": "R14",
+     "value": 13.1,
+     "gain": 0.1
+    }
+   ]
+  },
+  {
+   "id": "adv-reduce-shoulder#0",
+   "kind": "read",
+   "text": "When you cannot or do not want to invade, you can reduce from above. Against a third-line stone the shoulder hit (A or B) is a common way: you sit diagonally above it, the opponent usually crawls along the third line and gets territory, and you get strength outside. Which side to choose usually depends on which one works better with your other stones.",
+   "claims": [
+    {
+     "what": "the two shoulder hits are about equal",
+     "type": "better",
+     "a": 27.2,
+     "b": 27.1,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "adv-reduce-shoulder#1",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Make a shoulder hit on the white third-line stone on the top side.",
+   "rootLead": 27.1,
+   "bestWhole": {
+    "x": 9,
+    "y": 16,
+    "vertex": "K3",
+    "value": 27.8,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 9,
+    "y": 3,
+    "vertex": "K16",
+    "value": 27.7,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": 27.2,
+     "loss": 0.5,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 3,
+     "vertex": "L16",
+     "value": 27.3,
+     "loss": 0.4,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": 27.4,
+     "gain": 0.2
+    },
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": 27.4,
+     "gain": 0.1
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": 27.3,
+     "gain": 0
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 27.2,
+     "gain": 0
+    },
+    {
+     "x": 9,
+     "y": 3,
+     "vertex": "K16",
+     "value": 27.7,
+     "gain": 0.4
+    },
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": 27.1,
+     "gain": -0.2
+    }
+   ]
+  },
+  {
+   "id": "adv-reduce-shoulder#2",
+   "kind": "place",
+   "view": "local",
+   "size": 19,
+   "toMove": 1,
+   "text": "This time the white stone is on the fourth line. Reduce it from above: a shoulder hit or a cap.",
+   "rootLead": -11.4,
+   "bestWhole": {
+    "x": 16,
+    "y": 13,
+    "vertex": "R6",
+    "value": -11.2,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 5,
+    "y": 2,
+    "vertex": "F17",
+    "value": -11.6,
+    "accepted": false
+   },
+   "topMissing": true,
+   "points": [
+    {
+     "x": 8,
+     "y": 4,
+     "vertex": "J15",
+     "value": -12.2,
+     "loss": 0.6,
+     "lossWhole": 1,
+     "verdict": "ok"
+    },
+    {
+     "x": 10,
+     "y": 4,
+     "vertex": "L15",
+     "value": -12.5,
+     "loss": 0.9,
+     "lossWhole": 1.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 9,
+     "y": 5,
+     "vertex": "K14",
+     "value": -12.7,
+     "loss": 1.2,
+     "lossWhole": 1.5,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": -11.6,
+     "gain": 0.6
+    },
+    {
+     "x": 5,
+     "y": 2,
+     "vertex": "F17",
+     "value": -11.6,
+     "gain": 0.6
+    },
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": -11.8,
+     "gain": 0.4
+    },
+    {
+     "x": 8,
+     "y": 3,
+     "vertex": "J16",
+     "value": -11.8,
+     "gain": 0.4
+    },
+    {
+     "x": 6,
+     "y": 3,
+     "vertex": "G16",
+     "value": -11.9,
+     "gain": 0.3
+    },
+    {
+     "x": 5,
+     "y": 3,
+     "vertex": "F16",
+     "value": -12,
+     "gain": 0.2
+    }
+   ]
+  },
+  {
+   "id": "adv-middle-attack-gain#0",
+   "kind": "read",
+   "text": "The aim of an attack is usually not to capture, but to gain while the opponent runs: territory, or strength. The best attacking moves often do two jobs at once, taking away the opponent's base while adding to your own area. White has split the left side; A and B both extend from a black corner and press the white stone at the same time.",
+   "claims": [
+    {
+     "what": "A and B are about equal",
+     "type": "better",
+     "a": 24.2,
+     "b": 24.2,
+     "pass": true
+    }
+   ]
+  },
+  {
+   "id": "adv-middle-attack-gain#1",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "Black to play. Extend and press the white stone on the left side with one move.",
+   "rootLead": 24,
+   "bestWhole": {
+    "x": 16,
+    "y": 2,
+    "vertex": "R17",
+    "value": 24.4,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 2,
+    "y": 12,
+    "vertex": "C7",
+    "value": 24.3,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 2,
+     "y": 7,
+     "vertex": "C12",
+     "value": 24.2,
+     "loss": 0.3,
+     "lossWhole": 0.3,
+     "verdict": "ok"
+    },
+    {
+     "x": 2,
+     "y": 11,
+     "vertex": "C8",
+     "value": 24.2,
+     "loss": 0.2,
+     "lossWhole": 0.2,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 7,
+     "vertex": "D12",
+     "value": 23.7,
+     "loss": 0.8,
+     "lossWhole": 0.8,
+     "verdict": "ok"
+    },
+    {
+     "x": 3,
+     "y": 11,
+     "vertex": "D8",
+     "value": 23.8,
+     "loss": 0.7,
+     "lossWhole": 0.7,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 13,
+     "y": 16,
+     "vertex": "O3",
+     "value": 24,
+     "gain": -0.2
+    },
+    {
+     "x": 16,
+     "y": 2,
+     "vertex": "R17",
+     "value": 24.4,
+     "gain": 0.2
+    },
+    {
+     "x": 12,
+     "y": 16,
+     "vertex": "N3",
+     "value": 24.1,
+     "gain": -0.1
+    },
+    {
+     "x": 13,
+     "y": 2,
+     "vertex": "O17",
+     "value": 24.3,
+     "gain": 0.1
+    },
+    {
+     "x": 16,
+     "y": 11,
+     "vertex": "R8",
+     "value": 24.2,
+     "gain": 0
+    },
+    {
+     "x": 2,
+     "y": 6,
+     "vertex": "C13",
+     "value": 24.2,
+     "gain": 0
+    },
+    {
+     "x": 2,
+     "y": 12,
+     "vertex": "C7",
+     "value": 24.3,
+     "gain": 0.1
+    },
+    {
+     "x": 3,
+     "y": 9,
+     "vertex": "D10",
+     "value": 24.2,
+     "gain": 0
+    },
+    {
+     "x": 3,
+     "y": 8,
+     "vertex": "D11",
+     "value": 24.2,
+     "gain": 0
+    }
+   ]
+  },
+  {
+   "id": "adv-middle-attack-gain#2",
+   "kind": "place",
+   "view": "whole",
+   "size": 19,
+   "toMove": 1,
+   "text": "The same idea on the top side. Black to play.",
+   "rootLead": 24.1,
+   "bestWhole": {
+    "x": 9,
+    "y": 3,
+    "vertex": "K16",
+    "value": 24.5,
+    "accepted": false
+   },
+   "bestLocal": {
+    "x": 9,
+    "y": 3,
+    "vertex": "K16",
+    "value": 24.5,
+    "accepted": false
+   },
+   "topMissing": false,
+   "points": [
+    {
+     "x": 7,
+     "y": 2,
+     "vertex": "H17",
+     "value": 24.4,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 2,
+     "vertex": "M17",
+     "value": 24.4,
+     "loss": 0.1,
+     "lossWhole": 0.1,
+     "verdict": "ok"
+    },
+    {
+     "x": 7,
+     "y": 3,
+     "vertex": "H16",
+     "value": 24,
+     "loss": 0.5,
+     "lossWhole": 0.5,
+     "verdict": "ok"
+    },
+    {
+     "x": 11,
+     "y": 3,
+     "vertex": "M16",
+     "value": 23.9,
+     "loss": 0.6,
+     "lossWhole": 0.6,
+     "verdict": "ok"
+    }
+   ],
+   "equal": [
+    {
+     "x": 16,
+     "y": 13,
+     "vertex": "R6",
+     "value": 24.1,
+     "gain": -0.3
+    },
+    {
+     "x": 5,
+     "y": 16,
+     "vertex": "F3",
+     "value": 24.2,
+     "gain": -0.2
+    },
+    {
+     "x": 12,
+     "y": 2,
+     "vertex": "N17",
+     "value": 24.4,
+     "gain": 0
+    },
+    {
+     "x": 6,
+     "y": 2,
+     "vertex": "G17",
+     "value": 24.5,
+     "gain": 0.1
+    },
+    {
+     "x": 9,
+     "y": 3,
+     "vertex": "K16",
+     "value": 24.5,
+     "gain": 0.1
+    }
+   ]
+  }
+ ]
+}
