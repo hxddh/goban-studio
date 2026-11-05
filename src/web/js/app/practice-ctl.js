@@ -5,7 +5,7 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
+import { currentStreak, dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE } from "../content/course.js";
@@ -333,6 +333,11 @@ export function buildDaily(now = Date.now()) {
   const rest = dailySet(p, [...dailyPool(), ...reviews].filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
   for (const x of rest) items.push({ kind: "p", id: x.id });
   return items.slice(0, 5);
+}
+
+/** v8: the practice streak as it stands today (0 once it is broken). */
+export function streakNow(now = Date.now()) {
+  return currentStreak(state.progress, now);
 }
 
 export function todaysDaily() {

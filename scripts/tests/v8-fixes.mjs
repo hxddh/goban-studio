@@ -417,4 +417,36 @@ export default async function ({ test, assert, root }) {
   } finally {
     globalThis.zero = savedHost;
   }
+
+  await test("v8 fix: a broken streak shows as none, not the old count", () => {
+    const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h, 0, 0).getTime();
+    const p = { streak: { count: 12, last: "2026-10-20" } };
+    assert.equal(persist.currentStreak(p, at(2026, 10, 20)), 12, "today");
+    assert.equal(persist.currentStreak(p, at(2026, 10, 21, 23)), 12, "yesterday: still alive");
+    assert.equal(persist.currentStreak(p, at(2026, 10, 22, 0)), 0, "two days later: broken");
+    assert.equal(persist.currentStreak({ streak: { count: 0, last: null } }, at(2026, 10, 22)), 0);
+    assert.equal(persist.currentStreak({}, at(2026, 10, 22)), 0);
+    // In the app (Today and the Daily five's last page read it from here).
+    state.progress = { ...P.loadProgress(), streak: { count: 5, last: P.todayKey(new Date(Date.now() - 3 * DAY)) } };
+    assert.equal(Practice.streakNow(), 0);
+    state.progress.streak.last = P.todayKey();
+    assert.equal(Practice.streakNow(), 5);
+  });
+
+  await test("v8 fix: the streak carries over the night after a 23-hour day (daylight saving)", () => {
+    const tz = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      // 8 March 2026 has 23 hours there; 00:30 on the 9th minus 24 h is the 7th.
+      const now = new Date(2026, 2, 9, 0, 30, 0).getTime();
+      assert.equal(persist.todayKey(new Date(now - DAY)), "2026-03-07", "the clock really jumps");
+      const p = { streak: { count: 4, last: "2026-03-08" }, problems: {}, lessons: {} };
+      persist.touchStreak(p, now);
+      assert.deepEqual(p.streak, { count: 5, last: "2026-03-09" });
+      assert.equal(persist.currentStreak({ streak: { count: 4, last: "2026-03-08" } }, now), 4);
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
 }
