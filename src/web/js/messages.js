@@ -12,6 +12,11 @@ import { V7_PLAN } from "./messages/v7-plan.js";
 import { V7_CALIBRATION } from "./messages/v7-calibration.js";
 import { V7_BOOK } from "./messages/v7-book.js";
 import { V7_PROBLEMS } from "./messages/v7-problems.js";
+import { V8_BEGINNER } from "./messages/v8-beginner.js";
+import { V8_TEACHING } from "./messages/v8-teaching.js";
+import { V8_FEEL } from "./messages/v8-feel.js";
+import { V8_FIXES } from "./messages/v8-fixes.js";
+import { V8_SIMPLIFY } from "./messages/v8-simplify.js";
 
 export const MESSAGES = {
   "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
@@ -295,7 +300,6 @@ export const MESSAGES = {
   "onboarding.new": m("从没下过", "Never", "처음입니다", "初めてです"),
   "onboarding.newHelp": m("从第一课开始：棋子、气和提子，十分钟就能下第一盘。", "Start with lesson one: stones, liberties and captures. You'll play a first game within minutes.", "1강부터 시작합니다. 돌, 활로, 따내기를 배우고 곧 첫 대국을 둡니다.", "第1課から始めます。石、呼吸点、石の取り方を学び、すぐに最初の一局を打てます。"),
   "onboarding.rules": m("懂规则，刚开始下", "I know the rules", "규칙은 압니다", "ルールは知っています"),
-  "onboarding.rulesHelp": m("在标准的 19 路棋盘上和一个温和的对手下一盘。", "Play a gentle opponent on the standard 19×19 board.", "표준 19줄 판에서 순한 상대와 한 판 둡니다.", "標準の19路盤でやさしい相手と一局打ちます。"),
   "onboarding.player": m("我会下", "I play regularly", "꾸준히 둡니다", "よく打ちます"),
   "onboarding.playerHelp": m("告诉我们大概棋力，在 19 路上下一盘。", "Tell us roughly how strong you are and play on 19×19.", "대략적인 기력을 알려 주고 19줄에서 둡니다.", "おおよその棋力を教えて、19路で打ちます。"),
   "onboarding.rankQuestion": m("你大概是什么棋力？", "Roughly how strong are you?", "기력이 대략 어느 정도인가요?", "棋力はどのくらいですか？"),
@@ -1101,4 +1105,10 @@ export const MESSAGES = {
   ...V7_CALIBRATION,
   ...V7_BOOK,
   ...V7_PROBLEMS,
+  // v8: one file per area (src/web/js/messages/v8-*.js).
+  ...V8_BEGINNER,
+  ...V8_TEACHING,
+  ...V8_FEEL,
+  ...V8_FIXES,
+  ...V8_SIMPLIFY,
 };

@@ -10,11 +10,13 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { storyText } from "./story.js";
+import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
+import { FirstCountNote } from "./beginner.jsx";
 
 export function rankLabel(id) {
   const r = rankParts(id);
@@ -241,26 +243,23 @@ function MoveStrip() {
     C.reviewCurrentGame();
     C.reviewGoto(i);
   };
+  // v8: before the first move, one quiet line (the opening tip while
+  // teaching, else where to start and how to find the keys) instead of a
+  // heading, "No moves yet" and a table of keys.
+  const tip = line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13;
   return (
     <section class="moves" aria-label={t("play.moveList")}>
-      <h2 class="slot-title">{t("play.moveList")}</h2>
-      {line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13 && (
-        <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>
-      )}
+      {line.length > 0 && <h2 class="slot-title">{t("play.moveList")}</h2>}
+      {tip && <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>}
       {line.length === 0 ? (
-        <div class="moves-empty">
-          <p>{t("play.noMoves")}</p>
-          <dl class="key-hints">
-            <dt>{t("play.hint.click")}</dt>
-            <dd>{t("play.hint.place")}</dd>
-            <dt>{`${MOD}${SHIFT}P`}</dt>
-            <dd>{t("common.pass")}</dd>
-            <dt>{`${MOD}Z`}</dt>
-            <dd>{t("common.undo")}</dd>
-            <dt>{`${MOD}${SHIFT}R`}</dt>
-            <dd>{t("review.title")}</dd>
-          </dl>
-        </div>
+        !tip && (
+          <p class="moves-empty fine">
+            {t("play.firstMove")}{" "}
+            <button type="button" class="link" onClick={() => C.openSheet("shortcuts")}>
+              {t("play.keys")}
+            </button>
+          </p>
+        )
       ) : (
         <ol class="move-grid" ref={ref}>
           {line.map((n, k) => {
@@ -288,7 +287,7 @@ function TeachCard() {
   return (
     <section class="card teach enter-up" role="alertdialog" aria-live="assertive" aria-labelledby="teach-title">
       <h2 id="teach-title">{t("teach.title")}</h2>
-      <p>{t("teach.body", [formatPoints(p.loss)])}</p>
+      <p>{warningText(formatPoints(p.loss), p.reason)}</p>
       <div class="actions wrap">
         <Button kind="primary" icon="undo" onClick={C.teachTakeBack}>
           {t("teach.takeBack")}
@@ -356,7 +355,7 @@ function PlayPanel() {
         )}
         {g.hint && (
           <p class="note">
-            <Icon name="bulb" size={15} /> {t("play.hintAt", [coordLabel(g.hint.x, g.hint.y, game.size)])}
+            <Icon name="bulb" size={15} /> {hintText(coordLabel(g.hint.x, g.hint.y, game.size), g.hint.reason)}
           </p>
         )}
         {g.ghost && <p class="fine">{t("play.confirmHint")}</p>}
@@ -376,6 +375,7 @@ function ScoringCard() {
     <section class="card score-card enter-up" aria-live="polite">
       <h2>{t(s.method === "area" ? "score.titleArea" : "score.title")}</h2>
       <p class="muted">{pending ? t("score.judging") : sc.source === "katago" ? t("score.engineMarked") : t("score.manual")}</p>
+      <FirstCountNote />
       <div class="score-pair">
         <div>
           <Stone color={BLACK} size={14} />
@@ -917,12 +917,13 @@ function ReviewPanel() {
         <>
           <Chart />
           <LiveLine />
-          <BookExitNote game={r.game} onGoto={C.reviewGoto} />
-          {(r.analyzing || r.engine !== "katago") && (
-            <p class="fine" aria-live="polite">
-              {r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}
-            </p>
-          )}
+          {/* v8: one quiet status line — the analysis, then where the game left the book. */}
+          <p class="fine review-status" aria-live="polite">
+            {(r.analyzing || r.engine !== "katago") && (
+              <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
+            )}
+            <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
+          </p>
           <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
@@ -936,7 +937,7 @@ function ReviewPanel() {
                       ))}
                     </ol>
                   ) : (
-                    <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
+                    !r.analyzing && <p class="muted">{noMistakesText(r)}</p>
                   )}
                 </section>
                 <Variations />

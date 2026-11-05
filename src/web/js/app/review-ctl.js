@@ -123,9 +123,14 @@ export function openReview(game, meta = {}) {
   stopLive();
   if (!isRestoring()) remember();
   const line = game.mainLine();
+  // v8: the game in play, still going: where it stands, so that moves tried
+  // in the review never become the game's own moves (settleLive).
+  const end = line[line.length - 1];
+  const live = (meta.source || "current") === "current" && state.game?.game === game && !end.result ? { end, kids: end.children.slice() } : null;
   const startAt = meta.startAt ?? line.length - 1;
   game.goto(line[Math.max(0, Math.min(line.length - 1, startAt))].id);
   const review = {
+    live0: live,
     game,
     source: meta.source || "current",
     meta,
@@ -171,8 +176,21 @@ export function openReview(game, meta = {}) {
   startLive();
 }
 
+/**
+ * v8: leaving a review of the game in play: moves tried from its last
+ * position are dropped, and its own line is the main line again, before
+ * anything is saved or the game carries on.
+ */
+function settleLive(r) {
+  const at = r?.live0;
+  if (!at) return;
+  at.end.children = at.end.children.filter((c) => at.kids.includes(c));
+  if (!r.game.isMainLine(at.end)) r.game.promoteVariation(at.end);
+}
+
 export function closeReview() {
   const r = state.review;
+  settleLive(r);
   if (r) saveEdits(r);
   if (canGoBack() && back()) return;
   stopReviewWork(r);
@@ -188,6 +206,7 @@ export function closeReview() {
 /** Leave a review without touching history (used by restore). */
 export function dropReview(r = state.review) {
   if (!r) return;
+  settleLive(r);
   saveEdits(r);
   stopReviewWork(r);
   stopLive();
@@ -411,29 +430,44 @@ function edited(r, { mainBefore = null } = {}) {
 }
 
 /**
+ * Save edited moves to a record, where it is in the list (an edit is not a
+ * new game). A stored report of other moves (a variation promoted, moves
+ * deleted) is dropped, so a new one is made; comments and marks keep it.
+ * Returns false when it could not be written (storage full).
+ */
+function saveRecord(id, game) {
+  const rec = Lib.saveGame(game, { id, keepPlace: true });
+  if (!rec) {
+    toast(t("toast.saveFailed"), "error");
+    return false;
+  }
+  if (rec.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
+  return true;
+}
+
+/**
  * Write pending edits now (they are otherwise saved 0.4 s after the last
  * one, and when the review closes). Returns true when something was saved.
  */
-/**
- * Save edited moves to a record. A stored report of other moves (a
- * variation promoted, moves deleted) is dropped, so the report and
- * Analyse all make it again; comments and marks keep it.
- */
-function saveRecord(id, game) {
-  const rec = Lib.saveGame(game, { id });
-  if (rec?.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
-}
-
 export function saveEdits(r = state.review) {
   clearTimeout(saveTimer);
   if (!r?.edits?.dirty) return false;
   const target = editTarget(r);
   if (target === "record") {
     if (!Lib.getGame(r.meta.recordId)) return false;
-    saveRecord(r.meta.recordId, r.game);
+    if (!saveRecord(r.meta.recordId, r.game)) return false;
   } else if (target === "current") {
-    persistCurrent();
-    if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
+    // v8: moves tried from where the game in play stands are not saved
+    // with it (the review is still open; settleLive drops them on leaving).
+    const at = r.live0;
+    const all = at?.end.children;
+    if (at) at.end.children = all.filter((c) => at.kids.includes(c));
+    try {
+      persistCurrent();
+      if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
+    } finally {
+      if (at) at.end.children = all;
+    }
   } else return false;
   r.edits = { ...r.edits, dirty: false, savedAt: Date.now(), target };
   return true;
@@ -716,6 +750,9 @@ export function practiceThis(km) {
     loss: km.loss,
     theme: km.theme,
     size: r.game.size,
+    // v8: a drill from a classic game or a pro opening is not the player's
+    // own mistake; the training plan leaves it out of the weak themes.
+    ...(r.meta.classicId || r.meta.openingId ? { own: false } : {}),
   };
   addMistake(state.progress, m);
   const id = `${key}-${km.index}`;
@@ -747,7 +784,7 @@ export function guessPlay(x, y) {
 
 export function revealGuess() {
   const r = state.review;
-  if (!r?.guess) return;
+  if (!r?.guess || r.guess.done) return;
   r.guess.last = "revealed";
   advanceGuess();
 }
@@ -776,6 +813,14 @@ export function toggleGuess() {
   if (!r) return;
   r.guess = r.guess ? null : { color: null, right: 0, tries: 0, last: null };
   if (r.guess) {
+    // v8: guessing needs a next move of the game: from a variation, the
+    // main-line move it left; from the last move, the start of the game.
+    const line = r.game.mainLine();
+    let n = r.game.current;
+    while (n.parent && !line.includes(n)) n = n.parent;
+    if (n === line[line.length - 1]) n = line[0];
+    r.game.goto(n.id);
+    r.variation = null;
     stopLive();
     r.live = null;
   } else startLive();

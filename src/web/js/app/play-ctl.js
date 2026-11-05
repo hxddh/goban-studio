@@ -13,7 +13,8 @@ import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, 
 import { state, update, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
 import { confirmAction, openSheet, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
-import { complexity, settled, addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
 import { ratingToRank } from "./rating.js";
 import { estimateNow, rateGame, recommendStrength, startEstimate } from "./strength.js";
@@ -21,6 +22,7 @@ import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
 import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { notePoints, queueReport } from "./report-ctl.js";
 import { themeLosses } from "./plan.js";
+import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -53,7 +55,7 @@ export function freshGameState(game, meta = {}) {
     before: null, // analysis of the position before the player's move (teaching)
     pending: null, // teaching warning waiting for the player's choice
     proposal: false, // "the game looks finished — count?"
-    proposalSeen: -1,
+    proposalSeen: -1, // v8: the move number of the last "keep playing"
     aiLow: 0,
     ghost: null, // two-click placement
     captureFx: null,
@@ -69,6 +71,9 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
+      // v8: a game saved during the count (both passed) counts again;
+      // otherwise it would have neither a count nor its play controls.
+      if (game.phase === "scoring" && !game.current.result) startScoring();
       return;
     } catch (_) {
       /* fall through */
@@ -113,6 +118,11 @@ export function saveToLibrary({ quiet = false } = {}) {
   const g = state.game;
   if (!g || g.game.moveNumber === 0) return null;
   const rec = Lib.saveGame(g.game, recordMeta(g));
+  if (!rec) {
+    // v8: storage is full; say so instead of "Saved".
+    toast(t("toast.saveFailed"), "error");
+    return null;
+  }
   g.recordId = rec.id;
   g.saved = true;
   persistCurrent();
@@ -298,29 +308,21 @@ export async function ponder() {
   update();
 }
 
-function checkProposal(a) {
-  const g = state.game;
-  const n = g.game.moveNumber;
-  if (n < (g.game.size * g.game.size) / 3 || g.proposalSeen === g.game.current.id) return;
-  if (settled(a.ownership) && a.moves[0] && (a.moves[0].pass || Math.abs((a.moves[1]?.scoreLead ?? a.moves[0].scoreLead) - a.moves[0].scoreLead) < 0.6)) {
-    g.proposal = true;
-  }
+/**
+ * "Shall we count?" on a settled board (feel.js countReady). v8: after
+ * "keep playing" it waits three moves each before it asks again.
+ */
+function proposalWaits(g) {
+  return g.proposalSeen >= 0 && g.game.moveNumber < g.proposalSeen + 6;
 }
 
-/**
- * How long the computer seems to think (ms). Tuned for the 19×19 game that
- * is now the default: the opening is brisk, fighting takes longer, and
- * nothing ever drags past 3.5 s or flickers under 0.35 s (docs/design.md §8).
- */
-export function thinkTime(strengthId, a, moveNumber, size, rnd = Math.random) {
-  const st = Engine.strengthById(strengthId);
-  const base = st.rank >= 20 ? 520 : st.rank >= 10 ? 820 : st.rank >= 1 ? 1150 : 1500;
-  const c = complexity(a);
-  const opening = moveNumber < (size >= 19 ? 30 : size) ? 0.55 : 1;
-  const endgame = size >= 13 && moveNumber > size * size * 0.6 ? 0.75 : 1;
-  const jitter = 0.85 + rnd() * 0.3;
-  return Math.max(350, Math.min(3500, Math.round(base * (0.55 + c * 1.5) * opening * endgame * jitter)));
+function checkProposal(a) {
+  const g = state.game;
+  if (!proposalWaits(g) && countReady(a, g.game.moveNumber, g.game.size)) g.proposal = true;
 }
+
+/** How long the computer seems to think (ms): feel.js. */
+export { thinkTime };
 
 export async function maybeComputerMove({ afterHuman = false } = {}) {
   const g = state.game;
@@ -348,8 +350,11 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
       const threshold = state.settings.playerRank != null && state.settings.playerRank <= 10 ? 6 : 4;
       if (loss >= threshold) {
         g.thinking = false;
-        g.pending = { loss: Math.round(loss * 2) / 2, move: g.game.current.move, best: best.pass ? null : { x: best.x, y: best.y }, result };
-        announce(t("teach.warn", [Math.round(loss)]));
+        const move = g.game.current.move;
+        // v8: one reason, from the two searches already made (no new search).
+        const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
+        g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
+        announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
         update();
         return;
       }
@@ -360,23 +365,25 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
 
 async function reply(g, gen, result, started) {
   const a = result.analysis;
-  // Resign when hopeless — except the gentlest levels, which play it out.
-  if (a && Number.isFinite(a.winrate)) {
-    const aiColor = -g.humanColor;
-    const aiWin = aiColor === BLACK ? a.winrate : 1 - a.winrate;
-    const deficit = aiColor * (a.scoreLead ?? 0);
-    const st = Engine.strengthById(g.strength);
-    if (aiWin < 0.03 && deficit < -15 && g.game.moveNumber > (g.game.size * g.game.size) / 5) g.aiLow++;
-    else g.aiLow = 0;
-    if (g.aiLow >= 3 && st.rank <= 15) {
-      g.thinking = false;
-      g.game.resign(aiColor);
-      toast(t("play.computerResigned"));
-      finishGame();
-      return;
-    }
-    checkProposal(a);
+  // Resign when clearly lost — except the gentlest levels, which play it
+  // out (feel.js resignStep).
+  const aiColor = -g.humanColor;
+  const empty = g.game.board.signMap.reduce((n, row) => n + row.filter((v) => !v).length, 0);
+  const verdict = resignStep(g.aiLow, { strengthId: g.strength, analysis: a, aiColor, moveNumber: g.game.moveNumber, size: g.game.size, empty });
+  g.aiLow = verdict.low;
+  if (verdict.resign) {
+    g.thinking = false;
+    g.game.resign(aiColor);
+    toast(t("play.computerResigned"));
+    finishGame();
+    return;
   }
+  // v8: a board settled before one of KataGo's own quiet moves is settled
+  // after it, so the count is offered on the player's turn even when
+  // nothing ponders there (before v8 it was cleared by the move itself).
+  const mv = result.move;
+  const quiet = !!a && !!mv && !mv.pass && a.moves.some((m) => m.visits > 0 && !m.pass && m.x === mv.x && m.y === mv.y);
+  const ready = quiet && countReady(a, g.game.moveNumber + 1, g.game.size);
   // Pace the reply like a person: quick when obvious, slower when it is not.
   const target = thinkTime(g.strength, a, g.game.moveNumber, g.game.size);
   const wait = target - (performance.now() - started);
@@ -398,6 +405,9 @@ async function reply(g, gen, result, started) {
   } else if (!playOnGame(move.x, move.y)) {
     g.game.pass();
     afterMove();
+  } else if (ready && !proposalWaits(g)) {
+    g.proposal = true;
+    update();
   }
   if (!gameOver(g) && !g.scoring) ponder();
 }
@@ -444,6 +454,7 @@ export function undo() {
   g.hint = null;
   g.ghost = null;
   g.proposal = false;
+  g.aiLow = 0;
   if (g.game.current.result) g.game.current.result = null;
   g.game.undo();
   if (g.opponent === "ai" && g.game.turn !== g.humanColor && g.game.current.parent) g.game.undo();
@@ -492,7 +503,7 @@ export function dismissProposal() {
   const g = state.game;
   if (!g) return;
   g.proposal = false;
-  g.proposalSeen = g.game.current.id;
+  g.proposalSeen = g.game.moveNumber;
   update();
 }
 
@@ -530,8 +541,8 @@ export async function askHint() {
   g.thinking = false;
   g.hints++;
   if (h && !h.pass) {
-    g.hint = { x: h.x, y: h.y };
-    announce(t("play.hintAt", [coordLabel(h.x, h.y, g.game.size)]));
+    g.hint = { x: h.x, y: h.y, reason: hintReason(g.game.current.board.signMap, g.game.turn, h) };
+    announce(hintText(coordLabel(h.x, h.y, g.game.size), g.hint.reason));
   } else toast(t("play.hintPass"));
   persistCurrent();
   update();
@@ -581,7 +592,8 @@ async function startScoring() {
 
 export function toggleDead(x, y) {
   const g = state.game;
-  if (!g?.scoring) return;
+  // v8: not while KataGo is still marking (its answer would undo the click).
+  if (!g?.scoring || g.scoring.source === "pending") return;
   const v = g.game.board.get([x, y]);
   if (!v) return;
   const chain = g.game.board.getChain([x, y]).map(([cx, cy]) => ({ x: cx, y: cy }));

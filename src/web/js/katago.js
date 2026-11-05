@@ -42,6 +42,14 @@ import { BLACK, LETTERS, coordLabel, rulesetById } from "./rules.js";
 const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
 
 let probe = null;
+// v8: whether a running search can be stopped (async hosts); a sync host
+// finishes every search it starts, so the scheduler must not pre-empt it.
+let cancellable = true;
+
+/** False once status() has found a host that cannot cancel a search. */
+export function canCancel() {
+  return cancellable;
+}
 
 /** { available, engine, version, async, stream, ... } — cached per session. */
 export async function status() {
@@ -51,7 +59,9 @@ export async function status() {
     try {
       const value = await nativeInvoke("studio.katagoStatus");
       if (!value || typeof value !== "object") return OFFLINE;
-      return { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
+      const st = { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
+      cancellable = st.async;
+      return st;
     } catch (_) {
       return OFFLINE;
     }

@@ -41,6 +41,8 @@ function lineName(mode, id) {
 
 export function ExplorerView() {
   const e = X.explorerState();
+  // v8: the book is fetched on first use; a moment's empty page until then.
+  if (!e) return <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
   const mode = e.mode;
   const node = e.game.current;
   const cands = X.explorerCandidates(e);
@@ -211,7 +213,7 @@ export function ExplorerEntries() {
                 <strong>{t(mode === "corner" ? "explorer.corner" : "explorer.whole")}</strong>
                 <span class="muted">{t(mode === "corner" ? "explorer.cornerHelp" : "explorer.wholeHelp")}</span>
               </span>
-              <span class="fine">{t("explorer.positions", [b.trees[mode]?.nodes.length || 0])}</span>
+              {b && <span class="fine">{t("explorer.positions", [b.trees[mode]?.nodes.length || 0])}</span>}
               <Icon name="next" size={15} />
             </button>
           </li>
@@ -225,16 +227,17 @@ export function ExplorerEntries() {
  * Review: where a 19×19 game left the opening book, as one quiet line with
  * a link to that move. Nothing for games the book does not cover.
  */
-export function BookExitNote({ game, onGoto }) {
+export function BookExitNote({ game, onGoto, inline = false }) {
   const n = X.bookExit(game);
   if (!n) return null;
+  const Tag = inline ? "span" : "p";
   const total = game.mainLine().length - 1;
-  if (n >= total) return <p class="fine book-exit">{t("explorer.inBookAll", [n])}</p>;
+  if (n >= total) return <Tag class="fine book-exit">{t("explorer.inBookAll", [n])}</Tag>;
   return (
-    <p class="fine book-exit">
+    <Tag class="fine book-exit">
       <button type="button" class="link" onClick={() => onGoto(n + 1)}>
         {t("explorer.leftBook", [n + 1])}
       </button>
-    </p>
+    </Tag>
   );
 }

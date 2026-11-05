@@ -185,6 +185,7 @@ jobs:
           test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
+          test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/content/book.json"
           codesign --verify --deep --strict dist/GobanStudio.app
           printf 'boardsize 19\nkata-set-rules japanese\ngenmove B\nquit\n' | \
             "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago" gtp \

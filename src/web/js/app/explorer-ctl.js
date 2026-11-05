@@ -25,10 +25,36 @@ export const EXPLORER_MODES = ["whole", "corner"];
 export const CORNER_AREA = { x0: 9, y0: 0, x1: 18, y1: 9 };
 
 let book = null;
+// v8: the app bundle leaves the book out (scripts/bundle.mjs LAZY_DATA:
+// BOOK_JSON is null there) and fetches content/book.json once, soon after
+// start-up or on first use, whichever comes first; tests bundle it.
+let raw = BOOK_JSON;
+let fetching = null;
 
-/** The indexed book, loaded on first use. */
+function fetchBook() {
+  if (raw || fetching || typeof fetch !== "function") return;
+  fetching = fetch("content/book.json")
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("book " + r.status))))
+    .then((data) => {
+      raw = data;
+      // Whatever waited for it (the explorer, a review's book note) shows now.
+      refresh();
+    })
+    .catch((error) => {
+      console.warn("The opening book could not be loaded.", error);
+      fetching = null;
+    });
+}
+
+if (!raw && typeof window !== "undefined") {
+  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+  idle(fetchBook, { timeout: 3000 });
+}
+
+/** The indexed book, or null while it is still loading (v8). */
 export function theBook() {
-  if (!book) book = loadBook(BOOK_JSON);
+  if (!book && raw) book = loadBook(raw);
+  if (!book) fetchBook();
   return book;
 }
 
@@ -44,6 +70,7 @@ function newExplorerGame(mode) {
 function ensure(mode) {
   const e = state.explorer;
   if (e && e.mode === mode) return e;
+  if (!theBook()) return null;
   const kept = state.explorerKept?.[mode];
   const next = kept || { mode, game: newExplorerGame(mode), live: null, forward: [] };
   state.explorerKept = { ...(state.explorerKept || {}), [mode]: next };
@@ -345,8 +372,10 @@ export function explorerPlayFromHere() {
 export function bookExit(game) {
   if (!game || game.size !== 19) return null;
   if (stonesOf(game.root.board.signMap).length) return null;
+  const b = theBook();
+  if (!b) return null;
   const moves = game.mainLine().slice(1).map((n) => n.move);
-  return bookDepth(theBook().trees.whole, moves);
+  return bookDepth(b.trees.whole, moves);
 }
 
 export { decodeMove };

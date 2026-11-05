@@ -3,7 +3,7 @@
     .name = "goban-studio",
     .display_name = "Goban Studio",
     .description = "Goban Studio — learn, play and review Go (围棋 · 바둑 · 囲碁) on macOS & Windows.",
-    .version = "7.0.0",
+    .version = "8.0.0",
     .icons = .{"assets/icon.png"},
     .platforms = .{ "macos", "windows" },
     .permissions = .{},

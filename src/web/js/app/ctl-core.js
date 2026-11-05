@@ -111,6 +111,7 @@ export function locationNow() {
       problemId: p.problem?.def?.id || null,
       mistakeId: p.mistake?.m?.id || null,
       daily: !!p.daily,
+      captureFrom: p.capture?.from || null, // v8
     },
     library: { ...state.library },
     // v6
