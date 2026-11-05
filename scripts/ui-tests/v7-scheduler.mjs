@@ -43,7 +43,7 @@ export default async function ({ check, assert, fresh, onboard }) {
     const notes = await page.locator(".game-row .row-analysis").allTextContents();
     assert(notes.length === 1 && /Analysing… \d+%/.test(notes[0]), `only the game being analysed says so: ${notes.join(" | ")}`);
     await page.keyboard.press("Control+,");
-    await page.click('[data-pane="engine"]');
+    await page.click('[data-pane="playing"]');
     await page.waitForSelector(".settings-pane");
     assert((await page.locator(".bg-jobs").count()) === 0, "a background list in Settings");
     await page.keyboard.press("Escape");
