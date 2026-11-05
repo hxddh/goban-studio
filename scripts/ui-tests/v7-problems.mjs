@@ -19,7 +19,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await onboard(page, 1);
     await page.keyboard.press("Control+3");
     await page.waitForSelector(".collections-section");
-    assert((await page.textContent(".collections-section")).includes("Your collections"), "no section");
+    // v8: with no collection yet, only a quiet import link.
+    assert((await page.textContent(".collections-section")).includes("Import SGF problems"), "no import link");
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(".collections-actions .btn >> nth=0")]);
     assert(chooser.isMultiple(), "the picker takes many files");
     await chooser.setFiles([path.join(fixtures, "collection.sgf"), path.join(fixtures, "white-capture.sgf")]);

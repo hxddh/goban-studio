@@ -351,7 +351,7 @@ await check("v6 explorer: opens from the Library, a book move shows candidates, 
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+4");
-  await page.click(".tabs-row .segmented button >> nth=3");
+  await page.click(".tabs-row .segmented button >> nth=-1");
   await page.click('.collection-row[data-explorer="whole"]');
   await page.waitForSelector(".explorer-panel");
   const start = await page.locator(".explorer-row").count();

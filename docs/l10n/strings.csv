@@ -918,3 +918,5 @@
 "v7problems.answer","Answer: {0}","正解：{0}","","정답: {0}","","正解：{0}",""
 "v7problems.koGoal"," (ko)","（劫）",""," (패)","","（コウ）",""
 "v7problems.source","{0} · tree {1}","{0} · 第 {1} 题","","{0} · {1}번째","","{0} · {1}番目",""
+"play.firstMove","Click the board to play.","点击棋盘落子。","","바둑판을 눌러 돌을 놓으세요.","","盤をクリックして打ちます。",""
+"play.keys","Keyboard shortcuts","快捷键","","단축키","","ショートカット",""

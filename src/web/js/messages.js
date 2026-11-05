@@ -12,6 +12,11 @@ import { V7_PLAN } from "./messages/v7-plan.js";
 import { V7_CALIBRATION } from "./messages/v7-calibration.js";
 import { V7_BOOK } from "./messages/v7-book.js";
 import { V7_PROBLEMS } from "./messages/v7-problems.js";
+import { V8_BEGINNER } from "./messages/v8-beginner.js";
+import { V8_TEACHING } from "./messages/v8-teaching.js";
+import { V8_FEEL } from "./messages/v8-feel.js";
+import { V8_FIXES } from "./messages/v8-fixes.js";
+import { V8_SIMPLIFY } from "./messages/v8-simplify.js";
 
 export const MESSAGES = {
   "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
@@ -1101,4 +1106,10 @@ export const MESSAGES = {
   ...V7_CALIBRATION,
   ...V7_BOOK,
   ...V7_PROBLEMS,
+  // v8: one file per area (src/web/js/messages/v8-*.js).
+  ...V8_BEGINNER,
+  ...V8_TEACHING,
+  ...V8_FEEL,
+  ...V8_FIXES,
+  ...V8_SIMPLIFY,
 };

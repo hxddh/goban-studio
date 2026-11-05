@@ -1,0 +1,5 @@
+/**
+ * v8 tests: bug fixes. Loaded by scripts/test.mjs (every file in
+ * scripts/tests/, in name order); receives the runner's helpers.
+ */
+export default async function ({ test, assert, root }) {}

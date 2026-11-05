@@ -29,45 +29,24 @@ export default async function ({ check, assert, fresh, onboard }) {
     await page.waitForSelector(".page, canvas.board");
   }
 
-  await check("v7 scheduler: Settings shows nothing in the background when idle", async () => {
-    const page = await fresh();
-    await onboard(page, 1);
-    await page.keyboard.press("Control+,");
-    await page.click('[data-pane="engine"]');
-    await page.waitForSelector(".settings-pane");
-    assert((await page.locator(".bg-jobs").count()) === 0, "a background list while idle");
-    await page.close();
-  });
-
-  await check("v7 scheduler: Analyse all runs in the background, shows on rows and in Settings, and stops", async () => {
+  await check("v8: no background list in Settings and no Analyse all button; older games are analysed by themselves", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await seed(page, 14, 150);
     await page.keyboard.press("Control+4");
-    const button = page.locator(".toolbar .analyse-all");
-    await button.waitFor();
-    assert((await button.textContent()).includes("Analyse all"), "the button");
-    await button.click();
+    await page.waitForSelector(".game-row");
+    assert((await page.locator(".toolbar .analyse-all").count()) === 0, "an Analyse all button");
+    // The automatic pass (with KataGo it starts a short while after launch).
+    await page.evaluate(() => window.__autoAnalyse());
     await page.waitForFunction(() => window.__state.batch && window.__state.batch.total === 14);
     await page.waitForSelector(".game-row .row-analysis", { timeout: 5000 });
     const notes = await page.locator(".game-row .row-analysis").allTextContents();
-    assert(notes.some((s) => /Analysing… \d+%|Waiting to be analysed/.test(s)), `row notes: ${notes.join(" | ")}`);
-    // Settings → Opponents and analysis: the batch, with its progress and Stop.
+    assert(notes.length === 1 && /Analysing… \d+%/.test(notes[0]), `only the game being analysed says so: ${notes.join(" | ")}`);
     await page.keyboard.press("Control+,");
-    await page.click('[data-pane="engine"]');
-    const job = page.locator(".bg-job");
-    await job.first().waitFor({ timeout: 5000 });
-    const text = await job.first().textContent();
-    assert(/Analysing your games — \d+ of 14 — \d+%/.test(text), `job text: ${text}`);
-    assert((await page.locator(".settings-sheet .btn.primary").count()) <= 1, "no extra primary button");
-    await job.first().locator("button").click();
-    await page.waitForFunction(() => !window.__state.batch, null, { timeout: 5000 });
-    await page.waitForFunction(() => !document.querySelector(".bg-jobs"), null, { timeout: 5000 });
-    const saved = await page.evaluate(() => localStorage.getItem("goban-studio.batch.v7"));
-    assert(saved === null, "a cancelled batch is forgotten");
+    await page.click('[data-pane="playing"]');
+    await page.waitForSelector(".settings-pane");
+    assert((await page.locator(".bg-jobs").count()) === 0, "a background list in Settings");
     await page.keyboard.press("Escape");
-    // Library offers it again for the games still without a report.
-    await page.waitForFunction(() => document.querySelector(".toolbar .analyse-all")?.textContent.includes("Analyse all"), null, { timeout: 5000 });
     await page.close();
   });
 
@@ -76,11 +55,10 @@ export default async function ({ check, assert, fresh, onboard }) {
     await onboard(page, 1);
     await seed(page, 3, 30);
     await page.keyboard.press("Control+4");
-    await page.locator(".toolbar .analyse-all").click();
-    await page.waitForFunction(() => !window.__state.batch, null, { timeout: 20000 });
+    await page.evaluate(() => window.__autoAnalyse());
+    await page.waitForFunction(() => window.__state.batch === null && JSON.parse(localStorage.getItem("goban-studio.library.v2")).games.every((g) => g.report), null, { timeout: 20000 });
     const reports = await page.evaluate(() => JSON.parse(localStorage.getItem("goban-studio.library.v2")).games.filter((g) => g.report).length);
     assert(reports === 3, `reports stored: ${reports}`);
-    assert((await page.locator(".toolbar .analyse-all").count()) === 0, "nothing left to analyse");
     // The library row's menu → Report.
     await page.locator(".game-item [aria-haspopup]").first().click();
     await page.locator("[role=menuitem]").filter({ hasText: "Report" }).first().click();
