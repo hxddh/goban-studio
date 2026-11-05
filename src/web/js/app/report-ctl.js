@@ -24,7 +24,7 @@ import { loadSGF } from "../sgf.js";
 import * as Lib from "../library.js";
 import * as Engine from "../engine.js";
 import { t } from "../i18n.js";
-import { addMistake } from "../persist.js";
+import { addMistake, readJSON, writeJSON } from "../persist.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast } from "./store.js";
 import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
@@ -65,6 +65,54 @@ export function reportJob(recordId) {
 /** A record whose stored report is current (an estimate is redone once KataGo is there). */
 function reportCurrent(rec, game) {
   return reportFits(rec.report, game) && !(rec.report.confidence !== "high" && state.engine.available);
+}
+
+/**
+ * v8: a one-time check, a few games at a time when the app is idle, that
+ * drops stored reports that no longer fit their game. Since v7 saving an
+ * edit drops such a report, but one stored before v7 for a game edited
+ * later stays, and wantsReport() (which does not parse the game) would skip
+ * that game for ever. Resolves the number dropped; once it has finished it
+ * is not run again (REPORTS_CHECKED_KEY).
+ */
+export const REPORTS_CHECKED_KEY = "goban-studio.reportsChecked.v8";
+const idle = () =>
+  new Promise((resolve) => (typeof globalThis.requestIdleCallback === "function" ? globalThis.requestIdleCallback(() => resolve(), { timeout: 2000 }) : setTimeout(resolve, 0)));
+let staleCheck = null;
+export function dropStaleReports({ chunk = 10, wait = idle, force = false } = {}) {
+  if (staleCheck) return staleCheck;
+  if (!force && readJSON(REPORTS_CHECKED_KEY, null)) return Promise.resolve(0);
+  staleCheck = (async () => {
+    let dropped = 0;
+    const ids = Lib.listGames()
+      .filter((rec) => rec.report)
+      .map((rec) => rec.id);
+    for (let i = 0; i < ids.length; i += chunk) {
+      await wait();
+      // One read of the library per chunk; each game is checked and, if
+      // need be, patched without waiting in between (nothing can write it
+      // meanwhile).
+      const byId = new Map(Lib.listGames().map((rec) => [rec.id, rec]));
+      for (const id of ids.slice(i, i + chunk)) {
+        const rec = byId.get(id);
+        if (!rec?.report || jobs.has(id)) continue;
+        let game = null;
+        try {
+          game = loadSGF(rec.sgf).game;
+        } catch (_) {
+          continue;
+        }
+        if (reportFits(rec.report, game)) continue;
+        Lib.patchGame(id, { report: null });
+        dropped++;
+      }
+    }
+    writeJSON(REPORTS_CHECKED_KEY, { v: 1, at: Date.now(), dropped });
+    return dropped;
+  })().finally(() => {
+    staleCheck = null;
+  });
+  return staleCheck;
 }
 
 /** Cheap check without parsing the game: it may need a report. */

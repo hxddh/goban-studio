@@ -716,6 +716,9 @@ export function practiceThis(km) {
     loss: km.loss,
     theme: km.theme,
     size: r.game.size,
+    // v8: a drill from a classic game or a pro opening is not the player's
+    // own mistake; the training plan leaves it out of the weak themes.
+    ...(r.meta.classicId || r.meta.openingId ? { own: false } : {}),
   };
   addMistake(state.progress, m);
   const id = `${key}-${km.index}`;

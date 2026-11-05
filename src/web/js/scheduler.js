@@ -12,9 +12,12 @@
  * One search runs at a time (the host's KataGo serves one request; a new one
  * would supersede the running one). When a search ends, the next one comes
  * from the highest lane that has work queued, so nothing new from a lower
- * lane starts while higher work waits. A running search is never killed to
- * make room: searches are short (a background search is 32–80 visits), so a
- * computer's move waits for at most one of them.
+ * lane starts while higher work waits. v8: a computer's move (the move
+ * lane) also pre-empts a background search that is already running: that
+ * search is stopped and goes back to the front of its lane, and its caller
+ * simply gets the result of the second run (a report keeps the positions it
+ * has and carries on). A search is pre-emptible unless it was queued with
+ * `preemptible: false` (a host that cannot cancel a search).
  *
  * Cancellation is one model everywhere: AbortSignal.
  *
@@ -83,6 +86,7 @@ export function createScheduler() {
   let nextJob = 0;
   let nextOwner = 0;
   let notifying = false;
+  let preemptions = 0;
 
   function emit() {
     if (notifying) return;
@@ -112,30 +116,53 @@ export function createScheduler() {
   function start(e) {
     e.state = "running";
     running = e;
+    // One controller per run: pre-empting stops this run only, not the entry.
+    const run = new AbortController();
+    const unlinkRun = linkSignals(run, [e.ctl.signal]);
+    e.run = run;
     let p;
     try {
-      p = Promise.resolve(e.fn(e.ctl.signal));
+      p = Promise.resolve(e.fn(run.signal));
     } catch (err) {
       p = Promise.reject(err);
     }
+    const again = () => e.preempted && !e.ctl.signal.aborted;
     p.then(
-      (v) => e.resolve(e.ctl.signal.aborted ? null : v),
-      (err) => (e.ctl.signal.aborted ? e.resolve(null) : e.reject(err)),
+      (v) => again() || e.resolve(e.ctl.signal.aborted ? null : v),
+      (err) => again() || (e.ctl.signal.aborted ? e.resolve(null) : e.reject(err)),
     ).finally(() => {
-      e.state = "done";
-      e.unlink();
+      unlinkRun();
+      e.run = null;
       if (running === e) running = null;
+      if (again()) {
+        // Pre-empted: back to the front of its lane, to run again.
+        e.preempted = false;
+        e.state = "queued";
+        queues[e.lane].unshift(e);
+      } else {
+        e.state = "done";
+        e.unlink();
+      }
       pump();
     });
   }
 
+  /** v8: stop a running background search for a move; it runs again later. */
+  function preempt() {
+    const e = running;
+    if (!e || e.lane !== LANES.length - 1 || !e.preemptible || e.preempted || !e.run) return;
+    e.preempted = true;
+    preemptions++;
+    e.run.abort("preempted");
+  }
+
   /** Queue one search. See the file comment. */
-  function search(fn, { lane = "background", signal = null } = {}) {
+  function search(fn, { lane = "background", signal = null, preemptible = true } = {}) {
     const li = laneIndex(lane);
     return new Promise((resolve, reject) => {
       if (signal?.aborted) return resolve(null);
       const ctl = new AbortController();
-      const entry = { lane: li, fn, ctl, resolve, reject, state: "queued", unlink: () => {} };
+      const entry = { lane: li, fn, ctl, resolve, reject, state: "queued", unlink: () => {}, preemptible, preempted: false, run: null };
       ctl.signal.addEventListener(
         "abort",
         () => {
@@ -152,6 +179,7 @@ export function createScheduler() {
       entry.unlink = linkSignals(ctl, [signal]);
       if (entry.state !== "queued") return;
       queues[li].push(entry);
+      if (li === 0) preempt();
       pump();
     });
   }
@@ -269,6 +297,7 @@ export function createScheduler() {
     return {
       running: running ? LANES[running.lane] : null,
       queued: Object.fromEntries(LANES.map((l, i) => [l, queues[i].length])),
+      preemptions,
     };
   }
 

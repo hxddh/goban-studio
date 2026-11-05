@@ -59,6 +59,18 @@ export function findUserProblem(id) {
   return null;
 }
 
+/**
+ * v8: your imported problems that are due for review (tried before, their
+ * review date reached), the most overdue first. New ones are not included:
+ * they stay in their collection.
+ */
+export function dueUserProblems(progress, now = Date.now()) {
+  const pr = progress?.problems || {};
+  const out = [];
+  for (const c of loadCollections()) for (const p of c.problems) if (pr[p.id]?.due && pr[p.id].due <= now) out.push(p);
+  return out.sort((a, b) => pr[a.id].due - pr[b.id].due);
+}
+
 export function collectionProblems(id) {
   return getCollection(id)?.problems || [];
 }
