@@ -225,16 +225,17 @@ export function ExplorerEntries() {
  * Review: where a 19×19 game left the opening book, as one quiet line with
  * a link to that move. Nothing for games the book does not cover.
  */
-export function BookExitNote({ game, onGoto }) {
+export function BookExitNote({ game, onGoto, inline = false }) {
   const n = X.bookExit(game);
   if (!n) return null;
+  const Tag = inline ? "span" : "p";
   const total = game.mainLine().length - 1;
-  if (n >= total) return <p class="fine book-exit">{t("explorer.inBookAll", [n])}</p>;
+  if (n >= total) return <Tag class="fine book-exit">{t("explorer.inBookAll", [n])}</Tag>;
   return (
-    <p class="fine book-exit">
+    <Tag class="fine book-exit">
       <button type="button" class="link" onClick={() => onGoto(n + 1)}>
         {t("explorer.leftBook", [n + 1])}
       </button>
-    </p>
+    </Tag>
   );
 }

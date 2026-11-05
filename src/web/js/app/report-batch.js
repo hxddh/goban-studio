@@ -1,12 +1,16 @@
 /**
- * v7: "Analyse all" in Library — a report for each of the player's games
- * that has none, one game after another, in the scheduler's background
- * lane (so a game being played never waits for it).
+ * v7: a report for each of the player's games that has none, one game
+ * after another, in the scheduler's background lane (so a game being
+ * played never waits for it).
+ *
+ * v8: automatic. There is no "Analyse all" button and no list of
+ * background work: a short while after launch, with KataGo there, the
+ * player's own games that lack a report are analysed quietly (autoAnalyse).
+ * Imported records are not: they get their report when it is opened.
  *
  * Resumable: the games still to do are saved, so a batch interrupted by
  * quitting carries on at the next launch, and a game stopped half-way keeps
- * the positions it had (report-ctl). Cancelling it (Library, or the
- * Settings list) forgets the rest; "Analyse all" starts it again.
+ * the positions it had (report-ctl).
  *
  * state.batch = { ids, done, total, current } while it runs, else null.
  */
@@ -94,7 +98,6 @@ async function runBatch(me, b) {
     return null;
   }
   removeKey(BATCH_KEY);
-  if (b.total > 1) toast(t("sched.batchDone"));
   return b.done;
 }
 
@@ -128,6 +131,24 @@ export function resumeBackground() {
   dropStaleReports().catch(() => {});
   resumeBatch();
   for (const rec of Lib.listGames().slice(0, 20)) if (rec.rating && wantsReport(rec)) queueReport(rec.id);
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => autoAnalyse(), AUTO_DELAY_MS);
+}
+
+/** How long after launch the quiet analysis of older games starts. */
+export const AUTO_DELAY_MS = 20000;
+let autoTimer = null;
+
+/**
+ * v8: analyse the player's own games that have no report, quietly. Only
+ * with KataGo (the offline estimate of the browser preview would cost the
+ * page's own thread); `offline` lets tests run it anyway.
+ */
+export function autoAnalyse({ offline = false } = {}) {
+  if (!state.engine?.available && !offline) return null;
+  if (job && !job.signal.aborted) return job;
+  const ids = batchCandidates().filter((id) => Lib.getGame(id)?.source === "game");
+  return ids.length ? analyseAll({ ids }) : null;
 }
 
 /**

@@ -14,7 +14,6 @@ import { rankLabel } from "./play.jsx";
 import { estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
-import { BackgroundGroup } from "./background.jsx";
 
 export function Sheets() {
   const sheet = state.sheet;
@@ -256,7 +255,6 @@ const SETTINGS_PANES = [
   { id: "general", icon: "gear", key: "settings.pane.general" },
   { id: "board", icon: "grid", key: "settings.pane.board" },
   { id: "playing", icon: "play", key: "settings.pane.playing" },
-  { id: "engine", icon: "sparkle", key: "settings.pane.engine" },
   { id: "data", icon: "save", key: "settings.pane.data" },
   { id: "about", icon: "info", key: "settings.pane.about" },
 ];
@@ -270,7 +268,9 @@ let settingsPane = "general";
 function SettingsSheet({ pane: open }) {
   const s = state.settings;
   const set = C.setSetting;
-  const [pane, setPane] = useState(open && SETTINGS_PANES.some((p) => p.id === open) ? open : settingsPane);
+  // v8: the opponents' networks sit at the end of Playing (no pane of their own).
+  const want = open === "engine" ? "playing" : open;
+  const [pane, setPane] = useState(want && SETTINGS_PANES.some((p) => p.id === want) ? want : settingsPane);
   const choose = (id) => {
     settingsPane = id;
     setPane(id);
@@ -393,12 +393,7 @@ function SettingsSheet({ pane: open }) {
                 </div>
                 <p class="fine">{t("settings.rankHelp")}</p>
               </section>
-            </>
-          )}
-          {pane === "engine" && (
-            <>
               <ModelsGroup />
-              <BackgroundGroup />
             </>
           )}
           {pane === "data" && (

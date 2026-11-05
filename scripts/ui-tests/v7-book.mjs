@@ -32,7 +32,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
       const page = await fresh("en-US", size);
       await onboard(page, 1);
       await page.keyboard.press("Control+4");
-      await page.click(".tabs-row .segmented button >> nth=3");
+      await page.click(".tabs-row .segmented button >> nth=-1");
       await page.click('.collection-row[data-explorer="corner"]');
       await page.waitForSelector(".explorer-panel");
       await page.waitForFunction(() => window.__board?.model.view && window.__board.geom);
@@ -70,7 +70,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     const page = await fresh();
     await onboard(page, 1);
     await page.keyboard.press("Control+4");
-    await page.click(".tabs-row .segmented button >> nth=3");
+    await page.click(".tabs-row .segmented button >> nth=-1");
     await page.click('.collection-row[data-explorer="corner"]');
     await page.waitForSelector(".explorer-about");
     await page.click(".explorer-about summary");

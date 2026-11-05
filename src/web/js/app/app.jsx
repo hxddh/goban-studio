@@ -302,6 +302,7 @@ export function start() {
   // Handles for the interface tests (scripts/ui-test.mjs); harmless in use.
   window.__state = state;
   window.__solver = S;
+  window.__autoAnalyse = () => C.autoAnalyse({ offline: true });
   render(<App />, document.getElementById("root"));
   document.addEventListener("keydown", onKeyDown);
   installKeys();
