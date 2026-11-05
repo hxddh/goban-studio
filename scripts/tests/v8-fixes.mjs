@@ -411,6 +411,31 @@ export default async function ({ test, assert, root }) {
       state.review = null;
     });
 
+    await test("v8 fix: a game saved during the count opens counting again, not stuck without controls", async () => {
+      const { Play } = A;
+      Play.newGame({ size: 9, opponent: "human" });
+      const g = state.game;
+      for (const [x, y] of [[2, 2], [6, 6], [2, 6], [6, 2]]) g.game.play(x, y);
+      g.game.pass();
+      g.game.pass();
+      assert.equal(g.game.phase, "scoring");
+      Play.persistCurrent();
+      // The app quits before the count is confirmed; the next launch restores the game.
+      state.game = null;
+      Play.restoreCurrent();
+      const r = state.game;
+      assert.equal(r.game.phase, "scoring");
+      assert.ok(r.scoring, "the count is on screen again");
+      await until(() => r.scoring?.source !== "pending", 3000, "dead stones");
+      Play.confirmScore();
+      assert.ok(r.game.current.result, "and it can be confirmed");
+      // A finished game is restored as it was.
+      Play.persistCurrent();
+      Play.restoreCurrent();
+      assert.equal(state.game.scoring, null);
+      await until(() => Engine.sched.listJobs({ all: true }).length === 0, 5000, "idle");
+    });
+
     await test("v8 fix: an SGF whose first move is in the root node keeps that move", () => {
       const { game } = loadSGF("(;GM[1]FF[4]SZ[9]C[root note]B[ee];W[cc];B[gg])");
       const line = game.mainLine();
