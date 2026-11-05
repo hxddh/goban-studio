@@ -10,6 +10,7 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { storyText } from "./story.js";
+import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
 import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
@@ -288,7 +289,7 @@ function TeachCard() {
   return (
     <section class="card teach enter-up" role="alertdialog" aria-live="assertive" aria-labelledby="teach-title">
       <h2 id="teach-title">{t("teach.title")}</h2>
-      <p>{t("teach.body", [formatPoints(p.loss)])}</p>
+      <p>{warningText(formatPoints(p.loss), p.reason)}</p>
       <div class="actions wrap">
         <Button kind="primary" icon="undo" onClick={C.teachTakeBack}>
           {t("teach.takeBack")}
@@ -356,7 +357,7 @@ function PlayPanel() {
         )}
         {g.hint && (
           <p class="note">
-            <Icon name="bulb" size={15} /> {t("play.hintAt", [coordLabel(g.hint.x, g.hint.y, game.size)])}
+            <Icon name="bulb" size={15} /> {hintText(coordLabel(g.hint.x, g.hint.y, game.size), g.hint.reason)}
           </p>
         )}
         {g.ghost && <p class="fine">{t("play.confirmHint")}</p>}
