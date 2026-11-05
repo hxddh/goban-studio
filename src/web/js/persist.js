@@ -459,10 +459,26 @@ export function dailySet(progress, problems, grades, limit = 5, now = Date.now()
   return out;
 }
 
+/** v8: the calendar day before `now` (24 hours back is not, on a 23-hour day). */
+function yesterdayKey(now) {
+  const d = new Date(now);
+  return todayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
+}
+
+/**
+ * v8: the streak as it stands now: a streak whose last day is neither
+ * today nor yesterday is broken, and shows as 0 until the next practice.
+ */
+export function currentStreak(progress, now = Date.now()) {
+  const s = progress?.streak;
+  if (!s || !(s.count > 0)) return 0;
+  return s.last === todayKey(new Date(now)) || s.last === yesterdayKey(now) ? s.count : 0;
+}
+
 export function touchStreak(progress, now = Date.now()) {
   const today = todayKey(new Date(now));
   if (progress.streak.last === today) return progress;
-  const yesterday = todayKey(new Date(now - DAY));
+  const yesterday = yesterdayKey(now);
   progress.streak.count = progress.streak.last === yesterday ? (progress.streak.count || 0) + 1 : 1;
   progress.streak.last = today;
   saveProgress(progress);

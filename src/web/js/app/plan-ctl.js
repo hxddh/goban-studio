@@ -9,6 +9,12 @@ import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, setDailyPlanner, t
 import { evidenceOf, focusLesson, focusTopic, planDaily, weekToKeep, weeklyModel } from "./plan.js";
 import { saveProgress } from "../persist.js";
 import { weekStart } from "./week.js";
+import { CLASSICS } from "../content/classics.js";
+import { OPENINGS } from "../content/openings.js";
+
+// v8: drills of these games (by their gameKey) are not the player's own.
+let foreignKeys = null;
+const foreign = () => (foreignKeys ||= new Set([...CLASSICS, ...OPENINGS].map((g) => g.id)));
 
 /** The model behind this week's focus (see plan.weeklyModel). */
 export function planModel(now = Date.now()) {
@@ -18,7 +24,7 @@ export function planModel(now = Date.now()) {
 /** The week's model; the first focus shown in a week is kept for that week. */
 function weekly(progress, grades, now) {
   const ws = weekStart(new Date(now));
-  const model = weeklyModel(progress, { problems: PROBLEMS, grades, now, weekStart: ws });
+  const model = weeklyModel(progress, { problems: PROBLEMS, grades, now, weekStart: ws, foreign: foreign() });
   const keep = weekToKeep(progress, model, ws);
   if (keep && progress) {
     progress.planWeek = keep;
@@ -60,7 +66,7 @@ export function openFocusProblems(item) {
 }
 
 /** Today's five: the plan chooses when it has a focus (else practice-ctl's own choice). */
-setDailyPlanner(({ progress, pool, grades, now }) => {
+setDailyPlanner(({ progress, pool, grades, now, reviews = [] }) => {
   const model = weekly(progress, grades, now);
-  return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now });
+  return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now, reviews });
 });

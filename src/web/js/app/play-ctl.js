@@ -70,6 +70,9 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
+      // v8: a game saved during the count (both passed) counts again;
+      // otherwise it would have neither a count nor its play controls.
+      if (game.phase === "scoring" && !game.current.result) startScoring();
       return;
     } catch (_) {
       /* fall through */
@@ -114,6 +117,11 @@ export function saveToLibrary({ quiet = false } = {}) {
   const g = state.game;
   if (!g || g.game.moveNumber === 0) return null;
   const rec = Lib.saveGame(g.game, recordMeta(g));
+  if (!rec) {
+    // v8: storage is full; say so instead of "Saved".
+    toast(t("toast.saveFailed"), "error");
+    return null;
+  }
   g.recordId = rec.id;
   g.saved = true;
   persistCurrent();

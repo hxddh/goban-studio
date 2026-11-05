@@ -109,6 +109,16 @@ export function themeLosses(mistakes, color = null) {
 const round1 = (v) => Math.round(v * 10) / 10;
 const half = (v) => Math.round(v * 2) / 2;
 
+/**
+ * v8: whether a mistake drill comes from the player's own play. Drills from
+ * a reviewed classic game or pro opening are marked `own: false`; older ones
+ * are known by their gameKey, a classic's or opening's id (`foreign`, a Set).
+ */
+export function ownDrill(m, foreign = null) {
+  if (!m || m.own === false) return false;
+  return !(foreign && foreign.has(m.gameKey));
+}
+
 /** When a drill was last tried: persist.markMistake set its next date one ladder step later. */
 export function drillLast(m) {
   const step = m.streak > 0 ? LADDER[Math.min(LADDER.length - 1, m.streak - 1)] : 1;
@@ -133,7 +143,7 @@ function area(map, key) {
  * problems: { tried, missed, rate, claim }
  * endgame:  { games, points, perGame, share, claim }
  */
-export function playerModel(progress, { problems = [], grades = {}, now = Date.now() } = {}) {
+export function playerModel(progress, { problems = [], grades = {}, now = Date.now(), foreign = null } = {}) {
   const R = RULES;
   const map = {};
 
@@ -201,7 +211,7 @@ export function playerModel(progress, { problems = [], grades = {}, now = Date.n
     results.push({ key: focusKey(p.theme || (p.topic === "endgame" ? "endgame" : null)), last: e.last || 0, miss: !e.solved || !(e.streak > 0), grade: grades[id]?.grade || 1 });
   }
   for (const m of progress?.mistakes || []) {
-    if (!m || !(m.attempts > 0) || !m.theme) continue;
+    if (!m || !(m.attempts > 0) || !m.theme || !ownDrill(m, foreign)) continue;
     results.push({ key: focusKey(m.theme), last: drillLast(m), miss: !(m.streak > 0), grade: null, drill: true });
   }
   const live = results.filter((r) => r.key && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY);
@@ -282,13 +292,13 @@ export function evidenceOf(a) {
  * began (Monday 00:00, `weekStart`), so the focus stays put for the week;
  * the current evidence when the week began without a focus.
  */
-export function weeklyModel(progress, { problems = [], grades = {}, now = Date.now(), weekStart } = {}) {
+export function weeklyModel(progress, { problems = [], grades = {}, now = Date.now(), weekStart, foreign = null } = {}) {
   // A focus already chosen this week is kept (progress.planWeek): problem
   // records only keep their latest attempt, so reviewing last week's
   // misses would otherwise erase the evidence the focus came from.
   const kept = progress?.planWeek;
   if (Number.isFinite(weekStart) && kept?.weekStart === weekStart && Array.isArray(kept.focus) && kept.focus.length) {
-    const m = playerModel(progress, { problems, grades, now });
+    const m = playerModel(progress, { problems, grades, now, foreign });
     return { ...m, status: "focus", focus: kept.focus, since: weekStart };
   }
   if (Number.isFinite(weekStart) && weekStart < now) {
@@ -298,10 +308,10 @@ export function weeklyModel(progress, { problems = [], grades = {}, now = Date.n
       problems: Object.fromEntries(Object.entries(progress?.problems || {}).filter(([, e]) => (e?.last || 0) < weekStart)),
       mistakes: (progress?.mistakes || []).filter((m) => m && (m.added || 0) < weekStart && drillLast(m) < weekStart),
     };
-    const m = playerModel(before, { problems, grades, now: weekStart });
+    const m = playerModel(before, { problems, grades, now: weekStart, foreign });
     if (m.focus.length) return { ...m, since: weekStart };
   }
-  return { ...playerModel(progress, { problems, grades, now }), since: null };
+  return { ...playerModel(progress, { problems, grades, now, foreign }), since: null };
 }
 
 /**
@@ -334,7 +344,7 @@ function seeded(now) {
  * Returns null without a focus, so the caller keeps its own choice.
  * Items: { kind: "m" | "p", id, role: "review" | "focus" | "stretch" | "new", why? }.
  */
-export function planDaily({ progress, model, pool, bank = null, grades = {}, now = Date.now(), limit = 5 }) {
+export function planDaily({ progress, model, pool, bank = null, grades = {}, now = Date.now(), limit = 5, reviews = [] }) {
   if (!model?.focus?.length || !pool?.length) return null;
   const gradeOf = (p) => grades[p.id]?.grade || 1;
   const entry = (p) => progress.problems?.[p.id];
@@ -352,7 +362,10 @@ export function planDaily({ progress, model, pool, bank = null, grades = {}, now
   // 1. Reviews.
   const dueDrills = (progress.mistakes || []).filter((m) => (m.due || 0) <= now).slice(0, 2);
   for (const m of dueDrills) add({ kind: "m", id: m.id, role: "review", ...(focusKeys.includes(focusKey(m.theme)) ? { why: focusKey(m.theme) } : {}) });
-  const dueProblems = pool.filter((p) => entry(p)?.due && entry(p).due <= now).sort((a, b) => entry(a).due - entry(b).due);
+  // v8: `reviews` are more problems that may come back for review (your
+  // imported ones); they only take review slots, never new or focus ones.
+  const inPool = new Set(pool.map((p) => p.id));
+  const dueProblems = [...pool, ...reviews.filter((p) => !inPool.has(p.id))].filter((p) => entry(p)?.due && entry(p).due <= now).sort((a, b) => entry(a).due - entry(b).due);
   for (const p of dueProblems) {
     if (items.length >= Math.min(RULES.MAX_REVIEWS, limit - 2)) break;
     add({ kind: "p", id: p.id, role: "review" });

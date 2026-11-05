@@ -141,7 +141,7 @@ export { LANES } from "./scheduler.js";
 export const sched = scheduler;
 const analyzeQ = (game, opts = {}) => {
   const { lane = "background", signal = null, ...rest } = opts;
-  return scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal });
+  return scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal, preemptible: KataGo.canCancel() });
 };
 
 /**
