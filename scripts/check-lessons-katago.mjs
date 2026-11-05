@@ -83,6 +83,11 @@ const LESSON_VIEW = {
   "endgame-order": "whole",
   "fight-attack-distance": "local",
 };
+/** Single steps whose click only points at something (an eye), so a move's value says nothing. */
+const STEP_VIEW = {
+  "life-eye#1": "rule",
+  "life-false-eye#1": "rule",
+};
 
 /**
  * Factual claims of read steps, by step id. Points are diagram-local [x, y].
@@ -97,7 +102,7 @@ const CLAIMS = {
     { type: "owner", toMove: 1, what: "the left side is Black's", color: 1, min: 0.8, pts: [[0, 0], [2, 2], [1, 4], [2, 8]] },
     { type: "owner", toMove: 1, what: "the right side is White's", color: -1, min: 0.8, pts: [[8, 0], [7, 4], [6, 6], [8, 8]] },
   ],
-  "game-score#0": [{ type: "lead", toMove: 1, what: "White wins by 2.5", value: -2.5, tol: 1 }],
+  "game-score#0": [{ type: "lead", toMove: 1, what: "White wins by 3.5", value: -3.5, tol: 1 }],
   "game-dead#0": [{ type: "owner", toMove: 1, what: "the marked white stone is dead", color: 1, min: 0.7, pts: [[1, 1]] }],
   "life-two-eyes#0": [{ type: "owner", toMove: -1, what: "the black group with two eyes is alive", color: 1, min: 0.8, pts: [[1, 1], [3, 1], [0, 1]] }],
   "kill-straight-three#0": [{ type: "owner", toMove: 1, what: "after Black's middle point White is dead", color: 1, min: 0.7, pts: [[0, 1], [3, 1]], after: [[1, 0, 1]] }],
@@ -108,7 +113,9 @@ const CLAIMS = {
   ],
   "endgame-reverse-sente#0": [{ type: "answer", toMove: 1, what: "White must answer Black's push on the first line", move: [4, 8], expect: [[5, 8]] }],
   "adv-judge-bigger#0": [{ type: "better", toMove: 1, what: "A is bigger than B", a: [9, 3], b: [3, 9], tol: 0.5 }],
-  "adv-judge-toward-thickness#0": [{ type: "better", toMove: 1, what: "the pincer A is better than the press B", a: [12, 3], b: [6, 2], tol: 0.5 }],
+  "adv-judge-toward-thickness#0": [
+    { type: "owner", toMove: 1, what: "White has lived low inside Black's wall", color: -1, min: 0.6, pts: [[2, 2], [2, 3], [2, 4], [2, 5]] },
+    { type: "better", toMove: 1, what: "the pincer A is better than the press B", a: [12, 3], b: [6, 2], tol: 0.5 }],
   "adv-judge-away#0": [{ type: "better", toMove: 1, what: "extending up the right side (A) is better than along the bottom (B)", a: [15, 9], b: [10, 16], tol: 0.5 }],
   "adv-reduce-shoulder#0": [{ type: "better", toMove: 1, what: "the two shoulder hits are about equal", a: [8, 3], b: [10, 3], tol: 1, both: true }],
   "adv-middle-attack-gain#0": [{ type: "better", toMove: 1, what: "A and B are about equal", a: [2, 7], b: [2, 11], tol: 1, both: true }],
@@ -149,7 +156,7 @@ export function lessonSteps() {
           lesson: lesson.id,
           index: i,
           kind: step.kind,
-          view: step.kind === "place" ? LESSON_VIEW[lesson.id] || UNIT_VIEW[unit.id] || "local" : null,
+          view: step.kind === "place" ? STEP_VIEW[id] || LESSON_VIEW[lesson.id] || UNIT_VIEW[unit.id] || "local" : null,
           step,
           pos: positionOf(step.board),
         });
@@ -199,7 +206,7 @@ export function localArea(pos, accept) {
     for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) area.push({ x, y });
   }
   // A new corner is never the local answer: leave out empty corners the step does not play in.
-  const span = pos.size >= 19 ? 6 : pos.size >= 13 ? 5 : 0;
+  const span = pos.size >= 19 ? 5 : pos.size >= 13 ? 4 : 0;
   const boxes = [];
   if (span)
     for (const [cx, cy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
@@ -222,7 +229,7 @@ const key = (p) => `${p.x},${p.y}`;
 
 /* ---------------------------------------------------------------- KataGo */
 
-class Analysis {
+export class Analysis {
   constructor({ katago, model, threads }) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lesson-check-"));
     const cfg = path.join(dir, "analysis.cfg");
@@ -580,7 +587,9 @@ async function main() {
   await Promise.all([worker(), worker()]);
   kg.close();
   const network = path.basename(a.model || process.env.KATAGO_STRONG_MODEL || "").replace(/\.(bin|txt)\.gz$/, "");
-  fs.writeFileSync(a.out || "lesson-check.json", JSON.stringify({ network, ...opt, runId: process.env.GITHUB_RUN_ID || null, seconds: Math.round((Date.now() - started) / 1000), results }, null, 1));
+  const outFile = a.out || "lesson-check.json";
+  fs.mkdirSync(path.dirname(path.resolve(outFile)), { recursive: true });
+  fs.writeFileSync(outFile, JSON.stringify({ network, ...opt, runId: process.env.GITHUB_RUN_ID || null, seconds: Math.round((Date.now() - started) / 1000), results }, null, 1));
   console.log(`${results.length} steps in ${Math.round((Date.now() - started) / 1000)} s`);
 }
 

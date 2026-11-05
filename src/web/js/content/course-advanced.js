@@ -67,8 +67,10 @@ const BOTTOM_MIDDLE = box(7, 15, 11, 16);
 
 // A black wall on the fourth line of the left side, White living low under
 // it, a lone white stone on the top side and Black's upper right star point.
+// v8: White's low group has C18 and B13 too; without them KataGo kills it
+// (docs/lesson-audit.md), and "White has lived" would not be true.
 const WALL_BLACK = [[3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [2, 6], [15, 3], [15, 15]];
-const WALL_WHITE = [[2, 2], [2, 3], [2, 4], [2, 5], [9, 2], [3, 15]];
+const WALL_WHITE = [[2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [1, 6], [9, 2], [3, 15]];
 const TOWARD_WALL = full(WALL_BLACK, WALL_WHITE);
 const TOWARD_WALL_MARKED = full(WALL_BLACK, WALL_WHITE, { marks: labels([12, 3, "A"], [6, 2, "B"]) });
 
