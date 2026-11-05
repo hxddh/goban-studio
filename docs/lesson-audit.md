@@ -41,13 +41,106 @@ and the generated section at the end of this file.
   favourite. Content changes only where KataGo clearly disagrees; every
   other disagreement is listed below with the reason it was left.
 
+## Runs
+
+| run | what | runner time |
+| --- | --- | --- |
+| [41957657141](https://github.com/hxddh/goban-studio/actions/runs/41957657141) | the course as it was: 107 place steps, 51 read steps with a board (16 claims) | 12 shards, 286 job-minutes (longest shard 35 min) |
+| later runs | the course after the changes below; their numbers are in "Latest run" | see the run id there |
+
+Values below are from run 41957657141 unless marked "local": a local
+check of the changed steps with the same script (800 / 300 visits).
+
 ## Changes made
 
-(filled in after the first run)
+1. **The finished 9×9 game of unit 8** (`game-territory`, `game-score`,
+   `game-dead`, `game-end`: 13 steps share the board). Both walls bent
+   diagonally (E7–D6 and D4–E3 for Black, E4–F3 for White), so each side
+   had a cutting point inside a "finished" game. KataGo: with White to
+   play White led by 21.7, with Black to play by 4.0, not the 2.5 the text
+   counts; the marked "dead" white stone was White's (ownership −0.6); and
+   every "close the gap" step lost 4 to 8 points against defending the cut
+   (game-territory#1 −7.1, game-score#2 −7.5, game-dead#1 −4.3, game-dead#2
+   −8.2). The bends are now solid (black stones at D7 and D3, a white stone
+   at F4). The new count is Black 31, White 28 + 6.5: White wins by 3.5,
+   corrected in all four languages. Local check after the change: the
+   count is −3.2 / −3.5 (claim agrees), the dead stone is Black's (+1.0),
+   both sides' areas are settled, and every place step of these lessons
+   is KataGo's best move (loss 0.0).
+2. **game-order#2** ("extend along the side between your corners"): D7 and
+   F7, right next to a corner stone, lost 4.0 and 3.9 points; they are no
+   longer accepted. E7 (the middle, −2.2, the lesson's point) and E6
+   (−0.8) stay.
+3. **game-order#3** ("now the centre matters most"): E6, on Black's own
+   side, lost 4.2 points and is no longer accepted. D4 and F4, central
+   points facing White's line, were KataGo's best (1.8 and 2.0 points
+   better than the best accepted point) and are now accepted. E5, D5 and F5 stay (2.0 to 2.6
+   points behind: the centre the lesson teaches, within 9×9 noise).
+4. **adv-judge-toward-thickness** (read and place): the text says "White
+   has lived low inside" Black's wall, but KataGo's ownership of that
+   group was unsettled (+0.3 for Black with Black to play) and its best
+   move was to attack it (B13, 5.8 points better than the pincer the step
+   asks for). White's group now has two more stones (C18 and B13): local
+   check, ownership −0.94 (alive), and KataGo's best move becomes the
+   pincer N17, which the step accepts.
+5. **joseki-why#2**: E16, the cutting point between the hane and the
+   block, is as good as the accepted points (+0.3) and is what KataGo
+   plays in the mirrored corner too; it is now accepted, and the wrong
+   answer text speaks of "a cutting point between your blocking stones"
+   (four languages).
+6. **The audit itself**: two "tap the eye" steps (life-eye#1,
+   life-false-eye#1) are pointing exercises, not moves (filling your own
+   eye is of course a loss), so they are reported as rule steps; the local
+   view leaves out empty corners with a 5-line box, so a side extension
+   is no longer compared with taking an empty corner (opening-extension#2
+   and #3 now agree: loss 0.0).
 
 ## Disagreements left as they are
 
-(filled in after the first run)
+- **Rule steps** (stones-*, opening-corner-points-*: 13 steps). They teach
+  where a stone goes (next to a stone, on a liberty, the ko rule); a
+  move's value is not the point. Reported only.
+- **Toy 9×9 shape and connection boards** (shape-empty-triangle#1/#2,
+  shape-bamboo#1/#2, shape-ponnuki#1, connect-hanging#1, game-opening#3,
+  shape-peep#1): three or four stones on an empty 9×9, so KataGo prefers
+  a big point elsewhere on the board (3 to 9 points). The lesson teaches
+  the local shape answer, which is right locally; the score gap measures
+  the empty board, not the shape.
+- **Toy endgame boards** (endgame-sente-gote#1/#2/#3,
+  endgame-reverse-sente#2, endgame-order#1, and the claims of
+  endgame-sente-gote#0 and endgame-reverse-sente#0). White's side of these
+  boards is four columns of open space behind a bare wall, so KataGo's
+  best move for either side is the invasion or its prevention (G2, 5 to 8
+  points), and White does not answer the first-line push. The local
+  sente/gote order the lessons teach is not what the score measures here;
+  making the areas closed would be a redesign of the unit, left for a
+  content pass. The double sente claim (endgame-double-sente#0) agrees.
+- **joseki-33-white#3** ("connect"): KataGo prefers cutting at R6 to the
+  standard connection S4 by about 6 points (5.8 at 600 visits, 6.1 local
+  at 1500). Left: the connection is the joseki move taught in every
+  book; on an otherwise empty 19×19 every fight and ladder favours the
+  cutter, which inflates the cut. Flagged for a human reviewer.
+- **opening-big-urgent#0** (claim "urgent before big"): the cutting point
+  and the empty corner are within 0.6 points (corner ahead); the place
+  step opening-big-urgent#2 (connect first) is within 1.1 of KataGo's
+  best. Noise-level, left.
+- **opening-big-urgent#3** (split the left side, 1.8 to 2.3 points behind
+  an approach on the right) and **opening-big-urgent#1** (P5, the 5-5
+  point, 2.0 behind the 3-3 / 4-4 points): doubtful, not clear losses on
+  a toy board; left.
+- **game-opening#1** (C3, the 3-3 point on 9×9, 1.8 behind) and
+  **game-opening#2** (the cut, 1.9 behind): doubtful, left.
+- **game-order#1** (first move in a corner): on an empty 9×9 KataGo rates
+  the centre points as good as the corners. The lesson teaches the
+  corner-side-centre order; every accepted point is within 1.5 points.
+- **Equal alternatives** in joseki, approach, invasion and opening steps
+  (for example joseki-33-invasion#2 C14, adv-invade-33#1 O17,
+  opening-pincer#1 F16): another move as good, but of a different kind
+  than the step asks for (the text names the idea: block, hane, pincer).
+  Adding it would make the text wrong; left.
+- **Read steps for human review** (37, listed in the generated section):
+  rules, tactics proved by the solver in the same lesson, and principles
+  a single position cannot prove.
 
 ## Latest run
 
