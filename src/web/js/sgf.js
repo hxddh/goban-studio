@@ -12,7 +12,7 @@
  * and properties the app does not interpret are kept on node.extra (root
  * and moves) so that toSGF() writes them back.
  */
-import { BLACK, WHITE, Game, EMPTY, rulesFromSgf, rulesetById, starPoints } from "./rules.js";
+import { BLACK, WHITE, Game, EMPTY, defaultKomi, rulesFromSgf, starPoints } from "./rules.js";
 
 let nodeSeq = 1;
 
@@ -252,7 +252,19 @@ export function loadSGF(text) {
   const roots = parseTree(String(text || ""));
   if (!roots.length) throw new Error("SGF has no root node");
   const root = roots[0];
-  const data = root.data || {};
+  const data = (root.data ||= {});
+  // v8: a move written in the root node (some programs do) is the first
+  // move, not an unknown root property.
+  if ("B" in data || "W" in data) {
+    const move = {};
+    for (const k of ["B", "W"]) {
+      if (k in data) move[k] = data[k];
+      delete data[k];
+    }
+    const child = { id: nodeSeq++, data: move, parent: root, children: root.children };
+    for (const c of child.children) c.parent = child;
+    root.children = [child];
+  }
   legacyColumns = isLegacyGobanSgf(first(data, "AP"));
   // v5: Japanese, Chinese and Korean records are read under their own
   // rules (spellings and the rulesets that stay rejected are listed at
@@ -266,10 +278,6 @@ export function loadSGF(text) {
     throw error;
   }
   const size = parseSize(first(data, "SZ"));
-  const komiRaw = first(data, "KM");
-  // A missing KM takes the ruleset's even-game komi (6.5 before v5).
-  const fallbackKomi = rulesetById(rules).komi;
-  const komi = komiRaw === "" ? fallbackKomi : Number(komiRaw);
   const ab = expandPoints(data.AB, size);
   const aw = expandPoints(data.AW, size);
   const ha = Math.max(0, Math.min(9, parseInt(first(data, "HA") || "0", 10) || 0));
@@ -278,6 +286,11 @@ export function loadSGF(text) {
   // matters for the Chinese handicap compensation (and matches how KataGo
   // reads the same root: see setupStones in katago.js).
   const handicap = aw.length ? ha : ab.length ? Math.min(9, ab.length) : ha;
+  const komiRaw = first(data, "KM");
+  // A missing KM takes the ruleset's komi (6.5 before v5); v8: the komi of
+  // a handicap game (0.5) when there are handicap stones.
+  const fallbackKomi = defaultKomi(rules, handicap);
+  const komi = komiRaw === "" ? fallbackKomi : Number(komiRaw);
   const dt = first(data, "DT");
   const dateMatch = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(dt);
   const date = dateMatch

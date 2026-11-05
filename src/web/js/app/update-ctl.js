@@ -89,6 +89,12 @@ export function openReleasePage() {
   return U.openReleasePage();
 }
 
+/**
+ * v8: which download the interface is waiting for. A download cancelled and
+ * started again answers twice; only the newest answer counts.
+ */
+let downloadGen = 0;
+
 /** "Download and install": fetch, verify and unpack the new version. */
 export async function downloadUpdate() {
   const u = state.updateCheck;
@@ -99,16 +105,18 @@ export async function downloadUpdate() {
     return u;
   }
   const base = { ...release(u), install: u.install || { can: true, blocked: "" } };
+  const gen = ++downloadGen;
   update({ updateCheck: { ...base, status: "downloading", step: "download", received: 0, total: 0, progress: null } });
   const result = await U.downloadNow(u.latest, {
     onProgress(s) {
-      if (state.updateCheck?.status !== "downloading") return;
+      if (gen !== downloadGen || state.updateCheck?.status !== "downloading") return;
       if (U.installStatusOf(s.phase) !== "downloading") return;
       update({ updateCheck: { ...base, status: "downloading", step: U.installStepOf(s.phase), received: s.received, total: s.total, progress: s.progress } });
     },
   });
-  // Cancelled meanwhile: cancelUpdate already settled the state.
-  if (state.updateCheck?.status !== "downloading") return state.updateCheck;
+  // Cancelled meanwhile: cancelUpdate already settled the state (and a
+  // download started since then answers for itself).
+  if (gen !== downloadGen || state.updateCheck?.status !== "downloading") return state.updateCheck;
   if (result.ok) {
     update({ updateCheck: { ...base, status: "ready" } });
     toast(t("update.ready", [u.latest]), "info", 6000);
@@ -124,6 +132,7 @@ export async function downloadUpdate() {
 export async function cancelUpdate() {
   const u = state.updateCheck;
   if (!u || (u.status !== "downloading" && u.status !== "ready")) return u;
+  downloadGen++;
   update({ updateCheck: { ...release(u), install: u.install, status: "available" } });
   await U.cancelNow();
   if (u.status === "downloading") toast(t("update.cancelled"), "info");

@@ -25,7 +25,7 @@ import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openCollection, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
-import { dropReport, restoreReport } from "./report-ctl.js";
+import { dropReport, forgetReportCheck, restoreReport } from "./report-ctl.js";
 import { resumeBackground } from "./report-batch.js";
 
 import { closeExplorer } from "./explorer-ctl.js";
@@ -42,6 +42,7 @@ export * from "./collections-ctl.js";
 
 export * from "./explorer-ctl.js";
 export * from "./plan-ctl.js";
+export * from "./capture-ctl.js"; // v8 beginner path
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -223,6 +224,10 @@ export async function exportRecord(id) {
 export async function importSGFText(text, name = "goban-studio.sgf") {
   const { game, warnings } = loadSGF(text);
   const rec = Lib.saveGame(game, { name: String(name).replace(/\.sgf$/i, ""), source: "import" });
+  if (!rec) {
+    toast(t("toast.saveFailed"), "error");
+    return;
+  }
   if (!state.settings.onboarded) {
     setSetting("onboarded", true);
     update({ sheet: null });
@@ -316,6 +321,7 @@ export async function importBackup() {
     onConfirm: () => {
       const r = Backup.restoreBackup(doc);
       if (!r.ok) return toast(t("backup.error." + r.error), "warn");
+      forgetReportCheck();
       location.reload();
     },
   });
@@ -355,7 +361,8 @@ export function finishOnboarding(choice, rank = null) {
     const first = allLessons()[0];
     if (first) openLesson(first.lesson.id, 0);
   } else if (choice === "rules") {
-    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: Engine.suggestHandicap(next.playerRank, strength, 19) });
+    // v8: the small board first, against a gentle level, teaching on (teachingOn).
+    newGame({ size: 9, opponent: "ai", color: BLACK, strength, handicap: 0 });
   } else {
     newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
   }

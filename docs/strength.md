@@ -24,6 +24,10 @@ v7 measured them again on GitHub's runners (708 games on 19×19, 824 on
 jumped from ≈12 kyu to ≈3 kyu) and moved the top two labels ("v7: the
 human-style ladder without a gap" below).
 
+v8 measured the whole ladder on 13×13 for the first time (960 games):
+no label changes, but 13×13 games now count on their measured scale
+("v8: the ladder on 13×13" below).
+
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `30k` | ≈30 kyu | 8 | 2 | 40 | 0.3 | 1 | 0 (reference) | −1272 (−2154 to −933) | 34k (43k–30k) |
@@ -834,6 +838,176 @@ candidates, then 120 and 80 games of the chosen one); `1k` was measured
 once. The runners used four games at a time with one thread per process;
 the app uses more threads, which matters little at these visit budgets.
 
+## v8: the ladder on 13×13
+
+**Short version.** 13×13 had never been measured: the strength estimate
+placed every level halfway between its 9×9 and 19×19 strengths. v8
+played 960 games on 13×13 on GitHub's runners (14 game-hours, about
+4 runner-hours of the 10 budgeted): the standard ladder, every
+human-style level, the stronger network, a 400-visit bridge above the
+top and three bridges inside the ladder's two sweeps. The halfway rule
+turns out close for the standard levels up to `1k` (within the
+intervals, at most 0.6 nats off) but too high at the top: the standard
+`2d` measures 17.4 against 19.1 assumed, and the human-style `2d`, which
+on 19×19 is far above the standard `2d` (θ 27.0 against 23.4), is level
+with it on 13×13 (17.8 against 22.1 assumed — about four ranks), as on
+9×9. **No label changes**: the labels are 19×19 ranks and nothing here
+measures 19×19. **The strength estimate changes**: 13×13 games are now
+compared on the measured 13×13 scale (`strength.js MEASURED[…][13]`),
+like 9×9 games, so a 13×13 result against human-style `2d` (or `1k`,
+`5k`) no longer flatters the player, and a 13×13 game now carries about
+0.89 of the weight of a 19×19 game near 10 kyu (it carried the same
+weight before).
+
+**Where it ran.** As in v7 (`.github/workflows/calibrate.yml`, the plan
+in `docs/calibration/plan.json`, four games at a time with one search
+thread per process on 4-core `ubuntu-latest` runners, KataGo 1.18.1
+Eigen AVX2 and the pinned networks), on the branches
+`calibrate/v8-13a` and `calibrate/v8-13c`. 13×13 games took about 150
+plies on average; 314 of 960 ended by adjudication, one at the move cap
+(260), the rest by two passes; no game failed.
+
+| Run | GitHub run | Games | What | Runner-minutes |
+| --- | --- | ---: | --- | ---: |
+| `v8-13a` | 41956831340 | 416 | the standard ladder: adjacent levels and two apart, 32 games each | ≈ 50 |
+| `v8-13b` | 41956831340 | 400 | each human-style level vs the standard level of its ID and both neighbours; `HL:2d` and `LS:2d` vs `L:2d` and `C:v400`; 16 games each | ≈ 170 |
+| `v8-13c` | 41960020906 | 144 | bridges `C:b40` (blunder 0.4, between `15k` and `10k`), `C:b03` (`5k` with 3% beginner's moves) and `C:k1b5` (`1k` with 5%), against both neighbours; 24 games each | ≈ 25 |
+
+(Runner-minutes from the jobs' durations, including about a minute of
+set-up per job.)
+
+**Fit.** One Bradley–Terry fit of all 960 games with every player free
+and `L:30k` = 0 (`fit … --size 13`; 1000-game bootstraps; there is no
+anchor on 13×13 — the human SL model is a 19×19 model — so these are
+order and spacing only, in the 13×13 frame):
+
+| Level | θ 13×13 (95% CI) | halfway rule (v6–v7) | θ 9×9 | θ 19×19 | Label (19×19, unchanged) |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `L:30k` | 0 (reference) | 0 | 0 | 0 | ≈30 kyu |
+| `L:25k` | 0.84 (0.29 to 1.51) | 1.10 | 0.40 | 1.80 | ≈29 kyu |
+| `L:20k` | 3.22 (2.48 to 4.33) | 3.33 | 2.06 | 4.59 | ≈23 kyu |
+| `L:15k` | 4.99 (4.14 to 6.21) | 4.87 | 2.85 | 6.88 | ≈18 kyu |
+| `L:10k` | 8.33 (7.50 to 9.91) | 8.17 | 6.13 | 10.21 | ≈12 kyu |
+| `L:5k` | 10.10 (9.23 to 11.88) | 10.66 | 7.47 | 13.85 | ≈7 kyu |
+| `L:1k` | 14.91 (13.90 to 16.89) | 14.99 | 12.08 | 17.90 | ≈2 kyu |
+| `L:2d` | 17.45 (16.35 to 19.86) | 19.14 | 14.93 | 23.35 | ≈4 dan |
+| `HL:30k` | 0.19 (−0.62 to 0.99) | 0.3 | 0.41 | 0.42 | ≈30 kyu |
+| `HL:25k` | 1.04 (0.30 to 1.86) | 0.8 | 1.15 | 1.39 | ≈29 kyu |
+| `HL:20k` | 3.66 (2.70 to 5.04) | 2.8 | 2.10 | 3.90 | ≈23 kyu |
+| `HL:15k` | 5.45 (4.51 to 7.03) | 4.8 | 4.64 | 6.77 | ≈18 kyu |
+| `HL:10k` | 8.81 (7.77 to 10.61) | 8.2 | 6.79 | 10.19 | ≈12 kyu |
+| `HL:5k` | 10.13 (9.02 to 12.10) | 10.5 | 8.03 | 13.68 | ≈7 kyu |
+| `HL:1k` | 14.47 (13.17 to 16.52) | 15.4 | 12.89 | 18.42 | ≈1 kyu |
+| `HL:2d` | 17.82 (16.55 to 20.28) | 22.1 | 14.99 | 26.99 | ≈6 dan |
+| `LS:2d` | 22.78 (21.64 to 25.29) | 23.0 | 16.82 | 28.11 | ≈7 dan |
+| `C:v400` | 18.82 (17.55 to 21.53) | – | – | 24.6 | – |
+| `C:b40` | 6.36 (5.35 to 8.00) | – | – | – | – |
+| `C:b03` | 11.27 (10.20 to 13.26) | – | – | – | – |
+| `C:k1b5` | 13.01 (11.72 to 15.03) | – | – | – | – |
+
+"Halfway rule" is what v6–v7 used for a 13×13 game: the level's 19×19 θ
+(of its mode) carried to 13×13 halfway between 19×19 and the 9×9 curve.
+Intervals are relative to `L:30k` and widen up the ladder.
+
+**What the games say.**
+
+- *The standard ladder* keeps its order and roughly its 9×9-to-19×19
+  proportions: it spans 17.4 nats on 13×13 against 14.9 on 9×9 and 23.4
+  on 19×19. Adjacent levels are 2–5 nats apart; the two pairs that were
+  32–0 in `v8-13a` (`15k`–`10k`, `5k`–`1k`) are now linked by bridges
+  that won some games on each side: `C:b40` 18–6 against `L:15k` and
+  4–20 against `L:10k`; `C:b03` 19–5 against `L:5k` and 0–24 against
+  `L:1k`; `C:k1b5` 23–1 against `L:5k` and 3–21 against `L:1k`. The
+  bridges moved `10k` and `5k` down by about one nat from the fit of
+  `v8-13a` alone, inside its intervals.
+- *The human-style levels* sit within about half a nat of the standard
+  level of the same ID from `30k` to `5k` (each pair 6–10 to 9–7 in 16
+  games), as on 19×19: their labels hold on 13×13 too. `HL:1k` is
+  slightly below `L:1k` (6–10).
+- *The top.* On 19×19 human-style `2d` and the stronger network are 3.6
+  and 4.8 nats above `L:2d`. On 13×13 human-style `2d` is level with it
+  (10–6 in 16 games, 0.4 nats) and below the bridge `C:v400` (4–12); the
+  stronger network is far above everything (16–0 against both). On 9×9
+  v6 and v7 found the same for human-style `2d`. The small boards favour
+  the network's reading over the human model's judgement; the ≈6 dan
+  label is a 19×19 rank and stays.
+
+**What changed in the app.** `strength.js MEASURED` has a `13` entry for
+every level in every mode (the fit above); `onBoard`/`fromBoard` carry
+θ between 19×19 and 13×13 through the standard levels' (θ19, θ13) pairs,
+as for 9×9 (beyond the ends, the overall slope 0.77); `levelTheta` on
+13×13 uses the level's own 13×13 measurement. So the expected score of a
+13×13 game, the update after it and the suggested 13×13 opponent are
+measured, not assumed. The suggestion moves one level down for a
+25-kyu and a 15-kyu player against the human-style ladder (its `20k`
+and `15k` are a little stronger on 13×13 than assumed) and nowhere else.
+Labels, the handicap rule (2.5 ranks a stone on 13×13) and
+`suggestHandicap` are unchanged; handicap games were not measured.
+
+**Limitations.** All of v7's apply: no human played, the spacing is
+bot-versus-bot, the runners used one search thread per process. 13×13
+has no anchor, so nothing here can move a 19×19 label. 16 games per
+human-style pair give ±0.8 nats or so on each; the top of the 13×13
+ladder rests on one bridge (`C:v400`). Games at komi 6.5, Japanese
+rules, no handicap.
+
+To refit:
+
+```bash
+node scripts/calibrate-strength.mjs fit docs/calibration/results/v8-13*.jsonl --size 13 --markdown
+# the human-style levels against the standard ladder held at its 13×13 values
+node scripts/calibrate-strength.mjs fit docs/calibration/results/v8-13*.jsonl --size 13 --fixed --markdown
+```
+
+13×13 games, all pairs (A is the player the fit rates lower):
+
+| Pair (A vs B, A rated lower) | Games | A–B | B win % (95% CI) | Avg plies | Adjudicated | Capped |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| L:30k vs HL:30k | 16 | 6–10 | 63 (39–82) | 222 | 1 | 0 |
+| L:30k vs L:25k | 32 | 12–20 | 63 (45–77) | 210 | 3 | 0 |
+| L:30k vs HL:25k | 16 | 3–13 | 81 (57–93) | 206 | 3 | 0 |
+| L:30k vs L:20k | 32 | 1–31 | 97 (84–99) | 162 | 18 | 0 |
+| HL:30k vs L:25k | 16 | 4–12 | 75 (51–90) | 205 | 3 | 0 |
+| L:25k vs HL:25k | 16 | 9–7 | 44 (23–67) | 212 | 2 | 0 |
+| L:25k vs L:20k | 32 | 2–30 | 94 (80–98) | 183 | 15 | 1 |
+| L:25k vs HL:20k | 16 | 1–15 | 94 (72–99) | 198 | 3 | 0 |
+| L:25k vs L:15k | 32 | 0–32 | 100 (89–100) | 148 | 21 | 0 |
+| HL:25k vs L:20k | 16 | 2–14 | 88 (64–97) | 172 | 7 | 0 |
+| L:20k vs HL:20k | 16 | 6–10 | 63 (39–82) | 180 | 1 | 0 |
+| L:20k vs L:15k | 32 | 4–28 | 88 (72–95) | 184 | 6 | 0 |
+| L:20k vs HL:15k | 16 | 2–14 | 88 (64–97) | 169 | 4 | 0 |
+| L:20k vs L:10k | 32 | 0–32 | 100 (89–100) | 113 | 30 | 0 |
+| HL:20k vs L:15k | 16 | 3–13 | 81 (57–93) | 166 | 6 | 0 |
+| L:15k vs HL:15k | 16 | 5–11 | 69 (44–86) | 150 | 5 | 0 |
+| L:15k vs C:b40 | 24 | 6–18 | 75 (55–88) | 157 | 7 | 0 |
+| L:15k vs L:10k | 32 | 0–32 | 100 (89–100) | 138 | 18 | 0 |
+| L:15k vs HL:10k | 16 | 0–16 | 100 (81–100) | 150 | 5 | 0 |
+| L:15k vs L:5k | 32 | 0–32 | 100 (89–100) | 107 | 29 | 0 |
+| HL:15k vs L:10k | 16 | 0–16 | 100 (81–100) | 135 | 2 | 0 |
+| C:b40 vs L:10k | 24 | 4–20 | 83 (64–93) | 160 | 3 | 0 |
+| L:10k vs HL:10k | 16 | 6–10 | 63 (39–82) | 137 | 2 | 0 |
+| L:10k vs L:5k | 32 | 3–29 | 91 (76–97) | 148 | 5 | 0 |
+| L:10k vs HL:5k | 16 | 3–13 | 81 (57–93) | 140 | 4 | 0 |
+| L:10k vs L:1k | 32 | 0–32 | 100 (89–100) | 130 | 19 | 0 |
+| HL:10k vs L:5k | 16 | 3–13 | 81 (57–93) | 119 | 0 | 0 |
+| L:5k vs HL:5k | 16 | 7–9 | 56 (33–77) | 141 | 0 | 0 |
+| L:5k vs C:b03 | 24 | 5–19 | 79 (60–91) | 138 | 2 | 0 |
+| L:5k vs C:k1b5 | 24 | 1–23 | 96 (80–99) | 142 | 2 | 0 |
+| L:5k vs HL:1k | 16 | 0–16 | 100 (81–100) | 148 | 7 | 0 |
+| L:5k vs L:1k | 32 | 0–32 | 100 (89–100) | 138 | 8 | 0 |
+| L:5k vs L:2d | 32 | 0–32 | 100 (89–100) | 128 | 12 | 0 |
+| HL:5k vs L:1k | 16 | 0–16 | 100 (81–100) | 119 | 3 | 0 |
+| C:b03 vs L:1k | 24 | 0–24 | 100 (86–100) | 141 | 2 | 0 |
+| C:k1b5 vs L:1k | 24 | 3–21 | 88 (69–96) | 122 | 7 | 0 |
+| HL:1k vs L:1k | 16 | 6–10 | 63 (39–82) | 122 | 4 | 0 |
+| HL:1k vs L:2d | 16 | 1–15 | 94 (72–99) | 117 | 2 | 0 |
+| L:1k vs L:2d | 32 | 1–31 | 97 (84–99) | 123 | 7 | 0 |
+| L:2d vs HL:2d | 16 | 6–10 | 63 (39–82) | 118 | 6 | 0 |
+| L:2d vs C:v400 | 16 | 3–13 | 81 (57–93) | 122 | 4 | 0 |
+| L:2d vs LS:2d | 16 | 0–16 | 100 (81–100) | 134 | 12 | 0 |
+| HL:2d vs C:v400 | 16 | 4–12 | 75 (51–90) | 129 | 3 | 0 |
+| C:v400 vs LS:2d | 16 | 0–16 | 100 (81–100) | 134 | 11 | 0 |
+
 ## v6: your strength — the estimate
 
 Until v5 the player's level was an Elo-style number that moved by a fixed
@@ -866,8 +1040,10 @@ spans 14.9 nats there against 23.4 on 19×19). A 9×9 game is compared on
 the 9×9 scale: the player's 19×19 θ is carried over through the levels'
 measured (θ19, θ9) pairs, joined piecewise linearly (beyond the ends, the
 overall slope 0.62). So a 9×9 win says less about 19×19 strength than a
-19×19 win, and the band narrows more slowly. 13×13 was never measured; it
-is taken halfway between the two. That is an assumption, not a result.
+19×19 win, and the band narrows more slowly. Until v7, 13×13 was not
+measured and was taken halfway between the two; since v8 it is measured
+and works the same way as 9×9, through the (θ19, θ13) pairs (overall
+slope 0.77; "v8" above).
 
 **Opponent mode.** A game against a human-style level or the stronger
 network uses that mode's measured θ (v6 measurement above) where it

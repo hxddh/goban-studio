@@ -862,3 +862,7 @@ button.group-row:hover { background: var(--fill); }
 .report-row .verdict { flex: none; min-width: 96px; font: var(--t-caption); padding-top: 3px; color: var(--text-2); }
 .report-row .verdict.accepted { color: var(--good); }
 .report-row .verdict.rejected { color: var(--bad); }
+
+/* v8 beginner path: the lesson bridge's one line, and the first count's note */
+.celebrate .bridge-lead { max-width: 360px; font: var(--t-body); color: var(--text-2); }
+.score-card .first-count { font: var(--t-small); }

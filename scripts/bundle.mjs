@@ -15,6 +15,22 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const entry = path.join(root, "src/web/js/main.jsx");
 const out = path.join(root, "src/web/js/bundle.js");
 
+/**
+ * v8: data the app reads only when it is first needed stays out of the
+ * script, so start-up does not parse it. Each import resolves to `null`
+ * here; the module fetches the file (copied beside index.html by
+ * sync-dist.mjs) on first use. Tests bundle the real data.
+ */
+const LAZY_DATA = ["content/book.json"];
+const lazyData = {
+  name: "lazy-data",
+  setup(b) {
+    // Either path separator (Windows builds).
+    const filter = new RegExp(`(${LAZY_DATA.map((f) => f.replace(/\./g, "\\.").replace(/\//g, "[\\\\/]")).join("|")})$`);
+    b.onLoad({ filter }, () => ({ contents: "export default null;", loader: "js" }));
+  },
+};
+
 await build({
   entryPoints: [entry],
   outfile: out,
@@ -28,6 +44,7 @@ await build({
   jsx: "automatic",
   jsxImportSource: "preact",
   loader: { ".json": "json" },
+  plugins: [lazyData],
   logLevel: "warning",
 });
 

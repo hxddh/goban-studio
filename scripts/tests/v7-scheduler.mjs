@@ -47,8 +47,9 @@ export default async function ({ test, assert, root }) {
     all.push(s.search(slow(log, "move"), { lane: "move" }));
     assert.equal(s.snapshot().running, "background");
     const out = await Promise.all(all);
-    assert.deepEqual(log, ["bg0", "move", "look", "live", "bg1", "bg2", "bg3", "bg4"]);
-    assert.equal(out[0], "bg0", "the running background search finished, not killed");
+    // v8: the move pre-empts the running background search, which runs again.
+    assert.deepEqual(log, ["bg0", "move", "look", "live", "bg0", "bg1", "bg2", "bg3", "bg4"]);
+    assert.equal(out[0], "bg0", "the pre-empted background search still resolves its value");
   });
 
   await test("v7 scheduler: an aborted search never runs; owners, lanes and jobs cancel", async () => {

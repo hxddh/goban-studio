@@ -112,6 +112,7 @@ jobs:
           test -f dist/GobanStudio/resources/frontend/dist/engine/windows/libcrypto-3-x64.dll
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
           test -f dist/GobanStudio/resources/frontend/dist/licenses/Goban-Studio-MIT.txt
+          test -f dist/GobanStudio/resources/frontend/dist/content/book.json
           ls -R dist/GobanStudio | head -40
       - name: signing mode
         id: mode
@@ -281,6 +282,7 @@ jobs:
           assert any(n.endswith("engine/windows/msvcp140.dll") for n in names), "missing MSVC runtime"
           assert any(n.endswith("engine/windows/libcrypto-3-x64.dll") for n in names), "missing OpenSSL runtime"
           assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"
+          assert any(n.endswith("frontend/dist/content/book.json") for n in names), "missing opening book"
           assert not any(".WebView2/" in n or "/EBWebView/" in n for n in names), "WebView2 test profile leaked"
           # v5: the in-app updater unpacks this archive and expects every
           # entry under GobanStudio/ (src/install.zig safeEntryName).

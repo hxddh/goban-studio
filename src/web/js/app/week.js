@@ -13,7 +13,7 @@ export function weekStart(now = new Date()) {
 
 export function weekSummary(progress, games, now = new Date()) {
   const since = weekStart(now);
-  const played = (games || []).filter((g) => g.source !== "import" && g.result && (g.updatedAt || 0) >= since).length;
+  const played = (games || []).filter((g) => g.source !== "import" && g.result && (g.finishedAt ?? g.updatedAt ?? 0) >= since).length;
   const solved = Object.values(progress?.problems || {}).filter((p) => p?.solved && (p.last || 0) >= since).length;
   const lessons = Object.values(progress?.lessons || {}).filter((l) => l?.done && (l.at || 0) >= since).length;
   const hist = progress?.rating?.history || [];
