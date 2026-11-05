@@ -46,7 +46,13 @@ and the generated section at the end of this file.
 | run | what | runner time |
 | --- | --- | --- |
 | [41957657141](https://github.com/hxddh/goban-studio/actions/runs/41957657141) | the course as it was: 107 place steps, 51 read steps with a board (16 claims) | 12 shards, 286 job-minutes (longest shard 35 min) |
-| later runs | the course after the changes below; their numbers are in "Latest run" | see the run id there |
+| 41963580886 | cancelled after a minute by the next push (one more content fix) | – |
+| [41963685718](https://github.com/hxddh/goban-studio/actions/runs/41963685718) | the course after the changes below ("Latest run") | 12 shards, 281 job-minutes (longest shard 32 min) |
+
+Run 41957657141 found accepted points that lose more than 2.5 points in
+21 steps (12 after the changes, all listed below as left), doubtful
+points in 7 (10 after: some former losses are now only doubtful), and 5
+failed read claims (2 after, both toy endgame boards).
 
 Values below are from run 41957657141 unless marked "local": a local
 check of the changed steps with the same script (800 / 300 visits).
@@ -130,6 +136,8 @@ check of the changed steps with the same script (800 / 300 visits).
   a toy board; left.
 - **game-opening#1** (C3, the 3-3 point on 9×9, 1.8 behind) and
   **game-opening#2** (the cut, 1.9 behind): doubtful, left.
+- **joseki-attach#3** (E15, 1.6 behind) and **shape-head-two#2** (1.5 to
+  2 behind on a toy 9×9): doubtful, left.
 - **game-order#1** (first move in a corner): on an empty 9×9 KataGo rates
   the centre points as good as the corners. The lesson teaches the
   corner-side-centre order; every accepted point is within 1.5 points.
