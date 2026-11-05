@@ -127,6 +127,7 @@ export default async function ({ test, assert, root }) {
     'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
     'export { setLang } from "./src/web/js/i18n.js";',
     'export { state } from "./src/web/js/app/store.js";',
+    'export { setRestorer } from "./src/web/js/app/ctl-core.js";',
     'export { loadSGF } from "./src/web/js/sgf.js";',
     'export { reportFits, buildReport } from "./src/web/js/app/report-model.js";',
   ]);
@@ -342,6 +343,76 @@ export default async function ({ test, assert, root }) {
       Review.practiceThis({ ...km, index: 6 });
       assert.equal(state.progress.mistakes[0].own, undefined, "a drill from the player's game is their own");
       state.review = null;
+    });
+
+    /* ------------------------------------------------- bugs found in v8 */
+
+    await test("v8 fix: a move tried in 'Review so far' never becomes a move of the game in play", async () => {
+      const { Play } = A;
+      Play.newGame({ size: 9, opponent: "human" });
+      const g = state.game;
+      for (const [x, y] of [[2, 2], [6, 6], [2, 6]]) g.game.play(x, y);
+      Play.persistCurrent();
+      const last = g.game.current;
+      Play.reviewCurrentGame();
+      assert.equal(state.review.source, "current");
+      Review.reviewPlay(4, 4); // from the last position: White "plays" E5 in the review
+      Review.reviewPlay(5, 5);
+      assert.equal(state.review.game.moveNumber, 5);
+      Review.setComment("what if", last); // an edit saves the game in play
+      Review.dropReview();
+      assert.equal(g.game.moveNumber, 3, "the game is where it was");
+      assert.equal(g.game.turn, -1, "and it is still White's turn");
+      assert.equal(g.game.mainLine().length, 4);
+      assert.deepEqual(g.game.current.children, []);
+      assert.equal(g.game.current.comment, "what if", "the comment is kept");
+      assert.equal(loadSGF(A.P.readJSON(A.P.KEYS.current, null).sgf).game.mainLine().length, 4, "the saved game has no extra moves");
+      // A variation tried earlier in the game stays, as before.
+      Play.reviewCurrentGame();
+      Review.reviewGoto(1);
+      Review.reviewPlay(7, 7);
+      // Back, as the app does it (controller.js restore drops the review).
+      A.setRestorer(() => state.review && Review.dropReview());
+      Review.closeReview();
+      A.setRestorer(() => {});
+      assert.equal(g.game.moveNumber, 3);
+      assert.equal(g.game.mainLine().length, 4);
+      assert.equal(g.game.mainLine()[1].children.length, 2, "the variation at move 1 is kept");
+    });
+
+    await test("v8 fix: an SGF whose first move is in the root node keeps that move", () => {
+      const { game } = loadSGF("(;GM[1]FF[4]SZ[9]C[root note]B[ee];W[cc];B[gg])");
+      const line = game.mainLine();
+      assert.equal(line.length, 4, "three moves");
+      assert.deepEqual(line[1].move, { color: BLACK, x: 4, y: 4, pass: false });
+      assert.equal(game.root.comment, "root note");
+      assert.equal(game.root.extra, null, "the move is not kept as an unknown root property");
+      const back = loadSGF(game.toSGF()).game.mainLine();
+      assert.deepEqual(back.map((n) => n.move && `${n.move.x},${n.move.y}`), [null, "4,4", "2,2", "6,6"]);
+      // With variations after it.
+      const v = loadSGF("(;SZ[9]W[ee](;B[cc])(;B[gg]))").game;
+      assert.equal(v.mainLine()[1].move.color, -1);
+      assert.equal(v.mainLine()[1].children.length, 2);
+    });
+
+    await test("v8 fix: a Daily five naming a drill that is no longer kept skips it instead of stopping", () => {
+      const now = Date.now();
+      state.progress = { ...P.loadProgress(), games: [], problems: {}, mistakes: [], daily: null };
+      const ids = PROBLEMS.slice(0, 4).map((p) => p.id);
+      state.progress.daily = { date: P.todayKey(), items: [{ kind: "m", id: "gone-12" }, ...ids.map((id) => ({ kind: "p", id }))], index: 0, done: [] };
+      state.practice = { ...state.practice, view: "home" };
+      Practice.startDaily();
+      assert.equal(state.practice.view, "problem", "the set opens on the next item");
+      assert.equal(state.practice.problem.def.id, ids[0]);
+      assert.equal(state.progress.daily.items.length, 4);
+      assert.ok(now > 0);
+    });
+
+    await test("v8 fix: Library's won and lost filters leave draws out", () => {
+      const g = (result, humanColor = BLACK) => ({ id: result + humanColor, result, opponent: "ai", source: "game", humanColor });
+      const all = [g("B+3.5"), g("W+R"), g("Draw"), g("Draw", -1), g("0"), g("Void"), g("W+T", -1)];
+      assert.deepEqual(Lib.filterGames(all, { kind: "won" }).map((x) => x.id), ["B+3.51", "W+T-1"]);
+      assert.deepEqual(Lib.filterGames(all, { kind: "lost" }).map((x) => x.id), ["W+R1"]);
     });
   } finally {
     globalThis.zero = savedHost;

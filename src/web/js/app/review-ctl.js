@@ -123,9 +123,14 @@ export function openReview(game, meta = {}) {
   stopLive();
   if (!isRestoring()) remember();
   const line = game.mainLine();
+  // v8: the game in play, still going: where it stands, so that moves tried
+  // in the review never become the game's own moves (settleLive).
+  const end = line[line.length - 1];
+  const live = (meta.source || "current") === "current" && state.game?.game === game && !end.result ? { end, kids: end.children.slice() } : null;
   const startAt = meta.startAt ?? line.length - 1;
   game.goto(line[Math.max(0, Math.min(line.length - 1, startAt))].id);
   const review = {
+    live0: live,
     game,
     source: meta.source || "current",
     meta,
@@ -171,8 +176,21 @@ export function openReview(game, meta = {}) {
   startLive();
 }
 
+/**
+ * v8: leaving a review of the game in play: moves tried from its last
+ * position are dropped, and its own line is the main line again, before
+ * anything is saved or the game carries on.
+ */
+function settleLive(r) {
+  const at = r?.live0;
+  if (!at) return;
+  at.end.children = at.end.children.filter((c) => at.kids.includes(c));
+  if (!r.game.isMainLine(at.end)) r.game.promoteVariation(at.end);
+}
+
 export function closeReview() {
   const r = state.review;
+  settleLive(r);
   if (r) saveEdits(r);
   if (canGoBack() && back()) return;
   stopReviewWork(r);
@@ -188,6 +206,7 @@ export function closeReview() {
 /** Leave a review without touching history (used by restore). */
 export function dropReview(r = state.review) {
   if (!r) return;
+  settleLive(r);
   saveEdits(r);
   stopReviewWork(r);
   stopLive();

@@ -340,7 +340,9 @@ export function todaysDaily() {
   if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
   // A saved set may name a problem a later version removed: drop it, and
   // keep the position in the set on the item the learner was at.
-  const known = (it) => it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id) || !!findUserProblem(it.id);
+  // v8: a drill can go too (only the newest 200 are kept), and an imported
+  // problem with its collection.
+  const known = (it) => (it?.kind === "m" ? state.progress.mistakes.some((m) => m.id === it.id) : it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id) || !!findUserProblem(it.id));
   if (!d.items.every(known)) {
     const before = d.items.slice(0, d.index || 0).filter(known).length;
     d.items = d.items.filter(known);

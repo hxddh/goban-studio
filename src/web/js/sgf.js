@@ -252,7 +252,19 @@ export function loadSGF(text) {
   const roots = parseTree(String(text || ""));
   if (!roots.length) throw new Error("SGF has no root node");
   const root = roots[0];
-  const data = root.data || {};
+  const data = (root.data ||= {});
+  // v8: a move written in the root node (some programs do) is the first
+  // move, not an unknown root property.
+  if ("B" in data || "W" in data) {
+    const move = {};
+    for (const k of ["B", "W"]) {
+      if (k in data) move[k] = data[k];
+      delete data[k];
+    }
+    const child = { id: nodeSeq++, data: move, parent: root, children: root.children };
+    for (const c of child.children) c.parent = child;
+    root.children = [child];
+  }
   legacyColumns = isLegacyGobanSgf(first(data, "AP"));
   // v5: Japanese, Chinese and Korean records are read under their own
   // rules (spellings and the rulesets that stay rejected are listed at
