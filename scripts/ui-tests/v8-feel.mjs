@@ -91,7 +91,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.waitForFunction(() => window.__state.engine?.available === true, null, { timeout: 3000 });
     await page.keyboard.press("Control+n");
     await page.click(".preset >> nth=0");
-    await page.click(".sheet .segmented button >> nth=3"); // play White: the computer opens
+    await page.locator(".sheet .segmented button").filter({ hasText: /^White$/ }).first().click(); // play White: the computer opens
     const t0 = Date.now();
     await page.click(".sheet-foot .btn.primary");
     await page.waitForFunction(() => window.__state.game?.game.moveNumber >= 1 && !window.__state.game.thinking, null, { timeout: 6000 });
@@ -112,7 +112,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     page.on("request", (r) => r.url().includes("book.json") && fetched.push(r.url()));
     await onboard(page, 1);
     await page.keyboard.press("Control+4");
-    await page.click(".tabs-row .segmented button >> nth=3");
+    await page.locator(".tabs-row .segmented button").filter({ hasText: "Explorer" }).click();
     const t0 = Date.now();
     await page.click("[data-explorer=whole]");
     await page.waitForSelector(".explorer-panel .explorer-row");

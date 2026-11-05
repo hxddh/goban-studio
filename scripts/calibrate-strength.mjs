@@ -16,7 +16,7 @@
  *          node scripts/calibrate-strength.mjs play ... --size 19 --pairs "L:10k-L:5k,L:5k-H:rank_5k" \
  *            --human-model b18c384nbt-humanv0.bin.gz
  *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [more.jsonl …] [--size 19] [--anchor rank_10k] [--boot 1000]
- *            [--fixed]   (v6: hold the L: ladder at its v4 measurement; needs --size 9 or 19)
+ *            [--fixed]   (v6: hold the L: ladder at its measured θ; needs --size 9, 19 or, since v8, 13)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
  * Players:
@@ -867,7 +867,8 @@ async function main() {
     const opt = { boot: Number(a.boot || 1000), anchors };
     if (a.fixed) {
       const size = Number(a.size);
-      if (size !== 9 && size !== 19) throw new Error("--fixed needs --size 9 or 19");
+      // v8: 13×13 too, once the standard ladder is measured there.
+      if (![9, 13, 19].includes(size) || !STRENGTHS.every((s) => Number.isFinite(MEASURED.standard[s.id][size]))) throw new Error("--fixed needs --size 9, 13 or 19 (a board the standard ladder is measured on)");
       opt.fixed = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
       if (size === 19) opt.gorMap = thetaToGoR;
     }

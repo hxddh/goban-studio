@@ -64,6 +64,55 @@ export default async function ({ test, assert, root }) {
   const R = await import("../../src/web/js/rules.js");
   const { BLACK, WHITE, EMPTY, Game } = R;
 
+  /* ------------------------------------------------- 13×13 calibration */
+
+  const SE = await import("../../src/web/js/app/strength.js");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  await test("v8 calibration: every level is measured on 13×13, in order, between its 9×9 and 19×19 spans", () => {
+    const ids = E.STRENGTHS.map((s) => s.id);
+    for (const mode of ["standard", "human"]) {
+      for (const id of ids) assert.ok(Number.isFinite(SE.MEASURED[mode][id][13]), `${mode} ${id}`);
+    }
+    assert.ok(Number.isFinite(SE.MEASURED.strong["2d"][13]));
+    const std = ids.map((id) => SE.MEASURED.standard[id][13]);
+    assert.equal(std[0], 0, "the weakest level is the reference");
+    for (let i = 1; i < std.length; i++) assert.ok(std[i] > std[i - 1], `${ids[i]} above ${ids[i - 1]}`);
+    // The ladder spans less on the smaller board.
+    const span = (b) => SE.MEASURED.standard["2d"][b] - SE.MEASURED.standard["30k"][b];
+    assert.ok(span(9) < span(13) && span(13) < span(19), `${span(9)} < ${span(13)} < ${span(19)}`);
+    // The games behind it are committed.
+    for (const run of ["v8-13a", "v8-13b", "v8-13c"]) {
+      const file = path.join(root, "docs/calibration/results", run + ".jsonl");
+      const games = fs.readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+      assert.ok(games.length >= 100 && games.every((g) => g.size === 13), run);
+    }
+  });
+
+  await test("v8 calibration: 13×13 games are compared on the measured 13×13 scale", () => {
+    for (const s of E.STRENGTHS) {
+      const m = SE.MEASURED.standard[s.id];
+      assert.ok(Math.abs(SE.onBoard(m[19], 13) - m[13]) < 1e-9, `${s.id}: 19×19 → 13×13 through the measured pair`);
+      assert.ok(Math.abs(SE.fromBoard(m[13], 13) - m[19]) < 1e-9, `${s.id}: and back`);
+      assert.equal(SE.levelTheta(s.id, { size: 13 }), m[13]);
+      assert.equal(SE.levelTheta(s.id, { size: 13, mode: "human" }), SE.MEASURED.human[s.id][13]);
+    }
+    for (let t = -5; t < 35; t += 0.5) {
+      assert.ok(SE.onBoard(t + 0.5, 13) > SE.onBoard(t, 13), "monotone");
+      assert.ok(Math.abs(SE.fromBoard(SE.onBoard(t, 13), 13) - t) < 1e-9, "inverse");
+    }
+    // Human-style 2d is far above the standard 2d on 19×19, not on 13×13.
+    const gap = (b) => SE.MEASURED.human["2d"][b] - SE.MEASURED.standard["2d"][b];
+    assert.ok(gap(19) > 3 && gap(13) < 1.5, `${gap(19)} vs ${gap(13)}`);
+    // A 13×13 result says less about 19×19 strength than a 19×19 one, more than a 9×9 one.
+    const est = SE.startEstimate(10, 0);
+    const moved = (size) => SE.updateEstimate(est, { opponent: SE.onBoard(est.mu, size), size, won: true, at: 0 }).mu - est.mu;
+    assert.ok(moved(9) < moved(13) && moved(13) < moved(19), `${moved(9)} ${moved(13)} ${moved(19)}`);
+    // Handicap stones on 13×13 still weaken the level.
+    assert.ok(SE.levelTheta("5k", { size: 13, handicap: 3 }) < SE.levelTheta("5k", { size: 13 }));
+  });
+
   /* ------------------------------------------------------- think time */
 
   const obvious = { moves: [{ visits: 152, scoreLead: 2 }, { visits: 5, scoreLead: -6 }, { visits: 3, scoreLead: -9 }] };

@@ -1,6 +1,27 @@
 {
-  "note": "v8: bridges for the two 13x13 sweeps of v8-13a (15k vs 10k and 5k vs 1k were 32-0): standard-style candidates between the neighbours' settings (docs/calibration/v8-candidates.json). Push to a calibrate/v8-13* branch to run it (.github/workflows/calibrate.yml).",
+  "note": "v8: the shipped ladder on 13x13, never measured before (docs/strength.md, v8). v8-13a: the standard levels, adjacent and two apart. v8-13b: every human-style level against the standard levels of the same ID and its neighbours, the stronger network, and a 400-visit bridge above the top. v8-13c: bridges for the two sweeps of v8-13a (docs/calibration/v8-candidates.json). The games are in results/v8-13*.jsonl, so pushing this plan unchanged plays nothing new. Push to a calibrate/** branch to run it (.github/workflows/calibrate.yml).",
   "runs": [
+    {
+      "id": "v8-13a",
+      "size": 13,
+      "games": 32,
+      "pairs": "adjacent,gap2",
+      "shards": 6,
+      "workers": 4,
+      "scoreVisits": 400,
+      "tag": "v8"
+    },
+    {
+      "id": "v8-13b",
+      "size": 13,
+      "games": 16,
+      "pairs": "HL:30k-L:30k,HL:30k-L:25k,HL:25k-L:30k,HL:25k-L:25k,HL:25k-L:20k,HL:20k-L:25k,HL:20k-L:20k,HL:20k-L:15k,HL:15k-L:20k,HL:15k-L:15k,HL:15k-L:10k,HL:10k-L:15k,HL:10k-L:10k,HL:10k-L:5k,HL:5k-L:10k,HL:5k-L:5k,HL:5k-L:1k,HL:1k-L:5k,HL:1k-L:1k,HL:1k-L:2d,HL:2d-L:2d,HL:2d-C:v400,LS:2d-L:2d,LS:2d-C:v400,C:v400-L:2d",
+      "shards": 8,
+      "workers": 4,
+      "scoreVisits": 400,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v8"
+    },
     {
       "id": "v8-13c",
       "size": 13,

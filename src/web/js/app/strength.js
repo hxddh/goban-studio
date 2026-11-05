@@ -33,38 +33,39 @@ export const thetaToGoR = (t) => 4100 - ANCHOR_K * Math.exp(-t / 20);
 export const gorToTheta = (g) => -20 * Math.log((4100 - Math.min(g, 3900)) / ANCHOR_K);
 
 /**
- * Measured strength of each level, θ on 19×19 and on 9×9 (each board its
- * own Bradley–Terry fit, both with the weakest standard level at 0).
+ * Measured strength of each level, θ on 19×19, 9×9 and 13×13 (each board
+ * its own Bradley–Terry fit, all with the weakest standard level at 0).
  * standard: v4 (527 + 620 games); human and strong: v7 (docs/strength.md).
+ * 13×13, every mode: v8, one fit of 960 games (docs/strength.md, "v8").
  * A missing entry falls back to the standard level.
  */
 export const MEASURED = {
   standard: {
-    "30k": { 19: 0, 9: 0 },
-    "25k": { 19: 1.8, 9: 0.4 },
-    "20k": { 19: 4.59, 9: 2.06 },
-    "15k": { 19: 6.88, 9: 2.85 },
-    "10k": { 19: 10.21, 9: 6.13 },
-    "5k": { 19: 13.85, 9: 7.47 },
-    "1k": { 19: 17.9, 9: 12.08 },
-    "2d": { 19: 23.35, 9: 14.93 },
+    "30k": { 19: 0, 9: 0, 13: 0 },
+    "25k": { 19: 1.8, 9: 0.4, 13: 0.84 },
+    "20k": { 19: 4.59, 9: 2.06, 13: 3.22 },
+    "15k": { 19: 6.88, 9: 2.85, 13: 4.99 },
+    "10k": { 19: 10.21, 9: 6.13, 13: 8.33 },
+    "5k": { 19: 13.85, 9: 7.47, 13: 10.1 },
+    "1k": { 19: 17.9, 9: 12.08, 13: 14.91 },
+    "2d": { 19: 23.35, 9: 14.93, 13: 17.45 },
   },
   // v7, 708 games on 19×19 and 824 on 9×9 (with v6's 54 and 372 for the
   // settings that did not change) against the standard levels held at
   // their v4 values; 5k, 15k and 1k have v7 settings. The top two rest on
   // a 400-visit bridge above the ladder and are the least certain.
   human: {
-    "30k": { 19: 0.42, 9: 0.41 },
-    "25k": { 19: 1.39, 9: 1.15 },
-    "20k": { 19: 3.9, 9: 2.1 },
-    "15k": { 19: 6.77, 9: 4.64 },
-    "10k": { 19: 10.19, 9: 6.79 },
-    "5k": { 19: 13.68, 9: 8.03 },
-    "1k": { 19: 18.42, 9: 12.89 },
-    "2d": { 19: 26.99, 9: 14.99 },
+    "30k": { 19: 0.42, 9: 0.41, 13: 0.19 },
+    "25k": { 19: 1.39, 9: 1.15, 13: 1.04 },
+    "20k": { 19: 3.9, 9: 2.1, 13: 3.66 },
+    "15k": { 19: 6.77, 9: 4.64, 13: 5.45 },
+    "10k": { 19: 10.19, 9: 6.79, 13: 8.81 },
+    "5k": { 19: 13.68, 9: 8.03, 13: 10.13 },
+    "1k": { 19: 18.42, 9: 12.89, 13: 14.47 },
+    "2d": { 19: 26.99, 9: 14.99, 13: 17.82 },
   },
   strong: {
-    "2d": { 19: 28.11, 9: 16.82 },
+    "2d": { 19: 28.11, 9: 16.82, 13: 22.78 },
   },
 };
 
@@ -87,17 +88,23 @@ const DAY = 86400000;
 /* ----------------------------------------------- board sizes and handicap */
 
 /**
- * Strength on a 9×9 board as a function of 19×19 strength: the levels'
- * measured (θ19, θ9) pairs, joined piecewise linearly, extended beyond the
- * ends with the overall slope. 13×13 is not measured and lies halfway.
+ * Strength on a 9×9 or 13×13 board as a function of 19×19 strength: the
+ * standard levels' measured (θ19, θ on that board) pairs, joined piecewise
+ * linearly, extended beyond the ends with the overall slope. (v8: 13×13 is
+ * measured; until v7 it was taken halfway between 9×9 and 19×19.)
  */
 const PAIRS = STRENGTHS.map((s) => MEASURED.standard[s.id]).sort((a, b) => a[19] - b[19]);
-const SLOPE9 = PAIRS.reduce((s, p) => s + p[19] * p[9], 0) / PAIRS.reduce((s, p) => s + p[19] * p[19], 0);
+/** Overall slope of θ on a board against θ on 19×19 (least squares through 0). */
+const slopeOf = (size) => PAIRS.reduce((s, p) => s + p[19] * p[size], 0) / PAIRS.reduce((s, p) => s + p[19] * p[19], 0);
+const SLOPE = { 9: slopeOf(9), 13: slopeOf(13) };
 
+/** Piecewise-linear map between two boards' θ through the levels' pairs. */
 function interp(x, from, to) {
   const n = PAIRS.length;
-  if (x <= PAIRS[0][from]) return PAIRS[0][to] + (x - PAIRS[0][from]) * (from === 19 ? SLOPE9 : 1 / SLOPE9);
-  if (x >= PAIRS[n - 1][from]) return PAIRS[n - 1][to] + (x - PAIRS[n - 1][from]) * (from === 19 ? SLOPE9 : 1 / SLOPE9);
+  const size = from === 19 ? to : from;
+  const k = from === 19 ? SLOPE[size] : 1 / SLOPE[size];
+  if (x <= PAIRS[0][from]) return PAIRS[0][to] + (x - PAIRS[0][from]) * k;
+  if (x >= PAIRS[n - 1][from]) return PAIRS[n - 1][to] + (x - PAIRS[n - 1][from]) * k;
   for (let i = 1; i < n; i++) {
     const a = PAIRS[i - 1];
     const b = PAIRS[i];
@@ -108,24 +115,12 @@ function interp(x, from, to) {
 
 /** 19×19 θ → θ on a board of `size` (that board's own scale). */
 export function onBoard(t19, size) {
-  if (size === 19) return t19;
-  const t9 = interp(t19, 19, 9);
-  return size === 9 ? t9 : (t19 + t9) / 2;
+  return size === 9 || size === 13 ? interp(t19, 19, size) : t19;
 }
 
 /** θ on a board of `size` → the 19×19 θ of the same strength. */
 export function fromBoard(t, size) {
-  if (size === 19) return t;
-  if (size === 9) return interp(t, 9, 19);
-  // 13×13: solve (t19 + f(t19)) / 2 = t by bisection (monotone).
-  let lo = -60;
-  let hi = 80;
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2;
-    if (onBoard(mid, 13) < t) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
+  return size === 9 || size === 13 ? interp(t, size, 19) : t;
 }
 
 /** Ranks one handicap stone is worth (as engine.js suggestHandicap). */
@@ -144,10 +139,11 @@ export function levelTheta(id, { mode = "standard", size = 19, handicap = 0 } = 
   const base = MEASURED.standard[s.id];
   // A board a mode was not measured on uses the standard level there.
   let t19 = m[19] ?? base[19];
-  const t9 = m[9] ?? base[9];
-  if (sz === 9 && Math.abs(handicap) < 2) return t9;
-  // On 9×9 the stones are counted on the 19×19 scale the ranks live on.
-  if (sz === 9) t19 = fromBoard(t9, 9);
+  // v8: 13×13 is measured too; each small board uses its own measurement.
+  const tSmall = sz === 19 ? null : m[sz] ?? base[sz];
+  if (sz !== 19 && Math.abs(handicap) < 2) return tSmall;
+  // On a small board the stones are counted on the 19×19 scale the ranks live on.
+  if (sz !== 19) t19 = fromBoard(tSmall, sz);
   if (Math.abs(handicap) >= 2) {
     const g = thetaToGoR(t19) - Math.sign(handicap) * Math.abs(handicap) * RANKS_PER_STONE[sz] * 100;
     t19 = gorToTheta(g);
