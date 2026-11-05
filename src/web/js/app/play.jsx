@@ -15,6 +15,7 @@ import { ratingParts } from "./rating.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
+import { FirstCountNote } from "./beginner.jsx";
 
 export function rankLabel(id) {
   const r = rankParts(id);
@@ -373,6 +374,7 @@ function ScoringCard() {
     <section class="card score-card enter-up" aria-live="polite">
       <h2>{t(s.method === "area" ? "score.titleArea" : "score.title")}</h2>
       <p class="muted">{pending ? t("score.judging") : sc.source === "katago" ? t("score.engineMarked") : t("score.manual")}</p>
+      <FirstCountNote />
       <div class="score-pair">
         <div>
           <Stone color={BLACK} size={14} />

@@ -42,6 +42,7 @@ export * from "./collections-ctl.js";
 
 export * from "./explorer-ctl.js";
 export * from "./plan-ctl.js";
+export * from "./capture-ctl.js"; // v8 beginner path
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -355,7 +356,8 @@ export function finishOnboarding(choice, rank = null) {
     const first = allLessons()[0];
     if (first) openLesson(first.lesson.id, 0);
   } else if (choice === "rules") {
-    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: Engine.suggestHandicap(next.playerRank, strength, 19) });
+    // v8: the small board first, against a gentle level, teaching on (teachingOn).
+    newGame({ size: 9, opponent: "ai", color: BLACK, strength, handicap: 0 });
   } else {
     newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
   }

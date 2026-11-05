@@ -12,6 +12,7 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { DailyDots, FocusRow } from "./today.jsx";
 import { CollectionPage, YourCollections } from "./collections.jsx";
+import { CaptureView, LessonDone } from "./beginner.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
@@ -24,6 +25,7 @@ export function PracticeView() {
   if (v === "mistake") return <MistakeView />;
   if (v === "dailyDone") return <DailyDone />;
   if (v === "collection") return <CollectionPage />;
+  if (v === "capture") return <CaptureView />;
   return <PracticeHome />;
 }
 
@@ -573,31 +575,8 @@ function ProblemView() {
 function LessonView() {
   const L = state.practice.lesson;
   const steps = L.lesson.steps;
-  if (L.finished) {
-    const next = C.nextLesson();
-    return (
-      <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} />
-      <div class="page center-page">
-        <section class="card celebrate">
-          <span class="eyebrow">{C.tx(L.unit.title)}</span>
-          <h1>{t("practice.lessonDone")}</h1>
-          <p class="muted">{C.tx(L.lesson.title)}</p>
-          <div class="actions center">
-            {next && (
-              <Button kind="primary" onClick={() => C.openLesson(next.lesson.id)}>
-                {t("practice.nextLesson")}
-              </Button>
-            )}
-            <Button kind="ghost" onClick={C.practiceHome}>
-              {t("practice.backHome")}
-            </Button>
-          </div>
-        </section>
-      </div>
-      </>
-    );
-  }
+  // v8: lesson complete, with its bridge into a game (beginner.jsx).
+  if (L.finished) return <LessonDone L={L} />;
   const cur = L.cur;
   const step = cur.step;
   let model = null;

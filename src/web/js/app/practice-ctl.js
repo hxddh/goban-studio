@@ -141,6 +141,14 @@ export function openLesson(lessonId, stepIndex = null) {
   if (!isRestoring()) remember();
   const saved = state.progress.lessons[lessonId];
   const index = stepIndex ?? (saved && !saved.done ? Math.min(saved.step || 0, found.lesson.steps.length - 1) : 0);
+  // v8: back to a finished lesson (from the game it led to) shows its lesson-complete page.
+  if (index >= found.lesson.steps.length) {
+    update((s) => {
+      s.space = "practice";
+      s.practice = { ...s.practice, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: null, finished: true }, problem: null, mistake: null, daily: null };
+    });
+    return;
+  }
   const step = found.lesson.steps[index];
   if (step?.kind === "place") step.board = { ...step.board, accept: step.accept };
   update((s) => {
