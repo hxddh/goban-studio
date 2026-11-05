@@ -224,6 +224,10 @@ export async function exportRecord(id) {
 export async function importSGFText(text, name = "goban-studio.sgf") {
   const { game, warnings } = loadSGF(text);
   const rec = Lib.saveGame(game, { name: String(name).replace(/\.sgf$/i, ""), source: "import" });
+  if (!rec) {
+    toast(t("toast.saveFailed"), "error");
+    return;
+  }
   if (!state.settings.onboarded) {
     setSetting("onboarded", true);
     update({ sheet: null });

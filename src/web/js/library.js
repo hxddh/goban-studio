@@ -60,19 +60,30 @@ export function describeGame(game) {
  * Save (or update) a record. `source` is "game" for a game played here,
  * "import" for an opened SGF.
  */
-export function saveGame(game, { id = null, name = "", source = "game", ...meta } = {}) {
+/**
+ * Save a game (a new record, or the record `id`). Returns the record, or
+ * null when it could not be written (storage full). `keepPlace` keeps an
+ * edited record where it is in the list instead of moving it to the top.
+ * v8: `finishedAt` is set the first time a record is saved with a result,
+ * so "this week" counts games finished this week, not games edited.
+ */
+export function saveGame(game, { id = null, name = "", source = "game", keepPlace = false, ...meta } = {}) {
   const games = listGames();
   const existing = id ? games.find((g) => g.id === id) : null;
   const rec = existing || { id: id || newId(), createdAt: Date.now(), source };
+  const hadResult = !!rec.result;
+  const now = Date.now();
   Object.assign(rec, describeGame(game), meta, {
     sgf: game.toSGF(),
     name: name || rec.name || "",
-    updatedAt: Date.now(),
   });
+  // The list is ordered by updatedAt: an edit in place records editedAt instead.
+  if (existing && keepPlace) rec.editedAt = now;
+  else rec.updatedAt = now;
+  if (rec.result && !hadResult && !rec.finishedAt) rec.finishedAt = now;
   const next = games.filter((g) => g.id !== rec.id);
   next.unshift(rec);
-  writeGames(next);
-  return rec;
+  return writeGames(next) ? rec : null;
 }
 
 export function renameGame(id, name) {

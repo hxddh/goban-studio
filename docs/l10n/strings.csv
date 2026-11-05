@@ -931,4 +931,5 @@
 "firstCount.note","The game ends when both players pass in a row. Stones that cannot escape are dead and come off the board; tap a group to mark it dead or alive. The score compares the points each side surrounds, and White adds komi for playing second.","双方连续停一手，对局就结束了。逃不掉的棋子是死子，要从棋盘上拿掉；点一块棋可以改它的死活。分数比的是双方围住的地，白棋后下，所以另加贴目。","","두 사람이 연달아 패스하면 대국이 끝납니다. 살아날 수 없는 돌은 사석이 되어 판에서 들어내며, 돌 무리를 누르면 사석 여부를 바꿀 수 있습니다. 점수는 양쪽이 둘러싼 집을 비교하고, 백은 나중에 두므로 덤을 더합니다.","","二人が続けてパスすると終局です。逃げられない石は死に石で盤から取り除き、石のかたまりをタップすると死活を切り替えられます。点数は双方が囲んだ地を比べ、白は後から打つのでコミを足します。",""
 "onboarding.rulesHelp","Play a gentle opponent on the small 9×9 board, in teaching mode.","在 9 路小棋盘上和一个温和的对手下一盘，开着指导棋模式。","","작은 9줄 판에서 순한 상대와 지도 모드로 한 판 둡니다.","","小さな9路盤で、やさしい相手と指導碁モードで一局打ちます。",""
 "play.firstMove","Click the board to play.","点击棋盘落子。","","바둑판을 눌러 돌을 놓으세요.","","盤をクリックして打ちます。",""
+"toast.saveFailed","Couldn't save: storage is full. Delete some games, or export a backup first.","没能保存：存储空间已满。可以删掉一些棋谱，或先导出备份。","","저장하지 못했습니다: 저장 공간이 가득 찼습니다. 기보를 일부 지우거나 먼저 백업을 내보내세요.","","保存できませんでした：保存領域がいっぱいです。棋譜をいくつか削除するか、先にバックアップを書き出してください。",""
 "play.keys","Keyboard shortcuts","快捷键","","단축키","","ショートカット",""

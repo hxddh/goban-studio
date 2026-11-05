@@ -430,26 +430,32 @@ function edited(r, { mainBefore = null } = {}) {
 }
 
 /**
+ * Save edited moves to a record, where it is in the list (an edit is not a
+ * new game). A stored report of other moves (a variation promoted, moves
+ * deleted) is dropped, so a new one is made; comments and marks keep it.
+ * Returns false when it could not be written (storage full).
+ */
+function saveRecord(id, game) {
+  const rec = Lib.saveGame(game, { id, keepPlace: true });
+  if (!rec) {
+    toast(t("toast.saveFailed"), "error");
+    return false;
+  }
+  if (rec.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
+  return true;
+}
+
+/**
  * Write pending edits now (they are otherwise saved 0.4 s after the last
  * one, and when the review closes). Returns true when something was saved.
  */
-/**
- * Save edited moves to a record. A stored report of other moves (a
- * variation promoted, moves deleted) is dropped, so the report and
- * Analyse all make it again; comments and marks keep it.
- */
-function saveRecord(id, game) {
-  const rec = Lib.saveGame(game, { id });
-  if (rec?.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
-}
-
 export function saveEdits(r = state.review) {
   clearTimeout(saveTimer);
   if (!r?.edits?.dirty) return false;
   const target = editTarget(r);
   if (target === "record") {
     if (!Lib.getGame(r.meta.recordId)) return false;
-    saveRecord(r.meta.recordId, r.game);
+    if (!saveRecord(r.meta.recordId, r.game)) return false;
   } else if (target === "current") {
     // v8: moves tried from where the game in play stands are not saved
     // with it (the review is still open; settleLive drops them on leaving).
