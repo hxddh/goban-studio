@@ -451,6 +451,14 @@ export default async function ({ test, assert, root }) {
       assert.equal(v.mainLine()[1].children.length, 2);
     });
 
+    await test("v8 fix: a handicap game's SGF without KM gets a handicap game's komi, not 6.5", () => {
+      assert.equal(loadSGF("(;GM[1]SZ[19]HA[2]AB[pd][dp];W[qp])").game.komi, 0.5);
+      assert.equal(loadSGF("(;GM[1]SZ[19]RU[Chinese]AB[pd][dp][pp];W[qp])").game.komi, 0.5);
+      assert.equal(loadSGF("(;GM[1]SZ[19]HA[2]KM[5.5]AB[pd][dp];W[qp])").game.komi, 5.5, "a stated komi stays");
+      assert.equal(loadSGF("(;GM[1]SZ[9];B[ee])").game.komi, 6.5, "an even game as before");
+      assert.equal(loadSGF("(;GM[1]SZ[9]RU[Chinese];B[ee])").game.komi, 7.5);
+    });
+
     await test("v8 fix: a Daily five naming a drill that is no longer kept skips it instead of stopping", () => {
       const now = Date.now();
       state.progress = { ...P.loadProgress(), games: [], problems: {}, mistakes: [], daily: null };

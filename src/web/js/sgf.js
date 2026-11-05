@@ -12,7 +12,7 @@
  * and properties the app does not interpret are kept on node.extra (root
  * and moves) so that toSGF() writes them back.
  */
-import { BLACK, WHITE, Game, EMPTY, rulesFromSgf, rulesetById, starPoints } from "./rules.js";
+import { BLACK, WHITE, Game, EMPTY, defaultKomi, rulesFromSgf, starPoints } from "./rules.js";
 
 let nodeSeq = 1;
 
@@ -278,10 +278,6 @@ export function loadSGF(text) {
     throw error;
   }
   const size = parseSize(first(data, "SZ"));
-  const komiRaw = first(data, "KM");
-  // A missing KM takes the ruleset's even-game komi (6.5 before v5).
-  const fallbackKomi = rulesetById(rules).komi;
-  const komi = komiRaw === "" ? fallbackKomi : Number(komiRaw);
   const ab = expandPoints(data.AB, size);
   const aw = expandPoints(data.AW, size);
   const ha = Math.max(0, Math.min(9, parseInt(first(data, "HA") || "0", 10) || 0));
@@ -290,6 +286,11 @@ export function loadSGF(text) {
   // matters for the Chinese handicap compensation (and matches how KataGo
   // reads the same root: see setupStones in katago.js).
   const handicap = aw.length ? ha : ab.length ? Math.min(9, ab.length) : ha;
+  const komiRaw = first(data, "KM");
+  // A missing KM takes the ruleset's komi (6.5 before v5); v8: the komi of
+  // a handicap game (0.5) when there are handicap stones.
+  const fallbackKomi = defaultKomi(rules, handicap);
+  const komi = komiRaw === "" ? fallbackKomi : Number(komiRaw);
   const dt = first(data, "DT");
   const dateMatch = /^(\d{4})-?(\d{2})-?(\d{2})/.exec(dt);
   const date = dateMatch
