@@ -213,7 +213,7 @@ function Classics() {
 function Openings() {
   const p = state.progress;
   return (
-    <>
+    <section class="section">
       <h2 class="section-title">{t("library.openings")}</h2>
       <p class="muted section-sub">{t("library.openingsHelp")}</p>
       <ul class="group collection">
@@ -222,13 +222,14 @@ function Openings() {
             <button type="button" class={`collection-row ${p.openings[o.id]?.done ? "done" : ""}`} onClick={() => C.openOpening(o.id)}>
               <span class="collection-no">{String(i + 1).padStart(2, "0")}</span>
               <span class="collection-main">
-                <strong>{C.tx(o.title)}</strong>
+                {/* The heading already says "Pro openings": the rows keep the players. */}
+                <strong>{C.tx(o.title).replace(/^[^：:]+[：:]\s*/, "")}</strong>
               </span>
               {p.openings[o.id]?.done && <Icon name="check" size={15} />}
             </button>
           </li>
         ))}
       </ul>
-    </>
+    </section>
   );
 }

@@ -1,7 +1,8 @@
 /**
  * Today: one screen to start from (docs/design.md §7). One hero — continue
  * the game, or the suggested game — carries the only primary button; the
- * rest is a grouped list: today's five, the next lesson, a weak spot, your
+ * rest is a grouped list: one thing to learn (the Daily five, then the next
+ * lesson), the game in progress, your
  * level, recent games. Empty things collapse to nothing, never to an empty
  * card.
  */
@@ -9,7 +10,7 @@ import * as Lib from "../library.js";
 import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
-import { topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { THEME_TOPIC } from "./insight.js";
 import { rankLabel } from "./play.jsx";
 import { StrengthChart, estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, Thumb } from "./parts.jsx";
@@ -47,9 +48,7 @@ export function TodayView() {
   const next = C.nextLesson();
   const daily = C.todaysDaily();
   const dailyDone = daily ? daily.index >= daily.items.length : false;
-  // v7: with a focus from the plan, it replaces the older "weak spot" rows.
   const plan = C.trainingFocus();
-  const weak = plan.items.length ? [] : topWeaknesses(p.weakness, 2);
   const recent = Lib.listGames().slice(0, 3);
   const r = p.rating;
   const dueMistakes = p.mistakes.filter((m) => (m.due || 0) <= Date.now()).length;
@@ -104,6 +103,8 @@ export function TodayView() {
         )}
 
         <ul class="group enter-up">
+          {/* v8: one thing to learn today — the Daily five until it is done, then the next lesson. */}
+          {(!dailyDone || !next) && (
           <li class="group-row">
             <span class="gr-icon">
               <Icon name="target" size={18} />
@@ -119,7 +120,8 @@ export function TodayView() {
               </Button>
             )}
           </li>
-          {next && (
+          )}
+          {next && dailyDone && (
             <li class="group-row">
               <span class="gr-icon">
                 <Icon name="practice" size={18} />
@@ -149,22 +151,6 @@ export function TodayView() {
               </Button>
             </li>
           )}
-          {weak.map((w) => (
-            <li class="group-row">
-              <span class="gr-icon">
-                <Icon name="bulb" size={18} />
-              </span>
-              <span class="gr-text">
-                <strong>{C.themeName(w.theme)}</strong>
-                <span>
-                  {t("today.workOn")} · {t("today.seenN", [w.count])}
-                </span>
-              </span>
-              <Button size="sm" onClick={() => C.openTopic(THEME_TOPIC[w.theme] || topicFor(w.theme), w.theme)}>
-                {t("summary.practice")}
-              </Button>
-            </li>
-          ))}
         </ul>
 
         <WeekFocus plan={plan} />
