@@ -942,3 +942,5 @@
 "why.hint.cut","it cuts {0} apart","把{0}棋分断","","{0} 돌을 끊어 놓습니다.","","{0}を切り離します。",""
 "why.hint.atari","it puts stones in atari","可以打吃","","상대 돌을 단수로 몹니다.","","相手の石をアタリにします。",""
 "why.hint.corner","it takes an empty corner","占据空角","","빈 귀를 차지합니다.","","空き隅を占めます。",""
+"play.firstMove","Click the board to play.","点击棋盘落子。","","바둑판을 눌러 돌을 놓으세요.","","盤をクリックして打ちます。",""
+"play.keys","Keyboard shortcuts","快捷键","","단축키","","ショートカット",""

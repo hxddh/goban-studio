@@ -24,11 +24,11 @@ function menuItems(c) {
   ];
 }
 
-function ImportButtons() {
+function ImportButtons({ quiet = false }) {
   const busy = !!state.problemImport;
   return (
     <div class="actions wrap collections-actions">
-      <Button icon="upload" size="sm" onClick={() => C.pickProblemImport()} disabled={busy}>
+      <Button icon="upload" size="sm" kind={quiet ? "ghost" : undefined} onClick={() => C.pickProblemImport()} disabled={busy}>
         {t("v7problems.import")}
       </Button>
       {!hasNative() && (
@@ -48,10 +48,19 @@ function ImportButtons() {
 /** Practice home: the section listing your collections. */
 export function YourCollections() {
   const list = C.loadCollections();
+  // v8: until there is a collection, only a quiet import link at the foot
+  // of the page (importing is for the few who have SGF problem files).
+  if (!list.length) {
+    return (
+      <section class="collections-section quiet" aria-label={t("v7problems.section")}>
+        <ImportButtons quiet />
+      </section>
+    );
+  }
   return (
     <section class="section collections-section">
       <h2 class="section-title">{t("v7problems.section")}</h2>
-      {list.length ? (
+      {
         <ul class="group collections">
           {list.map((c) => {
             const s = C.collectionStats(c);
@@ -78,9 +87,7 @@ export function YourCollections() {
             );
           })}
         </ul>
-      ) : (
-        <p class="muted">{t("v7problems.empty")}</p>
-      )}
+      }
       <ImportButtons />
     </section>
   );

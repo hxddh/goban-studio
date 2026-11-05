@@ -242,26 +242,23 @@ function MoveStrip() {
     C.reviewCurrentGame();
     C.reviewGoto(i);
   };
+  // v8: before the first move, one quiet line (the opening tip while
+  // teaching, else where to start and how to find the keys) instead of a
+  // heading, "No moves yet" and a table of keys.
+  const tip = line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13;
   return (
     <section class="moves" aria-label={t("play.moveList")}>
-      <h2 class="slot-title">{t("play.moveList")}</h2>
-      {line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13 && (
-        <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>
-      )}
+      {line.length > 0 && <h2 class="slot-title">{t("play.moveList")}</h2>}
+      {tip && <p class="quiet-note opening-tip">{t("tip.opening." + (Math.floor(line.length / 4) + 1))}</p>}
       {line.length === 0 ? (
-        <div class="moves-empty">
-          <p>{t("play.noMoves")}</p>
-          <dl class="key-hints">
-            <dt>{t("play.hint.click")}</dt>
-            <dd>{t("play.hint.place")}</dd>
-            <dt>{`${MOD}${SHIFT}P`}</dt>
-            <dd>{t("common.pass")}</dd>
-            <dt>{`${MOD}Z`}</dt>
-            <dd>{t("common.undo")}</dd>
-            <dt>{`${MOD}${SHIFT}R`}</dt>
-            <dd>{t("review.title")}</dd>
-          </dl>
-        </div>
+        !tip && (
+          <p class="moves-empty fine">
+            {t("play.firstMove")}{" "}
+            <button type="button" class="link" onClick={() => C.openSheet("shortcuts")}>
+              {t("play.keys")}
+            </button>
+          </p>
+        )
       ) : (
         <ol class="move-grid" ref={ref}>
           {line.map((n, k) => {
@@ -918,12 +915,13 @@ function ReviewPanel() {
         <>
           <Chart />
           <LiveLine />
-          <BookExitNote game={r.game} onGoto={C.reviewGoto} />
-          {(r.analyzing || r.engine !== "katago") && (
-            <p class="fine" aria-live="polite">
-              {r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}
-            </p>
-          )}
+          {/* v8: one quiet status line — the analysis, then where the game left the book. */}
+          <p class="fine review-status" aria-live="polite">
+            {(r.analyzing || r.engine !== "katago") && (
+              <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
+            )}
+            <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
+          </p>
           <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
@@ -937,7 +935,7 @@ function ReviewPanel() {
                       ))}
                     </ol>
                   ) : (
-                    <p class="muted">{r.analyzing ? t("review.waiting") : noMistakesText(r)}</p>
+                    !r.analyzing && <p class="muted">{noMistakesText(r)}</p>
                   )}
                 </section>
                 <Variations />

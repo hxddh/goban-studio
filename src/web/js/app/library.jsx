@@ -1,5 +1,6 @@
 /**
- * Library: the game in progress, my games, classic games, pro openings.
+ * Library: the game in progress, my games, classic games, and openings
+ * (the explorer and the pro-opening drills, v8: one tab).
  */
 import * as Lib from "../library.js";
 import { t } from "../i18n.js";
@@ -15,10 +16,11 @@ export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
   const L = state.library;
   if (L.explorer) return <ExplorerView />;
+  // v8: the pro openings live with the explorer (one place for openings).
+  const tab = L.tab === "openings" ? "explorer" : L.tab;
   return (
     <>
     <Toolbar>
-      {L.tab === "mine" && <AnalyseAll />}
       <Button size="sm" icon="upload" onClick={C.pickImport}>
         {t("library.import")}
       </Button>
@@ -32,49 +34,34 @@ export function LibraryView() {
       <Segmented
         class="tabs"
         label={t("nav.library")}
-        value={L.tab}
+        value={tab}
         onChange={(v) => update((s) => (s.library = { ...s.library, tab: v }))}
         options={[
           { value: "mine", label: t("library.mine") },
           { value: "classics", label: t("library.classics") },
-          { value: "openings", label: t("library.openings") },
           { value: "explorer", label: t("explorer.tab") },
         ]}
       />
       </div>
-      {L.tab === "mine" && <MyGames />}
-      {L.tab === "classics" && <Classics />}
-      {L.tab === "openings" && <Openings />}
-      {L.tab === "explorer" && <ExplorerEntries />}
+      {tab === "mine" && <MyGames />}
+      {tab === "classics" && <Classics />}
+      {tab === "explorer" && (
+        <>
+          <ExplorerEntries />
+          <Openings />
+        </>
+      )}
     </div>
     </>
   );
 }
 
-/** v7: "Analyse all" — reports for the player's games that have none (report-batch.js). */
-function AnalyseAll() {
-  useJobs();
-  if (C.batchState()) {
-    return (
-      <Button size="sm" kind="ghost" class="analyse-all" onClick={C.cancelBatch}>
-        {t("sched.stopAnalysing")}
-      </Button>
-    );
-  }
-  const n = C.batchCandidates().length;
-  if (!n) return null;
-  return (
-    <Button size="sm" kind="ghost" icon="chart" class="analyse-all" aria-description={t("sched.analyseAllHelp", [n])} onClick={() => C.analyseAll()}>
-      {t("sched.analyseAll")}
-    </Button>
-  );
-}
-
-/** v7: a row's place in the batch ("Waiting to be analysed", "Analysing… 40%"). */
+/** v7: a row's report being made ("Analysing… 40%"). */
 function rowNote(id) {
+  // v8: only the game being analysed shows it; waiting games say nothing.
   const a = C.rowAnalysis(id);
-  if (!a) return null;
-  return <span class="row-analysis">{a.queued ? t("sched.row.queued") : t("sched.row.progress", [Math.round(a.progress * 100)])}</span>;
+  if (!a || a.queued) return null;
+  return <span class="row-analysis">{t("sched.row.progress", [Math.round(a.progress * 100)])}</span>;
 }
 
 function ContinueCard() {
@@ -121,6 +108,7 @@ function outcome(g) {
 }
 
 function MyGames() {
+  useJobs(); // a row's "Analysing… 40%" follows its report
   const L = state.library;
   const all = Lib.listGames();
   const games = Lib.filterGames(all, { kind: L.kind, query: L.query });
@@ -225,7 +213,8 @@ function Classics() {
 function Openings() {
   const p = state.progress;
   return (
-    <>
+    <section class="section">
+      <h2 class="section-title">{t("library.openings")}</h2>
       <p class="muted section-sub">{t("library.openingsHelp")}</p>
       <ul class="group collection">
         {C.OPENINGS.map((o, i) => (
@@ -233,13 +222,14 @@ function Openings() {
             <button type="button" class={`collection-row ${p.openings[o.id]?.done ? "done" : ""}`} onClick={() => C.openOpening(o.id)}>
               <span class="collection-no">{String(i + 1).padStart(2, "0")}</span>
               <span class="collection-main">
-                <strong>{C.tx(o.title)}</strong>
+                {/* The heading already says "Pro openings": the rows keep the players. */}
+                <strong>{C.tx(o.title).replace(/^[^：:]+[：:]\s*/, "")}</strong>
               </span>
               {p.openings[o.id]?.done && <Icon name="check" size={15} />}
             </button>
           </li>
         ))}
       </ul>
-    </>
+    </section>
   );
 }

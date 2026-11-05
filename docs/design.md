@@ -143,16 +143,21 @@ group per screen region.
   and moves to the first key moment when the analysis is done, unless the
   player has already moved; a classic with a famous move opens on it.
 * **Today.** One hero (continue the game, or the suggested game) with the
-  only primary button; then a grouped list: today's five, next lesson,
-  practise a weak spot; then your level with its sparkline. Empty states
-  collapse to a single line instead of an empty card.
+  only primary button; then one thing to learn (today's five until it is
+  done, then the next lesson); this week's focus; then your level with its
+  sparkline. Empty states collapse to a single line instead of an empty
+  card.
 * **Practice.** Hero row for the next lesson with progress; today's five as
   a row; the course as grouped rows (title + check, no step counts); the
   problem topics as a grid of quiet tiles.
-* **Library.** Toolbar holds Import. Segmented tabs; games as rows with a
-  thumbnail; classics and openings as rows.
+* **Library.** Toolbar holds Import. Three segmented tabs: my games
+  (rows with a thumbnail), classics, and openings (the explorer, then the
+  pro-opening drills in their own section). Reports of the player's games
+  are made in the background by themselves; a row says so only while its
+  report is being made.
 * **Settings.** A wide sheet with two panes: a source list on the left
-  (General, Board, Playing, Opponents and analysis, Data, About; arrow keys
+  (General, Board, Playing, Data, About; the opponents' networks close the
+  Playing pane; arrow keys
   move through it) and one pane on the right. Nothing scrolls past more
   than one pane's worth of rows.
 * **Problems.** A problem window is widened towards the open side to at
@@ -168,6 +173,13 @@ group per screen region.
   only primary action; size cards (19×19 first and standard; 13×13 and 9×9
   as quicker games); opponent, strength and colour on one row each; time,
   handicap and komi under *More options*.
+
+* **Less on screen (v8).** Every element has to serve playing or learning.
+  The play panel says nothing before the first move but one quiet line;
+  the review keeps its status (analysis, where the game left the book) on
+  one line; there is no list of background work to manage; an empty
+  feature (imported problem collections) is a single quiet link until it
+  is used. A new element in a release comes with one taken away.
 
 ## 8. Motion
 
