@@ -494,18 +494,35 @@ export function estimateNode(game, node) {
 export async function deadStones(game, { signal, lane = "interactive" } = {}) {
   const a = await analysisQ(game, { visits: 160, signal, lane });
   if (!a?.ownership) return { stones: [], source: "manual" };
-  const size = game.size;
-  const signMap = game.board.signMap;
+  return { stones: deadFromOwnership(game.board, a.ownership), source: "katago", ownership: a.ownership };
+}
+
+/**
+ * v8: the dead stones of a finished board from KataGo's ownership (Black's
+ * point of view, row-major), decided chain by chain: a chain is dead when
+ * the mean ownership under it clearly belongs to the other colour, so a
+ * chain is never split into dead and living stones. Seki stones (ownership
+ * near zero) live; a stone left in atari inside the other side's area is
+ * dead. Exported for the tests.
+ */
+export function deadFromOwnership(board, ownership, threshold = 0.45) {
+  const size = board.width;
+  const seen = new Set();
   const dead = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const v = signMap[y][x];
-      if (v === EMPTY) continue;
-      const own = a.ownership[y * size + x];
-      if ((v === BLACK && own < -0.45) || (v === WHITE && own > 0.45)) dead.push({ x, y });
+      const v = board.get([x, y]);
+      if (v === EMPTY || seen.has(y * size + x)) continue;
+      const chain = board.getChain([x, y]);
+      let sum = 0;
+      for (const [cx, cy] of chain) {
+        seen.add(cy * size + cx);
+        sum += ownership[cy * size + cx];
+      }
+      if (v * (sum / chain.length) < -threshold) for (const [cx, cy] of chain) dead.push({ x: cx, y: cy });
     }
   }
-  return { stones: dead, source: "katago", ownership: a.ownership };
+  return dead.sort((p, q) => p.y - q.y || p.x - q.x);
 }
 
 /** Coarse location name for a point, for review sentences. */

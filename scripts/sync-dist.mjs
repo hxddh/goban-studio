@@ -21,6 +21,12 @@ for (const f of ["index.html", "styles.css"]) {
 for (const f of ["bundle.js"]) {
   fs.copyFileSync(path.join(src, "js", f), path.join(dist, "js", f));
 }
+// v8: data the bundle fetches on first use instead of parsing at start-up
+// (scripts/bundle.mjs LAZY_DATA), served beside index.html.
+fs.mkdirSync(path.join(dist, "content"), { recursive: true });
+for (const f of ["book.json"]) {
+  fs.copyFileSync(path.join(src, "js", "content", f), path.join(dist, "content", f));
+}
 if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
 }
