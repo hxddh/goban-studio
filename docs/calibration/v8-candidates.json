@@ -1,0 +1,5 @@
+{
+  "b40": { "visits": 8, "temp": 2.0, "maxLoss": 40, "slip": 0.3, "blunder": 0.4 },
+  "b03": { "visits": 8, "temp": 2.0, "maxLoss": 40, "slip": 0.3, "blunder": 0.03 },
+  "k1b5": { "visits": 32, "temp": 0.7, "maxLoss": 6, "slip": 0.02, "blunder": 0.05 }
+}
