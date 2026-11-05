@@ -22,6 +22,7 @@ import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
 import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { notePoints, queueReport } from "./report-ctl.js";
 import { themeLosses } from "./plan.js";
+import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -349,8 +350,11 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
       const threshold = state.settings.playerRank != null && state.settings.playerRank <= 10 ? 6 : 4;
       if (loss >= threshold) {
         g.thinking = false;
-        g.pending = { loss: Math.round(loss * 2) / 2, move: g.game.current.move, best: best.pass ? null : { x: best.x, y: best.y }, result };
-        announce(t("teach.warn", [Math.round(loss)]));
+        const move = g.game.current.move;
+        // v8: one reason, from the two searches already made (no new search).
+        const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
+        g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
+        announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
         update();
         return;
       }
@@ -537,8 +541,8 @@ export async function askHint() {
   g.thinking = false;
   g.hints++;
   if (h && !h.pass) {
-    g.hint = { x: h.x, y: h.y };
-    announce(t("play.hintAt", [coordLabel(h.x, h.y, g.game.size)]));
+    g.hint = { x: h.x, y: h.y, reason: hintReason(g.game.current.board.signMap, g.game.turn, h) };
+    announce(hintText(coordLabel(h.x, h.y, g.game.size), g.hint.reason));
   } else toast(t("play.hintPass"));
   persistCurrent();
   update();

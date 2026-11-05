@@ -76,16 +76,18 @@ const KO_TAKEN = b9({
   6: ". . X . X O . . .",
 });
 
-// Unit 8 boards: a finished-looking 9×9 game. Black owns the left, White
-// the right. Black 33 points, White 29 points.
+// Unit 8 boards: a finished 9×9 game. Black owns the left, White the
+// right. Black 31 points, White 28 points. v8: every bend in the walls is
+// solid (D7, D3 and F4); a diagonal bend left a cutting point, and KataGo
+// found the game far from over (docs/lesson-audit.md).
 const END_ROWS = {
   0: ". . . . X O . . .",
   1: ". . . . X O . . .",
-  2: ". . . . X O . . .",
+  2: ". . . X X O . . .",
   3: ". . . X O O . . .",
   4: ". . . X O . . . .",
-  5: ". . . X O . . . .",
-  6: ". . . . X O . . .",
+  5: ". . . X O O . . .",
+  6: ". . . X X O . . .",
   7: ". . . . X O . . .",
   8: ". . . . X O . . .",
 };
@@ -93,12 +95,12 @@ const END = b9(END_ROWS);
 const END_GAP = b9({ ...END_ROWS, 7: ". . . . . O . . ." });
 const END_GAP_WHITE = b9({ ...END_ROWS, 1: ". . . . X . . . ." });
 const END_DEAD = b9({ ...END_ROWS, 1: ". O . . X O . . .", 7: ". . . . . O . . ." });
-const END_DEAD_BLACK = b9({ ...END_ROWS, 1: ". . . . . O . . .", 5: ". . . X O . . X ." });
+const END_DEAD_BLACK = b9({ ...END_ROWS, 1: ". . . . . O . . .", 5: ". . . X O O . X ." });
 const END_PRISONERS = b9({
   ...END_ROWS,
   3: ". . X X O O . . .",
   4: ". X O X O . . . .",
-  5: ". X O X O . . . .",
+  5: ". X O X O O . . .",
 });
 
 const OPEN_EMPTY = b9();
@@ -2166,10 +2168,10 @@ const BEGINNER = [
           {
             kind: "read",
             text: L(
-              "日本规则：地加上提掉的子就是你的得分。黑棋先下占便宜，所以白棋另得6目半贴目。这盘棋黑33目，白29目加6目半是35目半，白胜2目半。",
-              "Under Japanese rules your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 33 points and White 29 + 6.5 = 35.5: White wins by 2.5.",
-              "일본 규칙에서는 집에 따낸 돌을 더한 것이 점수입니다. 흑이 먼저 두는 이점이 있어 백은 덤 6집 반을 받습니다. 이 판은 흑 33집, 백 29집에 덤을 더해 35집 반, 백이 2집 반 이깁니다.",
-              "日本ルールでは、地とアゲハマの合計が得点です。黒は先に打てる分有利なので、白はコミ6目半をもらいます。この碁は黒33目、白29目＋6目半で35目半、白の2目半勝ちです。",
+              "日本规则：地加上提掉的子就是你的得分。黑棋先下占便宜，所以白棋另得6目半贴目。这盘棋黑31目，白28目加6目半是34目半，白胜3目半。",
+              "Under Japanese rules your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 31 points and White 28 + 6.5 = 34.5: White wins by 3.5.",
+              "일본 규칙에서는 집에 따낸 돌을 더한 것이 점수입니다. 흑이 먼저 두는 이점이 있어 백은 덤 6집 반을 받습니다. 이 판은 흑 31집, 백 28집에 덤을 더해 34집 반, 백이 3집 반 이깁니다.",
+              "日本ルールでは、地とアゲハマの合計が得点です。黒は先に打てる分有利なので、白はコミ6目半をもらいます。この碁は黒31目、白28目＋6目半で34目半、白の3目半勝ちです。",
             ),
             board: END,
           },
@@ -2256,10 +2258,9 @@ const BEGINNER = [
             ),
             board: OPEN_SIDE,
             toMove: 1,
+            // v8: D7 and F7, right next to a corner stone, are too narrow (KataGo: about 4 points worse).
             accept: [
-              { x: 3, y: 2 },
               { x: 4, y: 2 },
-              { x: 5, y: 2 },
               { x: 4, y: 3 },
             ],
             success: L("角和边连成一片，黑棋的地成形了。", "Corners and side join up into a territory.", "귀와 변이 이어져 흑집의 틀이 잡혔습니다.", "隅と辺がつながり、黒の地ができてきました。"),
@@ -2280,11 +2281,14 @@ const BEGINNER = [
             ),
             board: b9({ 2: ". . X . X . X . .", 6: ". . O . O . O . ." }),
             toMove: 1,
+            // v8: E6, on Black's own side, is about 4 points worse (KataGo); D4 and F4, facing
+            // White's line, are the best central points.
             accept: [
               { x: 4, y: 4 },
-              { x: 4, y: 3 },
               { x: 3, y: 4 },
               { x: 5, y: 4 },
+              { x: 3, y: 5 },
+              { x: 5, y: 5 },
             ],
             success: L("中央的一手同时照顾上下两边。", "A central move looks after both your side and the fight in the middle.", "중앙의 한 수는 위아래를 동시에 돌봅니다.", "中央の一手は上下の両方に働きます。"),
             wrong: L(
