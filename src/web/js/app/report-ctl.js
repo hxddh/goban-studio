@@ -24,7 +24,7 @@ import { loadSGF } from "../sgf.js";
 import * as Lib from "../library.js";
 import * as Engine from "../engine.js";
 import { t } from "../i18n.js";
-import { addMistake, readJSON, writeJSON } from "../persist.js";
+import { addMistake, readJSON, removeKey, writeJSON } from "../persist.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast } from "./store.js";
 import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
@@ -113,6 +113,11 @@ export function dropStaleReports({ chunk = 10, wait = idle, force = false } = {}
     staleCheck = null;
   });
   return staleCheck;
+}
+
+/** A restored backup may hold such reports again: check once more at the next launch. */
+export function forgetReportCheck() {
+  removeKey(REPORTS_CHECKED_KEY);
 }
 
 /** Cheap check without parsing the game: it may need a report. */

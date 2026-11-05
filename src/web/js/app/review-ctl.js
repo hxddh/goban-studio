@@ -769,7 +769,7 @@ export function guessPlay(x, y) {
 
 export function revealGuess() {
   const r = state.review;
-  if (!r?.guess) return;
+  if (!r?.guess || r.guess.done) return;
   r.guess.last = "revealed";
   advanceGuess();
 }
@@ -798,6 +798,14 @@ export function toggleGuess() {
   if (!r) return;
   r.guess = r.guess ? null : { color: null, right: 0, tries: 0, last: null };
   if (r.guess) {
+    // v8: guessing needs a next move of the game: from a variation, the
+    // main-line move it left; from the last move, the start of the game.
+    const line = r.game.mainLine();
+    let n = r.game.current;
+    while (n.parent && !line.includes(n)) n = n.parent;
+    if (n === line[line.length - 1]) n = line[0];
+    r.game.goto(n.id);
+    r.variation = null;
     stopLive();
     r.live = null;
   } else startLive();

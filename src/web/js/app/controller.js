@@ -25,7 +25,7 @@ import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, openCollection, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
-import { dropReport, restoreReport } from "./report-ctl.js";
+import { dropReport, forgetReportCheck, restoreReport } from "./report-ctl.js";
 import { resumeBackground } from "./report-batch.js";
 
 import { closeExplorer } from "./explorer-ctl.js";
@@ -316,6 +316,7 @@ export async function importBackup() {
     onConfirm: () => {
       const r = Backup.restoreBackup(doc);
       if (!r.ok) return toast(t("backup.error." + r.error), "warn");
+      forgetReportCheck();
       location.reload();
     },
   });

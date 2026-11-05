@@ -251,6 +251,10 @@ export default async function ({ test, assert, root }) {
       Lib.patchGame(b.id, { report: reportB });
       assert.equal(await Report.dropStaleReports({ wait: () => Promise.resolve() }), 0);
       assert.ok(Lib.getGame(b.id).report);
+      // A restored backup is checked again (the flag is not part of a backup).
+      assert.ok(!Object.values(P.KEYS).includes(Report.REPORTS_CHECKED_KEY));
+      Report.forgetReportCheck();
+      assert.equal(await Report.dropStaleReports({ wait: () => Promise.resolve() }), 1);
       for (const r of Lib.listGames()) Lib.deleteGame(r.id);
     });
 
@@ -378,6 +382,33 @@ export default async function ({ test, assert, root }) {
       assert.equal(g.game.moveNumber, 3);
       assert.equal(g.game.mainLine().length, 4);
       assert.equal(g.game.mainLine()[1].children.length, 2, "the variation at move 1 is kept");
+    });
+
+    await test("v8 fix: 'Guess the next move' turned on at a game's last move starts from the beginning instead of failing", () => {
+      const game = new Game({ size: 9 });
+      fill(game, 6);
+      game.setResult("B+R");
+      Review.openReview(game, { source: "record", recordId: "none", space: "library" }); // opens on the last move
+      assert.equal(game.moveNumber, 6);
+      Review.toggleGuess();
+      assert.equal(game.moveNumber, 0, "from the start");
+      Review.revealGuess(); // threw before: there was no next move to reveal
+      assert.equal(game.moveNumber, 1);
+      for (let k = 0; k < 10; k++) Review.revealGuess();
+      assert.equal(state.review.guess.done, true);
+      assert.equal(game.moveNumber, 6);
+      Review.revealGuess(); // done: nothing more
+      assert.equal(game.moveNumber, 6);
+      // From a variation: back to the main-line move it left.
+      Review.toggleGuess();
+      Review.reviewGoto(2);
+      Review.reviewPlay(7, 7);
+      assert.ok(!Review.onMainLine());
+      Review.toggleGuess();
+      assert.equal(Review.reviewIndex(), 2);
+      Review.guessPlay(...[game.mainLine()[3].move.x, game.mainLine()[3].move.y]);
+      assert.equal(state.review.guess.right, 1);
+      state.review = null;
     });
 
     await test("v8 fix: an SGF whose first move is in the root node keeps that move", () => {
