@@ -32,8 +32,25 @@ what the signing steps actually did, not from a template. Until the
 certificates in [`docs/signing.md`](docs/signing.md) are in place, releases
 are ad-hoc signed (macOS) and unsigned (Windows).
 
-`SHA256SUMS` is attached to every GitHub release. The v7.0.0 notes are in
-[`.github/release-notes/v7.0.0.md`](.github/release-notes/v7.0.0.md).
+`SHA256SUMS` is attached to every GitHub release. The v8.0.0 notes are in
+[`.github/release-notes/v8.0.0.md`](.github/release-notes/v8.0.0.md).
+
+## v8 at a glance
+
+- **From the first lesson to the first game** — capture Go on 9×9 right
+  after the lesson on capturing, then a first 9×9 game with teaching on;
+  "I know the rules" starts on 9×9; the first count explains itself once
+  ([`docs/beginner.md`](docs/beginner.md)).
+- **Teaching that says why** — the warning before a costly move and the
+  hint each give one plain reason; the course was checked with KataGo and
+  corrected where it was wrong ([`docs/lesson-audit.md`](docs/lesson-audit.md)).
+- **Playing feel** — "Shall we count?" when the board is settled, no early
+  resignations, dead stones judged group by group, the computer's move
+  ahead of any background work; 13×13 measured for the first time.
+- **Quieter and faster** — less on every screen, three Library tabs, five
+  Settings panes, reports made by themselves; the opening book loads when
+  needed.
+- **Fixes** — seventeen bugs and leftovers from v7, each with a test.
 
 ## v7 at a glance
 

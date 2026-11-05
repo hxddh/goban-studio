@@ -1,4 +1,4 @@
-# Goban Studio design specification (v7)
+# Goban Studio design specification (v8)
 
 This is the single source of truth for how Goban Studio looks and moves.
 Every screen is checked against it before release (see the acceptance
