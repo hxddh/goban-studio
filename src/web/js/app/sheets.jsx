@@ -14,7 +14,6 @@ import { rankLabel } from "./play.jsx";
 import { estimateLabel } from "./strength-chart.jsx";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
-import { BackgroundGroup } from "./background.jsx";
 
 export function Sheets() {
   const sheet = state.sheet;
@@ -398,7 +397,6 @@ function SettingsSheet({ pane: open }) {
           {pane === "engine" && (
             <>
               <ModelsGroup />
-              <BackgroundGroup />
             </>
           )}
           {pane === "data" && (
