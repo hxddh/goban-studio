@@ -122,6 +122,30 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     return page;
   }
 
+  await check("v8 beginner: Back and Forward return to the capture game the player left, as it was", async () => {
+    const page = await start();
+    await lessonDone(page, "stones-capture");
+    await page.click(".celebrate .btn.primary");
+    await page.waitForFunction(() => window.__state.practice.view === "capture" && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
+    // One quiet move away from the white stones, and the computer's reply.
+    await clickPoint(page, 0, 8);
+    await page.waitForFunction(() => window.__state.practice.capture.game.moveNumber >= 2 && !window.__state.practice.capture.thinking, null, { timeout: 5000 });
+    const moves = await page.evaluate(() => window.__state.practice.capture.game.moveNumber);
+    await page.keyboard.press("Control+1");
+    await page.waitForFunction(() => window.__state.space === "today");
+    await page.keyboard.press("Control+[");
+    await page.waitForFunction(() => window.__state.practice.view === "capture", null, { timeout: 3000 });
+    const back = await page.evaluate(() => window.__state.practice.capture.game.moveNumber);
+    assert(back === moves, `Back reopened another game: ${back} moves, not ${moves}`);
+    await page.keyboard.press("Control+]");
+    await page.waitForFunction(() => window.__state.space === "today");
+    await page.keyboard.press("Control+[");
+    await page.waitForFunction(() => window.__state.practice.view === "capture", null, { timeout: 3000 });
+    assert((await page.evaluate(() => window.__state.practice.capture.game.moveNumber)) === moves, "Forward then Back keeps the game");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   await check("v8 beginner: capture Go after the capturing lesson — one primary, a game to the first capture, not saved or rated", async () => {
     const page = await start();
     await lessonDone(page, "stones-capture");

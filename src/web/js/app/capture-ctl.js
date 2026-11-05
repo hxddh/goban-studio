@@ -51,6 +51,22 @@ export function startCapture({ from = null } = {}) {
   announce(t("capture.goal"));
 }
 
+/**
+ * Back or Forward to a capture game: the game the player left, as it was
+ * (state.practice.capture stays while they visit other places); a new one
+ * only when there is none.
+ */
+export function resumeCapture({ from = null } = {}) {
+  const cap = state.practice.capture;
+  if (!cap) return startCapture({ from });
+  update((s) => {
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "capture", problem: null, mistake: null, daily: null };
+  });
+  // The computer was thinking when the player left: let it move now.
+  if (!cap.over && cap.game.turn !== cap.human && !cap.thinking) computerMove(cap);
+}
+
 /** "Play again": a new game in place (no new history entry). */
 export function captureAgain() {
   const prev = state.practice.capture;

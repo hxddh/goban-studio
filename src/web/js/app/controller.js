@@ -43,6 +43,7 @@ export * from "./collections-ctl.js";
 export * from "./explorer-ctl.js";
 export * from "./plan-ctl.js";
 export * from "./capture-ctl.js"; // v8 beginner path
+import { resumeCapture } from "./capture-ctl.js";
 export { OPENINGS, CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
@@ -140,6 +141,7 @@ function restore(loc) {
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
     else if (p.view === "collection" && p.collection) openCollection(p.collection);
+    else if (p.view === "capture") resumeCapture({ from: p.captureFrom });
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
     else practiceHome();
