@@ -69,6 +69,9 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
+      // v8: a game saved during the count (both passed) counts again;
+      // otherwise it would have neither a count nor its play controls.
+      if (game.phase === "scoring" && !game.current.result) startScoring();
       return;
     } catch (_) {
       /* fall through */

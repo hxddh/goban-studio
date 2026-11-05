@@ -19,7 +19,7 @@ import * as Engine from "../engine.js";
 import { readJSON, writeJSON, removeKey } from "../persist.js";
 import { t } from "../i18n.js";
 import { state, update, toast } from "./store.js";
-import { queueReport, reportJob, wantsReport } from "./report-ctl.js";
+import { dropStaleReports, queueReport, reportJob, wantsReport } from "./report-ctl.js";
 
 export const BATCH_KEY = "goban-studio.batch.v7";
 const OWNER = "batch";
@@ -127,6 +127,8 @@ export function resumeBatch() {
  * reports of recent rated games that quitting interrupted.
  */
 export function resumeBackground() {
+  // v8: reports stored before v7 for games edited since (at idle, once).
+  dropStaleReports().catch(() => {});
   resumeBatch();
   for (const rec of Lib.listGames().slice(0, 20)) if (rec.rating && wantsReport(rec)) queueReport(rec.id);
   clearTimeout(autoTimer);

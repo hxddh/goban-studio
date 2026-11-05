@@ -681,7 +681,7 @@ function LessonView() {
 function DailyDone() {
   const d = state.practice.daily || state.progress.daily;
   const total = d?.items?.length || 5;
-  const streak = state.progress.streak?.count || 0;
+  const streak = C.streakNow();
   return (
     <>
     <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.daily")} />

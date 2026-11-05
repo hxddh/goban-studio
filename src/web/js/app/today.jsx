@@ -52,7 +52,7 @@ export function TodayView() {
   const recent = Lib.listGames().slice(0, 3);
   const r = p.rating;
   const dueMistakes = p.mistakes.filter((m) => (m.due || 0) <= Date.now()).length;
-  const streak = p.streak?.count || 0;
+  const streak = C.streakNow();
   const recText = `${rec.handicap ? t("today.withHandicap", [rec.handicap]) : t("today.even")} · ${rec.weak ? t("today.because", [C.themeName(rec.weak.theme)]) : t("today.becauseLevel")}`;
   return (
     <>

@@ -117,9 +117,11 @@ export function filterGames(games, { kind = "all", query = "" } = {}) {
     if (kind === "imported" && g.source !== "import") return false;
     if (kind === "won" || kind === "lost") {
       if (g.source === "import" || !g.result || g.opponent !== "ai") return false;
-      const blackWon = g.result.startsWith("B");
+      // v8: a draw (or a result with no winner) is neither won nor lost.
+      if (!/^[BW]\+/i.test(g.result)) return false;
+      const blackWon = /^B/i.test(g.result);
       const humanBlack = g.humanColor !== -1;
-      const won = blackWon === humanBlack && !/draw/i.test(g.result);
+      const won = blackWon === humanBlack;
       if ((kind === "won") !== won) return false;
     }
     if (!q) return true;

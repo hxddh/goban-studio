@@ -5,7 +5,7 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
+import { currentStreak, dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE } from "../content/course.js";
@@ -15,7 +15,7 @@ import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { pickNextLesson } from "./course-path.js";
-import { collectionProblems, findUserProblem, userProblemDef } from "./collections-store.js";
+import { collectionProblems, dueUserProblems, findUserProblem, userProblemDef } from "./collections-store.js";
 
 export const PROBLEMS = ProblemContent.PROBLEMS;
 export const THEMES = ProblemContent.THEMES || [];
@@ -326,7 +326,9 @@ export function setDailyPlanner(fn) {
 
 export function buildDaily(now = Date.now()) {
   const p = state.progress;
-  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now }) : null;
+  // v8: due reviews of imported problems share the review slots.
+  const reviews = dueUserProblems(p, now);
+  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now, reviews }) : null;
   if (Array.isArray(planned) && planned.length) return planned;
   const items = [];
   const due = p.mistakes.filter((m) => (m.due || 0) <= now).slice(0, 2);
@@ -336,9 +338,14 @@ export function buildDaily(now = Date.now()) {
     const pool = problemsOfTheme(weak.theme).filter((x) => !p.problems[x.id]?.solved);
     for (const x of pool.slice(0, 2)) if (items.length < 4) items.push({ kind: "p", id: x.id, why: weak.theme });
   }
-  const rest = dailySet(p, dailyPool().filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
+  const rest = dailySet(p, [...dailyPool(), ...reviews].filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
   for (const x of rest) items.push({ kind: "p", id: x.id });
   return items.slice(0, 5);
+}
+
+/** v8: the practice streak as it stands today (0 once it is broken). */
+export function streakNow(now = Date.now()) {
+  return currentStreak(state.progress, now);
 }
 
 export function todaysDaily() {
@@ -346,7 +353,9 @@ export function todaysDaily() {
   if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
   // A saved set may name a problem a later version removed: drop it, and
   // keep the position in the set on the item the learner was at.
-  const known = (it) => it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id);
+  // v8: a drill can go too (only the newest 200 are kept), and an imported
+  // problem with its collection.
+  const known = (it) => (it?.kind === "m" ? state.progress.mistakes.some((m) => m.id === it.id) : it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id) || !!findUserProblem(it.id));
   if (!d.items.every(known)) {
     const before = d.items.slice(0, d.index || 0).filter(known).length;
     d.items = d.items.filter(known);
