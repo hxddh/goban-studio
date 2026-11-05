@@ -451,8 +451,17 @@ export function saveEdits(r = state.review) {
     if (!Lib.getGame(r.meta.recordId)) return false;
     saveRecord(r.meta.recordId, r.game);
   } else if (target === "current") {
-    persistCurrent();
-    if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
+    // v8: moves tried from where the game in play stands are not saved
+    // with it (the review is still open; settleLive drops them on leaving).
+    const at = r.live0;
+    const all = at?.end.children;
+    if (at) at.end.children = all.filter((c) => at.kids.includes(c));
+    try {
+      persistCurrent();
+      if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
+    } finally {
+      if (at) at.end.children = all;
+    }
   } else return false;
   r.edits = { ...r.edits, dirty: false, savedAt: Date.now(), target };
   return true;

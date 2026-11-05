@@ -365,12 +365,18 @@ export default async function ({ test, assert, root }) {
       Review.reviewPlay(5, 5);
       assert.equal(state.review.game.moveNumber, 5);
       Review.setComment("what if", last); // an edit saves the game in play
+      Review.saveEdits(); // (0.4 s later, while the review is still open)
+      const kept = loadSGF(A.P.readJSON(A.P.KEYS.current, null).sgf).game;
+      assert.equal(kept.mainLine().length, 4, "saved while reviewing: without the moves tried");
+      assert.equal(kept.mainLine()[3].comment, "what if");
+      assert.equal(state.review.game.moveNumber, 5, "which are still on screen");
+      Review.setComment("what if?", last);
       Review.dropReview();
       assert.equal(g.game.moveNumber, 3, "the game is where it was");
       assert.equal(g.game.turn, -1, "and it is still White's turn");
       assert.equal(g.game.mainLine().length, 4);
       assert.deepEqual(g.game.current.children, []);
-      assert.equal(g.game.current.comment, "what if", "the comment is kept");
+      assert.equal(g.game.current.comment, "what if?", "the comment is kept");
       assert.equal(loadSGF(A.P.readJSON(A.P.KEYS.current, null).sgf).game.mainLine().length, 4, "the saved game has no extra moves");
       // A variation tried earlier in the game stays, as before.
       Play.reviewCurrentGame();
