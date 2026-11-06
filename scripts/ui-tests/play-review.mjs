@@ -86,12 +86,25 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".preset >> nth=2");
     await page.click(".sheet-foot .btn.primary");
     await page.waitForFunction((was) => window.__state.game?.owner !== was && window.__board?.model.size === 9 && window.__board.geom?.cell > 30 && window.__state.game.opponent === "ai", was);
-    const mine = [[2, 2], [6, 6], [6, 2], [2, 6], [5, 3]];
+    // Black's moves, in order; when the computer has already taken one (the
+    // offline engine of the browser preview plays where it likes), the next
+    // free point of the list instead.
+    const mine = [[2, 2], [6, 6], [6, 2], [2, 6], [5, 3], [3, 5], [4, 4], [5, 5], [3, 3], [5, 6]];
     for (let i = 0; i < n; i++) {
       await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, i * 2, { timeout: 15000 }); // the reply is paced like a person (feel.js thinkTime, up to a few seconds)
-      await clickPoint(page, ...mine[i]);
+      const [x, y] = await page.evaluate((list) => list.find(([x, y]) => window.__state.game.game.canPlay(x, y).ok), mine.slice(i));
+      await clickPoint(page, x, y);
     }
-    await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, n * 2, { timeout: 15000 });
+    try {
+      await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, n * 2, { timeout: 15000 });
+    } catch (e) {
+      const at = await page.evaluate(() => {
+        const g = window.__state.game;
+        const line = g.game.mainLine().slice(1).map((nd) => (nd.move.pass ? "pass" : `${nd.move.x},${nd.move.y}`));
+        return { moves: g.game.moveNumber, thinking: g.thinking, pending: !!g.pending, result: g.game.current.result || null, sheet: window.__state.sheet?.kind || null, line, toasts: window.__state.toasts.map((x) => x.message) };
+      });
+      throw new Error(`the last reply never came: ${JSON.stringify(at)}`);
+    }
     await page.click(".panel .menu-wrap > button");
     await page.click(".menu [role=menuitem].danger");
     await page.click(".sheet-foot .btn.primary");

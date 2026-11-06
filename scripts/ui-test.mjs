@@ -47,14 +47,18 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 let failures = 0;
 let count = 0;
 const results = [];
+// UI_ONLY=<text>: run only the checks whose name contains it (to chase one check).
+const ONLY = process.env.UI_ONLY || "";
 async function check(name, fn) {
+  if (ONLY && !name.includes(ONLY)) return;
   try {
     const extra = await fn();
     count++;
     console.log(`ok ${count} - ${name}${extra ? " (" + extra + ")" : ""}`);
   } catch (e) {
     failures++;
-    console.error(`not ok - ${name}\n  ${e.message}`);
+    const at = ONLY ? (String(e.stack || "").split("\n").find((l) => l.includes("/scripts/ui-test")) || "").trim() : "";
+    console.error(`not ok - ${name}\n  ${e.message}${at ? "\n  " + at : ""}`);
   }
 }
 function assert(cond, msg) {
