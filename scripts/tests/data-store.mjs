@@ -340,6 +340,35 @@ export default async function ({ test, assert, root }) {
     assert.equal(logged.length, 1);
   });
 
+  await test("data store: an operation that fails after a newer one was queued does not come back over it", async () => {
+    // A backend whose removal hangs until told, then fails.
+    const files = new Map([["games/a.json", '{"v":1}']]);
+    let failRemove;
+    const backend = {
+      kind: "test",
+      list: async () => [...files.keys()],
+      read: async (k) => files.get(k) ?? null,
+      write: async (k, text) => void files.set(k, text),
+      remove: () => new Promise((_, reject) => (failRemove = () => reject(new Error("Disk")))),
+    };
+    const errors = [];
+    const store = S.createStore({ backend, onError: (e) => errors.push(e) });
+    await store.open();
+    store.remove("games/a.json");
+    const first = store.flush(); // the removal is in flight
+    await new Promise((r) => setTimeout(r, 0));
+    store.put("games/a.json", { v: 2 });
+    const second = store.flush(); // the new value waits behind it
+    failRemove();
+    assert.equal(await first, false);
+    assert.equal(await second, true);
+    assert.equal(errors.length, 1);
+    assert.equal(files.get("games/a.json"), '{"v":2}', "the newer write was made");
+    assert.deepEqual(store.pending(), [], "the failed removal is not retried over it");
+    assert.equal(await store.flush(), true);
+    assert.equal(files.get("games/a.json"), '{"v":2}', "and the file stays");
+  });
+
   await test("data store: the browser preview keeps keys in localStorage under goban9:", async () => {
     const m = new Map([["goban-studio.settings.v2", "{}"], ["goban9:bad key.json", "{}"]]);
     const storage = { get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, String(v)), removeItem: (k) => void m.delete(k) };

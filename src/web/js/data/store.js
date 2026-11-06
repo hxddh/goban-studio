@@ -194,6 +194,9 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
   const timer = new Map();
   /** key → the promise of the last operation on that key (so they run in order). */
   const chain = new Map();
+  /** key → the number of the latest operation queued on it (newest wins). */
+  const gen = new Map();
+  let seq = 0;
   let handler = onError;
   let opened = null;
 
@@ -220,6 +223,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
     const op = pending.get(key);
     if (!op) return chain.get(key) || Promise.resolve(true);
     pending.delete(key);
+    const mine = gen.get(key);
     const prev = chain.get(key) || Promise.resolve(true);
     const next = prev.then(async () => {
       // A newer operation of the same key was queued meanwhile: it carries the latest value.
@@ -233,8 +237,9 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
         }
         return true;
       } catch (err) {
-        // Kept pending: the next put of this key, or the next flush, tries again.
-        if (!pending.has(key)) pending.set(key, op);
+        // Kept pending (the next put of this key, or the next flush, tries
+        // again), unless a newer operation was queued since: that one wins.
+        if (!pending.has(key) && gen.get(key) === mine) pending.set(key, op);
         report(op === "remove" ? "remove" : "write", key, err);
         return false;
       }
@@ -248,6 +253,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
 
   function schedule(key, op) {
     pending.set(key, op);
+    gen.set(key, ++seq);
     clearT(timer.get(key));
     timer.set(key, setT(() => run(key), delay));
   }
