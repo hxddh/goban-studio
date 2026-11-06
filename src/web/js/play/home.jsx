@@ -89,7 +89,7 @@ function SuggestedHero() {
           {t("play.suggest.play")}
         </Button>
         <button type="button" class="link" onClick={() => playSuggested(rec, true)}>
-          {t("play.suggest.quick9")}
+          {t("play.suggest.other", [rec.quick.size])}
         </button>
       </div>
     </section>

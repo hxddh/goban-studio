@@ -172,17 +172,23 @@ export function suggestedOpponent(size = 19) {
   return { size, opponentRank: pick.rank, label: pick.label, handicap };
 }
 
+/** Players around 20 kyu and weaker start on 9×9 (about ten minutes a game). */
+export const BEGINNER_RANK = 20;
+
 /**
- * What to play next (Play's suggested game): the standard board, with a
- * 9×9 game beside it as the quick option, and why: the week's first focus
- * (model/player.js focus) or the player's level.
+ * What to play next (Play's suggested game), and why: the week's first
+ * focus (model/player.js focus) or the player's level. A beginner is
+ * offered 9×9 with the standard board as the other option; everyone else
+ * the standard board, with a quick 9×9 game beside it.
  * { size, opponentRank, label, handicap, rank, weak: { theme } | null, quick }.
  */
 export function recommendedGame() {
-  const main = suggestedOpponent(19);
+  const rank = playerRankNow();
+  const small = rank == null || rank >= BEGINNER_RANK;
+  const main = suggestedOpponent(small ? 9 : 19);
   const view = focus(state.profile, Date.now());
   const key = view.focus?.[0]?.key || null;
-  return { ...main, rank: playerRankNow(), weak: key ? { theme: key } : null, quick: suggestedOpponent(9) };
+  return { ...main, rank, weak: key ? { theme: key } : null, quick: suggestedOpponent(small ? 19 : 9) };
 }
 
 export function newGame(opts = {}) {

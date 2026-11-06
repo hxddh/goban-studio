@@ -16,7 +16,8 @@ export const PLAY = {
   "play.suggest.because": m("练练本周重点：{0}", "works on this week's focus: {0}", "이번 주 집중 연습: {0}", "今週の重点の練習：{0}"),
   "play.suggest.level": m("按你现在的棋力", "matched to your current level", "현재 기력에 맞춤", "今の棋力に合わせて"),
   "play.suggest.play": m("开始对局", "Play", "대국 시작", "対局を始める"),
-  "play.suggest.quick9": m("来盘 9 路快棋", "Or a quick 9×9", "9줄 속기 한 판", "9路で早碁を一局"),
+  // Play's suggested game, the other board as a quiet link: {0} is 9 or 19.
+  "play.suggest.other": m("或者下一盘 {0} 路", "Or a {0}×{0} game", "또는 {0}줄 한 판", "または{0}路で一局"),
   "play.home.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
   "play.home.levelGames": m("根据 {0} 盘对局估计", "estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
   "play.home.showAll": m("显示全部 {0} 盘", "Show all {0}", "전체 {0}판 보기", "全{0}局を表示"),
