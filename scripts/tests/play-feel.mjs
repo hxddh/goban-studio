@@ -1,11 +1,11 @@
 /**
- * v8 tests: playing feel. Loaded by scripts/test.mjs (every file in
+ * Play: how the computer plays — think time, resigning, the count. Loaded by scripts/test.mjs (every file in
  * scripts/tests/, in name order); receives the runner's helpers.
  *
  * The pure rules first (app/feel.js: think time, resignation, the count
  * proposal; engine.js deadFromOwnership; rules.js scoring of typical
  * endings), then the play controller with a fake KataGo host (the pattern
- * of v7-scheduler.mjs): the computer resigns in time and only then, offers
+ * of core-scheduler.mjs): the computer resigns in time and only then, offers
  * the count only on a settled board, and the end-of-game marking can be
  * corrected group by group.
  */
@@ -66,11 +66,11 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------- 13×13 calibration */
 
-  const SE = await import("../../src/web/js/app/strength.js");
+  const SE = await import("../../src/web/js/model/player.js");
   const fs = await import("node:fs");
   const path = await import("node:path");
 
-  await test("v8 calibration: every level is measured on 13×13, in order, between its 9×9 and 19×19 spans", () => {
+  await test("play calibration: every level is measured on 13×13, in order, between its 9×9 and 19×19 spans", () => {
     const ids = E.STRENGTHS.map((s) => s.id);
     for (const mode of ["standard", "human"]) {
       for (const id of ids) assert.ok(Number.isFinite(SE.MEASURED[mode][id][13]), `${mode} ${id}`);
@@ -90,13 +90,13 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 calibration: 13×13 games are compared on the measured 13×13 scale", () => {
+  await test("play calibration: 13×13 games are compared on the measured 13×13 scale", () => {
     for (const s of E.STRENGTHS) {
       const m = SE.MEASURED.standard[s.id];
       assert.ok(Math.abs(SE.onBoard(m[19], 13) - m[13]) < 1e-9, `${s.id}: 19×19 → 13×13 through the measured pair`);
       assert.ok(Math.abs(SE.fromBoard(m[13], 13) - m[19]) < 1e-9, `${s.id}: and back`);
-      if (E.impl("L:" + s.id)) assert.equal(SE.levelTheta("L:" + s.id, { size: 13 }), m[13]);
-      if (E.impl("HL:" + s.id)) assert.equal(SE.levelTheta("HL:" + s.id, { size: 13 }), SE.MEASURED.human[s.id][13]);
+      if (E.impl("L:" + s.id)) assert.equal(SE.implOpponent("L:" + s.id, { size: 13 }), m[13]);
+      if (E.impl("HL:" + s.id)) assert.equal(SE.implOpponent("HL:" + s.id, { size: 13 }), SE.MEASURED.human[s.id][13]);
     }
     for (let t = -5; t < 35; t += 0.5) {
       assert.ok(SE.onBoard(t + 0.5, 13) > SE.onBoard(t, 13), "monotone");
@@ -106,11 +106,11 @@ export default async function ({ test, assert, root }) {
     const gap = (b) => SE.MEASURED.human["2d"][b] - SE.MEASURED.standard["2d"][b];
     assert.ok(gap(19) > 3 && gap(13) < 1.5, `${gap(19)} vs ${gap(13)}`);
     // A 13×13 result says less about 19×19 strength than a 19×19 one, more than a 9×9 one.
-    const est = SE.startEstimate(10, 0);
-    const moved = (size) => SE.updateEstimate(est, { opponent: SE.onBoard(est.mu, size), size, won: true, at: 0 }).mu - est.mu;
+    const est = SE.priorRating(10, 0);
+    const moved = (size) => SE.updateRating(est, { opponent: SE.onBoard(est.mu, size), size, won: true, at: 0 }).mu - est.mu;
     assert.ok(moved(9) < moved(13) && moved(13) < moved(19), `${moved(9)} ${moved(13)} ${moved(19)}`);
     // Handicap stones on 13×13 still weaken the level.
-    assert.ok(SE.levelTheta("L:5k", { size: 13, handicap: 3 }) < SE.levelTheta("L:5k", { size: 13 }));
+    assert.ok(SE.implOpponent("L:5k", { size: 13, handicap: 3 }) < SE.implOpponent("L:5k", { size: 13 }));
   });
 
   /* ------------------------------------------------------- think time */
@@ -123,7 +123,7 @@ export default async function ({ test, assert, root }) {
   const middling = { moves: [{ visits: 90, scoreLead: 1.5 }, { visits: 40, scoreLead: 0 }, { visits: 30, scoreLead: -1 }] };
   const fixed = (v) => () => v;
 
-  await test("v8 feel: the computer's think time stays between 0.35 s and 3.5 s at every level, board and phase", () => {
+  await test("play feel: the computer's think time stays between 0.35 s and 3.5 s at every level, board and phase", () => {
     assert.equal(F.THINK_MIN, 350);
     assert.equal(F.THINK_MAX, 3500);
     for (const s of LEVELS) {
@@ -140,7 +140,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 feel: an obvious move is answered at least twice as fast as a hard one, and the opening is brisk", () => {
+  await test("play feel: an obvious move is answered at least twice as fast as a hard one, and the opening is brisk", () => {
     for (const s of LEVELS) {
       const easy = F.thinkTime(s, obvious, 100, 19, fixed(0.5));
       const hard = F.thinkTime(s, complex, 100, 19, fixed(0.5));
@@ -159,7 +159,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(F.thinkTime(-7, obvious, 100, 19, fixed(0.5)) <= 1200, "an obvious move, even at the top");
   });
 
-  await test("v8 feel: think time varies by about ±15% from move to move, never mechanically", () => {
+  await test("play feel: think time varies by about ±15% from move to move, never mechanically", () => {
     for (const s of LEVELS) {
       const lo = F.thinkTime(s, middling, 100, 19, fixed(0));
       const hi = F.thinkTime(s, middling, 100, 19, fixed(0.999));
@@ -193,7 +193,7 @@ export default async function ({ test, assert, root }) {
     return out;
   };
 
-  await test("v8 feel: the computer resigns a clearly lost, settled game after three searches in a row", () => {
+  await test("play feel: the computer resigns a clearly lost, settled game after three searches in a row", () => {
     const resigning = LEVELS.filter((r) => r <= F.RESIGN_FROM_RANK);
     assert.deepEqual(resigning, [15, 12, 10, 7, 5, 3, 2, 1, -3, -6, -7]);
     for (const id of resigning) {
@@ -215,7 +215,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(low, 2);
   });
 
-  await test("v8 feel: the computer never resigns while ahead, in an open position, early, offline, or at the gentlest levels", () => {
+  await test("play feel: the computer never resigns while ahead, in an open position, early, offline, or at the gentlest levels", () => {
     for (const s of LEVELS) {
       // Ahead, or level: never.
       for (const a of [{ winrate: 0.01, scoreLead: -25, ownership: settledOwn(19, -1) }, { winrate: 0.5, scoreLead: 0.5, ownership: settledOwn(19, 1) }]) {
@@ -247,7 +247,7 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------------- the count */
 
-  await test("v8 feel: the count is offered only on a settled board where no move is worth anything", () => {
+  await test("play feel: the count is offered only on a settled board where no move is worth anything", () => {
     const own = settledOwn(9, 1).map((_, i) => (i % 9 < 4 ? 0.95 : i % 9 > 4 ? -0.95 : 0.9));
     const dame = [{ x: 4, y: 0, visits: 30, winrate: 0.1, scoreLead: -6.5 }, { x: 4, y: 1, visits: 20, winrate: 0.1, scoreLead: -6.4 }];
     assert.equal(F.countReady({ moves: dame, ownership: own }, 40, 9), true, "only dame left");
@@ -285,7 +285,7 @@ export default async function ({ test, assert, root }) {
     return own;
   }
 
-  await test("v8 feel: dead stones from ownership, chain by chain: seki lives, a stone left in atari is dead", () => {
+  await test("play feel: dead stones from ownership, chain by chain: seki lives, a stone left in atari is dead", () => {
     const game = fromRows(Game, BLACK, WHITE, ENDING);
     assert.equal(game.board.getLiberties([4, 7]).length, 1, "the white stone is in atari");
     const own = ownershipFor(game, DEAD);
@@ -307,7 +307,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(E.deadFromOwnership(game.board, unclear), [{ x: 4, y: 7 }]);
   });
 
-  await test("v8 feel: a typical ending counts right under Japanese, Korean and Chinese rules", () => {
+  await test("play feel: a typical ending counts right under Japanese, Korean and Chinese rules", () => {
     const counts = {};
     for (const rules of ["japanese", "korean", "chinese"]) {
       const game = fromRows(Game, BLACK, WHITE, ENDING, { rules, komi: R.defaultKomi(rules) });
@@ -347,8 +347,10 @@ export default async function ({ test, assert, root }) {
       contents: [
         'export * as Play from "./src/web/js/app/play-ctl.js";',
         'export * as Engine from "./src/web/js/engine.js";',
-        'export * as Lib from "./src/web/js/library.js";',
-        'export * as P from "./src/web/js/persist.js";',
+        'export * as Lib from "./src/web/js/data/games.js";',
+        'export * as P from "./src/web/js/data/settings.js";',
+        'export * as PM from "./src/web/js/model/player.js";',
+        'export { store } from "./src/web/js/data/store.js";',
         'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
@@ -367,7 +369,9 @@ export default async function ({ test, assert, root }) {
     logLevel: "error",
   });
   const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
-  const { Play, Lib, P, state } = A;
+  const { Play, Lib, P, state, PM, store } = A;
+  // The store picks its backend on first use: the preview's, before any fake host.
+  await store.open();
 
   // The fake host answers every search with `respond(payload)` → { info, play }.
   let respond = () => ({ info: "", play: "pass" });
@@ -396,7 +400,7 @@ export default async function ({ test, assert, root }) {
   A.setLang("en");
   for (const rec of Lib.listGames()) Lib.deleteGame(rec.id);
   state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: false, showEval: false, onboarded: true, confirmMove: false };
-  state.progress = P.loadProgress();
+  state.profile = PM.newProfile();
   state.engine = { kind: "katago", name: "KataGo test", available: true };
 
   /** The first empty point of column E (the dame between the walls). */
@@ -441,7 +445,7 @@ export default async function ({ test, assert, root }) {
     await until(() => !g.thinking && (g.game.moveNumber === n + 2 || g.game.current.result), 6000, "the computer's reply");
   }
 
-  await test("v8 feel: the computer takes at least the minimum think time, and its pace follows the position", async () => {
+  await test("play feel: the computer takes at least the minimum think time, and its pace follows the position", async () => {
     fast = false;
     try {
       const g = wallsGame(30);
@@ -456,7 +460,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 feel: on a settled board the count is offered on the player's turn, with nothing pondering", async () => {
+  await test("play feel: on a settled board the count is offered on the player's turn, with nothing pondering", async () => {
     const g = wallsGame(-3);
     respond = () => dameReport();
     assert.equal(g.proposal, false);
@@ -479,7 +483,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.scoring.score.result, "W+6.5");
   });
 
-  await test("v8 feel: no count offer while the board is open or a move is still worth points", async () => {
+  await test("play feel: no count offer while the board is open or a move is still worth points", async () => {
     let g = wallsGame(-3);
     respond = () => dameReport({ ownership: new Float32Array(81).fill(0.3) });
     await humanThenReply(g, 4, 8);
@@ -494,7 +498,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.proposal, false, "a move worth three points is left");
   });
 
-  await test("v8 feel: a clearly lost computer resigns on its third hopeless search; a winning or gentle one plays on", async () => {
+  await test("play feel: a clearly lost computer resigns on its third hopeless search; a winning or gentle one plays on", async () => {
     // 2d, White, 40 points behind on a settled board.
     let g = wallsGame(-3);
     respond = () => dameReport({ winrate: 0.998, lead: 40 });
@@ -549,7 +553,7 @@ export default async function ({ test, assert, root }) {
     return g;
   }
 
-  await test("v8 feel: the end-of-game marking finds the dead stones, keeps the seki, and scores", async () => {
+  await test("play feel: the end-of-game marking finds the dead stones, keeps the seki, and scores", async () => {
     const own = ownershipFor(fromRows(Game, BLACK, WHITE, ENDING), DEAD);
     const g = await countBoard(ENDING, own);
     assert.deepEqual(g.scoring.dead, [...DEAD].sort((p, q) => p.y - q.y || p.x - q.x));
@@ -559,7 +563,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.game.current.result, "W+6.5");
   });
 
-  await test("v8 feel: one click on a group fixes a misjudged marking, and a second click undoes it", async () => {
+  await test("play feel: one click on a group fixes a misjudged marking, and a second click undoes it", async () => {
     // KataGo misjudges: the seki's white group as dead, the dead black J5 as alive.
     const own = ownershipFor(fromRows(Game, BLACK, WHITE, ENDING), DEAD);
     for (const [x, y] of [[3, 0], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [1, 3], [0, 4], [1, 4]]) own[y * 9 + x] = 0.7;
@@ -584,5 +588,8 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.scoring, null);
   });
 
+  // Nothing of these games keeps running into the next file's fake host.
+  A.Engine.sched.cancelAll("quit");
+  await sleep(20);
   performance.now = realNow;
 }

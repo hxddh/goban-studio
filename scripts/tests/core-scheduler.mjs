@@ -1,5 +1,5 @@
 /**
- * v7 tests: scheduler. Loaded by scripts/test.mjs (every file in scripts/tests/,
+ * Core: the engine scheduler. Loaded by scripts/test.mjs (every file in scripts/tests/,
  * in name order); receives the runner's helpers.
  *
  * The engine scheduler (src/web/js/scheduler.js) on its own, then the app's
@@ -34,7 +34,7 @@ export default async function ({ test, assert, root }) {
       });
     });
 
-  await test("v7 scheduler: higher lanes run first; a running search is never killed for them", async () => {
+  await test("core scheduler: higher lanes run first; a running search is never killed for them", async () => {
     assert.deepEqual(LANES, ["move", "interactive", "live", "background"]);
     const s = createScheduler();
     const log = [];
@@ -52,7 +52,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(out[0], "bg0", "the pre-empted background search still resolves its value");
   });
 
-  await test("v7 scheduler: an aborted search never runs; owners, lanes and jobs cancel", async () => {
+  await test("core scheduler: an aborted search never runs; owners, lanes and jobs cancel", async () => {
     const s = createScheduler();
     const log = [];
     const ctl = new AbortController();
@@ -114,6 +114,59 @@ export default async function ({ test, assert, root }) {
     assert.equal(any.reason, "why");
   });
 
+  await test("core scheduler: a move pre-empts a running background search, which runs again and resolves", async () => {
+    const s = createScheduler();
+    const log = [];
+    const bg = s.search(slow(log, "bg", 200), { lane: "background" });
+    const bg2 = s.search(slow(log, "bg2", 5), { lane: "background" });
+    await sleep(20);
+    const t0 = Date.now();
+    let startedAt = 0;
+    const move = s.search((sig) => {
+      startedAt = Date.now();
+      return slow(log, "move", 5)(sig);
+    }, { lane: "move" });
+    assert.equal(await move, "move");
+    assert.ok(startedAt - t0 < 20, `the move started at once (${startedAt - t0} ms)`);
+    assert.equal(await bg, "bg", "the pre-empted search ran again and resolved its own value");
+    assert.equal(await bg2, "bg2");
+    assert.deepEqual(log, ["bg", "move", "bg", "bg2"], "it went back to the front of its lane");
+    assert.equal(s.snapshot().preemptions, 1);
+
+    // Lanes other than "move" never pre-empt; nor does a move pre-empt a
+    // search that is not pre-emptible, or one of a higher lane.
+    log.length = 0;
+    const a = s.search(slow(log, "a", 40), { lane: "background" });
+    await sleep(2);
+    const look = s.search(slow(log, "look", 1), { lane: "interactive" });
+    const lv = s.search(slow(log, "live", 1), { lane: "live" });
+    await Promise.all([a, look, lv]);
+    const b = s.search(slow(log, "b", 40), { lane: "background", preemptible: false });
+    await sleep(2);
+    await s.search(slow(log, "m", 1), { lane: "move" });
+    await b;
+    const c = s.search(slow(log, "c", 30), { lane: "live" });
+    await sleep(2);
+    await s.search(slow(log, "m2", 1), { lane: "move" });
+    await c;
+    assert.deepEqual(log, ["a", "look", "live", "b", "m", "c", "m2"]);
+    assert.equal(s.snapshot().preemptions, 1);
+
+    // Cancelling the pre-empted search while it waits to run again: it never runs.
+    log.length = 0;
+    const ctl = new AbortController();
+    const d = s.search(slow(log, "d", 100), { lane: "background", signal: ctl.signal });
+    await sleep(2);
+    const m3 = s.search(slow(log, "m3", 20), { lane: "move" });
+    await sleep(2);
+    ctl.abort();
+    assert.equal(await d, null);
+    await m3;
+    await sleep(5);
+    assert.deepEqual(log, ["d", "m3"]);
+    assert.deepEqual(s.snapshot().queued, { move: 0, interactive: 0, live: 0, background: 0 });
+  });
+
   /* ---------------------------------------------- the app, with a fake host */
 
   const esbuild = await import("esbuild");
@@ -125,8 +178,10 @@ export default async function ({ test, assert, root }) {
         'export * as Batch from "./src/web/js/app/report-batch.js";',
         'export * as Status from "./src/web/js/app/report-status.jsx";',
         'export * as Engine from "./src/web/js/engine.js";',
-        'export * as Lib from "./src/web/js/library.js";',
-        'export * as P from "./src/web/js/persist.js";',
+        'export * as Lib from "./src/web/js/data/games.js";',
+        'export * as P from "./src/web/js/data/settings.js";',
+        'export * as PM from "./src/web/js/model/player.js";',
+        'export { store } from "./src/web/js/data/store.js";',
         'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
@@ -148,7 +203,9 @@ export default async function ({ test, assert, root }) {
     logLevel: "error",
   });
   const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
-  const { Play, Report, Batch, Status, Engine, Lib, P, Game, BLACK, WHITE, state, loadSGF, reportFits } = A;
+  const { Play, Report, Batch, Status, Engine, Lib, P, PM, Game, BLACK, WHITE, state, store, loadSGF, reportFits } = A;
+  // The store picks its backend on first use: the preview's, before the fake host below.
+  await store.open();
 
   // A fake async KataGo host: every search takes `delay` ms; the log keeps
   // each request (visits tell who asked: the computer at 30 kyu uses 8, the
@@ -191,10 +248,9 @@ export default async function ({ test, assert, root }) {
     },
   };
   A.setLang("en");
-  P.clearAll?.();
   for (const rec of Lib.listGames()) Lib.deleteGame(rec.id);
   state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: false, showEval: false, onboarded: true, confirmMove: false };
-  state.progress = P.loadProgress();
+  state.profile = PM.newProfile();
   state.engine = { kind: "katago", name: "KataGo test", available: true };
   // Back/forward as the app does it (controller.js restore), for the report page.
   A.setRestorer((loc) => {
@@ -223,7 +279,7 @@ export default async function ({ test, assert, root }) {
     return g;
   }
 
-  await test("v7 scheduler: a new game's computer move does not wait for the last game's background analysis", async () => {
+  await test("core scheduler: a new game's computer move does not wait for the last game's background analysis", async () => {
     const g1 = finishRatedGame(40);
     assert.ok(g1.recordId, "saved");
     assert.equal(g1.summary?.status, "analyzing");
@@ -263,16 +319,16 @@ export default async function ({ test, assert, root }) {
     assert.ok(rec.report, "report stored in the background");
     assert.equal(rec.report.confidence, "high");
     assert.ok(rec.rating?.before && rec.rating?.after, "rating change stored");
-    Report.openReport(g1.recordId, { space: "library" });
+    Report.openReport(g1.recordId, { space: "play" });
     assert.equal(state.report.status, "done");
     assert.match(Status.ratingChangeText(Report.reportRating()), /^Strength ≈ \d+ kyu/);
     Report.closeReport();
   });
 
-  await test("v7 scheduler: when a new game cuts the summary short, the background report fills in what it would have, once", async () => {
+  await test("core scheduler: when a new game cuts the summary short, the background report fills in what it would have, once", async () => {
     await until(() => Engine.sched.listJobs({ all: true }).length === 0, 8000, "idle");
-    const drillsOf = (id) => state.progress.mistakes.filter((m) => m.gameKey === id).map((m) => m.id).sort();
-    const trendOf = (id) => state.progress.games.find((r) => r.id === id);
+    const drillsOf = (id) => state.profile.mistakes.filter((m) => m.gameId === id).map((m) => m.id).sort();
+    const trendOf = (id) => state.profile.games.find((r) => r.id === id);
 
     // Interrupted: a new game starts while the summary is still running.
     const g1 = finishRatedGame(40);
@@ -291,31 +347,34 @@ export default async function ({ test, assert, root }) {
     assert.equal(Lib.getGame(id1).learned, true);
 
     // Only once: making the report again adds nothing.
-    const weak = JSON.stringify(state.progress.weakness);
+    const weak = JSON.stringify(state.profile);
     Lib.patchGame(id1, { report: null });
     await Report.queueReport(id1).promise;
     assert.deepEqual(drillsOf(id1), [`${id1}-11`, `${id1}-21`].sort());
-    assert.equal(JSON.stringify(state.progress.weakness), weak, "weaknesses not counted twice");
+    assert.equal(JSON.stringify(state.profile), weak, "nothing counted twice");
 
     // Not interrupted: the summary does it, and the report then does not again.
     const g2 = finishRatedGame(40);
     const id2 = g2.recordId;
     await until(() => g2.summary?.status === "done", 8000, "summary done");
     assert.equal(Lib.getGame(id2).learned, true, "the summary marked it");
-    const weak2 = JSON.stringify(state.progress.weakness);
+    const weak2 = JSON.stringify(state.profile);
     await until(() => Lib.getGame(id2).report, 8000, "report");
     assert.deepEqual(drillsOf(id2), [`${id2}-11`, `${id2}-21`].sort());
-    assert.equal(JSON.stringify(state.progress.weakness), weak2);
+    assert.equal(JSON.stringify(state.profile), weak2);
     assert.ok(trendOf(id2).phases);
   });
 
-  await test("v7 scheduler: rating change text, before → after with the ± of the new estimate", () => {
+  await test("core scheduler: rating change text, before → after with the ± of the new estimate", () => {
     assert.equal(Status.ratingChangeText({ before: { rank: 12, pm: 2 }, after: { rank: 11, pm: 1 } }), "Strength ≈ 12 kyu → ≈ 11 kyu (±1)");
     assert.equal(Status.ratingChangeText({ before: { rank: 1, pm: 2 }, after: { rank: 0, pm: 2 } }), "Strength ≈ 1 kyu → ≈ 1 dan (±2)");
     assert.equal(Status.ratingChangeText({ before: { rank: 5, pm: 1 }, after: { rank: 5, pm: 1 } }), "Strength ≈ 5 kyu (±1), unchanged");
     assert.equal(Status.ratingChangeText(null), "");
-    const ch = Play.ratingChange({ v: 6, mu: 5, sigma: 1, games: 3, at: 0, history: [] }, { v: 6, mu: 6, sigma: 0.9, games: 4, at: 0, history: [] }, 0);
+    const at = (mu, sigma, games) => PM.readRating({ mu, sigma, games, at: 0 }, 0);
+    const ch = Play.ratingChange(at(5, 1, 3), at(6, 0.9, 4));
     assert.ok(ch.after.r > ch.before.r && ch.after.pm >= 1);
+    assert.deepEqual(Object.keys(ch.after).sort(), ["pm", "r", "rank"]);
+    assert.equal(Play.ratingChange(null, ch.after), null);
   });
 
   /** A two-player record of `moves` moves. */
@@ -326,20 +385,20 @@ export default async function ({ test, assert, root }) {
     return Lib.saveGame(game, { opponent: "human", name, source: "game" });
   }
 
-  await test("v7 scheduler: closing a report cancels the analysis it started", async () => {
+  await test("core scheduler: closing a report cancels the analysis it started", async () => {
     delay = 25;
     const rec = twoPlayerRecord(14);
-    Report.openReport(rec.id, { space: "library" });
+    Report.openReport(rec.id, { space: "play" });
     const job = Report.reportJob(rec.id);
     assert.ok(job && job.owner.startsWith("report:"), "owned by the page");
     await until(() => job.progress > 0, 3000, "progress");
     Report.closeReport();
     assert.equal(job.signal.aborted, true);
     assert.equal(await job.promise, null);
-    assert.equal(Lib.getGame(rec.id).report, undefined);
+    assert.equal(Lib.getGame(rec.id).report, null);
     // Opened again, it resumes from the positions it had.
     const seen = requests.length;
-    Report.openReport(rec.id, { space: "library" });
+    Report.openReport(rec.id, { space: "play" });
     await Report.reportJob(rec.id).promise;
     assert.ok(Lib.getGame(rec.id).report);
     assert.ok(requests.length - seen < 15, "kept the positions already analysed");
@@ -347,10 +406,10 @@ export default async function ({ test, assert, root }) {
     delay = 15;
   });
 
-  await test("v7 scheduler: a stopped report's positions are not reused after the moves were edited", async () => {
+  await test("core scheduler: a stopped report's positions are not reused after the moves were edited", async () => {
     delay = 25;
     const rec = twoPlayerRecord(14);
-    Report.openReport(rec.id, { space: "library" });
+    Report.openReport(rec.id, { space: "play" });
     const job = Report.reportJob(rec.id);
     await until(() => job.progress > 0.3, 3000, "progress");
     Report.closeReport();
@@ -363,7 +422,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(other.mainLine().length, loadSGF(rec.sgf).game.mainLine().length);
     Lib.saveGame(other, { id: rec.id, opponent: "human", source: "game" });
     const seen = requests.length;
-    Report.openReport(rec.id, { space: "library" });
+    Report.openReport(rec.id, { space: "play" });
     await Report.reportJob(rec.id).promise;
     assert.ok(requests.length - seen >= 14, `every position analysed again (${requests.length - seen})`);
     assert.ok(reportFits(Lib.getGame(rec.id).report, other), "the report is of the edited moves");
@@ -371,7 +430,7 @@ export default async function ({ test, assert, root }) {
     delay = 15;
   });
 
-  await test("v7 scheduler: cancelling Analyse all does not wait for a report it did not start", async () => {
+  await test("core scheduler: cancelling Analyse all does not wait for a report it did not start", async () => {
     await until(() => Engine.sched.listJobs({ all: true }).length === 0, 8000, "idle");
     for (const r of Lib.listGames()) Lib.deleteGame(r.id);
     delay = 150; // the independent report takes about 2 s
@@ -387,14 +446,14 @@ export default async function ({ test, assert, root }) {
     assert.equal(await job.promise, null);
     assert.ok(Date.now() - t0 < 400, `the batch stopped at once (${Date.now() - t0} ms)`);
     assert.equal(state.batch, null);
-    assert.equal(P.readJSON(Batch.BATCH_KEY, null), null);
+    assert.equal((store.get(Batch.BATCH_KEY) ?? null), null);
     assert.equal(own.signal.aborted, false, "the independent report keeps going");
     await own.promise;
     assert.ok(Lib.getGame(a.id).report);
     delay = 15;
   });
 
-  await test("v7 scheduler: Analyse all makes the missing reports, cancels, and resumes after quitting", async () => {
+  await test("core scheduler: Analyse all makes the missing reports, cancels, and resumes after quitting", async () => {
     for (const r of Lib.listGames()) Lib.deleteGame(r.id);
     const recs = [twoPlayerRecord(10, "a"), twoPlayerRecord(10, "b"), twoPlayerRecord(10, "c"), twoPlayerRecord(10, "d")];
     assert.equal(Batch.batchCandidates().length, 4);
@@ -406,7 +465,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(Batch.rowAnalysis(state.batch.ids[1])?.queued);
     Batch.cancelBatch();
     assert.equal(await job.promise, null);
-    assert.equal(P.readJSON(Batch.BATCH_KEY, null), null);
+    assert.equal((store.get(Batch.BATCH_KEY) ?? null), null);
     assert.equal(state.batch, null);
     const left = Batch.batchCandidates().length;
     assert.ok(left >= 1 && left <= 3);
@@ -415,17 +474,17 @@ export default async function ({ test, assert, root }) {
     await until(() => Engine.sched.listJobs({ all: true }).some((j) => j.kind === "report"), 3000, "a report");
     Engine.sched.cancelAll("quit");
     await job.promise;
-    assert.ok(P.readJSON(Batch.BATCH_KEY, null)?.ids?.length >= 1, "saved for the next launch");
+    assert.ok((store.get(Batch.BATCH_KEY) ?? null)?.ids?.length >= 1, "saved for the next launch");
     job = Batch.resumeBatch();
     assert.ok(job);
     await job.promise;
     assert.equal(Batch.batchCandidates().length, 0);
     for (const r of recs) assert.ok(Lib.getGame(r.id).report, r.name);
-    assert.equal(P.readJSON(Batch.BATCH_KEY, null), null);
+    assert.equal((store.get(Batch.BATCH_KEY) ?? null), null);
     assert.equal(Engine.sched.listJobs().length, 0);
   });
 
-  await test("v7 scheduler: the browser preview (no KataGo) still analyses with the offline estimate", async () => {
+  await test("core scheduler: the browser preview (no KataGo) still analyses with the offline estimate", async () => {
     await until(() => Engine.sched.listJobs({ all: true }).length === 0, 5000, "idle");
     const saved = globalThis.zero;
     delete globalThis.zero;
@@ -448,7 +507,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v7 scheduler: strings in four languages; no old serial chain or tokens left", async () => {
+  await test("core scheduler: strings in four languages; no old serial chain or tokens left", async () => {
     const { V7_SCHEDULER } = await import("../../src/web/js/messages/v7-scheduler.js");
     const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
     assert.ok(Object.keys(V7_SCHEDULER).length >= 15);

@@ -1,5 +1,5 @@
 /**
- * v7 tests: calibration. Loaded by scripts/test.mjs (every file in scripts/tests/,
+ * Core: the calibration runs and the measured ladder. Loaded by scripts/test.mjs (every file in scripts/tests/,
  * in name order); receives the runner's helpers.
  */
 import fs from "node:fs";
@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { fitBT, mergeGames, parseShard, planMatrix, planTasks } from "../calibrate-strength.mjs";
 import { STRENGTHS, implLabel, implTheta, ladder } from "../../src/web/js/engine.js";
-import { MEASURED, thetaToGoR } from "../../src/web/js/app/strength.js";
+import { MEASURED, thetaToGoR } from "../../src/web/js/opponents.js";
 
 /** The names v7's games were played under → the shipped levels (docs/strength.md, v7). */
 export const V7_ALIAS = {
@@ -22,7 +22,7 @@ export const V7_ALIAS = {
 export default async function ({ test, assert, root }) {
   const candidates = JSON.parse(fs.readFileSync(path.join(root, "docs/calibration/v7-candidates.json"), "utf8"));
 
-  test("v7 calibration: --shard parses I/N and rejects nonsense", () => {
+  test("core calibration: --shard parses I/N and rejects nonsense", () => {
     assert.equal(parseShard(undefined), null);
     assert.deepEqual(parseShard("2/5"), { index: 2, count: 5 });
     assert.throws(() => parseShard("5/5"));
@@ -30,7 +30,7 @@ export default async function ({ test, assert, root }) {
     assert.throws(() => parseShard("a/b"));
   });
 
-  test("v7 calibration: shards split a schedule into disjoint slices that cover it", () => {
+  test("core calibration: shards split a schedule into disjoint slices that cover it", () => {
     const opt = { size: 19, komi: 6.5, games: 5, pairs: "HL:10k-L:10k,CH:s10k8-L:5k,L:1k-C:v400", tag: "t", anchors: [] };
     const all = planTasks(opt, candidates).map((t) => t.key);
     assert.equal(all.length, 15);
@@ -48,7 +48,7 @@ export default async function ({ test, assert, root }) {
     );
   });
 
-  test("v7 calibration: CH: candidates play as human-style levels, colours alternate", () => {
+  test("core calibration: CH: candidates play as human-style levels, colours alternate", () => {
     const [g0, g1] = planTasks({ size: 9, komi: 6.5, games: 2, pairs: "CH:s7k24b5-HL:5k", anchors: [] }, candidates);
     assert.equal(g0.black.kind, "humanLadder");
     assert.deepEqual(g0.black.strength.human, { profile: "rank_7k", style: "search", visits: 24, blunder: 0.05 });
@@ -60,13 +60,13 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  test("v7 calibration: merge keeps one line per game key and drops torn lines", () => {
+  test("core calibration: merge keeps one line per game key and drops torn lines", () => {
     const a = { key: "k1", winner: "B" };
     const out = mergeGames([a], [`${JSON.stringify(a)}\n${JSON.stringify({ key: "k2", winner: "W" })}\n{"key":"k3"`, JSON.stringify({ key: "k2", winner: "B" })]);
     assert.deepEqual(out, [{ key: "k2", winner: "W" }]);
   });
 
-  test("v7 calibration: the committed plan is a valid runner matrix", () => {
+  test("core calibration: the committed plan is a valid runner matrix", () => {
     const plan = JSON.parse(fs.readFileSync(path.join(root, "docs/calibration/plan.json"), "utf8"));
     const m = planMatrix(plan);
     assert.ok(m.include.length >= 1 && m.include.length <= 256);
@@ -79,7 +79,7 @@ export default async function ({ test, assert, root }) {
     assert.throws(() => planMatrix({ runs: [] }));
   });
 
-  test("v7 calibration: the workflow runs only on calibrate/** branches", () => {
+  test("core calibration: the workflow runs only on calibrate/** branches", () => {
     const yml = fs.readFileSync(path.join(root, ".github/workflows/calibrate.yml"), "utf8");
     const on = yml.slice(yml.indexOf("\non:"), yml.indexOf("\npermissions:"));
     assert.match(on, /push:\s*\n\s*branches: \["calibrate\/\*\*"\]/);
@@ -90,7 +90,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(yml.includes("src/models.zig"));
   });
 
-  test("v7 calibration: every level's measured strength exists on both boards", () => {
+  test("core calibration: every level's measured strength exists on both boards", () => {
     for (const s of STRENGTHS) {
       for (const mode of ["standard", "human"]) {
         const m = MEASURED[mode][s.id];
@@ -99,7 +99,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  test("v7 calibration: the human-style ladder has no gap and its labels follow the measurement", () => {
+  test("core calibration: the human-style ladder has no gap and its labels follow the measurement", () => {
     // v9: the ladder with the human-style network installed (opponents.js).
     const entries = ladder({ human: true });
     for (let i = 1; i < entries.length; i++) {
@@ -121,7 +121,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  test("v7 calibration: the committed games reproduce the measured human-style strengths", () => {
+  test("core calibration: the committed games reproduce the measured human-style strengths", () => {
     const dir = path.join(root, "docs/calibration/results");
     const games = fs
       .readdirSync(dir)

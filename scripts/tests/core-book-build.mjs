@@ -1,5 +1,5 @@
 /**
- * v7 tests: book. Loaded by scripts/test.mjs (every file in scripts/tests/,
+ * Core: how the opening book was built (network, depth, coverage). Loaded by scripts/test.mjs (every file in scripts/tests/,
  * in name order); receives the runner's helpers.
  */
 import fs from "node:fs";
@@ -25,7 +25,7 @@ export default async function ({ test, assert, root }) {
     return Book.lookup(tree, m, toMove);
   };
 
-  await test("v7 book: made with the strong network at 2,000 visits, and small when gzipped", () => {
+  await test("core book: made with the strong network at 2,000 visits, and small when gzipped", () => {
     assert.match(raw.network, /^g170e-b15c192-/);
     assert.ok(raw.visits >= 2000, `visits ${raw.visits}`);
     assert.ok(/^\d+\.\d+/.test(raw.katago || ""), `KataGo version ${raw.katago}`);
@@ -39,7 +39,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v7 book: deeper and broader than v6", () => {
+  await test("core book: deeper and broader than v6", () => {
     const whole = book.trees.whole;
     const corner = book.trees.corner;
     assert.ok(whole.nodes.length >= 2000, `whole ${whole.nodes.length}`);
@@ -49,7 +49,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(deepest(corner) >= 14, `corner depth ${deepest(corner)}`);
   });
 
-  await test("v7 book: the 3-3 invasion and the 3-4 approaches have their common answers", () => {
+  await test("core book: the 3-3 invasion and the 3-4 approaches have their common answers", () => {
     const corner = book.trees.corner;
     // After the 3-3 invasion both blocks are book moves (one position, mirrored).
     const inv = replay(corner, ["Q16", "R17"]);
@@ -74,7 +74,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(replay(corner, ["Q16", "O17", "M17", "R17"]), "pincer and 3-3");
   });
 
-  await test("v7 book: every record replays, and edges point at searched positions", () => {
+  await test("core book: every record replays, and edges point at searched positions", () => {
     for (const id of ["whole", "corner"]) {
       const t = raw.trees[id];
       const named = Object.keys(t.names).map(Number);
@@ -84,7 +84,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v7 book: a corner window with coordinates leaves room for the labels", async () => {
+  await test("core book: a corner window with coordinates leaves room for the labels", async () => {
     const { BoardView } = await import("../../src/web/js/board.js");
     // geometry() reads only the model and the canvas size.
     const geom = (model, w, h) => BoardView.prototype.geometry.call({ model, cssW: w, cssH: h, window: () => windowOf(model.view, 19) });

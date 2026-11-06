@@ -1,5 +1,5 @@
 /**
- * v8 tests: teaching reasons in warnings and hints. Loaded by scripts/test.mjs (every file in
+ * Play: teaching reasons in warnings and hints. Loaded by scripts/test.mjs (every file in
  * scripts/tests/, in name order); receives the runner's helpers.
  *
  * The reason chooser (src/web/js/app/teach-why.js) on constructed positions (atari, cut, eye space,
@@ -35,7 +35,7 @@ export default async function ({ test, assert, root }) {
   setLang("en");
   const E = ". . . . . . . . .";
 
-  await test("v8 teaching: a move that puts itself in atari is taken at once", () => {
+  await test("play teaching: a move that puts itself in atari is taken at once", () => {
     // White at C9 and B8; Black's B9 has one liberty (A9) and White takes it.
     const before = board([". . O . . . . . .", ". O . . . . . . .", E, E, E, E, E, E, E]);
     const r = warningReason({
@@ -50,7 +50,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(warningText("6", r), "This move may cost about 6 points — White can capture it at once.");
   });
 
-  await test("v8 teaching: a group that loses its eye space is named at its point", () => {
+  await test("play teaching: a group that loses its eye space is named at its point", () => {
     // Black's corner group has a straight three (A9–C9); Black plays elsewhere and White takes the
     // vital point B9. Ownership: the group was Black's before and is White's after.
     const before = board([". . . X O . . . .", "X X X X O . . . .", "O O O O O . . . .", E, E, E, E, E, E]);
@@ -71,7 +71,7 @@ export default async function ({ test, assert, root }) {
     setLang("en");
   });
 
-  await test("v8 teaching: a punishing line that is a ladder says so", () => {
+  await test("play teaching: a punishing line that is a ladder says so", () => {
     // Black's E5 stone; White's E6, D5 and F4 wait. Black plays elsewhere; White ataris at F5,
     // Black runs to E4, White ataris again at E3 and the chase zig-zags down: a ladder.
     const before = board([E, E, E, ". . . . O . . . .", ". . . O X . . . .", ". . . . . O . . .", E, E, E]);
@@ -88,7 +88,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(warningText("8", r), "This move may cost about 8 points — White can catch your stones in a ladder.");
   });
 
-  await test("v8 teaching: no confident reason means the plain number, never a guess", () => {
+  await test("play teaching: no confident reason means the plain number, never a guess", () => {
     const before = board([E, E, ". . X . . . O . .", E, E, E, ". . O . . . X . .", E, E]);
     // No ownership, a quiet line: nothing to say.
     const quiet = warningReason({
@@ -116,7 +116,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(hintReason(before, 1, { pass: true }), null);
   });
 
-  await test("v8 teaching: hints say what the move does (capture, atari, cut, connect, corner)", () => {
+  await test("play teaching: hints say what the move does (capture, atari, cut, connect, corner)", () => {
     const center = board([E, E, E, ". . . . X . . . .", ". . . X O X . . .", E, E, E, E]);
     const cap = hintReason(center, 1, { x: 4, y: 5, pv: [{ x: 4, y: 5 }] });
     assert.equal(cap?.key, "why.hint.capture1");
@@ -148,7 +148,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(ladder?.key, "why.hint.ladder");
   });
 
-  await test("v8 teaching: every reason string exists in four languages with matching placeholders", () => {
+  await test("play teaching: every reason string exists in four languages with matching placeholders", () => {
     const holes = (v) => [...new Set([...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]))].sort().join();
     for (const k of Object.keys(V8_TEACHING)) {
       assert.ok(MESSAGES[k], k);
@@ -168,8 +168,10 @@ export default async function ({ test, assert, root }) {
     stdin: {
       contents: [
         'export * as Play from "./src/web/js/app/play-ctl.js";',
-        'export * as Lib from "./src/web/js/library.js";',
-        'export * as P from "./src/web/js/persist.js";',
+        'export * as Lib from "./src/web/js/data/games.js";',
+        'export * as P from "./src/web/js/data/settings.js";',
+        'export * as PM from "./src/web/js/model/player.js";',
+        'export { store } from "./src/web/js/data/store.js";',
         'export { BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
@@ -188,7 +190,9 @@ export default async function ({ test, assert, root }) {
     logLevel: "error",
   });
   const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
-  const { Play, Lib, P, BLACK, state } = A;
+  const { Play, Lib, P, BLACK, state, PM, store } = A;
+  // The store picks its backend on first use: the preview's, before any fake host.
+  await store.open();
 
   // The fake host: before Black's 3rd move the position is even (best E5);
   // after Black's B9 (a self-atari) White leads by 8 and its line takes at A9.
@@ -213,12 +217,11 @@ export default async function ({ test, assert, root }) {
     },
   };
 
-  await test("v8 teaching: the warning shows and announces its reason, with no extra search", async () => {
+  await test("play teaching: the warning shows and announces its reason, with no extra search", async () => {
     A.setLang("en");
-    P.clearAll?.();
     for (const rec of Lib.listGames()) Lib.deleteGame(rec.id);
     state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: true, showEval: false, onboarded: true, confirmMove: false };
-    state.progress = P.loadProgress();
+    state.profile = PM.newProfile();
     state.engine = { kind: "katago", name: "KataGo test", available: true };
     Play.newGame({ size: 9, color: BLACK, opponentRank: 30 });
     const g = state.game;
@@ -239,7 +242,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.pending, null);
   });
 
-  await test("v8 teaching: the hint reads its reason off the board", async () => {
+  await test("play teaching: the hint reads its reason off the board", async () => {
     const g = state.game;
     await until(() => !g.thinking, 2000, "idle");
     // Black to play; the engine's hint is E5, a quiet point: no reason is invented.

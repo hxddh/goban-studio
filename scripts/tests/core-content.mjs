@@ -147,7 +147,7 @@ export default async function ({ test, assert, root }) {
     assert.match(win, /for part in \("course", "problems", "classics"\):/, "the Windows ZIP is checked too");
   });
 
-  await test("core content: Practice's openers wait for the lesson or problem they open", async () => {
+  await test("core content: Learn's openers wait for the lesson or problem they open", async () => {
     const { index, bodies } = split();
     const { mod: A } = await bundleLazy(
       root,
@@ -156,6 +156,7 @@ export default async function ({ test, assert, root }) {
         'export * as Content from "./src/web/js/content.js";',
         'export { state } from "./src/web/js/app/store.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
+        'export { newProfile } from "./src/web/js/model/player.js";',
       ],
       Split.indexModules(index),
     );
@@ -168,25 +169,25 @@ export default async function ({ test, assert, root }) {
     try {
       A.setLang("en");
       state.settings = { ...state.settings, lang: "en", experience: "player", playerRank: 15 };
-      state.progress = { lessons: {}, problems: {}, classics: {}, mistakes: [], games: [], weakness: {}, daily: null, streak: { count: 0, last: null }, rating: null };
+      state.profile = A.newProfile({ rank: 15 });
       // Lists read the index alone.
       assert.ok(Practice.problemsOfTopic("capture").length > 0);
       assert.ok(Practice.nextLesson()?.lesson.id);
       const id = Practice.COURSE[0].lessons[0].id;
       const opening = Practice.openLesson(id);
-      assert.notEqual(state.practice?.view, "lesson", "not before its steps are here");
+      assert.notEqual(state.learn?.view, "lesson", "not before its steps are here");
       gate.course();
       await opening;
-      assert.equal(state.practice.view, "lesson");
-      assert.equal(state.practice.lesson.lesson.id, id);
+      assert.equal(state.learn.view, "lesson");
+      assert.equal(state.learn.lesson.lesson.id, id);
       const pid = Practice.PROBLEMS[0].id;
       const pending = Practice.openProblem(pid);
-      assert.equal(state.practice.view, "lesson");
+      assert.equal(state.learn.view, "lesson");
       gate.problems();
       await pending;
-      assert.equal(state.practice.view, "problem");
-      assert.equal(state.practice.problem.def.id, pid);
-      assert.ok(state.practice.problem.pz, "the solver has the diagram");
+      assert.equal(state.learn.view, "problem");
+      assert.equal(state.learn.problem.def.id, pid);
+      assert.ok(state.learn.problem.pz, "the solver has the diagram");
       assert.ok(Content.loaded("course") && Content.loaded("problems") && !Content.loaded("classics"));
     } finally {
       delete globalThis.fetch;

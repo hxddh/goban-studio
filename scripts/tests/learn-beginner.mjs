@@ -1,11 +1,12 @@
 /**
- * v8 tests: the beginner path (capture Go, lesson-to-game bridges, the first count). Loaded by scripts/test.mjs (every file in
- * scripts/tests/, in name order); receives the runner's helpers.
+ * Learn: the beginner bridges — capture Go and its small opponent, the
+ * lesson-to-game bridges, the first count. Loaded by scripts/test.mjs;
+ * receives the runner's helpers.
  */
 import fs from "node:fs";
 import path from "node:path";
 import * as A from "../../src/web/js/capture-ai.js";
-import { bridgeAfter, CAPTURE_AFTER, FIRST_GAME, FIRST_GAME_AFTER } from "../../src/web/js/app/beginner.js";
+import { bridgeAfter, CAPTURE_AFTER, FIRST_GAME, FIRST_GAME_AFTER, measuredRank, newProfile } from "../../src/web/js/model/player.js";
 import { COURSE } from "../../src/web/js/content/course.js";
 import { RANKS } from "../../src/web/js/engine.js";
 import { MESSAGES } from "../../src/web/js/messages.js";
@@ -50,7 +51,7 @@ function selfPlay(levelBlack, levelWhite, seed) {
 }
 
 export default async function ({ test, assert, root }) {
-  await test("v8 capture Go: the computer always captures when it can", () => {
+  await test("learn capture Go: the computer always captures when it can", () => {
     // Random positions with no capture yet; whenever one is available, it takes it.
     let checked = 0;
     for (let seed = 1; seed <= 300; seed++) {
@@ -74,7 +75,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(checked > 50, `only ${checked} positions had a capture`);
   });
 
-  await test("v8 capture Go: the computer saves its stone in atari", () => {
+  await test("learn capture Go: the computer saves its stone in atari", () => {
     // White's centre stone is in atari; extending gives it room.
     const b = board(".........", ".........", ".........", "....X....", "...XOX...", ".........");
     for (const level of [1, 2]) {
@@ -86,7 +87,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 capture Go: ladders and nets are read; the gentle level reads less", () => {
+  await test("learn capture Go: ladders and nets are read; the gentle level reads less", () => {
     // A ladder: White's stone has two liberties and every escape is ataried to the edge.
     const ladder = board(".........", "..X......", ".XO......", "...X.....");
     assert.equal(A.canForceCapture(ladder, 1, { depth: 8, nets: false }), true);
@@ -112,7 +113,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 capture Go: the computer defuses a ladder threat before it starts", () => {
+  await test("learn capture Go: the computer defuses a ladder threat before it starts", () => {
     // White's stone has two liberties and Black threatens to ladder or net
     // it. The stronger level answers so that no forced capture remains.
     const b = board(".........", "..X......", ".XO......");
@@ -124,7 +125,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v8 capture Go: two levels, stronger after two wins, every move well under 50 ms", () => {
+  await test("learn capture Go: two levels, stronger after two wins, every move well under 50 ms", () => {
     assert.equal(A.levelFor(0), 1);
     assert.equal(A.levelFor(1), 1);
     assert.equal(A.levelFor(2), 2);
@@ -146,7 +147,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(slowest < 50, `slowest move ${slowest.toFixed(1)} ms`);
   });
 
-  await test("v8 capture Go: suicide is illegal and a full board has no move", () => {
+  await test("learn capture Go: suicide is illegal and a full board has no move", () => {
     // The corner point is surrounded by White: Black may not play there.
     const b = board(".O.......", "O........");
     assert.equal(A.tryMove(b, 0, 1), null);
@@ -157,7 +158,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(A.hasLegalMove(board("........."), 1), true);
   });
 
-  await test("v8 bridges: capture Go after the capturing lessons, the first 9×9 game after the life basics", () => {
+  await test("learn bridges: capture Go after the capturing lessons, the first 9×9 game after the life basics", () => {
     const ids = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
     for (const id of [...CAPTURE_AFTER, ...FIRST_GAME_AFTER]) assert.ok(ids.includes(id), id);
     const stones = COURSE.find((u) => u.id === "stones").lessons.map((l) => l.id);
@@ -167,34 +168,38 @@ export default async function ({ test, assert, root }) {
     assert.ok(FIRST_GAME_AFTER.every((id) => life.includes(id)));
     assert.equal(FIRST_GAME_AFTER.at(-1), life.at(-1), "and at the end of the life unit");
     assert.equal(FIRST_GAME.size, 9);
-    assert.equal(FIRST_GAME.opponentRank, RANKS[0], "the gentlest rank");
-    const none = { settings: {}, progress: { games: [] } };
+    assert.equal(measuredRank(FIRST_GAME.level), RANKS[0], "the gentlest rank");
+    const none = newProfile();
     assert.equal(bridgeAfter("stones-capture", none), "capture");
     assert.equal(bridgeAfter("stones-suicide", none), "capture");
     assert.equal(bridgeAfter("stones-ko", none), null);
-    assert.equal(bridgeAfter("stones-capture", { ...none, settings: { captureWins: 1 } }), "capture");
-    assert.equal(bridgeAfter("stones-capture", { ...none, settings: { captureWins: 2 } }), null, "two wins: no longer offered");
+    assert.equal(bridgeAfter("stones-capture", none, { captureWins: 1 }), "capture");
+    assert.equal(bridgeAfter("stones-capture", none, { captureWins: 2 }), null, "two wins: no longer offered");
     assert.equal(bridgeAfter("life-two-eyes", none), "firstGame");
     assert.equal(bridgeAfter("life-space", none), "firstGame");
     assert.equal(bridgeAfter("life-eye", none), null);
-    assert.equal(bridgeAfter("life-two-eyes", { settings: {}, progress: { games: [{ id: "1" }] } }), null, "not after a first game");
+    assert.equal(bridgeAfter("life-two-eyes", { ...none, games: [{ id: "1" }] }), null, "not after a first game");
+    // The page reads it from the player model and the capture wins setting.
+    const done = fs.readFileSync(path.join(root, "src/web/js/app/beginner.jsx"), "utf8");
+    assert.match(done, /bridgeAfter\(L\.lesson\.id, state\.profile, \{ captureWins: state\.settings\.captureWins \}\)/);
   });
 
-  await test("v8 beginner: capture games stay out of the game, the Library and the estimate", () => {
+  await test("learn beginner: capture games stay out of the game, the history of games and the player model", () => {
     const src = fs.readFileSync(path.join(root, "src/web/js/app/capture-ctl.js"), "utf8");
-    // Its own state in Practice; none of the rated-game machinery.
-    for (const word of ["state.game", "Lib.", "saveGame", "rateGame", "addGameRecord", "queueReport", "saveProgress", "persistCurrent"]) {
+    // Its own state in Learn; none of the rated-game machinery.
+    for (const word of ["state.game", "Games.", "saveGame", "recordGame", "changeProfile", "queueReport", "persistCurrent", "state.profile"]) {
       const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
       assert.ok(!code.includes(word), `capture-ctl uses ${word}`);
     }
-    // Not in New game, Today or the sidebar.
-    for (const f of ["sheets.jsx", "today.jsx", "app.jsx", "chrome.jsx"]) {
-      const s = fs.readFileSync(path.join(root, "src/web/js/app", f), "utf8");
+    // Not in New game, Play or the sidebar: in Learn only (its path and the lesson-complete page).
+    for (const f of ["app/sheets.jsx", "app/app.jsx", "app/chrome.jsx", "play/home.jsx", "app/play.jsx"]) {
+      const s = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.ok(!/capture\.play|startCapture/.test(s), `${f} offers capture Go`);
     }
+    assert.match(fs.readFileSync(path.join(root, "src/web/js/learn/path.jsx"), "utf8"), /C\.startCapture\(/);
   });
 
-  await test("v8 beginner: strings in four languages; the first-count note is at most three sentences", () => {
+  await test("learn beginner: strings in four languages; the first-count note is at most three sentences", () => {
     for (const [key, v] of Object.entries(V8_BEGINNER)) {
       assert.deepEqual(MESSAGES[key], v, key);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(v[lang]?.trim(), `${key} ${lang}`);

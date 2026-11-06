@@ -13,14 +13,14 @@ import path from "node:path";
 
 import * as O from "../../src/web/js/opponents.js";
 import { fitBT } from "../calibrate-strength.mjs";
-import { V7_ALIAS } from "./v7-calibration.mjs";
+import { V7_ALIAS } from "./core-calibration.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const INSTALLS = [{}, { human: true }, { strong: true }, { human: true, strong: true }];
 const name = (i) => JSON.stringify(i);
 
 export default async function ({ test, assert, root }) {
-  await test("v9 opponent: the ladder is short, evenly spaced, and each label is the measured rank", () => {
+  await test("play opponent: the ladder is short, evenly spaced, and each label is the measured rank", () => {
     assert.deepEqual(O.RANKS, [30, 24, 18, 15, 12, 10, 7, 4, 1, -3, -6]);
     for (const inst of INSTALLS) {
       const l = O.ladder(inst);
@@ -42,7 +42,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v9 opponent: each rank maps to the closest measured implementation, human-style where it measured well", () => {
+  await test("play opponent: each rank maps to the closest measured implementation, human-style where it measured well", () => {
     const table = (inst) => O.ladder(inst).map((e) => `${e.rank}:${e.impl}:${e.label}`);
     assert.deepEqual(table({}), ["30:L:25k:29", "24:L:20k:23", "18:L:15k:18", "15:C:b40:15", "12:L:10k:12", "10:C:b18:10", "7:L:5k:7", "4:C:b0:5", "1:L:1k:2", "-3:L:2d:-3"]);
     assert.deepEqual(table({ human: true }), ["30:HL:25k:30", "24:HL:20k:24", "18:HL:15k:18", "15:CH:r20k:15", "12:HL:10k:12", "10:C:b18:10", "7:HL:5k:7", "4:CH:s7k24:3", "1:HL:1k:1", "-3:L:2d:-3", "-6:HL:2d:-6"]);
@@ -78,7 +78,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(O.nearest(15, { human: true }).rank, 15);
   });
 
-  await test("v9 opponent: measured() is the implementation's θ on each board, measured or derived from its kind", () => {
+  await test("play opponent: measured() is the implementation's θ on each board, measured or derived from its kind", () => {
     for (const inst of INSTALLS) {
       for (const e of O.ladder(inst)) {
         for (const size of [9, 13, 19]) {
@@ -118,7 +118,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v9 opponent: the implementations play exactly the settings that were measured", () => {
+  await test("play opponent: the implementations play exactly the settings that were measured", () => {
     const v7 = JSON.parse(fs.readFileSync(path.join(root, "docs/calibration/v7-candidates.json"), "utf8"));
     const v8 = JSON.parse(fs.readFileSync(path.join(root, "docs/calibration/v8-candidates.json"), "utf8"));
     const play = (id) => O.impl(id).level;
@@ -143,7 +143,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("v9 opponent: the committed games reproduce the measured strengths of the v6 human settings", () => {
+  await test("play opponent: the committed games reproduce the measured strengths of the v6 human settings", () => {
     const dir = path.join(root, "docs/calibration/results");
     const games = fs
       .readdirSync(dir)
@@ -167,9 +167,12 @@ export default async function ({ test, assert, root }) {
       contents: [
         'export * as Play from "./src/web/js/app/play-ctl.js";',
         'export * as Engine from "./src/web/js/engine.js";',
-        'export * as Lib from "./src/web/js/library.js";',
-        'export * as P from "./src/web/js/persist.js";',
-        'export * as SE from "./src/web/js/app/strength.js";',
+        // A bundle of its own: an identical one would be the same module, with another file's KataGo status cached.
+        'export { RANKS } from "./src/web/js/opponents.js";',
+        'export * as Lib from "./src/web/js/data/games.js";',
+        'export * as P from "./src/web/js/data/settings.js";',
+        'export * as PM from "./src/web/js/model/player.js";',
+        'export { store } from "./src/web/js/data/store.js";',
         'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
@@ -188,7 +191,9 @@ export default async function ({ test, assert, root }) {
     logLevel: "error",
   });
   const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
-  const { Play, Engine, Lib, P, SE, Game, BLACK, state } = A;
+  const { Play, Engine, Lib, P, PM, Game, BLACK, state, store } = A;
+  // The store picks its backend on first use: the preview's, before the fake host below.
+  await store.open();
 
   // A fake host: every search answers D4 with one candidate, except the
   // engines listed in `failing`, which do not answer.
@@ -217,7 +222,7 @@ export default async function ({ test, assert, root }) {
   try {
     const fresh = () => new Game({ size: 19 });
 
-    await test("v9 opponent: the engine plays the rank's implementation and falls back to the nearest standard level", async () => {
+    await test("play opponent: the engine plays the rank's implementation and falls back to the nearest standard level", async () => {
       Engine.setModels({ human: true, strong: false });
       searches.length = 0;
       let r = await Engine.decide(fresh(), 12);
@@ -250,12 +255,12 @@ export default async function ({ test, assert, root }) {
       assert.deepEqual(Engine.installed({ human: true, strong: true, strongUsable: false }), { human: true, strong: false });
     });
 
-    await test("v9 opponent: a game stores its rank and implementation, never a strength id, and is rated against what played", async () => {
+    await test("play opponent: a game stores its rank and implementation, never a strength id, and is rated against what played", async () => {
       Engine.setModels({ human: true, strong: false });
       A.setLang("en");
       for (const rec of Lib.listGames()) Lib.deleteGame(rec.id);
       state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: false, showEval: false, onboarded: true, confirmMove: false };
-      state.progress = P.loadProgress();
+      state.profile = PM.newProfile();
       state.engine = { kind: "katago", name: "KataGo test", available: true };
       assert.equal(state.settings.opponentRank, 30);
       assert.ok(!("strength" in state.settings) && !("humanStyle" in state.settings));
@@ -289,12 +294,16 @@ export default async function ({ test, assert, root }) {
       assert.ok(O.RANKS.includes(sug.opponentRank) && Number.isInteger(sug.label) && O.RANKS.includes(sug.quick.opponentRank));
       assert.ok(!("strength" in sug) && !("strength" in sug.quick));
       // The rating: a win against what played moves the estimate by that implementation's θ.
-      const prev = SE.startEstimate(5, 0);
-      const a = SE.rateGame(prev, { impl: "CH:s7k24", won: true, at: 0 });
-      const b = SE.updateEstimate(prev, { opponent: O.measured(4, 19, { human: true }), won: true, at: 0 });
+      const prev = PM.priorRating(5, 0);
+      const a = PM.updateRating(prev, { opponent: PM.implOpponent("CH:s7k24", { size: 19 }), won: true, at: 0 });
+      const b = PM.updateRating(prev, { opponent: O.measured(4, 19, { human: true }), won: true, at: 0 });
       assert.equal(a.mu, b.mu);
+      // Handicap stones make the opponent effectively weaker, on each board's own scale.
+      assert.ok(PM.implOpponent("L:10k", { handicap: 4 }) < PM.implOpponent("L:10k"));
+      assert.ok(PM.implOpponent("L:10k", { size: 9, handicap: 2 }) < PM.implOpponent("L:10k", { size: 9 }));
       const src = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
       assert.match(src, /const impl = g\.played \|\| Engine\.resolveOpponent\(/);
+      assert.match(src, /opponent: implOpponent\(impl, \{ size, handicap \}\)/);
     });
   } finally {
     globalThis.zero = savedHost;
@@ -302,10 +311,10 @@ export default async function ({ test, assert, root }) {
     Engine.setModels({ human: false, strong: false });
   }
 
-  await test("v9 opponent: no mode wording or human-style switch is left in the interface", async () => {
+  await test("play opponent: no mode wording or human-style switch is left in the interface", async () => {
     const { MESSAGES } = await import("../../src/web/js/messages.js");
     for (const k of Object.keys(MESSAGES)) assert.ok(!/^models\.(mode\.|humanStyle)/.test(k), k);
-    const files = ["app/sheets.jsx", "app/play.jsx", "app/models-ctl.js", "app/play-ctl.js", "app/controller.js", "app/today.jsx", "app/library.jsx", "persist.js"];
+    const files = ["app/sheets.jsx", "app/play.jsx", "app/models-ctl.js", "app/play-ctl.js", "app/controller.js", "play/home.jsx", "data/settings.js"];
     for (const f of files) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.doesNotMatch(src, /humanStyle|opponentMode\(|models\.mode\.|STRENGTHS|strengthById|labelRank/, f);
