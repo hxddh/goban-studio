@@ -47,6 +47,24 @@ function giveUp() {
 const keyNow = () => state.learn.daily?.current;
 
 try {
+  await test("learn session: a restart keeps what is done today; another day starts afresh", async () => {
+    beginner("stones-capture");
+    C.startPath();
+    const first = keyNow();
+    assert.ok(first, "an item is open");
+    C.continuePath();
+    const done = [...state.learn.daily.done];
+    assert.ok(done.includes(first), "the first item is done");
+    // A restart: memory is gone, the store keeps the session.
+    C.resetSession({ keepStored: true });
+    const again = C.todaysSession();
+    assert.ok(again, "today's session is back");
+    assert.deepEqual(again.done, done, "with what was done");
+    // Tomorrow: the stored session is another day's.
+    C.resetSession({ keepStored: true });
+    assert.equal(C.todaysSession(Date.now() + 86400000), null);
+  });
+
   await test("learn session: the path plays as one session — lesson, capture Go, your drill, problems — then done for today", async () => {
     beginner("stones-capture");
     const path0 = C.learnPath();
