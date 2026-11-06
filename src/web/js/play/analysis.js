@@ -25,7 +25,7 @@ import { loadSGF } from "../sgf.js";
 import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { learnFromGame } from "../app/play-ctl.js";
-import { REVIEW_VERSION, analysisFits, buildReview, lineKey } from "./review-model.js";
+import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 
 /* ---------------------------------------------------------- one pass */
 
@@ -113,6 +113,10 @@ export function isOwnGame(rec) {
 export function storedAnalysis(rec, game) {
   const a = rec?.analysis;
   if (!analysisFits(a, game)) return null;
+  // Of these very moves: the analysis is stored with its review, which names
+  // the main line it was made for (a game saved again with other moves at
+  // the same count keeps the old file's analysis until it is analysed anew).
+  if (rec.report?.lineKey !== lineKey(game)) return null;
   if (state.engine.available && a.some((p) => p.source !== "katago")) return null;
   return a;
 }
@@ -137,7 +141,9 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
   const now = recordOf(recordId);
   if (!now || lineKey(now.game) !== model.lineKey) return model;
   Games.patchGame(recordId, { review: model, analysis: points });
-  if (humanColor != null && !now.rec.learned && points.every((p) => p.source === "katago")) {
+  // Once per game, and only for the finished game ("Review so far" of a
+  // game still in play does not use it up).
+  if (humanColor != null && resultOf(game) && !now.rec.learned && points.every((p) => p.source === "katago")) {
     learnFromGame({ game, points, humanColor, recordId });
   }
   return model;

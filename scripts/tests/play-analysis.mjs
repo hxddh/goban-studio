@@ -305,6 +305,43 @@ export default async function ({ test, assert, root }) {
       await idle();
     });
 
+    await test("play analysis: a stored analysis is used only for its own moves; only a finished game teaches the player model", async () => {
+      await idle();
+      const g = finishRatedGame(40);
+      await until(() => !state.review.analyzing && !state.review.refining, 15000, "the analysis");
+      C.dropReview();
+      const rec = Lib.getGame(g.recordId);
+      const game = loadSGF(rec.sgf).game;
+      assert.ok(Analysis.storedAnalysis(rec, game), "its own moves: used");
+      // The same number of moves, the last one elsewhere, saved over the same file.
+      const line = game.mainLine();
+      const moves = [...rec.sgf.matchAll(/;([BW])\[([a-i]{2})\]/g)];
+      const lastMove = moves[moves.length - 1];
+      const unused = ["aa", "ia", "ai", "ii", "ba", "ab"].find((c) => !rec.sgf.includes(`[${c}]`));
+      const sgf = rec.sgf.slice(0, lastMove.index) + `;${lastMove[1]}[${unused}]` + rec.sgf.slice(lastMove.index + lastMove[0].length);
+      const other = loadSGF(sgf).game;
+      assert.equal(other.mainLine().length, line.length);
+      Lib.saveGame(other, { id: g.recordId, keepPlace: true });
+      const again = Lib.getGame(g.recordId);
+      assert.equal(again.analysis.length, line.length, "the old analysis is still in the file");
+      assert.equal(Analysis.storedAnalysis(again, other), null, "but not taken for the new moves");
+
+      // "Review so far" of a game still in play: stored, but the game does not teach yet.
+      const live = new Game({ size: 9, komi: 6.5 });
+      fill(live, 20);
+      const saved = Lib.saveGame(live, { opponent: "ai", humanColor: BLACK, rated: true });
+      const points = live.mainLine().map((_, i) => ({ source: "katago", scoreLead: i % 2 ? 1 : -1, winrate: 0.5, visits: 50, moves: [] }));
+      const mistakesBefore = state.profile.mistakes.length;
+      assert.ok(Analysis.storeAnalysis(saved.id, live, points, { humanColor: BLACK }), "a review of the game so far");
+      assert.notEqual(Lib.getGame(saved.id).learned, true, "not used up before the game ends");
+      assert.equal(state.profile.mistakes.length, mistakesBefore);
+      live.setResult("W+R");
+      Lib.saveGame(live, { id: saved.id, keepPlace: true });
+      assert.ok(Analysis.storeAnalysis(saved.id, live, points, { humanColor: BLACK }));
+      assert.equal(Lib.getGame(saved.id).learned, true, "the finished game teaches it, once");
+      await idle();
+    });
+
     await test("play analysis: a new game's computer move does not wait for the last game's analysis, which goes on in the background", async () => {
       delay = 15;
       const g1 = finishRatedGame(40);
