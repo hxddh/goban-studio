@@ -5,7 +5,7 @@
  * The host reports that path through `studio.selftest` ({tour}), and the
  * page walks through its main screens with the app's own controller:
  *
- *   today → a 19×19 game → its review → Practice → Settings
+ *   Play → a 19×19 game → its review → Learn → Settings
  *
  * For each screen it writes `{step, name, total}` to the tour path and
  * waits until the script has captured the window and written the same

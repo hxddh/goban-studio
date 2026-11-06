@@ -59,7 +59,7 @@ The window has three columns:
 | Content | remaining | toolbar (52 px) on top, then the place |
 | Panel (board places) | 320 px (352 px from 1600 px) | fixed slots, see §7 |
 
-List pages (Today, Practice home, Library) centre a 880 px column. Radii:
+List pages (Play's home, Learn's path and catalog) centre a 880 px column. Radii:
 `--r-1` 6 px (controls), `--r-2` 10 px (cards, rows), `--r-3` 14 px (sheets).
 
 ## 4. Colour
@@ -146,11 +146,6 @@ group per screen region.
   record opens on its final position and moves to the first key moment
   when the analysis is there, unless the player has already moved; a
   classic with a famous move opens on it.
-* **Today.** One hero (continue the game, or the suggested game) with the
-  only primary button; then one thing to learn (today's five until it is
-  done, then the next lesson); this week's focus; then your level as one
-  number with its ± ("≈ 12 kyu (±1)"). Empty states collapse to a single line instead of an empty
-  card.
 * **Learn (v9).** One path chosen for you: a short ordered list of rows
   (5–8: the next lesson, reviews due, the week's focus, one stretch
   problem, the beginner bridges), each saying why it is there in a few

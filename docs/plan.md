@@ -1,9 +1,12 @@
-# The training plan (v7)
+# The training plan
 
 The plan picks one or two things to work on ("this week's focus"), says why,
-and fills today's five with them. The model is `src/web/js/app/plan.js`
-(pure and tested in `scripts/tests/v7-plan.mjs`). The app side is
-`plan-ctl.js`. The thresholds are `RULES` in plan.js.
+and orders Learn's path around them. Since v9 it is part of the one player
+model, `src/web/js/model/player.js` (`evidence`, `focus`, `keepFocus`,
+`learnPath`; pure, tested in `scripts/tests/model-player.mjs` and
+`learn-path.mjs`). The app side is `src/web/js/learn/session.js`. The
+thresholds are `RULES` in player.js. Where this page says "today's five",
+v9 has Learn's path for today.
 
 ## What counts as evidence
 

@@ -356,26 +356,24 @@ The items I am least sure about:
    more usual.
 4. zh **气紧** as the theme name for shortage of liberties. 紧气 is also seen
    used loosely in this sense.
-5. ko greetings on the Today screen (좋은 아침입니다 / 안녕하세요 / 좋은 저녁
-   되세요). They are natural, but a Korean UI writer may prefer other wording.
-6. ja: the course keeps 呼吸点 (beginner style) for liberty and uses ダメ
+5. ja: the course keeps 呼吸点 (beginner style) for liberty and uses ダメ
    inside capturing races; the problem bank uses ダメ throughout. A Japanese
    reviewer may prefer ダメ everywhere.
-7. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
+6. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
    bank. I kept them as the author wrote them, but I have not confirmed them.
-8. v5 intermediate course (all model-written, none reviewed by a native
+7. v5 intermediate course (all model-written, none reviewed by a native
    speaker): ko **입이전삼 / 입삼전사** as the Korean form of the
    extension proverb; ko **붙여 물러서기** for 托退 / ツケヒキ (descriptive;
    an established Korean name may exist); ko **두 점 머리는 두드려라** and
    **빵따냄 30집** as proverbs; zh **单关无恶手**; zh **分开攻击** and the
    descriptive ko / ja names for the splitting attack; ja **押し込む** and ko
    **밀고 들어가기** for the first-line push.
-9. v4: the big-eye race theme — ko **큰 눈 대 작은 눈** and ja
+8. v4: the big-eye race theme — ko **큰 눈 대 작은 눈** and ja
    **大きい眼と小さい眼** are descriptive; an established short name may exist
    (zh 大眼杀小眼 is the standard proverb). Also ko **완생** / ja **完全な生き**
    for independent life, ko **2선의 일곱 점** / ja **二線の七子**, and the
    collection name ko **사활의 기본형** / ja **死活の基本形** / zh **基本死活形**.
-9. v5 rules: ko **계자 / 계지** and ja **計子 / 計地** for area / territory
+8. v5 rules: ko **계자 / 계지** and ja **計子 / 計地** for area / territory
    scoring. zh 数子 / 数目 are standard; the ko and ja pairs are the
    Sino-Korean / Sino-Japanese readings of the same idea and appear in rules
    discussions, but everyday writing more often says "중국식 계산 / 일본식
@@ -384,15 +382,15 @@ The items I am least sure about:
    stands alone. Also ja **計算** as the title of an area count, ja
    **置き石の補正** and ko **치석 보상** for the Chinese handicap
    compensation, and zh **让子补偿**.
-10. v5: ko **본선** / ja **本線** for the main line of a record (Go software
+9. v5: ko **본선** / ja **本線** for the main line of a record (Go software
    varies; ko 주 변화 / ja 本譜 are possible), ko **변화도** / ja **変化図**
    for the variation tree, ja **大悪手** and ko **큰 실수** for blunder, and
    ja **正確さ** for accuracy (一致率 is used for "agrees with the AI", which
    is a different measure).
-11. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
+10. v5: the 2-1 point — ja **二の一** is the usual name (二の一の急所); zh
    **二一路** and ko **2·1의 급소** (also written 2의 1) follow the same pattern,
    but a native reviewer should confirm them.
-12. v6 advanced course (model-written, not reviewed by a native speaker):
+11. v6 advanced course (model-written, not reviewed by a native speaker):
    ko **석하** for under the stones (석하의 맥 is also seen; a Korean
    reviewer should confirm 석하 is current usage); zh **倒脱靴** is the
    usual name of the shape where two (or four) stones are given up, which is

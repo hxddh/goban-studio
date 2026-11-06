@@ -367,7 +367,7 @@ combination; they were then mirrored into different corners.
 
 ## Next lesson
 
-`nextLesson()` (`pickNextLesson()` in `src/web/js/app/course-path.js`) sends
+`nextLesson()` (in `src/web/js/model/player.js` since v9) sends
 a player whose estimated level (the rating from their games, or the level
 they gave) is 5 kyu or stronger to the advanced course when they have
 finished the intermediate course or never started it. A strong player part

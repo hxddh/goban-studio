@@ -35,167 +35,59 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 `SHA256SUMS` is attached to every GitHub release. The v8.0.0 notes are in
 [`.github/release-notes/v8.0.0.md`](.github/release-notes/v8.0.0.md).
 
-## v8 at a glance
+## v9: one loop
 
-- **From the first lesson to the first game** — capture Go on 9×9 right
-  after the lesson on capturing, then a first 9×9 game with teaching on;
-  "I know the rules" starts on 9×9; the first count explains itself once
-  ([`docs/beginner.md`](docs/beginner.md)).
-- **Teaching that says why** — the warning before a costly move and the
-  hint each give one plain reason; the course was checked with KataGo and
-  corrected where it was wrong ([`docs/lesson-audit.md`](docs/lesson-audit.md)).
-- **Playing feel** — "Shall we count?" when the board is settled, no early
-  resignations, dead stones judged group by group, the computer's move
-  ahead of any background work; 13×13 measured for the first time.
-- **Quieter and faster** — less on every screen, three Library tabs, five
-  Settings panes, reports made by themselves; the opening book loads when
-  needed.
-- **Fixes** — seventeen bugs and leftovers from v7, each with a test.
+v9 is rebuilt around one loop: **play a game → see what mattered, on the
+board → try that moment again → play the next game**. It starts empty: no
+data from earlier versions is read (see the v9 release notes).
 
-## v7 at a glance
+## Two spaces
 
-- **A training plan** — *This week's focus* on Today: one or two themes
-  chosen from your analysed games and problem results, with the reason, and
-  a Daily five built around them ([`docs/plan.md`](docs/plan.md)).
-- **Reports that make themselves** — prepared in the background after
-  every game, with the change in your strength estimate; *Analyse all* in
-  the Library for older games; two-player reports drill one side at a time.
-- **Problem collections** — import SGF problems; each answer is proved by
-  the solver before it is added, and an answer proved wrong is shown with
-  its refutation.
-- **The engine answers your move first** — analysis is scheduled (your
-  opponent's move, then what you look at, then background work) and work
-  that is no longer needed is cancelled.
-- **Strength** — the human-style ladder measured again on GitHub's build
-  machines (1,532 new games): no gap any more between ≈12 kyu and ≈3 kyu.
-- **Opening book 2.0** — 3,874 positions evaluated with the 15-block
-  network at 2,000 visits on GitHub's build machines (v6: 1,400 with the
-  small network); corner joseki zoom into the corner.
-- **SGF coordinates** — records from other programs are read correctly
-  (FF[4] uses the letter *i*; earlier versions skipped it); records saved by
-  earlier versions of the app keep reading as they were.
-- **Checked together** — every page in all four languages, light and dark,
-  with and without larger text.
-
-## v6 at a glance
-
-- **Interface** — the review panel in three tabs (analysis, summary,
-  notes), records that open on their key moment, Settings as a two-pane
-  window, quiet empty states, problem windows at a natural stone size.
-- **A report for every game** — result, the three phases, three key
-  moments as small boards, *Practise this game* (your worst mistakes become
-  drills), and an image export.
-- **Strength** — your level as an estimate with an uncertainty
-  ("≈ 12 kyu (±1)") and its curve over time; the human-style levels
-  measured again in 426 games.
-- **Learning** — an advanced course for about 5 kyu to 1 dan (5 units, 15
-  lessons: whole-board judgement, invasion and reduction, advanced life and
-  death, combined tesuji, middle-game strategy); the leaning attack and
-  sabaki lessons; 34 endgame problems proved by exact counting. 18 units, 82
-  lessons and 543 problems in all.
-- **Opening explorer** — a KataGo book of whole-board openings and corner
-  joseki (1,400 positions, offline), with live analysis past the book on
-  the desktop; review says where a game left the book.
-- **Accessibility** — the board can be played with a screen reader and the
-  keyboard (spoken moves, point and group reading, region summaries), and a
-  larger-text option.
-
-## v5 at a glance
-
-- **Rules** — Japanese (still the default for everyone), Chinese (area
-  scoring) or Korean, chosen per game or as your default; SGF records in
-  any of the three open and keep their ruleset.
-- **Opponents** — an optional human-style opponent (KataGo's human model,
-  downloaded only when you choose it) that plays like a person of its level,
-  and an optional stronger network for analysis and the top level.
-- **Review** — the game in three phases (points lost, mistakes, accuracy),
-  three takeaways, trends across your recent games, comments and marks on
-  any move, a variation tree, promote and delete variations; all saved in
-  the SGF.
-- **Learning** — an intermediate course (opening, joseki, shape, endgame,
-  fighting; 26 lessons) and 509 solver-proved problems.
-- **Your data** — one-click backup to a file and restore on another computer.
-- **Updates** — download, verify and install a new version from inside the
-  app (with automatic rollback); Intel Macs get their own build.
-- **Interface** — this week on Today, the course as a map, problem facts,
-  proportioned problem windows, thumbnails that follow the board.
-
-## v4 at a glance
-
-- **A calm board** — no texture by default (Plain; Light wood at a quarter of
-  the old grain; Ink for dark rooms), lines snapped to whole pixels, star
-  points and stones to a written spec, coordinates on.
-- **The standard board** — 19×19 is the default everywhere (first launch,
-  onboarding, the suggested game with a handicap, New game, which remembers
-  your choice); 13×13 and 9×9 are the quicker games.
-- **One design system** — [`docs/design.md`](docs/design.md): system fonts,
-  an 8 px grid, neutral colours with one accent, one primary action per
-  screen, a sidebar and a toolbar with back/forward; a tall hidden title bar
-  on macOS.
-- **Review that explains** — what each key mistake cost and where (group
-  died, race or ko lost, territory, tempo), and the better line or the
-  refutation as clickable, described steps.
-- **Content proved on a real board** — seki, capturing races and classic
-  shapes; every problem re-proved with captured points playable again
-  ([`docs/problems-audit.md`](docs/problems-audit.md)).
-- **Release** — conditional Developer ID signing and notarization (macOS) and
-  Authenticode (Windows), a user-initiated update check, and native
-  screenshots of the packaged apps in CI.
-
-## Places, one board
-
-- **Today** — one starting screen: continue (or the suggested game), today's
-  five, the next lesson, what to work on, your level ("≈ 12 kyu (±1)").
-- **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
-  dan), or two players on one board. Handicap is suggested from your level.
-  The panel shows only the players, whose turn it is, **Pass** (with a
-  confirmation) and **Undo**; hint, review-so-far, save, export, focus mode
-  and resign sit behind one menu. When both players pass, KataGo marks the
-  dead stones and the score counts up; you accept it or keep playing.
-  Finished games go to the Library automatically; abandoned ones never do.
-- **Review** is a mode of any game, not a place: your current game, a saved
-  game, an imported SGF, a classic. KataGo analyses every position (win rate
-  and score lead), draws the balance of the game, and lists the three moves
-  that lost the most, each with the move played and KataGo's better line to
-  play through on the board. Territory estimate and “play from here” are
-  one click away.
-- **Practice** — a course that starts from zero and goes on to intermediate
-  play (opening principles, basic joseki, shape, endgame, middle-game
-  fighting) and, since v6, an advanced course for players around 5 kyu to
-  1 dan (whole-board judgement, invasion and reduction, life and death with
-  ko and seki, tesuji in combination, middle-game strategy; 5 units, 15
-  lessons), 18 units and 82 lessons in all, in multi-step lessons with
-  explanation, placement exercises and live problems; problems by topic,
-  and a daily five with spaced review. Every problem is
-  answered live by a built-in solver: a wrong move is met with the real
-  refutation on the board, a right move with the most stubborn defence.
-- **Library** — the game in progress (“Continue”), your games with
-  thumbnails, filters (won / lost / imported) and search, 20 classic games
-  and the opening explorer. SGF import
-  and export; double-clicking an `.sgf` opens it on macOS and Windows; records
-  under Japanese, Chinese or Korean rules keep their ruleset, and one that
-  declares another ruleset (AGA, Ing, New Zealand…) is rejected with an
-  explanation rather than silently re-scored.
-- **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
-  coordinates, move numbers, sound, your
-  level, and update checks.
-- **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
-  ⌘1/2/3/4 places, ←/→ through a review, and the board itself is playable with
-  Tab, the arrow keys and Space (⌘/ lists them all; Ctrl on Windows).
+- **Play** (⌘1) — opens on the game in progress, or the suggested game with
+  one button (9×9 for a beginner, 19×19 from about 20 kyu). Below it: your
+  level ("≈ 12 kyu (±1)"), your games, the 20 classics and the opening
+  explorer. The opponent is one choice: a measured rank, 30 kyu to 7 dan;
+  the app picks the KataGo setting that measured closest. Teaching mode
+  warns before a costly move and says why; a hint gives its reason too.
+- **The post-game review** — when a game ends, the same board becomes its
+  review: the result, the balance of the game, the three phases (with
+  KataGo), up to three key moments with their stories, comments and
+  variations. Each key moment of your own game can be **tried again from
+  the position**: KataGo judges your new move on the board, and a miss
+  comes back in Learn on the spaced-review ladder. One analysis per game,
+  stored with the game; your older games are analysed quietly in the
+  background.
+- **Learn** (⌘2) — one short path for today, chosen for you and played as
+  one session: the next lesson, your own mistakes and problems due for
+  review, this week's focus (named, with its reason), one stretch problem,
+  new problems at your level, and for beginners capture Go and a first 9×9
+  game. A quiet catalog holds every lesson (18 units, 82 lessons) and the
+  543 solver-proved problems.
+- **Settings** (⌘, / Ctrl+,) — language, appearance, larger text, board
+  coordinates and move numbers, sound, teaching, rules, your level, the
+  optional KataGo networks, backup, updates.
+- **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘1/⌘2 the two
+  spaces, ←/→ through a review; the board is playable with Tab, the arrow
+  keys and Space, and with a screen reader (⌘/ lists every key; Ctrl on
+  Windows).
+- **Your data** — files in the app's data folder (`data/settings.json`,
+  `profile.json`, `current.json`, `games/<id>.json`), written atomically by
+  the desktop shell, with no size limit; *Export backup* writes them all as
+  one file.
 - **Offline by design** — no account, no telemetry, and no network request
   unless you ask for one: **Check for updates…** makes a single request to
   GitHub for the latest release, and the weekly automatic check is off
-  until you turn it on in Settings. When a newer version is found you may
-  choose **Download and install**, which fetches that release's package for
-  your computer and its `SHA256SUMS` from GitHub — nothing else, and only
-  when you choose it. Nothing about you or your games is sent; everything
-  else (KataGo, lessons, your library) stays on your computer.
-- **Optional downloads** (v5) — two KataGo networks you may add in
-  Settings, fetched only when you choose them: KataGo's human model, which
-  makes the opponent play like a person of its level, and a larger network
-  for analysis and review. They come from KataGo's official GitHub
-  releases (pinned addresses and SHA-256 hashes), are verified before use,
-  live in the app's data folder and can be removed again.
+  until you turn it on in Settings. **Download and install** fetches that
+  release's package and its `SHA256SUMS` from GitHub — nothing else, and
+  only when you choose it.
+- **Optional downloads** — two KataGo networks you may add in Settings,
+  fetched only when you choose them: KataGo's human model (more human-like
+  opponents) and a larger network (the strongest ranks and deeper
+  analysis). They come from KataGo's official GitHub releases (pinned
+  addresses and SHA-256 hashes) and can be removed again.
+
+Earlier versions are described in their release notes in
+[`.github/release-notes/`](.github/release-notes/).
 
 ## In-app updates (v5)
 
@@ -344,13 +236,16 @@ npm run ui-update      # rewrite tests/visual baselines after an intended change
 node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv for native-speaker review
 ```
 
-The suite covers Japanese, Chinese and Korean scoring (territory and area, seki, handicap compensation), ko and suicide, SGF round trips
-and rules rejection, every UI string in four languages (and that every key
-the interface uses exists), the solver on classic shapes and ladders,
-Benson's unconditional life, every practice problem and course lesson, the
-KataGo report parser and strength picker, the native bridge request,
-handicap suggestion, library rules and the
-spaced-review ladder. It runs in Node without a browser or native SDK.
+Tests are organised by area (`scripts/tests/{core,data,model,shell,play,learn}-*.mjs`,
+`scripts/ui-tests/*.mjs`); `node scripts/test.mjs play-,learn-` runs some of
+them, `UI_ONLY=<text> npm run ui-test` one browser check. They cover the
+rules and scoring under three rulesets, SGF, the solver and every problem
+and lesson, the file store and backups, the player model (rating, spaced
+review, focus, Learn's path), the engine scheduler and the opponent
+ladder, teaching warnings, capture Go, the post-game review and try
+again, every string in four languages, the accessibility audit, start-up
+budgets and the visual baselines. The unit suite runs in Node without a
+browser or native SDK.
 
 ## Desktop shell
 
@@ -401,7 +296,7 @@ notarized and stapled, and the Windows `goban-studio.exe` and `katago.exe`
 are Authenticode-signed and timestamped; without them the builds fall back
 to ad-hoc / unsigned and say so in the release notes. Both platform builds
 also run a native screenshot tour of the packaged app
-(`scripts/tour-app.mjs`: Today, a 19×19 game, its review, Practice,
+(`scripts/tour-app.mjs`: Play, a 19×19 game, its review, Learn,
 Settings) and upload the captures as `native-screenshots-macos` /
 `native-screenshots-windows`.
 
@@ -433,9 +328,15 @@ src/web/index.html            shell markup (one root element)
 src/web/styles.css            design tokens, light/dark, every component
 src/web/js/main.jsx           entry
 src/web/js/app/store.js       one state object, update(), toasts, announcements
-src/web/js/app/controller.js  everything the app does (play, review, practice, library)
+src/web/js/app/controller.js  boot, the two spaces, history, import, backup
 src/web/js/app/chrome.jsx     sidebar and toolbar (docs/design.md)
-src/web/js/app/*.jsx          views: play + review, today, practice, library, sheets
+src/web/js/app/*.jsx          the board views (play, lessons, problems) and sheets
+src/web/js/play/              Play's home, the post-game review model, the analysis, try again
+src/web/js/learn/             Learn's path, today's session, the catalog
+src/web/js/data/              the file store (store.js), settings, games, backups
+src/web/js/model/player.js    the one player model: rating, spaced review, focus, Learn's path
+src/web/js/opponents.js       the opponent ladder: ranks, implementations, measured strengths
+src/store.zig                 the host side of the store: data/ files, atomic, chunked
 src/web/js/app/story.js       step-by-step mistake stories (rules-derived descriptions)
 src/web/js/app/explain.js     key mistakes and loss attribution
 src/web/js/board.js           canvas renderer: zoom windows, overlays, keyboard cursor
@@ -456,7 +357,6 @@ src/models.zig                optional downloads: pinned URLs, resume, SHA-256, 
 src/web/js/models.js          optional downloads: status logic and host calls
 src/web/js/app/models-ctl.js  optional downloads for the interface (state.models)
 src/web/js/app/insight.js     mistake sources, themes, atari, complexity
-src/web/js/app/rating.js      rating on the EGF kyu/dan scale
 scripts/calibrate-strength.mjs  strength-ladder calibration (KataGo self-play, Bradley–Terry)
 scripts/make-assets.mjs       regenerates every texture, stone, sound and icon
 scripts/patch-sdk.mjs         keeps the system Edit/Window menus beside app menus
@@ -466,8 +366,6 @@ src/web/js/content/           course, problems (+ measured grades), classics, bo
 src/web/js/content.js         content in two steps: a start-up index, then lesson steps,
                               problem bodies and classic records fetched on idle or first use
 src/web/js/i18n.js            one key → four strings
-src/web/js/persist.js         guarded storage, spaced review
-src/web/js/library.js         saved games and the current game
 src/engine.zig                persistent KataGo GTP child process
 src/main.zig                  Native SDK entry, bridge, window, open-file queue
 ```
