@@ -80,7 +80,7 @@ export async function boot() {
   // Lesson steps, problem bodies and classic records follow on idle
   // (content.js). Nothing on screen reads them before it is opened, and
   // what opens them waits for them, so their arrival renders nothing.
-  preloadContent();
+  preloadContent(() => update());
   Engine.info().then((info) => {
     update({ engine: info });
     maybeComputerMove();

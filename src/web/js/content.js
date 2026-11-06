@@ -65,13 +65,17 @@ export function withContent(part, fn) {
   return ready(part).then(fn, () => undefined);
 }
 
-/** Load every part on idle, one after the other (started once at boot). */
-export function preload() {
+/**
+ * Load every part on idle, one after the other (started once at boot).
+ * `onArrive(part)` runs after each part is merged, so a view that showed
+ * the index alone (Learn's path reads problem titles) can draw again.
+ */
+export function preload(onArrive = () => {}) {
   if (have.size === PARTS.length || typeof window === "undefined") return;
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
   const next = (i) => {
     if (i >= PARTS.length) return;
-    idle(() => ready(PARTS[i]).catch(() => {}).then(() => next(i + 1)), { timeout: 3000 });
+    idle(() => ready(PARTS[i]).then(() => onArrive(PARTS[i]), () => {}).then(() => next(i + 1)), { timeout: 3000 });
   };
   next(0);
 }

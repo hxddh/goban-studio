@@ -128,6 +128,33 @@ export default async function ({ test, assert, root }) {
     }
   });
 
+  await test("core content: the idle preload tells the app as each part arrives, so a view drawn from the index draws again", async () => {
+    const { index, bodies } = split();
+    // A bundle of its own (the same text would be the module the test above loaded).
+    const { mod: C } = await bundleLazy(root, ['export * from "./src/web/js/content.js";', "export const PRELOAD_TEST = 1;"], Split.indexModules(index));
+    globalThis.fetch = async (url) => {
+      const part = /^content\/(\w+)\.json$/.exec(url)?.[1];
+      return { ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(bodies[part])) };
+    };
+    const hadWindow = "window" in globalThis;
+    if (!hadWindow) globalThis.window = { requestIdleCallback: (f) => setTimeout(f, 0) };
+    try {
+      assert.equal(C.PROBLEMS[0].title, undefined, "a title is not in the index");
+      const arrived = [];
+      const titled = [];
+      C.preload((part) => {
+        arrived.push(part);
+        titled.push(!!C.PROBLEMS[0].title);
+      });
+      for (let i = 0; i < 50 && arrived.length < C.PARTS.length; i++) await new Promise((r) => setTimeout(r, 5));
+      assert.deepEqual(arrived, C.PARTS, "once per part, in order");
+      assert.equal(titled[C.PARTS.indexOf("problems")], true, "told after the part is merged");
+    } finally {
+      delete globalThis.fetch;
+      if (!hadWindow) delete globalThis.window;
+    }
+  });
+
   await test("core content: unbundled, every part is there from the start (tests and scripts read the modules whole)", async () => {
     const { mod: C } = await bundleLazy(root, ['export * from "./src/web/js/content.js";'], {});
     for (const part of C.PARTS) assert.equal(C.loaded(part), true, part);

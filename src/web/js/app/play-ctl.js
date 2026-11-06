@@ -591,7 +591,8 @@ export function clockTick() {
   lastTick = now;
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
-  if (state.space !== "play" || playReviewing() || document.hidden) return;
+  // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
+  if (state.space !== "play" || state.play.view !== "game" || state.play.explorer || playReviewing() || document.hidden) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.

@@ -242,6 +242,35 @@ export default async function ({ test, assert, root }) {
       assert.equal(loadSGF("(;GM[1]SZ[9]RU[Chinese];B[ee])").game.komi, 7.5);
     });
 
+    await test("play game: a timed game's clock runs only while its board is on screen", async () => {
+      const { Play } = A;
+      const hadDoc = "document" in globalThis;
+      if (!hadDoc) globalThis.document = { hidden: false };
+      try {
+        Play.newGame({ size: 9, opponent: "human", timeControl: "move30" });
+        const left = () => state.game.clock.b.left;
+        const run = async () => {
+          Play.clockTick();
+          await sleep(40);
+          Play.clockTick();
+        };
+        state.play = { ...state.play, view: "game", explorer: null };
+        let was = left();
+        await run();
+        assert.ok(left() < was, "the board: the clock runs");
+        state.play = { ...state.play, view: "home" };
+        was = left();
+        await run();
+        assert.equal(left(), was, "Play's home: the clock waits");
+        state.play = { ...state.play, view: "game", explorer: { open: true } };
+        await run();
+        assert.equal(left(), was, "the explorer: the clock waits");
+        state.play = { ...state.play, view: "game", explorer: null };
+      } finally {
+        if (!hadDoc) delete globalThis.document;
+      }
+    });
+
 
   } finally {
     globalThis.zero = savedHost;
