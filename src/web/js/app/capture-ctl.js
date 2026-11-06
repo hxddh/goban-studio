@@ -4,7 +4,7 @@
  *
  * It lives in Learn (state.learn.capture), never in state.game: it is
  * not saved, rated, reported or analysed, and it never reaches the history of games,
- * the strength estimate, the training plan or "this week". The only thing
+ * the strength estimate or the player model. The only thing
  * kept is how many the player has won (settings.captureWins), which picks
  * the computer's level and tells the lesson bridge when to stop offering it.
  */
@@ -17,6 +17,7 @@ import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring, setSetting } from "./ctl-core.js";
 import { newGame } from "./play-ctl.js";
 import { FIRST_GAME, measuredRank } from "../model/player.js";
+import { itemDone } from "../learn/session.js";
 
 const SIZE = 9;
 
@@ -38,15 +39,15 @@ function fresh(from) {
   };
 }
 
-/** Open a capture game (from the lesson-complete page). */
-export function startCapture({ from = null } = {}) {
-  if (!isRestoring()) remember();
+/** Open a capture game (from the lesson-complete page, or as an item of today's session). */
+export function startCapture({ from = null, daily = null } = {}) {
+  if (!isRestoring() && !daily) remember();
   const prev = state.learn.capture;
   if (prev) prev.gen++;
   const cap = fresh(from ?? prev?.from ?? null);
   update((s) => {
     s.space = "learn";
-    s.learn = { ...s.learn, view: "capture", capture: cap, problem: null, mistake: null, daily: null };
+    s.learn = { ...s.learn, view: "capture", capture: cap, problem: null, mistake: null, daily };
   });
   announce(t("capture.goal"));
 }
@@ -122,6 +123,8 @@ function finish(C, over) {
   C.over = over;
   C.thinking = false;
   const won = over.winner === C.human;
+  // A game played to its end is done in today's session, won or lost.
+  itemDone("capture");
   if (won) {
     setSetting("captureWins", (state.settings.captureWins || 0) + 1);
     Audio.win();

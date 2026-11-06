@@ -196,7 +196,7 @@ export default async function ({ test, assert, root }) {
       const s = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.ok(!/capture\.play|startCapture/.test(s), `${f} offers capture Go`);
     }
-    assert.match(fs.readFileSync(path.join(root, "src/web/js/learn/path.jsx"), "utf8"), /C\.startCapture\(/);
+    assert.match(fs.readFileSync(path.join(root, "src/web/js/learn/session.js"), "utf8"), /startCapture\(\{ daily: s \}\)/, "an item of the path");
   });
 
   await test("learn beginner: strings in four languages; the first-count note is at most three sentences", () => {

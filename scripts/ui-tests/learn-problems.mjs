@@ -8,7 +8,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
   /** The first capture problem: its first correct move and one legal wrong move inside its view. */
   async function openFirstProblem(page) {
     await page.keyboard.press("Control+2");
-    await page.click(".topic-card >> nth=0");
+    await page.click(".catalog-link .group-row");
+    await page.click(".topic-row >> nth=0");
     await page.click(".problem-card >> nth=0");
     await page.waitForFunction(() => window.__state.learn.view === "problem");
     // The view switches before the board mounts; wait for the problem's own board.
