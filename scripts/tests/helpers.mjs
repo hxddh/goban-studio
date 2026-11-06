@@ -274,9 +274,9 @@ export function branchedGame() {
 /* ---------------------------------------- models */
 
 
-/* ---------------------------------------- report */
+/* ---------------------------------------- the review model */
 
-export const R = await import("../../src/web/js/app/report-model.js");
+export const R = await import("../../src/web/js/play/review-model.js");
 
 /**
  * A 13×13 game of 80 moves with no captures (Black fills the top rows,

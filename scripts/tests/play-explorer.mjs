@@ -4,13 +4,16 @@
 import { test, BLACK, assert, bundle, empty, loadSGF, root, setup } from "./helpers.mjs";
 
 await test("play explorer: book moves, out of the book, back/forward, reset and play from here", async () => {
-  const { X, state, P, PM, loadSGF } = await bundle([
+  const { X, state, P, PM, loadSGF, store } = await bundle([
+    'export { store } from "./src/web/js/data/store.js";',
     'export * as X from "./src/web/js/app/explorer-ctl.js";',
     'export { state } from "./src/web/js/app/store.js";',
     'export * as P from "./src/web/js/data/settings.js";',
     'export * as PM from "./src/web/js/model/player.js";',
     'export { loadSGF } from "./src/web/js/sgf.js";',
   ]);
+  // The preview's store, opened before any later file's fake host (its writes come a moment later).
+  await store.open();
   state.settings = { ...P.DEFAULT_SETTINGS };
   state.profile = PM.newProfile();
   state.engine = { available: false };

@@ -113,7 +113,7 @@ await test("data games: the analysis and the review live in the game's own file 
     assert.ok(!("report" in file.meta) && !("analysis" in file.meta));
     assert.deepEqual(Games.getGame(a.id).report, { v: 1, lineKey: "x" });
     assert.equal(Games.getGame(b.id).report, null);
-    // Saving the game again (review edits) keeps both; report-model reportFits decides if they still hold.
+    // Saving the game again (review edits) keeps both; play/review-model reviewFits decides if they still hold.
     Games.saveGame(finished(), { id: a.id, keepPlace: true });
     assert.deepEqual(Games.getGame(a.id).report, { v: 1, lineKey: "x" });
     Games.patchGame(a.id, { report: null, analysis: null });

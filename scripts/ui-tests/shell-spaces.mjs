@@ -58,9 +58,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     assert(keys.includes("goban9:settings.json") && keys.includes("goban9:current.json"), `stored: ${keys.join(", ")}`);
     assert(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("goban-studio.")))), "nothing under the old keys");
     await page.reload();
-    await page.waitForSelector(".play-home");
+    // A game in progress: Play opens on its board.
+    await page.waitForSelector("canvas.board");
     const s = await page.evaluate(() => ({ space: window.__state.space, view: window.__state.play.view, moves: window.__state.game.game.moveNumber, sheet: window.__state.sheet, onboarded: window.__state.settings.onboarded }));
-    assert(s.space === "play" && s.view === "home" && s.moves >= 1 && !s.sheet && s.onboarded, JSON.stringify(s));
+    assert(s.space === "play" && s.view === "game" && s.moves >= 1 && !s.sheet && s.onboarded, JSON.stringify(s));
+    await page.keyboard.press("Control+1");
+    await page.waitForSelector(".play-home .hero");
     assert((await page.textContent(".play-home .hero")).includes("Game in progress"), "the game is offered again");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();

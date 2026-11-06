@@ -1,21 +1,23 @@
 /**
- * v6 report: drawing. The small boards of the key moments (on the page and
- * in the image), the words both use, and the report as one PNG image.
+ * The post-game review as words and as one PNG image: the result line and
+ * the game's facts, a key moment in words, the change of the strength
+ * estimate, the small boards of the key moments, and the image *Export
+ * image* saves (play/review-model.js is what they draw).
  *
  * The image always uses the light palette (docs/design.md §4), so a shared
- * report looks the same whatever the viewer's appearance setting was.
+ * review looks the same whatever the viewer's appearance setting was.
  */
 import { BLACK, coordLabel, formatPoints, rulesetById } from "../rules.js";
 import { t } from "../i18n.js";
-import { resultText } from "./ctl-core.js";
-import { storyText } from "./story.js";
+import { resultText } from "../app/ctl-core.js";
+import { storyText } from "../app/story.js";
 
 /* ------------------------------------------------------------ words */
 
 const half = (v) => formatPoints(Math.round(Math.max(0, v) * 2) / 2);
 
 /** The headline: from the player's side when there is one. */
-export function reportHeadline(model) {
+export function reviewHeadline(model) {
   if (!model.result) return t("library.unfinished");
   if (model.won === true) return t("result.youWon");
   if (model.won === false) return t("result.youLost");
@@ -23,7 +25,7 @@ export function reportHeadline(model) {
 }
 
 /** "Black wins by 3.5 · Japanese rules · Komi 6.5 · 19 × 19" */
-export function reportFacts(model) {
+export function reviewFacts(model) {
   const out = [];
   if (model.result && model.won != null) out.push(resultText(model.result));
   out.push(t(rulesetById(model.rules).labelKey));
@@ -148,14 +150,14 @@ export function wrap(g, text, max) {
 }
 
 /**
- * Lay out (and, with `draw`, paint) the report at width W. Returns the
+ * Lay out (and, with `draw`, paint) the review at width W. Returns the
  * height used, so the first pass sizes the canvas for the second.
  */
 const rankText = (rank) => (rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]));
 
 /**
  * v7: the words for a rated game's change of strength estimate
- * ({ before: { rank, pm }, after: { rank, pm } }, library record `rating`):
+ * ({ before: { rank, pm }, after: { rank, pm } }, the game file's `rating`):
  * "Strength ≈ 12 kyu → ≈ 11 kyu (±1)", or "".
  */
 export function ratingChangeText(rt) {
@@ -198,11 +200,11 @@ function layout(g, model, { W, date, draw, rating = null }) {
   try {
     when = new Date(date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch (_) {}
-  para(["Goban Studio", t("report.title"), when].filter(Boolean).join(" · "), `500 22px ${F}`, c.text3, 30);
+  para(["Goban Studio", t("review.title"), when].filter(Boolean).join(" · "), `500 22px ${F}`, c.text3, 30);
   y += 8;
-  para(reportHeadline(model), `600 52px ${F}`, c.text, 64);
+  para(reviewHeadline(model), `600 52px ${F}`, c.text, 64);
   y += 4;
-  para(reportFacts(model), `400 26px ${F}`, c.text2, 36);
+  para(reviewFacts(model), `400 26px ${F}`, c.text2, 36);
   const change = ratingChangeText(rating);
   if (change) para(change, `400 24px ${F}`, c.text2, 34);
   rule();
@@ -278,8 +280,8 @@ function layout(g, model, { W, date, draw, rating = null }) {
   return Math.ceil(y);
 }
 
-/** The report as a PNG blob (≤ 380 KB, so it fits the native file bridge). */
-export async function renderReportPNG(model, { date = Date.now(), W = 1080, rating = null } = {}) {
+/** The review as a PNG blob (≤ 380 KB, so it fits the native file bridge). */
+export async function renderReviewPNG(model, { date = Date.now(), W = 1080, rating = null } = {}) {
   const measure = document.createElement("canvas").getContext("2d");
   const H = layout(measure, model, { W, date, draw: false, rating });
   for (const scale of [1, 0.8, 0.6]) {

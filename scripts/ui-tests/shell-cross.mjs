@@ -6,8 +6,8 @@
  *
  * For each combination it visits Play's home, Learn's home (the path and
  * the catalog), a problem, the history of games, the explorer (both
- * modes), a classic in review (every tab), a game report, and every
- * Settings pane, and checks: the audit, no raw string keys on screen, no
+ * modes), a classic in review (every tab), a finished game's post-game
+ * review (every tab), and every Settings pane, and checks: the audit, no raw string keys on screen, no
  * clipped buttons, no horizontal page overflow, at most one primary
  * button, no page errors.
  */
@@ -67,11 +67,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForFunction(() => window.__state.learn.view === "problem");
       await inspect(page, "problem");
 
-      // Play's tabs, the explorer in both modes, a classic in review.
+      // Play's home, the explorer in both modes, a classic in review.
       await page.keyboard.press("Control+1");
       await inspect(page, "Play's home again");
-      const tabs = await page.locator(".tabs-row .segmented button").count();
-      await page.click(`.tabs-row .segmented button >> nth=${tabs - 1}`);
       await page.waitForSelector(".collection-row[data-explorer]");
       await page.click('.collection-row[data-explorer="whole"]');
       await page.waitForSelector(".explorer-panel");
@@ -80,7 +78,6 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
       await inspect(page, "explorer (corner)");
       await page.keyboard.press("Escape");
-      await page.click(".tabs-row .segmented button >> nth=1");
       await page.click(".collection-row >> nth=0");
       await page.waitForSelector(".review-layer .chart");
       const rtabs = await page.locator(".review-tabs button").count();
@@ -90,7 +87,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       }
       await page.keyboard.press("Escape");
 
-      // A finished two-player game and its report.
+      // A finished two-player game: its board turns into its review.
       await page.keyboard.press("Control+n");
       await page.click(".preset >> nth=2");
       await page.click(".sheet .segmented button >> nth=1");
@@ -107,15 +104,17 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       }
       await page.waitForSelector(".score-card");
       await page.click(".score-card .btn.primary");
-      await page.waitForSelector(".result-card");
-      await inspect(page, "result");
-      await page.keyboard.press("Control+1");
-      await page.click(".tabs-row .segmented button >> nth=0");
-      await page.waitForSelector(".page .menu-wrap");
-      await page.click(".page .menu-wrap > button >> nth=0");
-      await page.click(".menu [role=menuitem] >> nth=1");
-      await page.waitForFunction(() => window.__state.report?.status === "done", null, { timeout: 15000 });
-      await inspect(page, "report");
+      await page.waitForSelector(".review-layer .review-result");
+      await page.waitForFunction(() => !window.__state.review.analyzing, null, { timeout: 15000 });
+      const ptabs = await page.locator(".review-tabs button").count();
+      for (let i = 0; i < ptabs; i++) {
+        await page.click(`.review-tabs button >> nth=${i}`);
+        await inspect(page, `post-game review tab ${i + 1}`);
+      }
+      await page.keyboard.press("Escape");
+      await page.waitForSelector(".play-home .game-row");
+      await page.click(".play-home .menu-wrap > button >> nth=0");
+      await inspect(page, "history row menu");
       await page.keyboard.press("Escape");
 
       // Every Settings pane.

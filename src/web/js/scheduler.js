@@ -313,7 +313,7 @@ export function createScheduler() {
 export const scheduler = createScheduler();
 
 // Quitting (or reloading the page) stops everything; a batch keeps its
-// place and resumes at the next launch (report-batch.js).
+// place and resumes at the next launch (play/analysis.js).
 if (typeof globalThis.addEventListener === "function") {
   globalThis.addEventListener("pagehide", () => scheduler.cancelAll("quit"));
 }

@@ -32,9 +32,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
       const page = await fresh("en-US", size);
       await onboard(page, 1);
       await page.keyboard.press("Control+1");
-      await page.click(".tabs-row .segmented button >> nth=-1");
-      await page.click('.collection-row[data-explorer="corner"]');
+      // Play's home has one explorer row (the whole board); the corner tree is one click inside.
+      await page.click('.collection-row[data-explorer="whole"]');
       await page.waitForSelector(".explorer-panel");
+      await page.click(".explorer-panel .segmented button >> nth=1");
+      await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
       await page.waitForFunction(() => window.__board?.model.view && window.__board.geom);
       const r = await labelRoom(page);
       assert(r.view.x0 === 9 && r.view.y0 === 0, `not the upper-right corner: ${JSON.stringify(r.view)}`);
@@ -70,8 +72,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     const page = await fresh();
     await onboard(page, 1);
     await page.keyboard.press("Control+1");
-    await page.click(".tabs-row .segmented button >> nth=-1");
-    await page.click('.collection-row[data-explorer="corner"]');
+    await page.click('.collection-row[data-explorer="whole"]');
+    await page.waitForSelector(".explorer-panel");
+    await page.click(".explorer-panel .segmented button >> nth=1");
+    await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
     await page.waitForSelector(".explorer-about");
     await page.click(".explorer-about summary");
     const text = await page.textContent(".explorer-build");
