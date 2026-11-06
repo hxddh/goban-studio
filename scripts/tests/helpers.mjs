@@ -73,7 +73,7 @@ export async function bundle(lines) {
   const esbuild = await import("esbuild");
   const out = await esbuild.build({
     // Each bundle is a module of its own (an identical data: URL would be the same instance).
-    stdin: { contents: [...lines, `export const BUNDLE = ${++bundles};`].join("\n"), resolveDir: root, loader: "js" },
+    stdin: { contents: [...lines, ...TEARDOWN_EXPORTS, `export const BUNDLE = ${++bundles};`].join("\n"), resolveDir: root, loader: "js" },
     bundle: true,
     format: "esm",
     platform: "neutral",
@@ -93,23 +93,33 @@ export async function bundle(lines) {
  * into the next file's fake native host.
  */
 const live = new Set();
+/** Lines every test bundle carries, so teardown can reach its engine, state and store whatever the file exports. */
+export const TEARDOWN_EXPORTS = [
+  'export * as __Engine from "./src/web/js/engine.js";',
+  'export { state as __state } from "./src/web/js/app/store.js";',
+  'export { store as __store } from "./src/web/js/data/store.js";',
+];
 export function register(mod) {
   live.add(mod);
   return mod;
 }
 export async function teardown() {
   for (const mod of live) {
+    const store = mod.__store || mod.store;
+    const Engine = mod.__Engine || mod.Engine;
+    const st = mod.__state || mod.state;
     try {
-      await mod.store?.flush?.();
+      await store?.flush?.();
     } catch (_) {}
     try {
-      mod.Engine?.sched?.cancelAll?.("test-end");
+      Engine?.sched?.cancelAll?.("test-end");
     } catch (_) {}
-    const st = mod.state;
     if (st) {
       st.game = null;
       st.review = null;
       if (st.learn) st.learn = { ...st.learn, capture: null };
+      if (st.play) st.play = { ...st.play, explorer: null };
+      if (st.settings) st.settings = { ...st.settings, liveAnalysis: false };
     }
   }
   live.clear();

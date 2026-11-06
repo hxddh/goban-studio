@@ -5,7 +5,7 @@
  * quirks of real records. Loaded by scripts/test.mjs; receives the
  * runner's helpers.
  */
-import { register } from "./helpers.mjs";
+import { register, TEARDOWN_EXPORTS } from "./helpers.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 8000, what = "condition") {
@@ -20,7 +20,7 @@ async function until(fn, ms = 8000, what = "condition") {
 async function bundle(root, lines) {
   const esbuild = await import("esbuild");
   const out = await esbuild.build({
-    stdin: { contents: lines.join("\n"), resolveDir: root, loader: "js" },
+    stdin: { contents: [...lines, ...TEARDOWN_EXPORTS].join("\n"), resolveDir: root, loader: "js" },
     bundle: true,
     format: "esm",
     platform: "neutral",

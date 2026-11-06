@@ -10,7 +10,7 @@
  * Loaded by scripts/test.mjs; receives the runner's helpers.
  */
 import fs from "node:fs";
-import { register } from "./helpers.mjs";
+import { register, TEARDOWN_EXPORTS } from "./helpers.mjs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -41,6 +41,7 @@ export default async function ({ test, assert, root }) {
         'export { setRestorer } from "./src/web/js/app/ctl-core.js";',
         'export { loadSGF } from "./src/web/js/sgf.js";',
         'export { reviewFits, tryMoments } from "./src/web/js/play/review-model.js";',
+        ...TEARDOWN_EXPORTS,
       ].join("\n"),
       resolveDir: root,
       loader: "js",

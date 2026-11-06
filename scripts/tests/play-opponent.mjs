@@ -9,7 +9,7 @@
  * process cannot answer; then what a game stores.
  */
 import fs from "node:fs";
-import { register } from "./helpers.mjs";
+import { register, TEARDOWN_EXPORTS } from "./helpers.mjs";
 import path from "node:path";
 
 import * as O from "../../src/web/js/opponents.js";
@@ -177,6 +177,7 @@ export default async function ({ test, assert, root }) {
         'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
+        ...TEARDOWN_EXPORTS,
       ].join("\n"),
       resolveDir: root,
       loader: "js",

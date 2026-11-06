@@ -7,7 +7,7 @@
  * host: a teaching warning shows and announces its reason, and costs no extra search.
  */
 import fs from "node:fs";
-import { register } from "./helpers.mjs";
+import { register, TEARDOWN_EXPORTS } from "./helpers.mjs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -176,6 +176,7 @@ export default async function ({ test, assert, root }) {
         'export { BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
+        ...TEARDOWN_EXPORTS,
       ].join("\n"),
       resolveDir: root,
       loader: "js",

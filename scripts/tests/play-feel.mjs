@@ -9,7 +9,7 @@
  * the count only on a settled board, and the end-of-game marking can be
  * corrected group by group.
  */
-import { register } from "./helpers.mjs";
+import { register, TEARDOWN_EXPORTS } from "./helpers.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 8000, what = "condition") {
@@ -356,6 +356,7 @@ export default async function ({ test, assert, root }) {
         'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
         'export { setLang } from "./src/web/js/i18n.js";',
         'export { state } from "./src/web/js/app/store.js";',
+        ...TEARDOWN_EXPORTS,
       ].join("\n"),
       resolveDir: root,
       loader: "js",
