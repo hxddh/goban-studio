@@ -128,6 +128,36 @@ await test("data games: the analysis and the review live in the game's own file 
   }
 });
 
+await test("data games: KataGo's ownership maps come back from the file as arrays, with the same phases", async () => {
+  const { phaseBoundaries } = await import("../../src/web/js/app/summary.js");
+  const { store, map } = memStore();
+  Games.useStore(store);
+  try {
+    const rec = Games.saveGame(finished(), { name: "own" });
+    // 61 positions of a 9×9 game; the board settles from move 11 on (as katago.js parses it: Float32Array).
+    const points = Array.from({ length: 61 }, (_, i) => ({
+      source: "katago",
+      scoreLead: 0,
+      ownership: Float32Array.from({ length: 81 }, (_, k) => (i >= 11 ? (k % 2 ? 0.97 : -0.96) : (k % 3) * 0.1 - 0.1)),
+    }));
+    const before = phaseBoundaries(9, points, 61);
+    Games.patchGame(rec.id, { analysis: points });
+    assert.equal(await store.flush(), true);
+    // A restart: a new store over the same files.
+    const again = createStore({ backend: localBackend({ get length() { return map.size; }, key: (i) => [...map.keys()][i] ?? null, getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => void map.set(k, String(v)), removeItem: (k) => void map.delete(k) }, "t:"), delay: 1 });
+    await again.open();
+    Games.useStore(again);
+    const back = Games.getGame(rec.id).analysis;
+    assert.ok(Array.isArray(back[20].ownership), "an array, not an object with numbered keys");
+    assert.equal(back[20].ownership.length, 81);
+    assert.ok(Math.abs(back[20].ownership[1] - 0.97) < 0.001);
+    assert.deepEqual(phaseBoundaries(9, back, 61), before, "the same phases after the round trip");
+    assert.equal(before.method, "ownership");
+  } finally {
+    Games.useStore(null);
+  }
+});
+
 await test("data games: finishedAt is set once; an edit keeps its place, a game saved again from play moves up", async () => {
   const { store } = memStore();
   Games.useStore(store);

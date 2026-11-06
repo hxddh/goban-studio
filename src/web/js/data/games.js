@@ -79,6 +79,22 @@ function readFile(id) {
   return f && typeof f === "object" ? f : null;
 }
 
+/**
+ * An analysis as it is kept in the file: KataGo's ownership maps
+ * (Float32Array from katago.js) become plain arrays, rounded to 0.001, so
+ * they come back from JSON with the same shape (a typed array would come
+ * back as an object with numbered keys). Readers index and iterate them
+ * either way.
+ */
+export function packAnalysis(points) {
+  if (!Array.isArray(points)) return points;
+  return points.map((p) => {
+    const own = p?.ownership;
+    if (!own || Array.isArray(own) || typeof own.length !== "number") return p;
+    return { ...p, ownership: Array.from(own, (v) => Math.round(v * 1000) / 1000) };
+  });
+}
+
 function writeFile(file) {
   store.put(gameKey(file.id), file);
 }
@@ -134,7 +150,7 @@ export function patchGame(id, patch) {
     if (k === "report" || k === "review" || k === "analysis") {
       const field = k === "analysis" ? "analysis" : "review";
       if (v == null) delete file[field];
-      else file[field] = v;
+      else file[field] = field === "analysis" ? packAnalysis(v) : v;
     } else if (k === "createdAt" || k === "updatedAt" || k === "finishedAt" || k === "source") file[k] = v;
     else if (!FILE_FIELDS.includes(k)) file.meta[k] = v;
   }

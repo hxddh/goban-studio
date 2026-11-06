@@ -31,30 +31,74 @@ export function windowDrag() {
   if (hasNative()) invoke("studio.windowDrag").catch(() => {});
 }
 
-export async function writeTextFile(path, text) {
-  if (!hasNative()) return false;
-  const bytes = new TextEncoder().encode(text);
+/* ------------------------------------------------------- the user's files */
+
+/** Raw bytes per file call (as store.zig chunk_bytes; base64 fits one bridge message). */
+export const FILE_CHUNK_BYTES = 384 * 1024;
+
+function bytesToBase64(bytes) {
   let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function base64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Write `bytes` to `path` through `studio.writeTextFile`, in chunks: one
+ * call when it fits, else chunks from offset 0 in order, the last with
+ * `done` (the host writes beside the file and renames it over at the end).
+ * `call` is the bridge (a parameter so the tests can drive it).
+ */
+export async function writeFileChunks(call, path, bytes) {
+  if (bytes.length <= FILE_CHUNK_BYTES) {
+    await call("studio.writeTextFile", { path, b64: bytesToBase64(bytes) });
+    return;
   }
-  try {
-    await invoke("studio.writeTextFile", { path, b64: btoa(bin) });
-    return true;
-  } catch (_) {
-    return false;
+  for (let offset = 0; offset < bytes.length; offset += FILE_CHUNK_BYTES) {
+    const end = Math.min(bytes.length, offset + FILE_CHUNK_BYTES);
+    await call("studio.writeTextFile", { path, b64: bytesToBase64(bytes.subarray(offset, end)), offset, done: end >= bytes.length });
   }
+}
+
+/** The whole file at `path` through `studio.readTextFile` ({size, b64} per chunk). */
+export async function readFileChunks(call, path) {
+  const parts = [];
+  let offset = 0;
+  let size = 0;
+  for (;;) {
+    const r = await call("studio.readTextFile", { path, offset });
+    if (!r || typeof r !== "object" || typeof r.b64 !== "string") throw new Error("BadReply");
+    size = Number(r.size) || 0;
+    const bytes = base64ToBytes(r.b64);
+    parts.push(bytes);
+    offset += bytes.length;
+    if (offset >= size || !bytes.length) break;
+  }
+  if (offset !== size) throw new Error("Changed");
+  const all = new Uint8Array(offset);
+  let at = 0;
+  for (const p of parts) {
+    all.set(p, at);
+    at += p.length;
+  }
+  return all;
+}
+
+export async function writeTextFile(path, text) {
+  return writeBinaryFile(path, new TextEncoder().encode(text));
 }
 
 /** v6: write bytes (a Uint8Array) through the same native file command. */
 export async function writeBinaryFile(path, bytes) {
   if (!hasNative()) return false;
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  }
   try {
-    await invoke("studio.writeTextFile", { path, b64: btoa(bin) });
+    await writeFileChunks(invoke, path, bytes);
     return true;
   } catch (_) {
     return false;
@@ -64,12 +108,7 @@ export async function writeBinaryFile(path, bytes) {
 export async function readTextFile(path) {
   if (!hasNative()) return null;
   try {
-    const b64 = await invoke("studio.readTextFile", { path });
-    if (typeof b64 !== "string") return null;
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
+    return new TextDecoder().decode(await readFileChunks(invoke, path));
   } catch (_) {
     return null;
   }

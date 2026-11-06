@@ -562,52 +562,54 @@ fn jsonUnescape(raw: []const u8, out: []u8) ?[]const u8 {
     return out[0..wi];
 }
 
+/// The payload of the two user-file commands.
+const FilePayload = struct {
+    path: []const u8 = "",
+    b64: []const u8 = "",
+    offset: u64 = 0,
+    done: bool = true,
+};
+
+/// `studio.writeTextFile {path, b64, offset?, done?}` → true. Without
+/// `offset` and `done` it is one write of at most `store.chunk_bytes`
+/// (written beside, then renamed over); a larger file is sent as chunks from
+/// offset 0 in order, the last with `done: true` (as `studio.storeWrite`).
 fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = output;
     const self: *App = @ptrCast(@alignCast(context));
-    const path_raw = jsonStringField(invocation.request.payload, "path") orelse return error.InvalidRequest;
-    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
-    // Paths need JSON unescape (Windows `C:\…` arrives as `C:\\…`); base64 is
-    // ASCII without escapes under JSON.stringify, so the raw slice is fine.
-    var path_buf: [4096]u8 = undefined;
-    const path = jsonUnescape(path_raw, &path_buf) orelse return error.InvalidRequest;
-    if (path.len == 0 or path.len > 4096) return error.InvalidRequest;
-    if (b64.len == 0 or b64.len > 512 * 1024) return error.InvalidRequest;
-
-    var decoded_buf: [384 * 1024]u8 = undefined;
+    const parsed = std.json.parseFromSlice(FilePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const v = parsed.value;
+    if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
     const dec = std.base64.standard.Decoder;
-    const dec_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
-    if (dec_len > decoded_buf.len) return error.InvalidRequest;
-    dec.decode(decoded_buf[0..dec_len], b64) catch return error.InvalidRequest;
-
-    var file = std.Io.Dir.createFileAbsolute(self.io, path, .{ .truncate = true }) catch return error.HandlerFailed;
-    defer file.close(self.io);
-    file.writeStreamingAll(self.io, decoded_buf[0..dec_len]) catch return error.HandlerFailed;
-
-    return std.fmt.bufPrint(output, "true", .{}) catch "true";
+    const n = dec.calcSizeForSlice(v.b64) catch return error.InvalidRequest;
+    if (n > store_mod.chunk_bytes) return error.TooLarge;
+    const bytes = try self.allocator.alloc(u8, n);
+    defer self.allocator.free(bytes);
+    dec.decode(bytes, v.b64) catch return error.InvalidRequest;
+    store_mod.writePath(self.io, v.path, bytes, v.offset, v.done) catch return error.HandlerFailed;
+    return "true";
 }
 
+/// `studio.readTextFile {path, offset?}` → `{size, b64}`: the file's size
+/// and up to `store.chunk_bytes` of it from `offset`, as base64. A larger
+/// file is read in several calls (as `studio.storeRead`).
 fn readTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
-    const path_raw = jsonStringField(invocation.request.payload, "path") orelse return error.InvalidRequest;
-    var path_buf: [4096]u8 = undefined;
-    const path = jsonUnescape(path_raw, &path_buf) orelse return error.InvalidRequest;
-    if (path.len == 0 or path.len > 4096) return error.InvalidRequest;
-
-    var file = std.Io.Dir.openFileAbsolute(self.io, path, .{}) catch return error.HandlerFailed;
-    defer file.close(self.io);
-
-    var raw_buf: [256 * 1024]u8 = undefined;
-    const n = file.readPositionalAll(self.io, &raw_buf, 0) catch return error.HandlerFailed;
-    if (n == 0) return error.InvalidRequest;
-
-    var b64_buf: [360 * 1024]u8 = undefined;
+    const parsed = std.json.parseFromSlice(FilePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const v = parsed.value;
+    if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
+    const raw = try self.allocator.alloc(u8, store_mod.chunk_bytes);
+    defer self.allocator.free(raw);
+    const chunk = store_mod.readPath(self.io, v.path, v.offset, raw) catch return error.HandlerFailed;
     const enc = std.base64.standard.Encoder;
-    const enc_len = enc.calcSize(n);
-    if (enc_len > b64_buf.len) return error.InvalidRequest;
-    const encoded = enc.encode(b64_buf[0..enc_len], raw_buf[0..n]);
-
-    // JSON string result
-    return native_sdk.bridge.writeJsonStringValue(output, encoded);
+    const b64_len = enc.calcSize(chunk.bytes.len);
+    const head = std.fmt.bufPrint(output, "{{\"size\":{d},\"b64\":\"", .{chunk.size}) catch return error.TooLarge;
+    if (head.len + b64_len + 2 > output.len) return error.TooLarge;
+    _ = enc.encode(output[head.len..][0..b64_len], chunk.bytes);
+    @memcpy(output[head.len + b64_len ..][0..2], "\"}");
+    return output[0 .. head.len + b64_len + 2];
 }
 
 /// 隐藏标题栏(macOS hidden_inset_tall)下,前端顶栏的空白处就是标题栏:mousedown 时

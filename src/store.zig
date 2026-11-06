@@ -294,6 +294,92 @@ test "store keys are validated strictly" {
     try testing.expect(!validPrefix("/games/"));
 }
 
+// ------------------------------------------------ files the user picks
+
+/// Largest file the user's own files (backups, SGF, images) may be.
+pub const max_user_file_bytes: u64 = 64 * 1024 * 1024;
+/// Suffix of the temporary file a chunked user-file write goes to.
+pub const part_suffix = ".part";
+
+fn openParent(io: std.Io, path: []const u8) Error!std.Io.Dir {
+    const parent = std.fs.path.dirname(path) orelse return error.InvalidKey;
+    return std.Io.Dir.cwd().openDir(io, parent, .{}) catch return error.Disk;
+}
+
+/// One chunk of the file at `path` (absolute) from `offset` into `buf`.
+pub fn readPath(io: std.Io, path: []const u8, offset: u64, buf: []u8) Error!Chunk {
+    if (!std.fs.path.isAbsolute(path)) return error.InvalidKey;
+    const dir = try openParent(io, path);
+    defer dir.close(io);
+    const file = dir.openFile(io, std.fs.path.basename(path), .{}) catch return error.Disk;
+    defer file.close(io);
+    const size = file.length(io) catch return error.Disk;
+    if (size > max_user_file_bytes) return error.TooLarge;
+    if (offset > size) return error.OutOfOrder;
+    const want: usize = @intCast(@min(@as(u64, buf.len), size - offset));
+    const n = file.readPositionalAll(io, buf[0..want], offset) catch return error.Disk;
+    return .{ .size = size, .bytes = buf[0..n] };
+}
+
+/// Write one chunk of the file at `path` (absolute), as `Store.write` does:
+/// offset 0 starts `<name>.part` beside it, later chunks must follow on, and
+/// `done` renames it over the target.
+pub fn writePath(io: std.Io, path: []const u8, bytes: []const u8, offset: u64, done: bool) Error!void {
+    if (!std.fs.path.isAbsolute(path)) return error.InvalidKey;
+    if (offset + bytes.len > max_user_file_bytes) return error.TooLarge;
+    const name = std.fs.path.basename(path);
+    if (name.len == 0 or name.len + part_suffix.len > 255) return error.InvalidKey;
+    var tmp_buf: [256]u8 = undefined;
+    const tmp = std.fmt.bufPrint(&tmp_buf, "{s}{s}", .{ name, part_suffix }) catch return error.InvalidKey;
+    const dir = try openParent(io, path);
+    defer dir.close(io);
+    {
+        const file = blk: {
+            if (offset == 0) break :blk dir.createFile(io, tmp, .{ .truncate = true }) catch return error.Disk;
+            break :blk dir.openFile(io, tmp, .{ .mode = .read_write }) catch |err| switch (err) {
+                error.FileNotFound => return error.OutOfOrder,
+                else => return error.Disk,
+            };
+        };
+        defer file.close(io);
+        if (offset > 0) {
+            const len = file.length(io) catch return error.Disk;
+            if (len != offset) return error.OutOfOrder;
+        }
+        if (bytes.len > 0) file.writePositionalAll(io, bytes, offset) catch return error.Disk;
+        if (done) file.sync(io) catch return error.Disk;
+    }
+    if (done) dir.rename(tmp, dir, name, io) catch return error.Disk;
+}
+
+test "a user file is written in chunks beside its target and read back from offsets" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir_len = try tmp.dir.realPath(io, &dir_buf);
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = try std.fmt.bufPrint(&path_buf, "{s}{c}backup.json", .{ dir_buf[0..dir_len], std.fs.path.sep });
+    try tmp.dir.writeFile(io, .{ .sub_path = "backup.json", .data = "old" });
+
+    try writePath(io, path, "0123456789", 0, false);
+    var buf: [64]u8 = undefined;
+    try testing.expectEqualStrings("old", (try readPath(io, path, 0, &buf)).bytes);
+    try testing.expectError(error.OutOfOrder, writePath(io, path, "x", 3, false));
+    try writePath(io, path, "abcdef", 10, true);
+    const whole = try readPath(io, path, 0, &buf);
+    try testing.expectEqual(@as(u64, 16), whole.size);
+    try testing.expectEqualStrings("0123456789abcdef", whole.bytes);
+    try testing.expectEqualStrings("abcd", (try readPath(io, path, 10, buf[0..4])).bytes);
+    try testing.expectEqual(@as(usize, 0), (try readPath(io, path, 16, &buf)).bytes.len);
+    try testing.expectError(error.OutOfOrder, readPath(io, path, 17, &buf));
+    try testing.expectError(error.FileNotFound, tmp.dir.access(io, "backup.json.part", .{}));
+    // One-shot writes replace the whole file; relative paths are refused.
+    try writePath(io, path, "{}", 0, true);
+    try testing.expectEqualStrings("{}", (try readPath(io, path, 0, &buf)).bytes);
+    try testing.expectError(error.InvalidKey, writePath(io, "backup.json", "x", 0, true));
+}
+
 test "store writes atomically, reads in chunks, lists and removes in a temp dir" {
     const io = testing.io;
     var tmp = testing.tmpDir(.{});
