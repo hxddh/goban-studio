@@ -1,15 +1,15 @@
 /**
  * Model: the one player model (src/web/js/model/player.js) and the
- * measured ladder (model/ladder.js). Ports the meaningful assertions of
- * the v6 strength tests (scripts/test.mjs), the persist tests (problems,
- * drills, game records), scripts/tests/v7-plan.mjs, the v6 next-lesson
- * test and the v8 beginner bridges, onto the v9 profile.
+ * measured ladder (model/ladder.js): the rating, spaced review of problems
+ * and drills, game records, the week's focus, Learn's path, the next
+ * lesson and the beginner bridges.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 export default async function ({ test, assert, root }) {
   const P = await import("../../src/web/js/model/player.js");
+  const O = await import("../../src/web/js/opponents.js");
   const { PROBLEMS } = await import("../../src/web/js/content/problems.js");
   const { COURSE } = await import("../../src/web/js/content/course.js");
   const GRADES = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
@@ -312,7 +312,7 @@ export default async function ({ test, assert, root }) {
 
   await test("model profile: v9 starts empty; anything else is not read; bad parts are dropped", () => {
     const empty = P.newProfile();
-    assert.deepEqual(Object.keys(empty).sort(), ["games", "history", "lessons", "mistakes", "problems", "rating", "v", "week"]);
+    assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "problems", "rating", "v", "week"]);
     assert.equal(empty.v, 9);
     assert.deepEqual(Object.keys(empty.rating), ["9", "13", "19"]);
     // A v8 progress object, or junk, is not migrated.
@@ -323,7 +323,10 @@ export default async function ({ test, assert, root }) {
     p = P.recordProblem(p, PROBLEMS[0].id, { solved: true }, NOW);
     p = P.addMistake(p, { gameId: "r1", index: 30, theme: "ko" }, NOW);
     p = P.recordLesson(p, "stones-ko", { done: true }, NOW);
+    p = P.recordClassic(p, "shusaku-ear-reddening", NOW);
+    assert.deepEqual(p.classics, { "shusaku-ear-reddening": { done: true, at: NOW } });
     assert.deepEqual(P.normalizeProfile(JSON.parse(JSON.stringify(p))), p);
+    assert.deepEqual(P.normalizeProfile({ ...p, classics: { a: { done: "yes" }, b: 3 } }).classics, {}, "a classic is done or not there");
     // Damaged parts go, the rest stays.
     const bad = JSON.parse(JSON.stringify(p));
     bad.rating[19] = { mu: "x" };
@@ -638,7 +641,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(!P.learnPath(done, who, NOW).some((i) => i.kind === "lesson"));
   });
 
-  await test("model: pure — no DOM, storage, engine or app imports; the old modules stay in place", () => {
+  await test("model: pure — no DOM, storage, engine or app imports; the old modules are gone", () => {
     for (const f of ["model/player.js", "model/ladder.js"]) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       const imports = [...src.matchAll(/^import[^;]*from "([^"]+)"/gm)].map((m) => m[1]);
@@ -647,6 +650,10 @@ export default async function ({ test, assert, root }) {
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
     assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");
-    for (const f of ["app/strength.js", "app/plan.js", "persist.js", "app/beginner.js", "app/course-path.js"]) assert.ok(fs.existsSync(path.join(root, "src/web/js", f)), f);
+    for (const f of ["app/strength.js", "app/plan.js", "persist.js", "app/beginner.js", "app/course-path.js", "app/rating.js", "app/week.js"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js", f)), f);
+    // The rating of a game against the opponent ladder: what played, on its board, with its handicap.
+    assert.ok(P.implOpponent("L:10k", { handicap: 4 }) < P.implOpponent("L:10k"));
+    assert.equal(P.implOpponent("L:10k", { size: 9 }), O.implTheta("L:10k", 9));
+    assert.equal(P.implOpponent("nope"), null);
   });
 }

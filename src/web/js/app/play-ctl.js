@@ -5,23 +5,19 @@
 import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
-import * as Lib from "../library.js";
-import { addGameRecord, addMistake, saveProgress, updateGameRecord } from "../persist.js";
+import * as Games from "../data/games.js";
+import { THEME_TOPIC, addMistake, estimate, focus, implOpponent, recordGame, suggestedGame, themeLosses } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
-import { confirmAction, openSheet, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
-import { addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { ratingToRank } from "./rating.js";
-import { estimateNow, rateGame, recommendStrength, startEstimate } from "./strength.js";
 import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
-import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
+import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { notePoints, queueReport } from "./report-ctl.js";
-import { themeLosses } from "./plan.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
 /* ------------------------------------------------------------ state */
@@ -79,7 +75,7 @@ export function freshGameState(game, meta = {}) {
 }
 
 export function restoreCurrent() {
-  const saved = Lib.loadCurrent();
+  const saved = Games.loadCurrent();
   if (saved?.sgf) {
     try {
       const { game } = loadSGF(saved.sgf);
@@ -100,7 +96,7 @@ export function restoreCurrent() {
 export function persistCurrent() {
   const g = state.game;
   if (!g) return;
-  Lib.saveCurrent(g.game, {
+  Games.saveCurrent(g.game, {
     recordId: g.recordId,
     humanColor: g.humanColor,
     opponent: g.opponent,
@@ -128,16 +124,14 @@ function recordMeta(g) {
   };
 }
 
-/** Finished or explicitly saved games go to the library; nothing else does. */
+/**
+ * Finished or explicitly saved games go to the history (data/games.js);
+ * nothing else does. A write that fails is said once by the store's toast.
+ */
 export function saveToLibrary({ quiet = false } = {}) {
   const g = state.game;
   if (!g || g.game.moveNumber === 0) return null;
-  const rec = Lib.saveGame(g.game, recordMeta(g));
-  if (!rec) {
-    // v8: storage is full; say so instead of "Saved".
-    toast(t("toast.saveFailed"), "error");
-    return null;
-  }
+  const rec = Games.saveGame(g.game, recordMeta(g));
   g.recordId = rec.id;
   g.saved = true;
   persistCurrent();
@@ -163,29 +157,33 @@ function gameOver(g = state.game) {
 /* --------------------------------------------------------- new game */
 
 /**
- * What to play next: size, the opponent's rank and handicap from your
- * rating. `rank` is yours; `opponentRank` is a rank of the ladder and
- * `label` the measured rank of what plays it (opponents.js).
+ * The opponent to suggest on one board: the player model's suggestion
+ * (model/player.js suggestedGame: the level you are expected to score
+ * about even against, and a handicap for what remains), as the rank of the
+ * ladder that plays it here (opponents.js). With autoStrength off, the
+ * rank last chosen. { size, opponentRank, label, handicap }.
+ */
+export function suggestedOpponent(size = 19) {
+  const installed = Engine.installed();
+  // The human-style levels play where they are installed (opponents.js prefers them).
+  const sg = suggestedGame(state.profile, { size, modeOf: () => (installed.human ? "human" : "standard") });
+  const s = state.settings;
+  const pick = Engine.nearest(s.autoStrength === false ? s.opponentRank : sg.rank, installed);
+  const handicap = s.autoStrength === false ? Engine.suggestHandicap(playerRankNow(), pick.label, size) : sg.handicap;
+  return { size, opponentRank: pick.rank, label: pick.label, handicap };
+}
+
+/**
+ * What to play next (Play's suggested game): the standard board, with a
+ * 9×9 game beside it as the quick option, and why: the week's first focus
+ * (model/player.js focus) or the player's level.
+ * { size, opponentRank, label, handicap, rank, weak: { theme } | null, quick }.
  */
 export function recommendedGame() {
-  const p = state.progress;
-  const s = state.settings;
-  // v6: the rank you are expected to score closest to even against, from
-  // the strength estimate and the measured strengths (strength.js).
-  const est = p.rating?.mu != null ? p.rating : startEstimate(s.playerRank ?? 30);
-  const rank = ratingToRank(est.r);
-  const installed = Engine.installed();
-  const pick = (size) => Engine.nearest(s.autoStrength ? recommendStrength(est, { size, installed }) : s.opponentRank, installed);
-  // The standard board, always; strength and handicap close the gap. A
-  // 9×9 game is offered beside it as the quick option (its own rank: the
-  // small board compresses the ladder).
-  const size = 19;
-  const main = pick(size);
-  const handicap = Engine.suggestHandicap(rank, main.label, size);
-  const weak = topWeaknesses(p.weakness, 1)[0] || null;
-  const q = pick(9);
-  const quick = { size: 9, opponentRank: q.rank, label: q.label, handicap: Engine.suggestHandicap(rank, q.label, 9) };
-  return { size, opponentRank: main.rank, label: main.label, handicap, rank, weak, quick };
+  const main = suggestedOpponent(19);
+  const view = focus(state.profile, Date.now());
+  const key = view.focus?.[0]?.key || null;
+  return { ...main, rank: playerRankNow(), weak: key ? { theme: key } : null, quick: suggestedOpponent(9) };
 }
 
 export function newGame(opts = {}) {
@@ -217,8 +215,10 @@ export function newGame(opts = {}) {
   update((s) => {
     s.game = freshGameState(game, { opponent, humanColor, rank: opponentRank, clock: newClock(tc), rated: opponent === "ai" });
     s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
     s.sheet = null;
     s.review = null;
+    s.report = null;
   });
   persistCurrent();
   announce(t("a11y.newGame", [size]));
@@ -667,30 +667,32 @@ function finishGame() {
   if (won === true) Audio.win();
   else if (won === false) Audio.lose();
   else Audio.gameEnd?.();
-  // Rating: games against the computer with enough moves to mean something.
+  saveToLibrary({ quiet: true });
+  // Rating: games against the computer with enough moves to mean something
+  // (model/player.js recordGame rates a game once, by its measured opponent).
   let rated = null;
   if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
-    const p = state.progress;
-    const prev = p.rating || startEstimate(state.settings.playerRank ?? 30);
     const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
-    // v9: against the implementation that played, by its measured strength
+    // Against the implementation that played, by its measured strength
     // (the offline engine counts as the standard level of the rank).
     const impl = g.played || Engine.resolveOpponent({ rank: g.rank, impl: g.impl }, {}).id;
-    p.rating = rateGame(prev, { impl, size: g.game.size, handicap, won });
-    g.ratingDelta = p.rating.r - prev.r;
+    const size = g.game.size;
+    const now = Date.now();
+    const before = estimate(state.profile, { size, now });
+    const id = g.recordId || String(now);
+    changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent: implOpponent(impl, { size, handicap }) }));
+    const rec = state.profile.games.find((x) => x.id === id);
     g.rated = false;
-    rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
-    saveProgress(p);
-    // v7: the estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
-    g.ratingChange = ratingChange(prev, p.rating);
+    g.trendId = id;
+    if (rec?.rating) {
+      const after = estimate(state.profile, { size, now });
+      g.ratingDelta = rec.rating.delta;
+      // The estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
+      g.ratingChange = ratingChange(before, after);
+      rated = rec.rating;
+    }
   }
-  saveToLibrary({ quiet: true });
-  if (g.ratingChange && g.recordId) Lib.patchGame(g.recordId, { rating: g.ratingChange });
-  // v5: a compact record for the trends view; the analysis fills it in.
-  if (rated) {
-    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.rank, won, rating: rated });
-    if (addGameRecord(state.progress, rec)) g.trendId = rec.id;
-  }
+  if (g.ratingChange && g.recordId) Games.patchGame(g.recordId, { rating: g.ratingChange });
   announce(resultText(result));
   update();
   // v7: a rated game gets its report in the background, so opening it is
@@ -701,12 +703,10 @@ function finishGame() {
   else if (autoReport) queueReport(g.recordId);
 }
 
-/** v7: the strength estimate before and after a rated game, as the report shows it. */
-export function ratingChange(before, after, now = Date.now()) {
-  const a = estimateNow(before, now);
-  const b = estimateNow(after, now);
-  if (!a || !b) return null;
-  return { before: { r: a.r, rank: a.rank, pm: a.pm }, after: { r: b.r, rank: b.rank, pm: b.pm } };
+/** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */
+export function ratingChange(before, after) {
+  if (!before || !after) return null;
+  return { before: { r: before.r, rank: before.rank, pm: before.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } };
 }
 
 /** The opponent's rank as a title shows it ("≈ 12 kyu"). */
@@ -787,50 +787,54 @@ async function summarizeAnalysis(g, recordId) {
 }
 
 /**
- * What a rated game teaches, from its whole-game analysis: the trend record
- * in progress.games (per-phase losses, themes, v7 plan themeLoss), the
- * weaknesses, and the two costliest mistakes as drills (ids
- * `${recordId}-${index}`). The post-game summary does it; when a new game
- * cancelled the summary, the game's background report does (report-ctl).
- * Once per record: the library record is marked `learned`. Returns false
+ * What a rated game teaches, from its whole-game analysis: the game's
+ * record in the player model (per-phase losses, themes and what each cost,
+ * model/player.js recordGame), and the two costliest mistakes as drills
+ * (ids `${gameId}-${index}`). The post-game summary does it; when a new
+ * game cancelled the summary, the game's background report does
+ * (report-ctl). Once per game: its file is marked `learned`. Returns false
  * when it was already done.
  */
 export function learnFromGame({ game, points, humanColor, recordId = null, trendId = recordId, mistakes = null }) {
-  const lib = recordId ? Lib.getGame(recordId) : null;
+  const lib = recordId ? Games.getGame(recordId) : null;
   if (lib?.learned) return false;
   mistakes = mistakes || describeMistakes(game, points, humanColor);
-  // v5: complete the game's trend record with per-phase losses and the
-  // themes of up to ten explained mistakes.
-  if (trendId && (state.progress.games || []).some((r) => r.id === String(trendId))) {
-    const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
-    const ten = describeMistakes(game, points, humanColor, 10).top;
-    const themes = themeCounts(ten, humanColor);
-    // v7 plan: also what each theme cost, for "this week's focus".
-    updateGameRecord(state.progress, trendId, { ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) }, { save: false });
-  }
-  // Record weaknesses and keep the two costliest mistakes as drills.
-  let weak = state.progress.weakness;
-  for (const m of mistakes.top) if (m.theme) weak = addWeakness(weak, m.theme);
-  state.progress.weakness = weak;
-  const key = recordId || String(Date.now());
-  const sgf = game.toSGF();
-  for (const m of mistakes.top.slice(0, 2)) {
-    if (m.loss < 4 || !m.best || m.best.pass) continue;
-    addMistake(state.progress, {
-      gameKey: key,
-      index: m.index,
-      sgf,
-      color: m.move.color,
-      played: { x: m.move.x, y: m.move.y },
-      best: { x: m.best.x, y: m.best.y },
-      accept: m.accept,
-      loss: m.loss,
-      theme: m.theme,
-      size: game.size,
-    });
-  }
-  saveProgress(state.progress);
-  if (lib) Lib.patchGame(recordId, { learned: true });
+  const now = Date.now();
+  changeProfile((profile) => {
+    let p = profile;
+    // Complete the game's record with per-phase losses and the themes of
+    // up to ten explained mistakes, and what each theme cost (the focus).
+    if (trendId && p.games.some((r) => r.id === String(trendId))) {
+      const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
+      const ten = describeMistakes(game, points, humanColor, 10).top;
+      const themes = themeCounts(ten, humanColor);
+      p = recordGame(p, { id: String(trendId), ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) });
+    }
+    // The two costliest mistakes become drills.
+    const gameId = recordId || String(now);
+    const sgf = game.toSGF();
+    for (const m of mistakes.top.slice(0, 2)) {
+      if (m.loss < 4 || !m.best || m.best.pass) continue;
+      p = addMistake(
+        p,
+        {
+          gameId,
+          index: m.index,
+          sgf,
+          color: m.move.color,
+          played: { x: m.move.x, y: m.move.y },
+          best: { x: m.best.x, y: m.best.y },
+          accept: m.accept,
+          loss: m.loss,
+          theme: m.theme,
+          size: game.size,
+        },
+        now,
+      );
+    }
+    return p;
+  });
+  if (lib) Games.patchGame(recordId, { learned: true });
   return true;
 }
 
@@ -886,7 +890,9 @@ export function continueCurrent() {
   remember();
   update((s) => {
     s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
     s.review = null;
+    s.report = null;
   });
   maybeComputerMove();
   ponder();

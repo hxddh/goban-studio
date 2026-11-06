@@ -5,8 +5,9 @@
  *   status   "analyzing" (our own whole-game pass), "waiting" (the post-game
  *            analysis of the game just played is still running; its
  *            progress is read from state.game.summary), "done", "missing"
- *   model    report-model.js buildReport(), also stored in the library
- *            record as rec.report so that reopening is instant.
+ *   model    report-model.js buildReport(), also stored in the game's own
+ *            file (data/games.js: its review, with the analysis it was
+ *            made from) so that reopening is instant.
  *
  * v7: every report analysis is a background job of the engine scheduler
  * (scheduler.js, queueReport), one per record. Who owns it decides what
@@ -21,13 +22,13 @@
  */
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
-import * as Lib from "../library.js";
+import * as Games from "../data/games.js";
+import { addMistake } from "../model/player.js";
 import * as Engine from "../engine.js";
 import { t } from "../i18n.js";
-import { addMistake, readJSON, removeKey, writeJSON } from "../persist.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast } from "./store.js";
-import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
+import { back, canGoBack, changeProfile, remember, isRestoring } from "./ctl-core.js";
 import { analyzeLine, openReview, reviewGoto } from "./review-ctl.js";
 import { learnFromGame, reviewCurrentGame, saveToLibrary } from "./play-ctl.js";
 import { openMistakeDrill } from "./practice-ctl.js";
@@ -65,59 +66,6 @@ export function reportJob(recordId) {
 /** A record whose stored report is current (an estimate is redone once KataGo is there). */
 function reportCurrent(rec, game) {
   return reportFits(rec.report, game) && !(rec.report.confidence !== "high" && state.engine.available);
-}
-
-/**
- * v8: a one-time check, a few games at a time when the app is idle, that
- * drops stored reports that no longer fit their game. Since v7 saving an
- * edit drops such a report, but one stored before v7 for a game edited
- * later stays, and wantsReport() (which does not parse the game) would skip
- * that game for ever. Resolves the number dropped; once it has finished it
- * is not run again (REPORTS_CHECKED_KEY).
- */
-export const REPORTS_CHECKED_KEY = "goban-studio.reportsChecked.v8";
-const idle = () =>
-  new Promise((resolve) => (typeof globalThis.requestIdleCallback === "function" ? globalThis.requestIdleCallback(() => resolve(), { timeout: 2000 }) : setTimeout(resolve, 0)));
-let staleCheck = null;
-export function dropStaleReports({ chunk = 10, wait = idle, force = false } = {}) {
-  if (staleCheck) return staleCheck;
-  if (!force && readJSON(REPORTS_CHECKED_KEY, null)) return Promise.resolve(0);
-  staleCheck = (async () => {
-    let dropped = 0;
-    const ids = Lib.listGames()
-      .filter((rec) => rec.report)
-      .map((rec) => rec.id);
-    for (let i = 0; i < ids.length; i += chunk) {
-      await wait();
-      // One read of the library per chunk; each game is checked and, if
-      // need be, patched without waiting in between (nothing can write it
-      // meanwhile).
-      const byId = new Map(Lib.listGames().map((rec) => [rec.id, rec]));
-      for (const id of ids.slice(i, i + chunk)) {
-        const rec = byId.get(id);
-        if (!rec?.report || jobs.has(id)) continue;
-        let game = null;
-        try {
-          game = loadSGF(rec.sgf).game;
-        } catch (_) {
-          continue;
-        }
-        if (reportFits(rec.report, game)) continue;
-        Lib.patchGame(id, { report: null });
-        dropped++;
-      }
-    }
-    writeJSON(REPORTS_CHECKED_KEY, { v: 1, at: Date.now(), dropped });
-    return dropped;
-  })().finally(() => {
-    staleCheck = null;
-  });
-  return staleCheck;
-}
-
-/** A restored backup may hold such reports again: check once more at the next launch. */
-export function forgetReportCheck() {
-  removeKey(REPORTS_CHECKED_KEY);
 }
 
 /** Cheap check without parsing the game: it may need a report. */
@@ -185,7 +133,7 @@ export function hasReport(rec) {
 }
 
 function recordOf(id) {
-  const rec = Lib.getGame(id);
+  const rec = Games.getGame(id);
   if (!rec) return null;
   try {
     return { rec, game: loadSGF(rec.sgf).game };
@@ -321,7 +269,7 @@ async function analyse(recordId, game, humanColor, job) {
   }
   // Store it with the game unless the record changed meanwhile.
   const now = recordOf(recordId);
-  if (now && reportFits(model, now.game)) Lib.patchGame(recordId, { report: model });
+  if (now && reportFits(model, now.game)) Games.patchGame(recordId, { report: model, analysis: points });
   // v7: a rated game whose post-game summary a new game cancelled: fill in
   // what the summary would have (trend record, weaknesses, drills), once.
   if (now?.rec.rating && humanColor != null && !now.rec.learned && points.every((p) => p?.source === "katago")) {
@@ -345,7 +293,7 @@ export function reportProgress() {
  */
 export function reportRating() {
   const r = state.report;
-  const rec = r && Lib.getGame(r.recordId);
+  const rec = r && Games.getGame(r.recordId);
   const rt = rec?.rating;
   return rt?.before && rt?.after && Number.isFinite(rt.before.rank) && Number.isFinite(rt.after.rank) ? rt : null;
 }
@@ -355,8 +303,6 @@ export function reportVisible() {
   const r = state.report;
   if (!r || r.space !== state.space) return false;
   if (state.review && (state.review.meta.space || "play") === state.space) return false;
-  // In Play the report belongs to the game that just ended.
-  if (r.space === "play" && state.game?.recordId !== r.recordId) return false;
   return true;
 }
 
@@ -386,7 +332,7 @@ export function restoreReport(loc) {
 export function openCurrentReport() {
   const g = state.game;
   if (!g) return;
-  if (!g.recordId || !Lib.getGame(g.recordId)) {
+  if (!g.recordId || !Games.getGame(g.recordId)) {
     // Saved quietly at the end of every game; save now if that failed.
     const rec = saveToLibrary({ quiet: true });
     if (rec) openReport(rec.id, { space: "play" });
@@ -407,7 +353,7 @@ export function openReportMove(index) {
     const found = recordOf(r.recordId);
     if (!found) return;
     const { rec, game } = found;
-    const points = analyses.get(r.recordId);
+    const points = analyses.get(r.recordId) || rec.analysis;
     openReview(game, {
       source: "record",
       recordId: rec.id,
@@ -449,15 +395,16 @@ export function setReportDrillColor(color) {
 export function reportPractice() {
   const r = state.report;
   if (!r?.model) return { add: [], have: [] };
-  const rec = Lib.getGame(r.recordId);
+  const rec = Games.getGame(r.recordId);
   if (!rec) return { add: [], have: [] };
-  return reportDrills(r.model, { sgf: rec.sgf, gameKey: rec.id, existing: state.progress.mistakes, color: reportDrillColor() });
+  return reportDrills(r.model, { sgf: rec.sgf, gameId: rec.id, existing: state.profile.mistakes, color: reportDrillColor() });
 }
 
 /** "Practise this game": add the worst mistakes as drills and start the first. */
 export function practiseReport() {
   const { add, have } = reportPractice();
-  for (const m of add) addMistake(state.progress, m);
+  const now = Date.now();
+  changeProfile((p) => add.reduce((q, m) => addMistake(q, m, now), p));
   const first = add[0]?.id || have[0];
   if (!first) return;
   if (add.length) toast(t("report.added", [add.length]));
@@ -475,7 +422,7 @@ export async function exportReportImage() {
   if (!r?.model) return;
   update({ menu: null });
   const { renderReportPNG } = await import("./report-draw.js");
-  const rec = Lib.getGame(r.recordId);
+  const rec = Games.getGame(r.recordId);
   const day = new Date(rec?.updatedAt || Date.now()).toISOString().slice(0, 10);
   const filename = `goban-studio-report-${day}.png`;
   const blob = await renderReportPNG(r.model, { date: rec?.updatedAt || r.model.at, rating: reportRating() });

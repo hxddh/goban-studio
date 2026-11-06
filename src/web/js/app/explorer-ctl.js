@@ -7,7 +7,7 @@
  * desktop app continues with live KataGo analysis; the browser preview says
  * the position is out of the book.
  *
- * The explorer's place in history is `state.library.explorer` (the mode, or
+ * The explorer's place in history is `state.play.explorer` (the mode, or
  * null), so back/forward in the toolbar work as on any other Library page.
  * The position itself lives in `state.explorer` and survives leaving.
  */
@@ -83,8 +83,8 @@ export function openExplorer(mode = "whole") {
   if (!EXPLORER_MODES.includes(mode)) mode = "whole";
   remember();
   update((s) => {
-    s.space = "library";
-    s.library = { ...s.library, tab: "explorer", explorer: mode };
+    s.space = "play";
+    s.play = { ...s.play, tab: "explorer", explorer: mode };
   });
   ensure(mode);
   refresh();
@@ -93,20 +93,20 @@ export function openExplorer(mode = "whole") {
 export function closeExplorer() {
   stopExplorerLive();
   remember();
-  update((s) => (s.library = { ...s.library, explorer: null }));
+  update((s) => (s.play = { ...s.play, explorer: null }));
 }
 
 /** The explorer state for the mode on screen (created on demand). */
 export function explorerState() {
-  const mode = state.library?.explorer;
+  const mode = state.play?.explorer;
   if (!mode) return null;
   return ensure(mode);
 }
 
 export function setExplorerMode(mode) {
-  if (!EXPLORER_MODES.includes(mode) || state.library.explorer === mode) return;
+  if (!EXPLORER_MODES.includes(mode) || state.play.explorer === mode) return;
   stopExplorerLive();
-  update((s) => (s.library = { ...s.library, explorer: mode }));
+  update((s) => (s.play = { ...s.play, explorer: mode }));
   ensure(mode);
   refresh();
 }

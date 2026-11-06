@@ -368,10 +368,10 @@ function SettingsSheet({ pane: open }) {
               </section>
               <section class="settings-group">
                 <h3>{t("settings.you")}</h3>
-                {state.progress.rating && (
+                {state.profile && (
                   <div class="row">
                     <span>{t("settings.estimated")}</span>
-                    <strong title={t("strength.about")}>{estimateLabel(state.progress.rating)}</strong>
+                    <strong title={t("strength.about")}>{estimateLabel(state.profile)}</strong>
                   </div>
                 )}
                 <div class="row">
@@ -645,7 +645,7 @@ function ShortcutsSheet() {
     [`${SHIFT}${MOD}H`, t("common.hint")],
     [`${MOD}.`, t("play.focus")],
     [`${MOD},`, t("nav.settings")],
-    [`${MOD}1 / 2 / 3 / 4`, `${t("nav.today")} / ${t("nav.play")} / ${t("nav.practice")} / ${t("nav.library")}`],
+    [`${MOD}1 / 2`, `${t("nav.play")} / ${t("nav.learn")}`],
     [`${MOD}[  ${MOD}]`, t("shortcuts.history")],
     ["← →", t("shortcuts.browse")],
     ["Enter", t("shortcuts.continue")],

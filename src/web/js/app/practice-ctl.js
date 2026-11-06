@@ -1,18 +1,18 @@
 /**
- * Practice: the course, problem topics, today's five (problems, your
- * own mistakes and your weak themes), and mistake drills.
+ * Learn: the course, problem topics, the path's problems (learnPath:
+ * reviews, the week's focus, new problems at your level) and drills of
+ * your own mistakes. Everything the learner does is recorded in the one
+ * player model (model/player.js) through changeProfile.
  */
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { currentStreak, dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
+import { THEME_TOPIC, learnPath as pathOf, nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem, taughtPool } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
-import { remember, isRestoring } from "./ctl-core.js";
-import { topWeaknesses, THEME_TOPIC } from "./insight.js";
-import { pickNextLesson } from "./course-path.js";
+import { changeProfile, isRestoring, playerEstimate, remember } from "./ctl-core.js";
 
 export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
@@ -36,11 +36,23 @@ export function allLessons() {
  * through the intermediate course finishes it first.
  */
 export function nextLesson() {
-  return pickNextLesson(allLessons(), (id) => !!state.progress.lessons[id]?.done, {
+  const est = playerEstimate();
+  return pickNextLesson(allLessons(), (id) => !!state.profile.lessons[id]?.done, {
     experience: state.settings.experience,
     playerRank: state.settings.playerRank,
-    rating: state.progress.rating?.r,
+    rating: est.games > 0 ? est.r : null,
   });
+}
+
+/**
+ * Learn's one ordered list (model/player.js learnPath): the next lesson,
+ * the beginner bridges while they apply, then the problems and drills of
+ * the day. Items: { kind: "lesson" | "capture" | "game" | "mistake" |
+ * "problem", id?, unit?, role, why?, game? }.
+ */
+export function learnPath(now = Date.now()) {
+  const s = state.settings;
+  return pathOf(state.profile, { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: s.experience, playerRank: s.playerRank }, captureWins: s.captureWins || 0 }, now);
 }
 
 /** The unit that teaches a topic, for weakness-driven recommendations. */
@@ -141,51 +153,50 @@ function showLesson(lessonId, stepIndex) {
   const found = allLessons().find((l) => l.lesson.id === lessonId);
   if (!found) return;
   if (!isRestoring()) remember();
-  const saved = state.progress.lessons[lessonId];
+  const saved = state.profile.lessons[lessonId];
   const index = stepIndex ?? (saved && !saved.done ? Math.min(saved.step || 0, found.lesson.steps.length - 1) : 0);
   // v8: back to a finished lesson (from the game it led to) shows its lesson-complete page.
   if (index >= found.lesson.steps.length) {
     update((s) => {
-      s.space = "practice";
-      s.practice = { ...s.practice, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: null, finished: true }, problem: null, mistake: null, daily: null };
+      s.space = "learn";
+      s.learn = { ...s.learn, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: null, finished: true }, problem: null, mistake: null, daily: null };
     });
     return;
   }
   const step = found.lesson.steps[index];
   if (step?.kind === "place") step.board = { ...step.board, accept: step.accept };
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: buildStep(step) }, problem: null, mistake: null, daily: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: buildStep(step) }, problem: null, mistake: null, daily: null };
   });
 }
 
 let autoTimer = 0;
 function scheduleAutoContinue() {
   clearTimeout(autoTimer);
-  const L = state.practice.lesson;
+  const L = state.learn.lesson;
   if (!L) return;
   const index = L.index;
   autoTimer = setTimeout(() => {
-    const now = state.practice.lesson;
-    if (state.practice.view === "lesson" && now === L && now.index === index && !now.finished) lessonContinue();
+    const now = state.learn.lesson;
+    if (state.learn.view === "lesson" && now === L && now.index === index && !now.finished) lessonContinue();
   }, 1500);
 }
 
 export function lessonContinue() {
   clearTimeout(autoTimer);
-  const L = state.practice.lesson;
+  const L = state.learn.lesson;
   if (!L) return;
   const next = L.index + 1;
   if (next >= L.lesson.steps.length) {
-    markLesson(state.progress, L.lesson.id, { done: true, step: next });
-    touchStreak(state.progress);
+    changeProfile((p) => recordLesson(p, L.lesson.id, { done: true, step: next }, Date.now()));
     Audio.win();
     update((s) => {
-      s.practice.lesson = { ...L, index: next, cur: null, finished: true };
+      s.learn.lesson = { ...L, index: next, cur: null, finished: true };
     });
     return;
   }
-  markLesson(state.progress, L.lesson.id, { step: next });
+  changeProfile((p) => recordLesson(p, L.lesson.id, { step: next }, Date.now()));
   L.index = next;
   const step = L.lesson.steps[next];
   if (step?.kind === "place") step.board = { ...step.board, accept: step.accept };
@@ -195,7 +206,7 @@ export function lessonContinue() {
 
 export function lessonBack() {
   clearTimeout(autoTimer);
-  const L = state.practice.lesson;
+  const L = state.learn.lesson;
   if (!L || L.index === 0) return;
   L.index -= 1;
   L.cur = buildStep(L.lesson.steps[L.index]);
@@ -206,15 +217,16 @@ export function lessonBack() {
 export function openNextLesson() {
   const n = nextLesson();
   if (n) openLesson(n.lesson.id);
-  else practiceHome();
+  else learnHome();
 }
 
-export function practiceHome() {
+/** Learn's home: the path, then the catalog. */
+export function learnHome() {
   clearTimeout(autoTimer);
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "home", lesson: null, problem: null, daily: null, topic: null, mistake: null, theme: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "home", lesson: null, problem: null, daily: null, topic: null, mistake: null, theme: null };
   });
 }
 
@@ -225,8 +237,8 @@ export function openTopic(topic, theme = null) {
 function showTopic(topic, theme) {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "topic", topic, theme, shape: null, problem: null, daily: null, mistake: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "topic", topic, theme, shape: null, problem: null, daily: null, mistake: null };
   });
 }
 
@@ -238,8 +250,8 @@ export function openShape(shape) {
 function showShape(shape) {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "topic", topic: "shapes", shape, theme: null, problem: null, daily: null, mistake: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "topic", topic: "shapes", shape, theme: null, problem: null, daily: null, mistake: null };
   });
 }
 
@@ -279,106 +291,83 @@ function showProblem(id, daily) {
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.practice.topic : p.topic };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.learn.topic : p.topic };
   });
 }
 
 /** The list a problem is browsed in: its theme or topic. */
 function browseList(def) {
-  return state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(def.topic);
+  return state.learn.theme ? problemsOfTheme(state.learn.theme) : problemsOfTopic(def.topic);
 }
 
-/* ------------------------------------------------------------- daily */
+/* ------------------------------------------------------ the day's problems */
 
 /**
- * Today's five: mistakes from your own games that are due, then problems on
- * your weakest theme, then due reviews and new problems at your level.
- */
-const GOAL_TOPICS = { capture: ["capture"], save: ["escape", "connect"], live: ["life"], kill: ["kill"] };
-
-/**
- * New problems for today's five. Someone still working through the
+ * New problems a player may be given: someone still working through the
  * beginner units only gets topics their finished lessons have taught
- * (capturing from the start), so a beginner is never handed a vital-point
- * kill on day two. The intermediate units do not count here: finishing the
- * beginner units opens the whole problem bank.
+ * (model/player.js taughtPool).
  */
 export function dailyPool() {
-  const p = state.progress;
-  const lessons = allLessons().filter(({ unit }) => !unit.level);
-  const done = lessons.filter(({ lesson }) => p.lessons[lesson.id]?.done);
-  const beginner = state.settings.experience === "new" || (state.settings.playerRank ?? 30) >= 25;
-  if (!beginner || done.length >= lessons.length) return PROBLEMS;
-  const topics = new Set(["capture"]);
-  for (const { lesson } of done) for (const st of lesson.steps || []) for (const tp of GOAL_TOPICS[st.problem?.goal] || []) topics.add(tp);
-  if (done.length >= lessons.length * 0.75) topics.add("race").add("technique");
-  const pool = PROBLEMS.filter((x) => topics.has(x.topic));
-  return pool.length >= 5 ? pool : PROBLEMS;
+  const s = state.settings;
+  return taughtPool(state.profile, { course: COURSE, problems: PROBLEMS, settings: { experience: s.experience, playerRank: s.playerRank } });
 }
 
 /**
- * v7: the training plan (plan-ctl.js) may choose today's five. It is called
- * with { progress, pool, grades, now } and returns items, or null to leave
- * the choice below (players without enough evidence).
+ * The problems and drills of the path, solved one after another: { date,
+ * items: [{ kind: "p" | "m", id, why? }], index, done: [id] }. It is the
+ * path's own list (learnPath, stable for a day), kept in memory for the day.
  */
-let dailyPlanner = null;
-export function setDailyPlanner(fn) {
-  dailyPlanner = typeof fn === "function" ? fn : null;
-}
+let session = null;
+
+const dayOf = (now) => {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
 
 export function buildDaily(now = Date.now()) {
-  const p = state.progress;
-  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now }) : null;
-  if (Array.isArray(planned) && planned.length) return planned;
   const items = [];
-  const due = p.mistakes.filter((m) => (m.due || 0) <= now).slice(0, 2);
-  for (const m of due) items.push({ kind: "m", id: m.id });
-  const weak = topWeaknesses(p.weakness, 1)[0];
-  if (weak) {
-    const pool = problemsOfTheme(weak.theme).filter((x) => !p.problems[x.id]?.solved);
-    for (const x of pool.slice(0, 2)) if (items.length < 4) items.push({ kind: "p", id: x.id, why: weak.theme });
+  for (const it of learnPath(now)) {
+    if (it.kind === "mistake") items.push({ kind: "m", id: it.id, ...(it.why ? { why: it.why } : {}) });
+    else if (it.kind === "problem") items.push({ kind: "p", id: it.id, ...(it.why ? { why: it.why } : {}) });
   }
-  const rest = dailySet(p, dailyPool().filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
-  for (const x of rest) items.push({ kind: "p", id: x.id });
-  return items.slice(0, 5);
+  return items;
 }
 
-/** v8: the practice streak as it stands today (0 once it is broken). */
-export function streakNow(now = Date.now()) {
-  return currentStreak(state.progress, now);
-}
-
-export function todaysDaily() {
-  const d = state.progress.daily;
-  if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
-  // A saved set may name a problem a later version removed: drop it, and
-  // keep the position in the set on the item the learner was at.
-  // v8: a drill can go too (only the newest 200 are kept).
-  const known = (it) => (it?.kind === "m" ? state.progress.mistakes.some((m) => m.id === it.id) : it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id));
+/** Today's session as it stands, or null before it starts (or when nothing is left of it). */
+export function todaysDaily(now = Date.now()) {
+  const d = session;
+  if (!d || d.date !== dayOf(now)) return null;
+  const known = (it) => (it.kind === "m" ? state.profile.mistakes.some((m) => m.id === it.id) : PROBLEMS.some((x) => x.id === it.id));
   if (!d.items.every(known)) {
-    const before = d.items.slice(0, d.index || 0).filter(known).length;
+    const before = d.items.slice(0, d.index).filter(known).length;
     d.items = d.items.filter(known);
     d.index = Math.min(d.items.length, before);
-    if (Array.isArray(d.done)) d.done = d.done.filter((id) => d.items.some((it) => it.id === id));
+    d.done = d.done.filter((id) => d.items.some((it) => it.id === id));
     if (!d.items.length) return null;
   }
   return d;
 }
 
 export function startDaily() {
-  // The beginner pool reads the finished lessons' steps (dailyPool).
+  // The beginner pool reads the finished lessons' steps (taughtPool).
   return withContent("course", () => withContent("problems", showDaily));
 }
 
-function showDaily() {
+/** One problem or drill of the path, opened as part of the day's session. */
+export function openPathItem(id) {
+  return withContent("course", () => withContent("problems", () => showDaily(id)));
+}
+
+function showDaily(id = null) {
   let daily = todaysDaily();
-  if (!daily) {
-    daily = { date: todayKey(), items: buildDaily(), index: 0, done: [] };
-    state.progress.daily = daily;
-    saveProgress(state.progress);
+  if (!daily || (id && !daily.items.some((it) => it.id === id))) {
+    const items = buildDaily();
+    if (!items.length) return learnHome();
+    daily = session = { date: dayOf(Date.now()), items, index: 0, done: daily?.done || [] };
   }
-  if (daily.index >= daily.items.length) return practiceHome();
+  if (id) daily.index = Math.max(0, daily.items.findIndex((it) => it.id === id));
+  if (daily.index >= daily.items.length) return learnHome();
   if (!isRestoring()) remember();
   openDailyItem(daily);
 }
@@ -392,17 +381,17 @@ function openDailyItem(daily) {
 /* ---------------------------------------------------------- problems */
 
 function currentProblem() {
-  const v = state.practice.view;
-  if (v === "problem") return state.practice.problem;
-  if (v === "lesson" && state.practice.lesson?.cur?.kind === "problem") return state.practice.lesson.cur;
+  const v = state.learn.view;
+  if (v === "problem") return state.learn.problem;
+  if (v === "lesson" && state.learn.lesson?.cur?.kind === "problem") return state.learn.lesson.cur;
   return null;
 }
 
 /** The learner clicks a point in practice. */
 export function practicePlay(x, y) {
-  const v = state.practice.view;
+  const v = state.learn.view;
   if (v === "mistake") return mistakePlay(x, y);
-  if (v === "lesson" && state.practice.lesson?.cur?.kind === "place") return placePlay(x, y);
+  if (v === "lesson" && state.learn.lesson?.cur?.kind === "place") return placePlay(x, y);
   const P = currentProblem();
   if (!P || P.busy || P.status !== "open" || P.answer) return;
   const pz = P.pz;
@@ -581,7 +570,7 @@ function finishProblem(P) {
   recordAttempt(P, true);
   announce(t(feedbackKey(P), endgameArgs(P)));
   update();
-  if (state.practice.view === "lesson" && state.practice.lesson?.cur === P) scheduleAutoContinue();
+  if (state.learn.view === "lesson" && state.learn.lesson?.cur === P) scheduleAutoContinue();
 }
 
 /**
@@ -593,10 +582,11 @@ function recordAttempt(P, solved) {
   if (P.recorded === "solved" || (P.recorded && !solved)) return;
   const first = !P.recorded;
   P.recorded = solved ? "solved" : "miss";
-  if (state.practice.view === "problem" && P.def) {
-    if (first) markProblem(state.progress, P.def.id, { solved, clean: solved && !P.used });
-    else markSolvedLate(state.progress, P.def.id);
-    const d = state.practice.daily;
+  if (state.learn.view === "problem" && P.def) {
+    const now = Date.now();
+    if (first) changeProfile((p) => recordProblem(p, P.def.id, { solved, clean: solved && !P.used }, now));
+    else changeProfile((p) => recordProblem(p, P.def.id, { late: true }, now));
+    const d = state.learn.daily;
     if (d && solved && !d.done.includes(P.def.id)) d.done.push(P.def.id);
   }
 }
@@ -647,14 +637,11 @@ export function showAnswer() {
 }
 
 function advanceDaily() {
-  const d = state.practice.daily;
+  const d = state.learn.daily;
   d.index = Math.min(d.items.length, d.index + 1);
-  state.progress.daily = d;
-  saveProgress(state.progress);
   if (d.index >= d.items.length) {
-    touchStreak(state.progress);
     update((s) => {
-      s.practice = { ...s.practice, view: "dailyDone", problem: null, mistake: null };
+      s.learn = { ...s.learn, view: "dailyDone", problem: null, mistake: null };
     });
     return;
   }
@@ -662,24 +649,24 @@ function advanceDaily() {
 }
 
 export function nextProblem() {
-  if (state.practice.daily) return advanceDaily();
-  const P = state.practice.problem;
+  if (state.learn.daily) return advanceDaily();
+  const P = state.learn.problem;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i >= 0 && i + 1 < list.length) openProblem(list[i + 1].id);
-  else openTopic(P.def.topic, state.practice.theme);
+  else openTopic(P.def.topic, state.learn.theme);
 }
 
 export function prevProblem() {
-  const P = state.practice.problem;
-  if (!P || state.practice.daily) return;
+  const P = state.learn.problem;
+  if (!P || state.learn.daily) return;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i > 0) openProblem(list[i - 1].id);
 }
 
 function placePlay(x, y) {
-  const C = state.practice.lesson.cur;
+  const C = state.learn.lesson.cur;
   if (C.result === "right") return;
   const ox = C.pz.x0;
   const oy = C.pz.y0;
@@ -715,7 +702,7 @@ export function goalText(pz) {
 
 /** Open one of your own mistakes as a "find the better move" drill. */
 export function openMistakeDrill(id, { daily = null } = {}) {
-  const m = state.progress.mistakes.find((x) => x.id === id);
+  const m = state.profile.mistakes.find((x) => x.id === id);
   if (!m) return;
   let game;
   try {
@@ -728,13 +715,13 @@ export function openMistakeDrill(id, { daily = null } = {}) {
   game.goto(line[Math.max(0, m.index - 1)].id);
   if (!isRestoring() && !daily) remember();
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "mistake", mistake: { m, game, status: "open", tries: 0, last: null, revealed: false }, problem: null, daily: daily || null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "mistake", mistake: { m, game, status: "open", tries: 0, last: null, revealed: false }, problem: null, daily: daily || null };
   });
 }
 
 function mistakePlay(x, y) {
-  const D = state.practice.mistake;
+  const D = state.learn.mistake;
   if (!D || D.status === "right") return;
   if (!D.game.canPlay(x, y).ok) {
     toast(t("error.illegal"), "warn");
@@ -747,8 +734,8 @@ function mistakePlay(x, y) {
     D.status = "right";
     Audio.stone(false);
     Audio.correct?.();
-    markMistake(state.progress, D.m.id, { solved: D.tries === 1 && !D.revealed });
-    const d = state.practice.daily;
+    changeProfile((p) => recordMistake(p, D.m.id, { solved: D.tries === 1 && !D.revealed }, Date.now()));
+    const d = state.learn.daily;
     if (d && !d.done.includes(D.m.id)) d.done.push(D.m.id);
   } else {
     D.status = x === D.m.played.x && y === D.m.played.y ? "same" : "wrong";
@@ -758,17 +745,17 @@ function mistakePlay(x, y) {
 }
 
 export function revealMistake() {
-  const D = state.practice.mistake;
+  const D = state.learn.mistake;
   if (!D) return;
   D.revealed = true;
   D.status = "revealed";
-  markMistake(state.progress, D.m.id, { solved: false });
+  changeProfile((p) => recordMistake(p, D.m.id, { solved: false }, Date.now()));
   update();
 }
 
 export function nextAfterMistake() {
-  if (state.practice.daily) return advanceDaily();
-  practiceHome();
+  if (state.learn.daily) return advanceDaily();
+  learnHome();
 }
 
 export function mistakeTopic(m) {

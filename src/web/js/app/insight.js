@@ -362,45 +362,8 @@ export function classifyMistake({ signMapBefore, signMapAfter = null, move, pv =
   return null;
 }
 
-/** Problem topic (practice collection) for a theme, to recommend a set. */
-export const THEME_TOPIC = {
-  ladder: "capture",
-  net: "capture",
-  snapback: "capture",
-  "throw-in": "capture",
-  "double-atari": "capture",
-  shortage: "capture",
-  "connect-and-die": "capture",
-  cut: "connect",
-  "vital-point": "kill",
-  "eye-space": "life",
-  "false-eye": "kill",
-  ko: "life",
-  "race-outside": "race",
-  "race-shared": "race",
-};
-
-/** Decay old weaknesses so the recommendation follows recent games. */
-export function addWeakness(weak = {}, theme, now = Date.now()) {
-  const out = {};
-  for (const [k, v] of Object.entries(weak)) {
-    const ageDays = (now - (v.last || now)) / 86400000;
-    const score = v.score * Math.pow(0.5, ageDays / 21);
-    if (score > 0.05) out[k] = { ...v, score };
-  }
-  if (theme) {
-    const prev = out[theme] || { score: 0, count: 0 };
-    out[theme] = { score: prev.score + 1, count: (prev.count || 0) + 1, last: now };
-  }
-  return out;
-}
-
-export function topWeaknesses(weak = {}, n = 2) {
-  return Object.entries(weak)
-    .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, n)
-    .map(([theme, v]) => ({ theme, ...v }));
-}
+/** Mistake themes → the problem topic that teaches them (one table, in the player model). */
+export { THEME_TOPIC } from "../model/player.js";
 
 /** How hard the position looks: drives the computer's thinking time. */
 export function complexity(analysis) {

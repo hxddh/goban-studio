@@ -180,17 +180,17 @@ export function drillMoments(report, max = MAX_DRILLS, color = null) {
 }
 
 /**
- * The mistake drills (persist.addMistake entries) for a report, split into
+ * The mistake drills (model/player.js addMistake entries) for a report, split into
  * the ones to add and the ids of the ones already there. A drill is the
- * same when it has the same id (`gameKey-index`, as play-ctl and review-ctl
+ * same when it has the same id (`gameId-index`, as play-ctl and review-ctl
  * build it) or the same position (same SGF and move index) under another
  * key, so a game drilled from the review is not added twice.
  */
-export function reportDrills(report, { sgf, gameKey, existing = [], color = null }) {
+export function reportDrills(report, { sgf, gameId, existing = [], color = null }) {
   const add = [];
   const have = [];
   for (const mo of drillMoments(report, MAX_DRILLS, color)) {
-    const id = `${gameKey}-${mo.index}`;
+    const id = `${gameId}-${mo.index}`;
     const same = existing.find((m) => m.id === id || (m.index === mo.index && m.sgf === sgf));
     if (same) {
       have.push(same.id);
@@ -198,7 +198,7 @@ export function reportDrills(report, { sgf, gameKey, existing = [], color = null
     }
     add.push({
       id,
-      gameKey,
+      gameId,
       index: mo.index,
       sgf,
       color: mo.color,

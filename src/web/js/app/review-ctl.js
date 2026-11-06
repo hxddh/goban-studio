@@ -6,17 +6,19 @@
  * v5: a whole-game summary by phase (review.summary, see summary.js), the
  * trends across rated games, and editing the record itself: comments,
  * marks, deleting and promoting variations, and a layout of the game tree.
- * Edits to a saved game are written back to its library record.
+ * Edits to a saved game are written back to its file (data/games.js).
  */
 import { Game, influenceMap, MARK_KINDS, treeLayout as layoutTree } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
-import { addMistake } from "../persist.js";
-import * as Lib from "../library.js";
+import * as Games from "../data/games.js";
+import { store } from "../data/store.js";
+import { saveSettings } from "../data/settings.js";
+import { addMistake } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { state, update, toast } from "./store.js";
-import { back, canGoBack, remember, isRestoring } from "./ctl-core.js";
+import { back, canGoBack, changeProfile, remember, isRestoring } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
 import { summarizeGame, trends } from "./summary.js";
 import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
@@ -402,12 +404,12 @@ export function reviewSummary() {
 
 /** Trends across the last `n` rated games (summary.js trends). */
 export function gameTrends(n = 10) {
-  return trends(state.progress, { n });
+  return trends(state.profile, { n });
 }
 
 /* ------------------------------------------ v5: editing the record */
 
-/** Where edits are saved: "record" (library), "current" (the game in play) or null (kept in memory only: classics). */
+/** Where edits are saved: "record" (its file), "current" (the game in play) or null (kept in memory only: classics). */
 function editTarget(r) {
   if (r.source === "record" && r.meta.recordId) return "record";
   if (r.source === "current" && state.game?.game === r.game) return "current";
@@ -430,15 +432,12 @@ function edited(r, { mainBefore = null } = {}) {
  * Save edited moves to a record, where it is in the list (an edit is not a
  * new game). A stored report of other moves (a variation promoted, moves
  * deleted) is dropped, so a new one is made; comments and marks keep it.
- * Returns false when it could not be written (storage full).
+ * Its stored analysis goes with it unless it is of these very moves.
  */
 function saveRecord(id, game) {
-  const rec = Lib.saveGame(game, { id, keepPlace: true });
-  if (!rec) {
-    toast(t("toast.saveFailed"), "error");
-    return false;
-  }
-  if (rec.report && !reportFits(rec.report, game)) Lib.patchGame(id, { report: null });
+  const rec = Games.saveGame(game, { id, keepPlace: true });
+  if (rec.report && !reportFits(rec.report, game)) Games.patchGame(id, { report: null, analysis: null });
+  else if (rec.analysis && rec.analysis.length !== game.mainLine().length) Games.patchGame(id, { analysis: null });
   return true;
 }
 
@@ -451,7 +450,7 @@ export function saveEdits(r = state.review) {
   if (!r?.edits?.dirty) return false;
   const target = editTarget(r);
   if (target === "record") {
-    if (!Lib.getGame(r.meta.recordId)) return false;
+    if (!Games.getGame(r.meta.recordId)) return false;
     if (!saveRecord(r.meta.recordId, r.game)) return false;
   } else if (target === "current") {
     // v8: moves tried from where the game in play stands are not saved
@@ -461,7 +460,7 @@ export function saveEdits(r = state.review) {
     if (at) at.end.children = all.filter((c) => at.kids.includes(c));
     try {
       persistCurrent();
-      if (state.game.recordId && Lib.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
+      if (state.game.recordId && Games.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
     } finally {
       if (at) at.end.children = all;
     }
@@ -631,7 +630,7 @@ export function startLive() {
 export function toggleLive() {
   const on = !state.settings.liveAnalysis;
   state.settings = { ...state.settings, liveAnalysis: on };
-  import("../persist.js").then((m) => m.saveSettings(state.settings));
+  saveSettings(store, state.settings);
   if (on) startLive();
   else {
     stopLive();
@@ -731,13 +730,21 @@ export function focusMistake(km) {
   else showVariation(km, "played");
 }
 
-/** Turn a key mistake into a drill and start it. */
+/**
+ * Turn a key mistake into a drill and start it. Drills come from your own
+ * games only (model/player.js addMistake): none from a classic.
+ */
+export function canPractiseThis(km) {
+  const r = state.review;
+  return !!r && !r.meta.classicId && !!km?.best && !km.best.pass;
+}
+
 export function practiceThis(km) {
   const r = state.review;
-  if (!r || !km.best || km.best.pass) return;
-  const key = r.meta.recordId || r.meta.classicId || "game-" + r.game.root.id;
+  if (!canPractiseThis(km)) return;
+  const key = r.meta.recordId || "game-" + r.game.root.id;
   const m = {
-    gameKey: key,
+    gameId: key,
     index: km.index,
     sgf: r.game.toSGF(),
     color: km.move.color,
@@ -747,13 +754,10 @@ export function practiceThis(km) {
     loss: km.loss,
     theme: km.theme,
     size: r.game.size,
-    // v8: a drill from a classic game is not the player's own mistake;
-    // the training plan leaves it out of the weak themes.
-    ...(r.meta.classicId ? { own: false } : {}),
   };
-  addMistake(state.progress, m);
-  const id = `${key}-${km.index}`;
-  openMistakeDrill(id);
+  changeProfile((p) => addMistake(p, m, Date.now()));
+  const drill = state.profile.mistakes.find((x) => x.gameId === key && x.index === km.index);
+  if (drill) openMistakeDrill(drill.id);
 }
 
 /* ---------------------------------------------------- play from here */

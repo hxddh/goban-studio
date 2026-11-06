@@ -14,20 +14,23 @@
  *
  * state.batch = { ids, done, total, current } while it runs, else null.
  */
-import * as Lib from "../library.js";
+import * as Games from "../data/games.js";
 import * as Engine from "../engine.js";
-import { readJSON, writeJSON, removeKey } from "../persist.js";
+import { store } from "../data/store.js";
 import { t } from "../i18n.js";
 import { state, update, toast } from "./store.js";
-import { dropStaleReports, queueReport, reportJob, wantsReport } from "./report-ctl.js";
+import { queueReport, reportJob, wantsReport } from "./report-ctl.js";
 
-export const BATCH_KEY = "goban-studio.batch.v7";
+/** The games still to do, in the store (data/store.js). */
+export const BATCH_KEY = "batch.json";
+const saveBatch = (ids) => store.put(BATCH_KEY, { ids });
+const clearBatch = () => store.has(BATCH_KEY) && store.remove(BATCH_KEY);
 const OWNER = "batch";
 
 let job = null;
 
 /** The player's games that need a report, newest first. */
-export function batchCandidates(games = Lib.listGames()) {
+export function batchCandidates(games = Games.listGames()) {
   return games.filter((rec) => wantsReport(rec)).map((rec) => rec.id);
 }
 
@@ -39,12 +42,12 @@ export function batchState() {
 /** "Analyse all": start (or resume) the batch. */
 export function analyseAll({ ids = null } = {}) {
   if (job && !job.signal.aborted) return job;
-  const todo = (ids || batchCandidates()).filter((id) => Lib.getGame(id));
+  const todo = (ids || batchCandidates()).filter((id) => Games.getGame(id));
   if (!todo.length) {
-    removeKey(BATCH_KEY);
+    clearBatch();
     return null;
   }
-  writeJSON(BATCH_KEY, { v: 1, ids: todo });
+  saveBatch(todo);
   const b = { ids: todo.slice(), done: 0, total: todo.length, current: null };
   state.batch = b;
   job = Engine.sched.startJob({
@@ -88,16 +91,16 @@ async function runBatch(me, b) {
     b.ids.shift();
     b.done++;
     b.current = null;
-    if (b.ids.length) writeJSON(BATCH_KEY, { v: 1, ids: b.ids });
-    else removeKey(BATCH_KEY);
+    if (b.ids.length) saveBatch(b.ids);
+    else clearBatch();
     update();
   }
   if (me.signal.aborted) {
     // Quitting keeps the rest for the next launch; a cancel forgets it.
-    if (me.signal.reason !== "quit") removeKey(BATCH_KEY);
+    if (me.signal.reason !== "quit") clearBatch();
     return null;
   }
-  removeKey(BATCH_KEY);
+  clearBatch();
   return b.done;
 }
 
@@ -108,15 +111,15 @@ export function cancelBatch() {
 
 /** At launch: carry on with a batch that quitting interrupted. */
 export function resumeBatch() {
-  const saved = readJSON(BATCH_KEY, null);
+  const saved = store.get(BATCH_KEY);
   const ids = Array.isArray(saved?.ids) ? saved.ids.filter((id) => typeof id === "string") : [];
   if (!ids.length) return null;
   const rest = ids.filter((id) => {
-    const rec = Lib.getGame(id);
+    const rec = Games.getGame(id);
     return rec && wantsReport(rec);
   });
   if (!rest.length) {
-    removeKey(BATCH_KEY);
+    clearBatch();
     return null;
   }
   return analyseAll({ ids: rest });
@@ -127,10 +130,8 @@ export function resumeBatch() {
  * reports of recent rated games that quitting interrupted.
  */
 export function resumeBackground() {
-  // v8: reports stored before v7 for games edited since (at idle, once).
-  dropStaleReports().catch(() => {});
   resumeBatch();
-  for (const rec of Lib.listGames().slice(0, 20)) if (rec.rating && wantsReport(rec)) queueReport(rec.id);
+  for (const rec of Games.listGames().slice(0, 20)) if (rec.rating && wantsReport(rec)) queueReport(rec.id);
   clearTimeout(autoTimer);
   autoTimer = setTimeout(() => autoAnalyse(), AUTO_DELAY_MS);
 }
@@ -147,7 +148,7 @@ let autoTimer = null;
 export function autoAnalyse({ offline = false } = {}) {
   if (!state.engine?.available && !offline) return null;
   if (job && !job.signal.aborted) return job;
-  const ids = batchCandidates().filter((id) => Lib.getGame(id)?.source === "game");
+  const ids = batchCandidates().filter((id) => Games.getGame(id)?.source === "game");
   return ids.length ? analyseAll({ ids }) : null;
 }
 
