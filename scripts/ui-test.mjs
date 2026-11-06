@@ -625,6 +625,9 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
   // A segmented control (New game: the opponent).
   await page.keyboard.press("Control+n");
   await page.waitForSelector(".sheet .segmented");
+  // The sheet gives itself its first focus after it mounts; let that happen first.
+  await page.waitForFunction(() => document.querySelector(".sheet")?.contains(document.activeElement), null, { timeout: 2000 });
+  await page.waitForTimeout(100);
   const checked = () => page.evaluate(() => [...document.querySelectorAll(".sheet .segmented")[0].querySelectorAll("[role=radio]")].findIndex((b) => b.getAttribute("aria-checked") === "true"));
   const was = await checked();
   await page.focus(".sheet .segmented button[aria-checked=true]");
