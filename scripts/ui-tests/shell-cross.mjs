@@ -1,15 +1,15 @@
 /**
- * v7 cross checks (runs after every area's own checks): the places and
- * pages added since v5 combined with what came before them — the
- * accessibility audit, all four languages, larger text and dark mode — so
- * one feature cannot quietly break another (the v6 problem window and the
- * screen-reader keys were such a pair).
+ * Shell cross checks: every page of both spaces combined with what applies
+ * to all of them — the accessibility audit, all four languages, larger
+ * text and dark mode — so one feature cannot quietly break another (the
+ * problem window and the screen-reader keys were such a pair).
  *
- * For each combination it visits Today, Practice home, a problem, Library,
- * the explorer (both modes), a classic in review (every tab), a game
- * report, and every Settings pane, and checks: the audit, no raw string
- * keys on screen, no clipped buttons, no horizontal page overflow, at most
- * one primary button, no page errors.
+ * For each combination it visits Play's home, Learn's home (the path and
+ * the catalog), a problem, the history of games, the explorer (both
+ * modes), a classic in review (every tab), a game report, and every
+ * Settings pane, and checks: the audit, no raw string keys on screen, no
+ * clipped buttons, no horizontal page overflow, at most one primary
+ * button, no page errors.
  */
 import { MESSAGES } from "../../src/web/js/messages.js";
 
@@ -47,24 +47,26 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
   }
 
   for (const c of combos) {
-    await check(`v7 cross: new places with audit, ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""}`, async () => {
+    await check(`shell cross: both spaces with audit, ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""}`, async () => {
       const page = await fresh(c.locale);
       await page.emulateMedia({ colorScheme: c.scheme });
       await onboard(page, 1);
       if (c.large) await page.keyboard.press("Control+Equal");
 
+      await inspect(page, "the board");
       await page.keyboard.press("Control+1");
-      await inspect(page, "today");
-      await page.keyboard.press("Control+3");
-      await inspect(page, "practice");
+      await inspect(page, "Play's home");
+      await page.keyboard.press("Control+2");
+      await page.waitForSelector(".learn-path");
+      await inspect(page, "Learn's home");
       await page.click(".topic-card >> nth=0");
       await page.click(".problem-card >> nth=0");
-      await page.waitForFunction(() => window.__state.practice.view === "problem");
+      await page.waitForFunction(() => window.__state.learn.view === "problem");
       await inspect(page, "problem");
 
-      // Library tabs, the explorer in both modes, a classic in review.
-      await page.keyboard.press("Control+4");
-      await inspect(page, "library");
+      // Play's tabs, the explorer in both modes, a classic in review.
+      await page.keyboard.press("Control+1");
+      await inspect(page, "Play's home again");
       const tabs = await page.locator(".tabs-row .segmented button").count();
       await page.click(`.tabs-row .segmented button >> nth=${tabs - 1}`);
       await page.waitForSelector(".collection-row[data-explorer]");
@@ -104,7 +106,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.click(".score-card .btn.primary");
       await page.waitForSelector(".result-card");
       await inspect(page, "result");
-      await page.keyboard.press("Control+4");
+      await page.keyboard.press("Control+1");
       await page.click(".tabs-row .segmented button >> nth=0");
       await page.waitForSelector(".page .menu-wrap");
       await page.click(".page .menu-wrap > button >> nth=0");

@@ -1,5 +1,5 @@
 /**
- * v7 browser checks: book. Loaded by scripts/ui-test.mjs before the visual
+ * Play: the opening explorer in the browser. Loaded by scripts/ui-test.mjs before the visual
  * baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser).
  */
@@ -27,11 +27,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
       };
     });
 
-  await check("v7 book: corner joseki zoom to the corner with every coordinate on the canvas", async () => {
+  await check("play explorer: corner joseki zoom to the corner with every coordinate on the canvas", async () => {
     for (const size of [{ width: 1200, height: 800 }, { width: 1600, height: 1000 }]) {
       const page = await fresh("en-US", size);
       await onboard(page, 1);
-      await page.keyboard.press("Control+4");
+      await page.keyboard.press("Control+1");
       await page.click(".tabs-row .segmented button >> nth=-1");
       await page.click('.collection-row[data-explorer="corner"]');
       await page.waitForSelector(".explorer-panel");
@@ -66,10 +66,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     }
   });
 
-  await check("v7 book: About this book names the network, the visits and the size", async () => {
+  await check("play explorer: About this book names the network, the visits and the size", async () => {
     const page = await fresh();
     await onboard(page, 1);
-    await page.keyboard.press("Control+4");
+    await page.keyboard.press("Control+1");
     await page.click(".tabs-row .segmented button >> nth=-1");
     await page.click('.collection-row[data-explorer="corner"]');
     await page.waitForSelector(".explorer-about");

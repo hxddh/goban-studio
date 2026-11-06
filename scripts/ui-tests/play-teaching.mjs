@@ -1,14 +1,14 @@
 /**
- * v8 browser checks: teaching reasons in warnings and hints. Loaded by scripts/ui-test.mjs before the
+ * Play: teaching reasons in warnings and hints, in the browser. Loaded by scripts/ui-test.mjs before the
  * visual baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser, audit).
  *
  * The browser preview has no KataGo, so the teaching warning (which needs the engine's searches) is
- * covered by the node flow test in scripts/tests/v8-teaching.mjs; here the offline hint shows its
+ * covered by the node flow test in scripts/tests/play-teaching.mjs; here the offline hint shows its
  * reason, and the panel stays clean.
  */
 export default async function ({ check, assert, fresh, onboard, clickPoint, audit }) {
-  await check("v8 teaching: a hint that captures says so, on screen and to screen readers", async () => {
+  await check("play teaching: a hint that captures says so, on screen and to screen readers", async () => {
     const page = await fresh();
     await onboard(page, 1);
     // A two-player 19×19 game (the offline hint is deterministic there): Black K10, White L10,

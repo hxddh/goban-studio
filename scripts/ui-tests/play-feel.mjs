@@ -1,5 +1,5 @@
 /**
- * v8 browser checks: playing feel and speed. Loaded by scripts/ui-test.mjs
+ * Play: how the computer plays, and the speed budgets. Loaded by scripts/ui-test.mjs
  * before the visual baselines; receives its helpers (check, assert, fresh,
  * onboard, clickPoint, pointOf, origin, browser).
  *
@@ -37,6 +37,10 @@ function fakeHost() {
     invoke: async (command, p) => {
       if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo (test)", async: true, stream: true };
       if (command === "studio.katagoCancel") return { ok: true };
+      // The store's file commands (src/store.zig), on nothing: a first launch.
+      if (command === "studio.storeList") return [];
+      if (command === "studio.storeRead") return null;
+      if (command === "studio.storeWrite" || command === "studio.storeRemove") return { ok: true };
       if (command === "studio.katagoAnalyzeAsync") {
         const taken = new Set((p.moves || "").split(/\s+/).filter((t, i) => i % 2 === 1));
         let v = "pass";
@@ -59,7 +63,7 @@ function fakeHost() {
 }
 
 export default async function ({ check, assert, fresh, onboard, origin }) {
-  await check("v8 budgets: one start-up script under 1.3 MB; the opening book and the content parts are served beside it", async () => {
+  await check("play budgets: one start-up script under 1.3 MB; the opening book and the content parts are served beside it", async () => {
     const bytes = fs.statSync(path.join(dist, "js/bundle.js")).size;
     assert(bytes < V8_BUDGET.bundleBytes, `bundle.js ${bytes} bytes > ${V8_BUDGET.bundleBytes}`);
     const js = fs.readFileSync(path.join(dist, "js/bundle.js"), "utf8");
@@ -78,7 +82,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     return `${(bytes / 1024).toFixed(0)} KB`;
   });
 
-  await check("v8 budgets: cold start to the first screen", async () => {
+  await check("play budgets: cold start to the first screen", async () => {
     const times = [];
     for (let i = 0; i < 3; i++) {
       const page = await fresh();
@@ -94,7 +98,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     return `median ${med} ms (${times.join(", ")})`;
   });
 
-  await check("v9 budgets: the first screen needs no content part; a problem waits for its part; each part comes once", async () => {
+  await check("play budgets: the first screen needs no content part; a problem waits for its part; each part comes once", async () => {
     const page = await fresh();
     const asked = [];
     const held = [];
@@ -104,7 +108,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
       if (hold) held.push(route);
       else route.continue();
     });
-    // Onboarding, a first game and Today come up with every part held back.
+    // Onboarding, a first game and Play's home come up with every part held back.
     await page.goto(origin + "/");
     await page.waitForSelector(".ob-card");
     await page.click(".ob-card .btn.primary");
@@ -112,12 +116,12 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.waitForSelector("canvas.board");
     await page.keyboard.press("Control+1");
     await page.waitForSelector(".page h1");
-    await page.keyboard.press("Control+3");
+    await page.keyboard.press("Control+2");
     await page.waitForSelector(".topic-card");
     // A topic lists its problems by title (the problems part): it opens once that part arrives.
     await page.click(".topic-card >> nth=0");
     await page.waitForTimeout(150);
-    assert(await page.evaluate(() => window.__state.practice.view === "home"), "the topic opened without its problems");
+    assert(await page.evaluate(() => window.__state.learn.view === "home"), "the topic opened without its problems");
     const t0 = Date.now();
     hold = false;
     for (const r of held.splice(0)) await r.continue();
@@ -125,7 +129,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     const ms = Date.now() - t0;
     assert(ms < V8_BUDGET.contentFirstUse, `topic ${ms} ms after its part was let through > ${V8_BUDGET.contentFirstUse}`);
     await page.click(".problem-card >> nth=0");
-    await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.problem?.pz);
+    await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.problem?.pz);
     // The rest arrives on idle, each part once.
     await page.waitForFunction(() => performance.getEntriesByType("resource").filter((e) => /content\/(course|problems|classics)\.json$/.test(e.name)).length >= 3, null, { timeout: 10000 });
     assert(asked.length === 3 && new Set(asked).size === 3, `asked: ${asked.join(", ")}`);
@@ -134,7 +138,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     return `topic ${ms} ms after its part`;
   });
 
-  await check("v8 budgets: the computer's first move with a KataGo host is paced, never instant, never slow", async () => {
+  await check("play budgets: the computer's first move with a KataGo host is paced, never instant, never slow", async () => {
     const page = await fresh();
     await page.addInitScript(fakeHost);
     await onboard(page, 1);
@@ -156,12 +160,12 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     return `${ms} ms`;
   });
 
-  await check("v8 budgets: the opening book loads on first use and the explorer opens within budget", async () => {
+  await check("play budgets: the opening book loads on first use and the explorer opens within budget", async () => {
     const page = await fresh();
     const fetched = [];
     page.on("request", (r) => r.url().includes("book.json") && fetched.push(r.url()));
     await onboard(page, 1);
-    await page.keyboard.press("Control+4");
+    await page.keyboard.press("Control+1");
     await page.locator(".tabs-row .segmented button").filter({ hasText: "Explorer" }).click();
     const t0 = Date.now();
     await page.click("[data-explorer=whole]");
@@ -186,9 +190,10 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
         for (let y = 0; y < 19 && i < moves; y += 2) for (let x = 0; x < 19 && i < moves; x++, i++) sgf += `;${i % 2 ? "W" : "B"}[${L[x]}${L[y]}]`;
         sgf += ")";
         const at = Date.now();
-        const game = { id: "v8-seed", createdAt: at, updatedAt: at, source: "game", opponent: "ai", rank: 12, impl: "L:10k", humanColor: 1, size: 19, moves, result: "W+R", name: "Seed", sgf, thumb: "" };
-        if (report) game.report = report;
-        localStorage.setItem("goban-studio.library.v2", JSON.stringify({ v: 2, games: [game] }));
+        // One game file in the browser preview's store (data/games.js).
+        const game = { id: "seed", createdAt: at, updatedAt: at, finishedAt: at, source: "game", sgf, meta: { opponent: "ai", rank: 12, impl: "L:10k", humanColor: 1, size: 19, moves, result: "W+R", name: "Seed", thumb: "" } };
+        if (report) game.review = report;
+        localStorage.setItem("goban9:games/seed.json", JSON.stringify(game));
       },
       { moves, report },
     );
@@ -196,7 +201,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.waitForSelector(".page, canvas.board");
   }
   async function openReport(page) {
-    await page.keyboard.press("Control+4");
+    await page.keyboard.press("Control+1");
     await page.locator(".game-item [aria-haspopup]").first().click();
     const t0 = Date.now();
     await page.locator("[role=menuitem]").filter({ hasText: "Report" }).first().click();
@@ -205,15 +210,16 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     return Date.now() - t0;
   }
 
-  await check("v8 budgets: a game's report opens within budget, made on the spot or in the background", async () => {
+  await check("play budgets: a game's report opens within budget, made on the spot or in the background", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await seedGame(page, 150);
     const freshMs = await openReport(page);
     assert(freshMs < V8_BUDGET.reportFresh, `report made on the spot ${freshMs} ms > ${V8_BUDGET.reportFresh}`);
-    // It is stored now; opening it again is instant.
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("goban-studio.library.v2")).games[0].report);
-    assert(stored, "the report was stored");
+    // It is stored with its game now; opening it again is instant.
+    await page.waitForFunction(() => !!JSON.parse(localStorage.getItem("goban9:games/seed.json")).review, null, { timeout: 3000 });
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("goban9:games/seed.json")));
+    assert(stored.review && Array.isArray(stored.analysis) && stored.analysis.length === 151, "the report and its analysis were stored in the game's file");
     await page.reload();
     await page.waitForSelector(".page, canvas.board");
     const storedMs = await openReport(page);
