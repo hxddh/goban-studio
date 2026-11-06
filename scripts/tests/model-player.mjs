@@ -29,15 +29,15 @@ export default async function ({ test, assert, root }) {
 
   /* ----------------------------------------------------- the ladder */
 
-  await test("model ladder: the θ ↔ GoR scale, the measured levels and the board maps", () => {
+  await test("model ladder: the θ ↔ GoR scale, the measured levels and the board maps", async () => {
     assert.equal(Math.round(P.thetaToGoR(11.65)), 1100, "rank_10k is 10 kyu");
     assert.equal(Math.round(P.thetaToGoR(P.MEASURED.standard["2d"][19])), 2429);
     for (const g of [-1500, 0, 1100, 2400]) assert.ok(Math.abs(P.thetaToGoR(P.gorToTheta(g)) - g) < 1e-6);
     assert.deepEqual(P.LEVELS, ["30k", "25k", "20k", "15k", "10k", "5k", "1k", "2d"]);
-    // The tables are the calibrated ones of app/strength.js, unchanged.
-    const old = fs.readFileSync(path.join(root, "src/web/js/app/strength.js"), "utf8");
-    const table = (src) => src.slice(src.indexOf("export const MEASURED = {"), src.indexOf("};", src.indexOf("export const MEASURED = {"))).replace(/\s*\/\/.*$/gm, "").replace(/\s+/g, "");
-    assert.equal(table(fs.readFileSync(path.join(root, "src/web/js/model/ladder.js"), "utf8")), table(old));
+    // One source for the calibration: the model reads opponents.js's tables.
+    const O = await import("../../src/web/js/opponents.js");
+    assert.equal(P.MEASURED, O.MEASURED);
+    assert.equal(P.thetaToGoR, O.thetaToGoR);
     // Handicap: given stones make the level weaker, given away stronger; one stone is none.
     const opp = P.MEASURED.standard["10k"][19];
     assert.equal(P.levelTheta("10k"), opp);
@@ -642,9 +642,11 @@ export default async function ({ test, assert, root }) {
     for (const f of ["model/player.js", "model/ladder.js"]) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       const imports = [...src.matchAll(/^import[^;]*from "([^"]+)"/gm)].map((m) => m[1]);
-      for (const i of imports) assert.ok(i === "./ladder.js", `${f} imports ${i}`);
+      // opponents.js is the calibration's one source: tables and pure functions, no imports of its own.
+      for (const i of imports) assert.ok(i === "./ladder.js" || i === "../opponents.js", `${f} imports ${i}`);
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
+    assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");
     for (const f of ["app/strength.js", "app/plan.js", "persist.js", "app/beginner.js", "app/course-path.js"]) assert.ok(fs.existsSync(path.join(root, "src/web/js", f)), f);
   });
 }

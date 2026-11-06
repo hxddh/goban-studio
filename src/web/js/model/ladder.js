@@ -35,44 +35,11 @@ export function rankParts(rank) {
  * GoR(θ) = 4100 − K·e^(−θ/20): the EGF curve, anchored as the ladder is
  * (KataGo's human SL rank_10k profile at θ = 11.65 is 10 kyu, GoR 1100).
  */
-export const ANCHOR_K = 3000 * Math.exp(11.65 / 20);
-export const thetaToGoR = (t) => 4100 - ANCHOR_K * Math.exp(-t / 20);
-export const gorToTheta = (g) => -20 * Math.log((4100 - Math.min(g, 3900)) / ANCHOR_K);
+// v9: one source for the calibration (opponents.js): the measured levels,
+// the θ ↔ GoR scale and its anchor.
+import { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR } from "../opponents.js";
+export { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR };
 
-/**
- * Measured strength of each level, θ on 19×19, 9×9 and 13×13.
- * standard: v4 (527 + 620 games); human and strong: v7; 13×13, every mode:
- * v8, one fit of 960 games (docs/strength.md). A missing entry falls back
- * to the standard level.
- */
-export const MEASURED = {
-  standard: {
-    "30k": { 19: 0, 9: 0, 13: 0 },
-    "25k": { 19: 1.8, 9: 0.4, 13: 0.84 },
-    "20k": { 19: 4.59, 9: 2.06, 13: 3.22 },
-    "15k": { 19: 6.88, 9: 2.85, 13: 4.99 },
-    "10k": { 19: 10.21, 9: 6.13, 13: 8.33 },
-    "5k": { 19: 13.85, 9: 7.47, 13: 10.1 },
-    "1k": { 19: 17.9, 9: 12.08, 13: 14.91 },
-    "2d": { 19: 23.35, 9: 14.93, 13: 17.45 },
-  },
-  // v7, 708 games on 19×19 and 824 on 9×9 against the standard levels held
-  // at their v4 values. The top two rest on a 400-visit bridge above the
-  // ladder and are the least certain.
-  human: {
-    "30k": { 19: 0.42, 9: 0.41, 13: 0.19 },
-    "25k": { 19: 1.39, 9: 1.15, 13: 1.04 },
-    "20k": { 19: 3.9, 9: 2.1, 13: 3.66 },
-    "15k": { 19: 6.77, 9: 4.64, 13: 5.45 },
-    "10k": { 19: 10.19, 9: 6.79, 13: 8.81 },
-    "5k": { 19: 13.68, 9: 8.03, 13: 10.13 },
-    "1k": { 19: 18.42, 9: 12.89, 13: 14.47 },
-    "2d": { 19: 26.99, 9: 14.99, 13: 17.82 },
-  },
-  strong: {
-    "2d": { 19: 28.11, 9: 16.82, 13: 22.78 },
-  },
-};
 
 /** The level ids, weakest first (the keys of the standard ladder). */
 export const LEVELS = Object.keys(MEASURED.standard);
