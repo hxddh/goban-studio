@@ -299,6 +299,9 @@ export class BoardView {
 
   eventPoint(e) {
     const rect = this.canvas.getBoundingClientRect();
+    // The layout can change before the ResizeObserver has told us (it reports
+    // at the next frame): a click then would be read with the old geometry.
+    if (Math.round(rect.width) !== this.cssW || Math.round(rect.height) !== this.cssH) this.resize();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 

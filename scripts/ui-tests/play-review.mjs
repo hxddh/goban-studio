@@ -94,6 +94,18 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".sheet-foot .btn.primary");
     await page.waitForSelector(".review-layer .review-result");
   }
+  /** Wait for KataGo's verdict on the try; on a timeout, say where the try stood. */
+  async function verdict(page, status) {
+    try {
+      await page.waitForFunction((s) => window.__state.review.trial?.status === s, status, { timeout: 5000 });
+    } catch (_) {
+      const at = await page.evaluate(() => {
+        const tr = window.__state.review?.trial;
+        return tr && { status: tr.status, tried: tr.tried, loss: tr.loss, before: !!tr.before, interactive: window.__board.model.interactive, jobs: window.__state.toasts.map((x) => x.message) };
+      });
+      throw new Error(`no "${status}" verdict: ${JSON.stringify(at)}`);
+    }
+  }
   const analysed = (page) => page.waitForFunction(() => window.__state.review && !window.__state.review.analyzing && !window.__state.review.refining, null, { timeout: 15000 });
 
   await check("play review: a game that ends turns into its review on the same board, with the result, the phases and the key moment", async () => {
@@ -162,7 +174,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     // A move KataGo did not list: it looks at the position after it — 6.5 points lost.
     await page.waitForFunction(() => window.__state.review.trial.before);
     await clickPoint(page, 8, 0);
-    await page.waitForFunction(() => window.__state.review.trial.status === "bad", null, { timeout: 5000 });
+    await verdict(page, "bad");
     // The board shows KataGo's move once the verdict is drawn.
     await page.waitForFunction(() => window.__board.model.marks.some((m) => m.x === 0 && m.y === 8 && m.tone === "good"), null, { timeout: 3000 });
     const bad = await page.evaluate(() => ({ text: document.querySelector(".try-card").innerText, marks: window.__board.model.marks, judged: window.__judged }));
@@ -173,7 +185,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".try-card .btn >> nth=0");
     await page.waitForFunction(() => window.__state.review.trial.status === "open" && window.__board.model.interactive && !window.__board.model.variation);
     await clickPoint(page, 0, 8);
-    await page.waitForFunction(() => window.__state.review.trial.status === "good", null, { timeout: 5000 });
+    await verdict(page, "good");
     assert((await page.textContent(".try-card")).includes("Good move"), "the good verdict");
     // Both tries are in the player model, as one drill of this game.
     const drill = await page.evaluate(() => window.__state.profile.mistakes.find((m) => m.index === 5));
@@ -186,6 +198,24 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".try-card .btn >> nth=-1");
     await page.waitForSelector(".try-card", { state: "detached" });
     assert(await page.evaluate(() => !window.__state.review.trial && window.__state.review.focus === 5), "back to the moment");
+    // Missed once more: the moment comes back in Learn's path, as a review due the next day.
+    await page.click(".key-move .try-again");
+    await page.waitForFunction(() => window.__state.review.trial?.before && window.__board.model.interactive);
+    await clickPoint(page, 8, 0);
+    await verdict(page, "bad");
+    // Today the miss put it on tomorrow's list (the game had made it a drill due at once).
+    await page.keyboard.press("Control+2");
+    await page.waitForSelector(".learn-path .path-row");
+    assert((await page.locator(".learn-path .path-row[data-kind=mistake]").count()) === 0, "due before tomorrow");
+    await page.evaluate(() => {
+      const real = Date.now.bind(Date);
+      Date.now = () => real() + 26 * 3600 * 1000;
+    });
+    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+2");
+    await page.waitForSelector(".learn-path .path-row");
+    const rows = await page.locator(".learn-path .path-row[data-kind=mistake]").allInnerTexts();
+    assert(rows.some((r) => r.includes("Due for review") && /\b5\b/.test(r)), `Learn's path: ${rows.join(" | ") || "no mistake row"}`);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
@@ -335,7 +365,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await inspect("try again");
       await page.waitForFunction(() => window.__state.review.trial.before);
       await clickPoint(page, 8, 0);
-      await page.waitForFunction(() => window.__state.review.trial.status === "bad", null, { timeout: 5000 });
+      await verdict(page, "bad");
       await inspect("try again, missed");
       await page.keyboard.press("Escape");
       await page.waitForSelector(".try-card", { state: "detached" });

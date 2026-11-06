@@ -84,7 +84,7 @@ export function openExplorer(mode = "whole") {
   remember();
   update((s) => {
     s.space = "play";
-    s.play = { ...s.play, tab: "explorer", explorer: mode };
+    s.play = { ...s.play, explorer: mode };
   });
   ensure(mode);
   refresh();

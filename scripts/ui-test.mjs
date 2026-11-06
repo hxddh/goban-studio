@@ -105,10 +105,16 @@ async function pointOf(page, x, y) {
 }
 async function clickPoint(page, x, y) {
   // The board on screen must be the one the page registered (a new view
-  // registers after its first paint).
+  // registers after its first paint), and its geometry must be of the
+  // canvas as laid out now: the ResizeObserver reports a new size only at
+  // the next frame, and a point read in between is off (the likely cause
+  // of the explorer check's rare timeout: its panel fills in late).
   await page.waitForFunction(() => {
     const c = document.querySelector("canvas.board");
-    return !!(c && window.__board && window.__board.canvas === c && window.__board.geom);
+    const b = window.__board;
+    if (!(c && b && b.canvas === c && b.geom)) return false;
+    const r = c.getBoundingClientRect();
+    return Math.round(r.width) === b.cssW && Math.round(r.height) === b.cssH;
   });
   const p = await pointOf(page, x, y);
   assert(p, "board geometry not exposed");
@@ -688,6 +694,22 @@ for (const vp of [
     out.push(await snap(page, `learn-catalog-${vp.tag}`));
     await page.keyboard.press("Control+,");
     out.push(await snap(page, `settings-${vp.tag}`, [".about"]));
+    // The post-game review: the same game counted, its board turned into its
+    // review (the offline estimate here: turning points, no phase numbers).
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".sheet", { state: "detached" });
+    await page.keyboard.press("Control+1");
+    await page.click(".play-home .hero .btn.primary");
+    await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.model.size === 9);
+    for (let i = 0; i < 2; i++) {
+      await page.keyboard.press("Control+Shift+P");
+      await page.click(".sheet-foot .btn.primary");
+    }
+    await page.waitForSelector(".score-card .btn.primary:not([disabled])");
+    await page.click(".score-card .btn.primary");
+    await page.waitForSelector(".review-layer .review-result");
+    await page.waitForFunction(() => !window.__state.review.analyzing && window.__state.toasts.length === 0, null, { timeout: 15000 });
+    out.push(await snap(page, `review-${vp.tag}`));
     await page.close();
     return out.join(", ");
   });

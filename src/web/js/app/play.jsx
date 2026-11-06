@@ -863,7 +863,7 @@ function Moments() {
   if (!m || m.confidence === "none") return <p class="muted">{t("report.noAnalysis")}</p>;
   if (m.confidence !== "high") {
     // v6 honesty: no loss and no better move from the estimate.
-    if (!m.moments.length) return null;
+    if (!m.moments.length) return <p class="muted">{t("review.noTurningPoints")}</p>;
     return (
       <section class="key-moves turning-points">
         <h2 class="slot-title">{t("report.turningPoints")}</h2>

@@ -32,5 +32,6 @@ export const PLAY = {
   "try.next": m("下一个关键时刻", "Next moment", "다음 결정적 순간", "次の勝負どころ"),
   "try.done": m("回到复盘", "Back to the review", "복기로 돌아가기", "検討に戻る"),
   "try.stop": m("不下了", "Stop", "그만두기", "やめる"),
+  "review.noTurningPoints": m("粗略估计里看不出明显的转折点。", "The rough estimate shows no clear turning point.", "대략적인 추정으로는 뚜렷한 전환점이 보이지 않습니다.", "大まかな推定では、はっきりした分かれ目は見えません。"),
   "try.noJudge": m("KataGo 没有回应，这一手没有计入。", "KataGo did not answer; this try was not counted.", "KataGo가 응답하지 않아 이번 수는 반영되지 않았습니다.", "KataGoが応答しなかったため、この手は記録されませんでした。"),
 };
