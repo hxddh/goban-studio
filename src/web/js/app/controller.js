@@ -22,7 +22,7 @@ import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
 import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, suggestedOpponent } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, learnHome, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
+import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { dropReport, restoreReport } from "./report-ctl.js";
@@ -39,7 +39,7 @@ export * from "./report-ctl.js";
 export * from "./report-batch.js";
 
 export * from "./explorer-ctl.js";
-export * from "./plan-ctl.js";
+export * from "../learn/session.js"; // Learn's path, today's session
 export * from "./capture-ctl.js"; // the beginner bridges (Learn)
 import { resumeCapture } from "./capture-ctl.js";
 export { CLASSICS, formatPoints };
@@ -178,6 +178,7 @@ function restore(loc) {
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
     else if (p.view === "capture") resumeCapture({ from: p.captureFrom });
+    else if (p.view === "catalog") openCatalog();
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
     else learnHome();

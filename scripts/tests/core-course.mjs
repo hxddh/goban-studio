@@ -64,7 +64,7 @@ await test("endgame: at least 30 endgame problems over grades 1–5, with their 
   for (const t of ["hane-connect", "monkey-jump", "double-sente", "sente-gote", "reverse-sente", "endgame-compare", "deiri"]) assert.ok(themes.has(t), t);
   for (const p of eg.filter((x) => x.ask === "value")) assert.ok(p.choices.includes(p.value), p.id);
   assert.ok(eg.some((p) => S.countAreas(S.createPuzzle(p)) >= 3), "some problems compare three areas");
-  const jsx = fs.readFileSync(path.join(root, "src/web/js/app/practice.jsx"), "utf8");
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/learn/catalog.jsx"), "utf8");
   assert.match(jsx, /export const TOPICS = \[[^\]]*"endgame"\]/);
 });
 

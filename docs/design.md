@@ -143,9 +143,13 @@ group per screen region.
   done, then the next lesson); this week's focus; then your level as one
   number with its ± ("≈ 12 kyu (±1)"). Empty states collapse to a single line instead of an empty
   card.
-* **Practice.** Hero row for the next lesson with progress; today's five as
-  a row; the course as grouped rows (title + check, no step counts); the
-  problem topics as a grid of quiet tiles.
+* **Learn (v9).** One path chosen for you: a short ordered list of rows
+  (5–8: the next lesson, reviews due, the week's focus, one stretch
+  problem, the beginner bridges), each saying why it is there in a few
+  words; the week's focus and its reason in one line above it. One primary
+  (*Start* / *Continue*) plays the rows as one session; at the end a quiet
+  "done for today". One row below opens the catalog: the course as one
+  group of unit rows, the problem topics as rows, the basic shapes as chips.
 * **Library.** Toolbar holds Import. Three segmented tabs: my games
   (rows with a thumbnail), classics, and the opening explorer. Reports of the player's games
   are made in the background by themselves; a row says so only while its
