@@ -13,6 +13,7 @@ import { t } from "../i18n.js";
 import * as Host from "../host.js";
 import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeOpenFiles } from "../host.js";
 import { state, update, useAppState, toast } from "./store.js";
+import { store } from "../data/store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
 import { SPACES, Sidebar, isFocus } from "./chrome.jsx";
@@ -342,6 +343,10 @@ export async function start() {
     // v4 release checks: the screenshot tour, only when the host was launched with GOBAN_TOUR_OUT.
     setTimeout(() => Host.selftestConfig().then((c) => c?.tour && import("../tour.js").then((m) => m.runTour(c))), 1200);
   }
+  // Whatever the store has not written yet goes out when the page goes (data/store.js).
+  window.addEventListener("pagehide", () => {
+    store.flush();
+  });
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => {
     const f = e.dataTransfer?.files?.[0];
