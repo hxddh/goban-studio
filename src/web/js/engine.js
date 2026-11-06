@@ -1,7 +1,7 @@
 /**
  * The one engine interface the app talks to.
  *
- *   chooseMove(game, strength)  the opponent's move at a rank-like strength
+ *   decide(game, opponent)      the opponent's move at a rank (opponents.js)
  *   hint(game)                  the best move and its line, for the learner
  *   analyzeNode(game, node)     win rate, score lead and best line (review)
  *   deadStones(game)            stones KataGo considers dead (scoring)
@@ -12,76 +12,21 @@
  * elsewhere, and `info()` says so, so the UI never presents a fallback as
  * the real thing.
  *
- * v5: optional networks (models.js). With the stronger network installed,
- * analysis, review, hints, scoring and the top level use it; with the human
- * SL model installed and `settings.humanStyle` on, the opponent plays like a
- * human of its level (`opponentMode`). Every optional path falls back to the
+ * v9: one opponent axis. The player chooses a rank; `levelFor(rank,
+ * installed())` (opponents.js) names the implementation that measured
+ * closest with the networks installed — human-style where it measured
+ * well, the stronger network at the top, the standard ladder otherwise —
+ * and `decide` plays it. With the stronger network installed, analysis,
+ * review, hints and scoring use it. Every optional path falls back to the
  * shipped network when its process cannot answer.
  */
 import { BLACK, WHITE, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
 import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 import { scheduler } from "./scheduler.js";
+import { impl, implLabel, ladder as ladderOf, levelFor } from "./opponents.js";
 
-/**
- * Strength ladder, calibrated by self-play and against KataGo's human SL
- * model (docs/strength.md, scripts/calibrate-strength.mjs). IDs are stable
- * (saved settings and games refer to them) even where the measured label
- * differs; `rank` is the measured 19×19 label (kyu > 0, 0 = 1 dan,
- * -1 = 2 dan …), shown as "≈". The weakest level measured below the
- * scale's floor (≈34 kyu, extrapolated) and is shown as 30 kyu.
- *
- *   visits   KataGo's search budget
- *   maxLoss  choose only among candidates within this many points of the best
- *   temp     how widely to sample those candidates (0 = always the best)
- *   slip     chance of taking a searched candidate outside the window
- *   blunder  chance of a beginner's move instead (see beginnerMove): the
- *            lever for every level below ≈ 2 kyu, since even KataGo's worst
- *            candidates are moves a strong network finds plausible
- *   local    offline fallback level (ai.js) when KataGo is unavailable
- *
- * v5, used only when the optional networks are installed:
- *
- *   human    the human-style opponent: KataGo's human SL model imitating
- *            `profile` (a KataGo humanSLProfile). `style` "raw" plays the
- *            profile's own move distribution at one network evaluation
- *            (KataGo's gtp_human5k_example.cfg); "search" keeps the style
- *            but lets `visits` of search veto losing moves
- *            (gtp_human9d_search_example.cfg) — the raw policy alone does
- *            not reach single-digit kyu against these programs (v4
- *            measurement, docs/strength.md). The model has no profile
- *            below 20 kyu, so the weakest levels add the level's own kind
- *            of beginner's move (`blunder`). Profiles follow the v4 anchor
- *            measurements: rank_20k measured ≈ 17 kyu and rank_15k ≈ 14 kyu
- *            on the ladder's scale.
- *   strong   the top level with the stronger network: `visits` of its
- *            search (the larger network is several times slower per visit
- *            and much stronger per visit).
- *
- * v6: `human.rank` / `strong.rank` is that mode's own label where the
- * measurement placed it clearly away from the level's label; labelRank()
- * picks it.
- *
- * v7 (docs/strength.md, "v7"; 708 games on 19×19 and 824 on 9×9 on
- * GitHub's runners): the human-style ladder has no gap. v6's `5k`
- * (≈3 kyu) left a nine-rank jump from `10k`; the search style plays far
- * above the raw style whatever its profile or visits, so `5k` keeps it and
- * adds 12% beginner's moves (≈7 kyu, as the standard `5k`). `15k` adds
- * 12% to the raw `rank_20k` (≈18 kyu; it measured ≈15 without). `1k` is
- * `rank_4k` at 32 visits (≈1 kyu; v6's `rank_2k` at 64 measured ≈1 dan).
- * Above 4 dan a 400-visit bridge placed the top: human-style `2d` ≈6 dan,
- * the stronger network ≈7 dan (both the lower ends of their intervals).
- */
-export const STRENGTHS = [
-  { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1, human: { profile: "rank_20k", blunder: 0.9 } },
-  { id: "25k", rank: 29, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.95, local: 1, human: { profile: "rank_20k", blunder: 0.7 } },
-  { id: "20k", rank: 23, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.75, local: 2, human: { profile: "rank_20k", blunder: 0.35 } },
-  { id: "15k", rank: 18, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.6, local: 3, human: { profile: "rank_20k", blunder: 0.12 } },
-  { id: "10k", rank: 12, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.25, local: 4, human: { profile: "rank_12k" } },
-  { id: "5k", rank: 7, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 0.09, local: 5, human: { profile: "rank_7k", style: "search", visits: 24, blunder: 0.12 } },
-  { id: "1k", rank: 2, visits: 32, temp: 0.7, maxLoss: 6, slip: 0.02, blunder: 0, local: 5, human: { profile: "rank_4k", style: "search", visits: 32, rank: 1 } },
-  { id: "2d", rank: -3, visits: 160, temp: 0, maxLoss: 0, slip: 0, blunder: 0, local: 5, human: { profile: "rank_4d", style: "search", visits: 200, rank: -5 }, strong: { visits: 64, rank: -6 } },
-];
+export { STRENGTHS, calibrated, IMPLS, RANKS, impl, implLabel, implTheta, ladder, levelFor, measured, nearest } from "./opponents.js";
 
 /** Search budget of a human-style move in "raw" style (passes only). */
 export const HUMAN_VISITS = 40;
@@ -92,36 +37,21 @@ export const HUMAN_VISITS = 40;
  */
 export const STRONG_VISIT_SCALE = 0.5;
 
-export function strengthById(id) {
-  return STRENGTHS.find((s) => s.id === id) || STRENGTHS[1];
+/** Display parts of a rank (rating.js encoding): 12 → 12 kyu, -3 → 4 dan. */
+export function rankParts(rank) {
+  const r = Math.round(Number(rank));
+  return r > 0 ? { n: r, unit: "kyu" } : { n: 1 - r, unit: "dan" };
 }
 
 /**
- * v6: the label rank a level plays at in `mode`. A human-style level or
- * the stronger network carries its own `rank` where the v6 measurement
- * moved it (docs/strength.md); otherwise the level's label.
+ * Suggested handicap for a player of `playerRank` against an opponent that
+ * plays at `opponentRank` (the measured rank shown) on a board of `size`.
+ * One stone per rank on 19×19, scaled down on smaller boards; komi 0.5
+ * whenever stones are given.
  */
-export function labelRank(idOrStrength, mode = opponentMode(idOrStrength)) {
-  const s = typeof idOrStrength === "string" ? strengthById(idOrStrength) : idOrStrength;
-  if (mode === "human" && s.human?.rank != null) return s.human.rank;
-  if (mode === "strong" && s.strong?.rank != null) return s.strong.rank;
-  return s.rank;
-}
-
-/** Display a rank: 25k → "25 级", 2d → "2 段" (via i18n keys), in the mode the level plays now. */
-export function rankParts(id, mode) {
-  const rank = labelRank(strengthById(id), mode);
-  return rank > 0 ? { n: rank, unit: "kyu" } : { n: 1 - rank, unit: "dan" };
-}
-
-/**
- * Suggested handicap for a player of `playerRank` against `strengthId` on a
- * board of `size`. One stone per rank on 19×19, scaled down on smaller
- * boards; komi 0.5 whenever stones are given.
- */
-export function suggestHandicap(playerRank, strengthId, size) {
-  if (playerRank == null) return 0;
-  const diff = playerRank - labelRank(strengthById(strengthId));
+export function suggestHandicap(playerRank, opponentRank, size) {
+  if (playerRank == null || !Number.isFinite(Number(opponentRank))) return 0;
+  const diff = playerRank - Number(opponentRank);
   if (diff <= 0) return 0;
   const perStone = size === 19 ? 1 : size === 13 ? 2.5 : 5;
   const stones = Math.floor(diff / perStone);
@@ -174,21 +104,19 @@ export async function info() {
 /* ------------------------------------------------- optional networks (v5) */
 
 /**
- * Which optional networks are installed and wanted. Set by the models
- * controller (app/models-ctl.js) from the host's status and
- * `settings.humanStyle`; all false until then.
+ * Which optional networks are installed. Set by the models controller
+ * (app/models-ctl.js) from the host's status; all false until then.
  */
-const models = { strong: false, human: false, humanStyle: true };
+const models = { strong: false, human: false };
 /** Consecutive failures of the strong process; after two, use the standard one. */
 let strongFailures = 0;
 
-export function setModels({ strong, human, humanStyle } = {}) {
+export function setModels({ strong, human } = {}) {
   if (strong !== undefined) {
     if (strong && !models.strong) strongFailures = 0;
     models.strong = !!strong;
   }
   if (human !== undefined) models.human = !!human;
-  if (humanStyle !== undefined) models.humanStyle = humanStyle !== false;
 }
 
 export function modelsState() {
@@ -206,16 +134,36 @@ export function scaledVisits(visits, engine) {
 }
 
 /**
- * How the opponent plays at `strength`: "human" (human SL model, when
- * installed and `humanStyle` is on), "strong" (the stronger network, for
- * the levels that have a `strong` entry), else "standard". Pure; `m` is
- * for the tests.
+ * What the opponent ladder can reach now (opponents.js `installed`): the
+ * human-style network when installed, the stronger one while its process
+ * answers. Pure; `m` is for the tests.
  */
-export function opponentMode(strengthOrId, m = modelsState()) {
-  const s = typeof strengthOrId === "string" ? strengthById(strengthOrId) : strengthOrId;
-  if (m.human && m.humanStyle && s?.human) return "human";
-  if (m.strong && m.strongUsable !== false && s?.strong) return "strong";
-  return "standard";
+export function installed(m = modelsState()) {
+  return { human: !!m.human, strong: !!m.strong && m.strongUsable !== false };
+}
+
+/** The ladder as the player can choose it now (opponents.js ladder). */
+export function currentLadder() {
+  return ladderOf(installed());
+}
+
+/** What plays `rank` now: { rank, label, impl } (opponents.js levelFor). */
+export function opponentFor(rank) {
+  return levelFor(rank, installed());
+}
+
+/**
+ * The implementation that plays an opponent `{ rank, impl }` (or a bare
+ * rank) with `inst`: its own implementation while that can play, else
+ * what plays its rank.
+ */
+export function resolveOpponent(opp, inst = installed()) {
+  const o = opp && typeof opp === "object" ? opp : { rank: opp };
+  const it = o.impl ? impl(o.impl) : null;
+  const can = it && (it.kind === "standard" || (it.kind === "human" && inst.human) || (it.kind === "strong" && inst.strong));
+  if (can) return it;
+  const rank = Number.isFinite(Number(o.rank)) ? Number(o.rank) : it ? implLabel(it.id) : undefined;
+  return impl(levelFor(rank, inst).impl);
 }
 
 function sample(list, weight, rnd) {
@@ -384,37 +332,44 @@ export function humanRequest(human) {
 /**
  * The computer's move plus the search behind it, so the caller can judge
  * the position (teaching warnings, resignation, "shall we count?") and pace
- * its reply. `analysis` is null when KataGo is not available. `mode` says
- * how the move was chosen ("human", "strong", "standard" or "offline").
+ * its reply. `opponent` is `{ rank, impl }` (what the game was started
+ * with) or a bare rank. `analysis` is null when KataGo is not available.
+ * `impl` names the implementation that chose the move, and `mode` its kind
+ * ("human", "strong", "standard", or "offline" for the local fallback).
+ * When an optional process cannot answer, the nearest standard level plays
+ * the move (and `impl` says so).
  */
-export async function decide(game, strengthId, { signal, lane = "move" } = {}) {
-  const strength = strengthById(strengthId);
-  const mode = opponentMode(strength);
-  if (mode === "human") {
-    const analysis = await analyzeQ(game, { ...humanRequest(strength.human), signal, lane });
-    if (signal?.aborted) return { move: null, analysis: null, mode };
-    const move = analysis && humanMoveFromAnalysis(game, analysis, strength.human);
-    if (move) return { move, analysis, mode };
-    // The human process could not answer: the level's standard play.
+export async function decide(game, opponent, { signal, lane = "move" } = {}) {
+  const inst = installed();
+  let it = resolveOpponent(opponent, inst);
+  const rank = opponent && typeof opponent === "object" && Number.isFinite(Number(opponent.rank)) ? Number(opponent.rank) : Number.isFinite(Number(opponent)) ? Number(opponent) : implLabel(it.id);
+  if (it.kind === "human") {
+    const analysis = await analyzeQ(game, { ...humanRequest(it.level.human), signal, lane });
+    if (signal?.aborted) return { move: null, analysis: null, mode: "human", impl: it.id };
+    const move = analysis && humanMoveFromAnalysis(game, analysis, it.level.human);
+    if (move) return { move, analysis, mode: "human", impl: it.id };
+    // The human process could not answer: what plays the rank without it.
+    it = impl(levelFor(rank, { strong: inst.strong }).impl);
   }
-  if (mode === "strong") {
-    const analysis = await analyzeQ(game, { visits: strength.strong.visits, engine: "strong", signal, lane });
-    if (signal?.aborted) return { move: null, analysis: null, mode };
-    const move = analysis && moveFromAnalysis(game, analysis, strength);
+  if (it.kind === "strong") {
+    const analysis = await analyzeQ(game, { visits: it.level.strong.visits, engine: "strong", signal, lane });
+    if (signal?.aborted) return { move: null, analysis: null, mode: "strong", impl: it.id };
+    const move = analysis && moveFromAnalysis(game, analysis, it.level);
     if (move) {
       strongFailures = 0;
-      return { move, analysis, mode };
+      return { move, analysis, mode: "strong", impl: it.id };
     }
     if (!analysis) strongFailures++;
+    it = impl(levelFor(rank, {}).impl);
   }
-  const analysis = await analyzeQ(game, { visits: strength.visits, signal, lane });
-  if (signal?.aborted) return { move: null, analysis: null, mode: "standard" };
+  const analysis = await analyzeQ(game, { visits: it.level.visits, signal, lane });
+  if (signal?.aborted) return { move: null, analysis: null, mode: "standard", impl: it.id };
   if (analysis) {
-    const move = moveFromAnalysis(game, analysis, strength);
-    if (move) return { move, analysis, mode: "standard" };
+    const move = moveFromAnalysis(game, analysis, it.level);
+    if (move) return { move, analysis, mode: "standard", impl: it.id };
   }
-  const move = await chooseLocal(game, { level: strength.local, color: game.turn });
-  return { move, analysis: null, mode: "offline" };
+  const move = await chooseLocal(game, { level: it.level.local, color: game.turn });
+  return { move, analysis: null, mode: "offline", impl: it.id };
 }
 
 /** A quick look at the position (for teaching mode and the eval bar): pondering. */
@@ -437,11 +392,13 @@ export function cancel() {
   scheduler.cancelLanes(["move", "interactive", "live"]);
 }
 
-export async function chooseMove(game, strengthId, opts = {}) {
+export async function chooseMove(game, opponent, opts = {}) {
   // Never resign, never pass early while the board is open: KataGo's own
   // choice is a pass only when the game is really over.
-  const { move } = await decide(game, strengthId, opts);
-  return move || chooseLocal(game, { level: strengthById(strengthId).local, color: game.turn });
+  const { move, impl: played } = await decide(game, opponent, opts);
+  if (move) return move;
+  const std = impl(played)?.kind === "standard" ? impl(played) : impl(levelFor(implLabel(played), {}).impl);
+  return chooseLocal(game, { level: std.level.local, color: game.turn });
 }
 
 /** The engine's suggestion for the side to move, with a short line (the player waits on it). */

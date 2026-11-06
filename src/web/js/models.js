@@ -6,7 +6,7 @@
  * fetch anything:
  *
  *   human   KataGo's human SL model: the opponent plays like a person of
- *           its level (engine.js `opponentMode`, STRENGTHS[].human)
+ *           its rank where it measured well (opponents.js levelFor)
  *   strong  a larger standard network: analysis, review, hints and the
  *           top level
  *

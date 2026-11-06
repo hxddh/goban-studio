@@ -351,8 +351,10 @@ export function finishOnboarding(choice, rank = null) {
   else if (choice === "rules") next.playerRank = 25;
   else next.playerRank = rank ?? 15;
   state.progress.rating = startEstimate(next.playerRank);
-  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : recommendStrength(state.progress.rating, { size: 19, modeOf: (st) => Engine.opponentMode(st) });
-  next.strength = strength;
+  // v9: the gentlest rank of the ladder for a beginner, else the rank the
+  // estimate suggests (opponents.js).
+  const opponentRank = choice === "new" || choice === "rules" ? 30 : recommendStrength(state.progress.rating, { size: 19, installed: Engine.installed() });
+  next.opponentRank = opponentRank;
   saveProgress(state.progress);
   update((st) => {
     st.settings = next;
@@ -364,9 +366,9 @@ export function finishOnboarding(choice, rank = null) {
     if (first) openLesson(first.lesson.id, 0);
   } else if (choice === "rules") {
     // v8: the small board first, against a gentle level, teaching on (teachingOn).
-    newGame({ size: 9, opponent: "ai", color: BLACK, strength, handicap: 0 });
+    newGame({ size: 9, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
   } else {
-    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
+    newGame({ size: 19, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
   }
 }
 

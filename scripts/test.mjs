@@ -22,12 +22,12 @@ import {
   beginnerMove,
   humanMoveFromAnalysis,
   humanRequest,
+  installed,
   moveFromAnalysis,
-  opponentMode,
   pickCandidate,
   rankParts,
   scaledVisits,
-  strengthById,
+  calibrated,
   suggestHandicap,
 } from "../src/web/js/engine.js";
 import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, humanStyleParams, mulberry32, profileGoR, wilson } from "./calibrate-strength.mjs";
@@ -1055,27 +1055,27 @@ await test("KataGo reports parse into candidates, lines and ownership", () => {
 
 await test("the strength ladder keeps strong levels exact and weak levels inside their loss window", () => {
   const analysis = { moves: parseInfo(SAMPLE_INFO, 19).moves, play: { x: 3, y: 15 } };
-  assert.deepEqual(pickCandidate(analysis, BLACK, strengthById("2d"), () => 0.99), { x: 3, y: 15 });
+  assert.deepEqual(pickCandidate(analysis, BLACK, calibrated("2d"), () => 0.99), { x: 3, y: 15 });
   // 1k allows up to 6 points: D4 and Q16, never K10 (8.9 points worse)
   // unless its 2% deliberate slip fires (the first draw below 0.02).
   for (let i = 0; i < 50; i++) {
-    const m = pickCandidate(analysis, BLACK, strengthById("1k"), () => 0.05 + (i / 50) * 0.94);
+    const m = pickCandidate(analysis, BLACK, calibrated("1k"), () => 0.05 + (i / 50) * 0.94);
     assert.ok(!(m.x === 9 && m.y === 9), "1k must not take a 9-point loss");
   }
-  const slipped = pickCandidate(analysis, BLACK, strengthById("1k"), () => 0.01);
+  const slipped = pickCandidate(analysis, BLACK, calibrated("1k"), () => 0.01);
   assert.deepEqual(slipped, { x: 9, y: 9 }, "the deliberate slip picks outside the window");
   // White's point of view flips the score lead: K10 is White's best here.
-  assert.deepEqual(pickCandidate(analysis, WHITE, { ...strengthById("2d"), temp: 0 }), { x: 3, y: 15 });
+  assert.deepEqual(pickCandidate(analysis, WHITE, { ...calibrated("2d"), temp: 0 }), { x: 3, y: 15 });
   assert.equal(new Set(STRENGTHS.map((s) => s.id)).size, STRENGTHS.length);
-  // One stone per rank of the level's calibrated label.
-  assert.equal(suggestHandicap(25, "15k", 19), 7);
-  assert.equal(suggestHandicap(15, "10k", 19), 3);
-  assert.equal(suggestHandicap(10, "10k", 19), 0);
-  assert.equal(suggestHandicap(null, "10k", 19), 0);
+  // One stone per rank of the rank the opponent plays at (v9: a number, the measured rank shown).
+  assert.equal(suggestHandicap(25, 18, 19), 7);
+  assert.equal(suggestHandicap(15, 12, 19), 3);
+  assert.equal(suggestHandicap(10, 12, 19), 0);
+  assert.equal(suggestHandicap(null, 12, 19), 0);
 });
 
-await test("the strength ladder is monotonic and keeps its saved IDs", () => {
-  // Saved settings, library games and ratings refer to these IDs.
+await test("the calibrated levels are monotonic under their calibration names", () => {
+  // The calibration (docs/strength.md, scripts/calibrate-strength.mjs) names these settings; nothing saved refers to them.
   assert.deepEqual(
     STRENGTHS.map((s) => s.id),
     ["30k", "25k", "20k", "15k", "10k", "5k", "1k", "2d"],
@@ -1095,7 +1095,7 @@ await test("the strength ladder is monotonic and keeps its saved IDs", () => {
   for (const s of STRENGTHS) {
     assert.ok(Number.isInteger(s.rank) && s.rank <= 30 && s.rank >= -8, `${s.id} rank`);
     assert.ok(s.visits >= 1 && s.visits <= 1000, `${s.id} visits fit a laptop CPU`);
-    const parts = rankParts(s.id);
+    const parts = rankParts(s.rank);
     assert.ok(parts.n >= 1 && (parts.unit === "kyu" || parts.unit === "dan"));
   }
 });
@@ -1108,8 +1108,8 @@ await test("a level's pick falls back to KataGo's own move when the app's rules 
     moves: [{ x: 4, y: 4, visits: 10, scoreLead: 1, winrate: 0.5, order: 0 }],
     play: { x: 2, y: 2 },
   };
-  assert.deepEqual(moveFromAnalysis(g, analysis, strengthById("2d")), { x: 2, y: 2 });
-  assert.equal(moveFromAnalysis(g, { moves: analysis.moves, play: { x: 4, y: 4 } }, strengthById("2d")), null);
+  assert.deepEqual(moveFromAnalysis(g, analysis, calibrated("2d")), { x: 2, y: 2 });
+  assert.equal(moveFromAnalysis(g, { moves: analysis.moves, play: { x: 4, y: 4 } }, calibrated("2d")), null);
 });
 
 await test("beginner moves are legal, local and never fill the player's own eye", () => {
@@ -1137,7 +1137,7 @@ await test("beginner moves are legal, local and never fill the player's own eye"
   }
   // A level with blunder 1 always plays a beginner move, unless KataGo passes.
   const analysis = { moves: [{ x: 4, y: 4, visits: 10, scoreLead: 1, order: 0 }], play: { x: 4, y: 4 } };
-  const level = { ...strengthById("30k"), blunder: 1 };
+  const level = { ...calibrated("30k"), blunder: 1 };
   const g2 = newGame(9);
   g2.play(2, 2);
   const m = moveFromAnalysis(g2, analysis, level, mulberry32(1));
@@ -1301,7 +1301,7 @@ await test("v1 data migrates to v2 without losing games or settings", () => {
   assert.equal(s.lang, "ja");
   assert.equal(s.appearance, "dark");
   assert.equal(s.board, "ink");
-  assert.equal(s.strength, "10k");
+  assert.equal(s.opponentRank, 12);
   assert.equal(s.onboarded, true);
   const p = loadProgress();
   assert.equal(p.streak.count, 3);
@@ -1309,7 +1309,7 @@ await test("v1 data migrates to v2 without losing games or settings", () => {
   assert.deepEqual(p.problems, {});
   const games = Lib.listGames();
   assert.equal(games.length, 1);
-  assert.equal(games[0].strength, "20k");
+  assert.equal(games[0].rank, 24);
 });
 
 await test("the library holds finished and saved games; the current game is separate", () => {
@@ -2182,21 +2182,16 @@ await test("v5: model actions name a kind only, and report what changed", async 
   assert.equal(M.megabytes(9_500_000), "9.5");
 });
 
-await test("v5: the opponent mode follows what is installed and the humanStyle setting", () => {
-  const none = { strong: false, human: false, humanStyle: true };
-  const human = { strong: false, human: true, humanStyle: true };
-  const off = { strong: true, human: true, humanStyle: false };
-  const strong = { strong: true, human: false, humanStyle: true };
-  for (const s of STRENGTHS) {
-    assert.equal(opponentMode(s.id, none), "standard", s.id);
-    assert.equal(opponentMode(s.id, human), "human", s.id);
-    assert.equal(opponentMode(s.id, off), s.strong ? "strong" : "standard", s.id);
-  }
-  // The stronger network plays only the top level; everything below keeps
-  // the network its label was measured with.
-  assert.deepEqual(STRENGTHS.filter((s) => opponentMode(s, strong) === "strong").map((s) => s.id), ["2d"]);
-  assert.equal(opponentMode("2d", { ...strong, strongUsable: false }), "standard");
-  assert.equal(DEFAULT_SETTINGS.humanStyle, true);
+await test("v9: what the opponent ladder can reach follows what is installed, with no mode setting", () => {
+  const none = { strong: false, human: false };
+  const strong = { strong: true, human: false };
+  assert.deepEqual(installed(none), { human: false, strong: false });
+  assert.deepEqual(installed({ strong: false, human: true }), { human: true, strong: false });
+  assert.deepEqual(installed(strong), { human: false, strong: true });
+  // A stronger network whose process keeps failing is not reachable.
+  assert.deepEqual(installed({ ...strong, strongUsable: false }), { human: false, strong: false });
+  assert.ok(!("humanStyle" in DEFAULT_SETTINGS), "no human-style switch");
+  assert.ok(!("strength" in DEFAULT_SETTINGS) && Number.isFinite(DEFAULT_SETTINGS.opponentRank));
   // Analysis uses the stronger network when installed, with fewer visits.
   assert.equal(analysisEngine(none), "standard");
   assert.equal(analysisEngine(strong), "strong");
@@ -2308,7 +2303,7 @@ await test("v5: the strings are one block in four languages", () => {
   const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("models."));
   assert.ok(keys.length >= 30);
   for (const k of keys) assert.ok(block.includes(`"${k}"`) || LATER_KEYS.has(k), `${k} outside the v5 block`);
-  for (const k of ["models.title", "models.download", "models.cancel", "models.remove", "models.humanStyle", "models.unavailable", "models.error.generic"]) {
+  for (const k of ["models.title", "models.download", "models.cancel", "models.remove", "models.unavailable", "models.error.generic"]) {
     for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
   }
   // Placeholders agree across languages.
@@ -3126,26 +3121,26 @@ await test("v6 strength: one rated game is a Glicko step against the level's mea
   // By hand: prior N(mu, 2.5²), +0.2² before the game, against L:10k on 19×19.
   const est = SE.startEstimate(12, 0);
   const opp = SE.MEASURED.standard["10k"][19];
-  assert.equal(SE.levelTheta("10k"), opp);
+  assert.equal(SE.levelTheta("L:10k"), opp);
   const v0 = Math.min(SE.SIGMA0 ** 2, SE.SIGMA0 ** 2 + SE.SIGMA_GAME ** 2);
   const g = 1 / Math.sqrt(1 + (3 * SE.SIGMA_LEVEL ** 2) / Math.PI ** 2);
   const e = 1 / (1 + Math.exp(-g * (est.mu - opp)));
   const v = 1 / (1 / v0 + g * g * e * (1 - e));
-  const won = SE.rateGame(est, { level: "10k", won: true, at: 0 });
+  const won = SE.rateGame(est, { impl: "L:10k", won: true, at: 0 });
   assert.ok(Math.abs(won.mu - (est.mu + v * g * (1 - e))) < 2e-3, `${won.mu}`);
   assert.ok(Math.abs(won.sigma - Math.sqrt(v)) < 2e-3);
-  const lost = SE.rateGame(est, { level: "10k", won: false, at: 0 });
+  const lost = SE.rateGame(est, { impl: "L:10k", won: false, at: 0 });
   assert.ok(Math.abs(lost.mu - (est.mu - v * g * e)) < 2e-3);
   // Beating a stronger level moves you more than beating a weaker one.
-  assert.ok(SE.rateGame(est, { level: "5k", won: true, at: 0 }).mu - est.mu > SE.rateGame(est, { level: "15k", won: true, at: 0 }).mu - est.mu);
+  assert.ok(SE.rateGame(est, { impl: "L:5k", won: true, at: 0 }).mu - est.mu > SE.rateGame(est, { impl: "L:15k", won: true, at: 0 }).mu - est.mu);
   // The stored shape: v6 fields plus the GoR `r` every v5 reader uses.
   assert.deepEqual(Object.keys(won).sort(), ["at", "games", "history", "mu", "r", "sigma", "v"]);
   assert.equal(won.r, Math.round(SE.thetaToGoR(won.mu)));
   const h = won.history[won.history.length - 1];
   assert.ok(h.lo < h.r && h.r < h.hi);
   // Handicap: given stones make the level weaker, given away stronger.
-  assert.ok(SE.levelTheta("10k", { handicap: 3 }) < opp && SE.levelTheta("10k", { handicap: -3 }) > opp);
-  assert.equal(SE.levelTheta("10k", { handicap: 1 }), opp, "one stone is not a handicap");
+  assert.ok(SE.levelTheta("L:10k", { handicap: 3 }) < opp && SE.levelTheta("L:10k", { handicap: -3 }) > opp);
+  assert.equal(SE.levelTheta("L:10k", { handicap: 1 }), opp, "one stone is not a handicap");
   // A board size maps through the levels' measured 19×19 ↔ 9×9 pairs.
   for (const s of STRENGTHS) assert.ok(Math.abs(SE.onBoard(SE.MEASURED.standard[s.id][19], 9) - SE.MEASURED.standard[s.id][9]) < 1e-9, s.id);
   for (const t19 of [-8, 0, 3.3, 12, 20, 30]) for (const size of [9, 13]) assert.ok(Math.abs(SE.fromBoard(SE.onBoard(t19, size), size) - t19) < 1e-6, `${t19} ${size}`);
@@ -3156,7 +3151,7 @@ await test("v6 strength: the uncertainty shrinks with games, less on 9×9, and g
     let est = SE.startEstimate(15, 0);
     const sig = [est.sigma];
     for (let i = 0; i < n; i++) {
-      est = SE.rateGame(est, { level: "15k", size, won: i % 2 === 0, at: 0 });
+      est = SE.rateGame(est, { impl: "L:15k", size, won: i % 2 === 0, at: 0 });
       sig.push(est.sigma);
     }
     return { est, sig };
@@ -3180,7 +3175,7 @@ await test("v6 strength: the uncertainty shrinks with games, less on 9×9, and g
   // History is kept, bounded.
   assert.equal(big.est.history.length, 61);
   let long = SE.startEstimate(15, 0);
-  for (let i = 0; i < 230; i++) long = SE.rateGame(long, { level: "15k", won: i % 2 === 0, at: i });
+  for (let i = 0; i < 230; i++) long = SE.rateGame(long, { impl: "L:15k", won: i % 2 === 0, at: i });
   assert.equal(long.history.length, 200);
   assert.equal(long.games, 230);
 });
@@ -3212,7 +3207,7 @@ await test("v6 strength: v5 ratings and their history migrate to an estimate wit
   const m = SE.migrateEstimate(p.rating);
   assert.equal(m.r, 1200);
   // The migrated estimate keeps updating.
-  const next = SE.rateGame(m, { level: "10k", won: true, at: 60 });
+  const next = SE.rateGame(m, { impl: "L:10k", won: true, at: 60 });
   assert.equal(next.games, 4);
   assert.equal(next.history.length, 5);
   for (const k of Object.values(KEYS)) removeKey(k);
@@ -3220,35 +3215,36 @@ await test("v6 strength: v5 ratings and their history migrate to an estimate wit
   const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
   assert.match(ctl, /migrateEstimate\(state\.progress\.rating\)/);
   const play = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
-  assert.match(play, /rateGame\(prev, \{ level: g\.strength, mode, size: g\.game\.size, handicap, won \}\)/);
+  assert.match(play, /rateGame\(prev, \{ impl, size: g\.game\.size, handicap, won \}\)/);
 });
 
-await test("v6 strength: the recommended opponent is the level you are expected to play evenly", () => {
-  // At a level's measured strength, that level is the suggestion, on both boards.
-  for (const s of STRENGTHS) {
-    const at = { mu: SE.MEASURED.standard[s.id][19] };
-    assert.equal(SE.recommendStrength(at), s.id, s.id);
-    assert.equal(SE.recommendStrength(at, { size: 9 }), s.id, `9×9 ${s.id}`);
+await test("v6 strength: the recommended opponent is the rank you are expected to play evenly", async () => {
+  const O = await import("../src/web/js/opponents.js");
+  // v9: the suggestion is a rank of the ladder, judged by what plays it.
+  // At an entry's measured strength, that entry is the suggestion, on both boards.
+  for (const installed of [{}, { human: true, strong: true }]) {
+    for (const e of O.ladder(installed)) {
+      const at = { mu: O.implTheta(e.impl, 19) };
+      assert.equal(SE.recommendStrength(at, { installed }), e.rank, e.impl);
+      // The standard ladder maps to 9×9 through its own measured pairs.
+      if (!installed.human) assert.equal(SE.recommendStrength(at, { size: 9, installed }), e.rank, `9×9 ${e.impl}`);
+    }
   }
-  // Between two levels: the nearer by expected score.
-  const mid = (SE.MEASURED.standard["10k"][19] + SE.MEASURED.standard["5k"][19]) / 2;
-  assert.equal(SE.recommendStrength({ mu: mid - 0.3 }), "10k");
-  assert.equal(SE.recommendStrength({ mu: mid + 0.3 }), "5k");
-  // A prior of 12 kyu (the 10k level's label) suggests that level.
-  assert.equal(SE.recommendStrength(SE.startEstimate(12)), "10k");
+  // Between two entries: the nearer by expected score.
+  const mid = (O.implTheta("L:10k", 19) + O.implTheta("C:b18", 19)) / 2;
+  assert.equal(SE.recommendStrength({ mu: mid - 0.3 }), 12);
+  assert.equal(SE.recommendStrength({ mu: mid + 0.3 }), 10);
+  // A prior of 12 kyu suggests 12 kyu.
+  assert.equal(SE.recommendStrength(SE.startEstimate(12)), 12);
   // Winning streaks move the suggestion up.
   let est = SE.startEstimate(18, 0);
-  assert.equal(SE.recommendStrength(est), "15k");
-  for (let i = 0; i < 8; i++) est = SE.rateGame(est, { level: SE.recommendStrength(est), won: true, at: i });
-  assert.ok(STRENGTHS.findIndex((s) => s.id === SE.recommendStrength(est)) > STRENGTHS.findIndex((s) => s.id === "15k"));
-  // The mode each level would be played in is taken into account.
-  for (const s of STRENGTHS) {
-    const mode = SE.MEASURED.human[s.id] ? "human" : "standard";
-    assert.ok(Number.isFinite(SE.levelTheta(s.id, { mode, size: 19 })) && Number.isFinite(SE.levelTheta(s.id, { mode, size: 9 })));
-  }
+  assert.equal(SE.recommendStrength(est), 18);
+  for (let i = 0; i < 8; i++) est = SE.rateGame(est, { impl: O.levelFor(SE.recommendStrength(est), {}).impl, won: true, at: i });
+  assert.ok(SE.recommendStrength(est) < 18);
+  // Every implementation has a strength on every board.
+  for (const it of O.IMPLS) for (const size of [9, 13, 19]) assert.ok(Number.isFinite(SE.levelTheta(it.id, { size })), `${it.id} ${size}`);
   const ctl = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
-  assert.match(ctl, /recommendStrength\(est, \{ size: 19, modeOf \}\)/);
-  assert.match(ctl, /recommendStrength\(est, \{ size: 9, modeOf \}\)/);
+  assert.match(ctl, /recommendStrength\(est, \{ size, installed \}\)/);
 });
 
 await test("v6 strength: the calibration fit can hold the measured ladder and place new players in its frame", () => {
@@ -3278,27 +3274,24 @@ await test("v6 strength: the calibration fit can hold the measured ladder and pl
   assert.equal(Math.round(row("L:c").gor), Math.round(SE.thetaToGoR(9)));
 });
 
-await test("v6 strength: human-style and stronger-network labels follow the v6 measurement", async () => {
+await test("v6 strength: human-style and stronger-network labels follow the measurement", async () => {
   const E = await import("../src/web/js/engine.js");
-  // v7 values (docs/strength.md, v7; the v7 tests check the whole ladder).
-  assert.equal(E.labelRank("1k", "human"), 1);
-  assert.equal(E.labelRank("2d", "human"), -5);
-  assert.equal(E.labelRank("2d", "strong"), -6);
-  for (const id of ["30k", "25k", "20k", "15k", "10k", "5k"]) assert.equal(E.labelRank(id, "human"), strengthById(id).rank, id);
-  for (const s of STRENGTHS) assert.equal(E.labelRank(s.id, "standard"), s.rank);
-  assert.deepEqual(rankParts("1k", "human"), { n: 1, unit: "kyu" });
-  assert.deepEqual(rankParts("2d", "strong"), { n: 7, unit: "dan" });
-  assert.deepEqual(rankParts("5k", "standard"), { n: 7, unit: "kyu" });
-  // Every mode's measured strength is ordered as its labels are, on 19×19.
-  for (const mode of ["standard", "human"]) {
-    for (let i = 1; i < STRENGTHS.length; i++) {
-      const a = SE.levelTheta(STRENGTHS[i - 1].id, { mode });
-      const b = SE.levelTheta(STRENGTHS[i].id, { mode });
-      assert.ok(b > a, `${mode} ${STRENGTHS[i].id}`);
-    }
+  // v7 values (docs/strength.md, v7); v9 shows each implementation's own
+  // measured rank: human-style 2d measured 7 dan, the stronger network 8.
+  assert.equal(E.implLabel("HL:1k"), 1);
+  assert.equal(E.implLabel("HL:2d"), -6);
+  assert.equal(E.implLabel("LS:2d"), -7);
+  assert.equal(E.implLabel("L:5k"), 7);
+  assert.deepEqual(rankParts(1), { n: 1, unit: "kyu" });
+  assert.deepEqual(rankParts(-6), { n: 7, unit: "dan" });
+  assert.deepEqual(rankParts(0), { n: 1, unit: "dan" });
+  // Every mode's measured strength is ordered as its calibrated levels are, on 19×19.
+  for (const prefix of ["L:", "HL:"]) {
+    const ids = STRENGTHS.map((s) => prefix + s.id).filter((id) => E.impl(id));
+    for (let i = 1; i < ids.length; i++) assert.ok(SE.levelTheta(ids[i]) > SE.levelTheta(ids[i - 1]), ids[i]);
   }
-  assert.ok(SE.levelTheta("2d", { mode: "strong" }) > SE.levelTheta("2d"));
-  assert.ok(SE.levelTheta("2d", { mode: "strong", size: 9 }) > SE.levelTheta("2d", { size: 9 }));
+  assert.ok(SE.levelTheta("LS:2d") > SE.levelTheta("L:2d"));
+  assert.ok(SE.levelTheta("LS:2d", { size: 9 }) > SE.levelTheta("L:2d", { size: 9 }));
 });
 
 await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {

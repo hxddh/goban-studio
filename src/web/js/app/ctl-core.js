@@ -80,7 +80,7 @@ export function teachingOn() {
   return rank >= 15;
 }
 
-/** The level nearest a rating (GoR), for "suggested opponent" (v6: by measured strength). */
+/** The ladder rank nearest a rating (GoR), for "suggested opponent" (v6: by measured strength; v9: a rank). */
 export function strengthForRating(r) {
   return recommendStrength({ mu: gorToTheta(r) });
 }

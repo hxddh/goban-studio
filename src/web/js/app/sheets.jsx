@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, RULESETS, defaultKomi, formatPoints, rulesetById } from "../rules.js";
-import { STRENGTHS, suggestHandicap } from "../engine.js";
+import { currentLadder, installed, nearest, suggestHandicap } from "../engine.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
 import * as U from "../update.js";
@@ -79,9 +79,13 @@ function NewGameSheet({ prefill }) {
   const [tc, setTc] = useState(s.timeControl || "none");
   const [opponent, setOpponent] = useState("ai");
   const [color, setColor] = useState(BLACK);
-  const [strengthIdx, setStrengthIdx] = useState(Math.max(0, STRENGTHS.findIndex((x) => x.id === (prefill?.strength || (s.autoStrength ? rec.strength : s.strength)))));
-  const strength = STRENGTHS[strengthIdx].id;
-  const suggested = opponent === "ai" ? suggestHandicap(rec.rank, strength, size) : 0;
+  // v9: one axis, the ranks of the ladder (opponents.js); each shows the
+  // measured rank of what plays it with the networks installed.
+  const ranks = currentLadder();
+  const startRank = nearest(prefill?.opponentRank ?? (s.autoStrength ? rec.opponentRank : s.opponentRank), installed()).rank;
+  const [rankIdx, setRankIdx] = useState(Math.max(0, ranks.findIndex((e) => e.rank === startRank)));
+  const choice = ranks[Math.min(rankIdx, ranks.length - 1)];
+  const suggested = opponent === "ai" ? suggestHandicap(rec.rank, choice.label, size) : 0;
   const [advanced, setAdvanced] = useState(false);
   const [handicap, setHandicap] = useState(null);
   const [komi, setKomi] = useState(null);
@@ -89,7 +93,7 @@ function NewGameSheet({ prefill }) {
   const h = handicap ?? (color === BLACK ? suggested : 0);
   const k = komi ?? defaultKomi(rules, h);
   const start = () =>
-    C.newGame({ size, opponent, color, strength: opponent === "ai" ? strength : undefined, handicap: h, komi: k, rules, timeControl: tc, rememberSize: true });
+    C.newGame({ size, opponent, color, opponentRank: opponent === "ai" ? choice.rank : undefined, handicap: h, komi: k, rules, timeControl: tc, rememberSize: true });
   return (
     <Modal
       title={t("common.newGame")}
@@ -138,18 +142,18 @@ function NewGameSheet({ prefill }) {
                 <input
                   type="range"
                   min="0"
-                  max={STRENGTHS.length - 1}
+                  max={ranks.length - 1}
                   step="1"
-                  value={strengthIdx}
+                  value={rankIdx}
                   aria-label={t("newGame.strength")}
-                  aria-valuetext={rankLabel(strength)}
+                  aria-valuetext={rankLabel(choice.label)}
                   onInput={(e) => {
-                    setStrengthIdx(Number(e.currentTarget.value));
+                    setRankIdx(Number(e.currentTarget.value));
                     setHandicap(null);
                     setKomi(null);
                   }}
                 />
-                <output>{rankLabel(strength)}</output>
+                <output>{rankLabel(choice.label)}</output>
               </div>
             </div>
             <div class="row">
@@ -452,7 +456,6 @@ function ModelsGroup() {
     C.refreshModels?.();
   }, []);
   const ms = state.models;
-  const s = state.settings;
   return (
     <section class="settings-group">
       <h3>{t("models.title")}</h3>
@@ -460,12 +463,6 @@ function ModelsGroup() {
       {["human", "strong"].map((kind) => (
         <ModelRow kind={kind} one={ms?.[kind]} />
       ))}
-      {ms?.human?.status === "ready" && (
-        <>
-          <Switch label={t("models.humanStyle")} checked={s.humanStyle !== false} onChange={(v) => C.setHumanStyle(v)} />
-          <p class="fine">{t("models.humanStyleHelp")}</p>
-        </>
-      )}
       <p class="fine">{t("models.source")}</p>
     </section>
   );

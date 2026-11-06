@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
-import { areaOf, rankParts, strengthById } from "../engine.js";
+import { areaOf, rankParts } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
@@ -18,8 +18,9 @@ import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { FirstCountNote } from "./beginner.jsx";
 
-export function rankLabel(id) {
-  const r = rankParts(id);
+/** A rank (rating.js encoding) as shown: "≈ 12 kyu", "≈ 4 dan". */
+export function rankLabel(rank) {
+  const r = rankParts(rank);
   return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
 }
 
@@ -177,8 +178,7 @@ function PlayerRow({ color }) {
   let sub = "";
   if (g.opponent === "ai" && color !== g.humanColor) {
     name = state.engine.available ? "KataGo" : t("play.offlineEngine");
-    sub = rankLabel(g.strength);
-    if (g.opponentMode === "human" || g.opponentMode === "strong") sub += " · " + t("models.mode." + g.opponentMode);
+    sub = rankLabel(g.rank);
   } else if (g.opponent === "ai") {
     name = t("play.you");
     const r = state.progress.rating?.r;
@@ -1121,10 +1121,6 @@ function GuessCard() {
       )}
     </section>
   );
-}
-
-export function strengthName(id) {
-  return rankLabel(strengthById(id).id);
 }
 
 export { SHIFT, update };

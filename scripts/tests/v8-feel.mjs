@@ -95,8 +95,8 @@ export default async function ({ test, assert, root }) {
       const m = SE.MEASURED.standard[s.id];
       assert.ok(Math.abs(SE.onBoard(m[19], 13) - m[13]) < 1e-9, `${s.id}: 19×19 → 13×13 through the measured pair`);
       assert.ok(Math.abs(SE.fromBoard(m[13], 13) - m[19]) < 1e-9, `${s.id}: and back`);
-      assert.equal(SE.levelTheta(s.id, { size: 13 }), m[13]);
-      assert.equal(SE.levelTheta(s.id, { size: 13, mode: "human" }), SE.MEASURED.human[s.id][13]);
+      if (E.impl("L:" + s.id)) assert.equal(SE.levelTheta("L:" + s.id, { size: 13 }), m[13]);
+      if (E.impl("HL:" + s.id)) assert.equal(SE.levelTheta("HL:" + s.id, { size: 13 }), SE.MEASURED.human[s.id][13]);
     }
     for (let t = -5; t < 35; t += 0.5) {
       assert.ok(SE.onBoard(t + 0.5, 13) > SE.onBoard(t, 13), "monotone");
@@ -110,10 +110,13 @@ export default async function ({ test, assert, root }) {
     const moved = (size) => SE.updateEstimate(est, { opponent: SE.onBoard(est.mu, size), size, won: true, at: 0 }).mu - est.mu;
     assert.ok(moved(9) < moved(13) && moved(13) < moved(19), `${moved(9)} ${moved(13)} ${moved(19)}`);
     // Handicap stones on 13×13 still weaken the level.
-    assert.ok(SE.levelTheta("5k", { size: 13, handicap: 3 }) < SE.levelTheta("5k", { size: 13 }));
+    assert.ok(SE.levelTheta("L:5k", { size: 13, handicap: 3 }) < SE.levelTheta("L:5k", { size: 13 }));
   });
 
   /* ------------------------------------------------------- think time */
+
+  // v9: every rank the opponent can play at, whatever is installed (opponents.js), weakest first.
+  const LEVELS = [...new Set([{}, { human: true }, { strong: true }, { human: true, strong: true }].flatMap((i) => E.ladder(i).map((e) => e.label)))].sort((a, b) => b - a);
 
   const obvious = { moves: [{ visits: 152, scoreLead: 2 }, { visits: 5, scoreLead: -6 }, { visits: 3, scoreLead: -9 }] };
   const complex = { moves: [{ visits: 40, scoreLead: 0.4 }, { visits: 38, scoreLead: 0.3 }, { visits: 35, scoreLead: 0.1 }, { visits: 30, scoreLead: 0 }] };
@@ -123,13 +126,13 @@ export default async function ({ test, assert, root }) {
   await test("v8 feel: the computer's think time stays between 0.35 s and 3.5 s at every level, board and phase", () => {
     assert.equal(F.THINK_MIN, 350);
     assert.equal(F.THINK_MAX, 3500);
-    for (const s of E.STRENGTHS) {
+    for (const s of LEVELS) {
       for (const size of [9, 13, 19]) {
         for (const n of [0, 10, 40, 120, 250, size * size]) {
           for (const a of [null, obvious, middling, complex]) {
             for (const r of [0, 0.5, 0.999]) {
-              const ms = F.thinkTime(s.id, a, n, size, fixed(r));
-              assert.ok(ms >= 350 && ms <= 3500, `${s.id} ${size} move ${n}: ${ms} ms`);
+              const ms = F.thinkTime(s, a, n, size, fixed(r));
+              assert.ok(ms >= 350 && ms <= 3500, `${s} ${size} move ${n}: ${ms} ms`);
             }
           }
         }
@@ -138,38 +141,38 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("v8 feel: an obvious move is answered at least twice as fast as a hard one, and the opening is brisk", () => {
-    for (const s of E.STRENGTHS) {
-      const easy = F.thinkTime(s.id, obvious, 100, 19, fixed(0.5));
-      const hard = F.thinkTime(s.id, complex, 100, 19, fixed(0.5));
-      assert.ok(hard >= 2 * easy, `${s.id}: ${easy} vs ${hard} ms`);
-      assert.ok(F.thinkTime(s.id, complex, 10, 19, fixed(0.5)) < hard, `${s.id}: the opening is quicker`);
-      assert.ok(F.thinkTime(s.id, complex, 300, 19, fixed(0.5)) < hard, `${s.id}: the endgame is quicker`);
+    for (const s of LEVELS) {
+      const easy = F.thinkTime(s, obvious, 100, 19, fixed(0.5));
+      const hard = F.thinkTime(s, complex, 100, 19, fixed(0.5));
+      assert.ok(hard >= 2 * easy, `${s}: ${easy} vs ${hard} ms`);
+      assert.ok(F.thinkTime(s, complex, 10, 19, fixed(0.5)) < hard, `${s}: the opening is quicker`);
+      assert.ok(F.thinkTime(s, complex, 300, 19, fixed(0.5)) < hard, `${s}: the endgame is quicker`);
     }
     // Stronger levels never answer faster than weaker ones in the same position.
     for (const a of [obvious, middling, complex]) {
-      const times = E.STRENGTHS.map((s) => F.thinkTime(s.id, a, 100, 19, fixed(0.5)));
-      for (let i = 1; i < times.length; i++) assert.ok(times[i] >= times[i - 1], `${E.STRENGTHS[i].id} quicker than ${E.STRENGTHS[i - 1].id}: ${times}`);
+      const times = LEVELS.map((s) => F.thinkTime(s, a, 100, 19, fixed(0.5)));
+      for (let i = 1; i < times.length; i++) assert.ok(times[i] >= times[i - 1], `${LEVELS[i]} quicker than ${LEVELS[i - 1]}: ${times}`);
     }
     // The gentlest level is quick, the strongest takes its time but is never sluggish.
-    assert.ok(F.thinkTime("30k", middling, 100, 19, fixed(0.5)) <= 1000);
-    assert.ok(F.thinkTime("2d", middling, 100, 19, fixed(0.5)) <= 2500);
-    assert.ok(F.thinkTime("2d", obvious, 100, 19, fixed(0.5)) <= 1200, "an obvious move, even at the top");
+    assert.ok(F.thinkTime(30, middling, 100, 19, fixed(0.5)) <= 1000);
+    assert.ok(F.thinkTime(-7, middling, 100, 19, fixed(0.5)) <= 2500);
+    assert.ok(F.thinkTime(-7, obvious, 100, 19, fixed(0.5)) <= 1200, "an obvious move, even at the top");
   });
 
   await test("v8 feel: think time varies by about ±15% from move to move, never mechanically", () => {
-    for (const s of E.STRENGTHS) {
-      const lo = F.thinkTime(s.id, middling, 100, 19, fixed(0));
-      const hi = F.thinkTime(s.id, middling, 100, 19, fixed(0.999));
+    for (const s of LEVELS) {
+      const lo = F.thinkTime(s, middling, 100, 19, fixed(0));
+      const hi = F.thinkTime(s, middling, 100, 19, fixed(0.999));
       if (lo > 350 && hi < 3500) {
-        assert.ok(hi / lo > 1.25 && hi / lo < 1.4, `${s.id}: ${lo}–${hi} ms`);
+        assert.ok(hi / lo > 1.25 && hi / lo < 1.4, `${s}: ${lo}–${hi} ms`);
       }
     }
     // Spread over a game's positions: more than a factor of two between the
     // quickest and slowest replies for every level.
-    for (const s of E.STRENGTHS) {
+    for (const s of LEVELS) {
       const all = [];
-      for (const a of [obvious, middling, complex]) for (const n of [10, 100, 300]) all.push(F.thinkTime(s.id, a, n, 19, fixed(0.5)));
-      assert.ok(Math.max(...all) / Math.min(...all) >= 2, `${s.id}: ${all}`);
+      for (const a of [obvious, middling, complex]) for (const n of [10, 100, 300]) all.push(F.thinkTime(s, a, n, 19, fixed(0.5)));
+      assert.ok(Math.max(...all) / Math.min(...all) >= 2, `${s}: ${all}`);
     }
   });
 
@@ -183,7 +186,7 @@ export default async function ({ test, assert, root }) {
     let low = 0;
     const out = [];
     for (let i = 0; i < k; i++) {
-      const v = F.resignStep(low, { strengthId: id, analysis: a, aiColor, moveNumber: n + 2 * i, size });
+      const v = F.resignStep(low, { rank: id, analysis: a, aiColor, moveNumber: n + 2 * i, size });
       low = v.low;
       out.push(v.resign);
     }
@@ -191,8 +194,8 @@ export default async function ({ test, assert, root }) {
   };
 
   await test("v8 feel: the computer resigns a clearly lost, settled game after three searches in a row", () => {
-    const resigning = E.STRENGTHS.filter((s) => s.rank <= F.RESIGN_FROM_RANK).map((s) => s.id);
-    assert.deepEqual(resigning, ["10k", "5k", "1k", "2d"]);
+    const resigning = LEVELS.filter((r) => r <= F.RESIGN_FROM_RANK);
+    assert.deepEqual(resigning, [15, 12, 10, 7, 5, 3, 2, 1, -3, -6, -7]);
     for (const id of resigning) {
       for (const size of [9, 13, 19]) {
         const r = steps(id, lostForWhite(30, settledOwn(size, 1)), 3, { size, n: Math.ceil((size * size) / 2) });
@@ -205,7 +208,7 @@ export default async function ({ test, assert, root }) {
     let low = 0;
     const lost = lostForWhite(40, settledOwn(19, 1));
     for (const a of [lost, lost, { ...lost, winrate: 0.9 }, lost, lost]) {
-      const v = F.resignStep(low, { strengthId: "2d", analysis: a, aiColor: WHITE, moveNumber: 200, size: 19 });
+      const v = F.resignStep(low, { rank: -3, analysis: a, aiColor: WHITE, moveNumber: 200, size: 19 });
       assert.equal(v.resign, false);
       low = v.low;
     }
@@ -213,33 +216,33 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("v8 feel: the computer never resigns while ahead, in an open position, early, offline, or at the gentlest levels", () => {
-    for (const s of E.STRENGTHS) {
+    for (const s of LEVELS) {
       // Ahead, or level: never.
       for (const a of [{ winrate: 0.01, scoreLead: -25, ownership: settledOwn(19, -1) }, { winrate: 0.5, scoreLead: 0.5, ownership: settledOwn(19, 1) }]) {
-        assert.ok(!steps(s.id, a, 8).some(Boolean), `${s.id} resigned while ahead or level`);
+        assert.ok(!steps(s, a, 8).some(Boolean), `${s} resigned while ahead or level`);
       }
       // Behind by 30 with most of the board open: a weak opponent could still throw it away.
       const open = lostForWhite(30, openOwn(19));
-      assert.ok(!steps(s.id, open, 8, { n: 120 }).some(Boolean), `${s.id} resigned an open game`);
+      assert.ok(!steps(s, open, 8, { n: 120 }).some(Boolean), `${s} resigned an open game`);
       // In the opening, however it looks.
-      assert.ok(!steps(s.id, lostForWhite(60, settledOwn(19, 1)), 8, { n: 20 }).some(Boolean), `${s.id} resigned in the opening`);
+      assert.ok(!steps(s, lostForWhite(60, settledOwn(19, 1)), 8, { n: 20 }).some(Boolean), `${s} resigned in the opening`);
       // No analysis (the offline engine): never.
-      assert.ok(!steps(s.id, null, 8).some(Boolean));
-      assert.ok(!steps(s.id, { winrate: null, scoreLead: null }, 8).some(Boolean));
+      assert.ok(!steps(s, null, 8).some(Boolean));
+      assert.ok(!steps(s, { winrate: null, scoreLead: null }, 8).some(Boolean));
       // The gentlest levels play every game out.
-      if (s.rank > F.RESIGN_FROM_RANK) assert.ok(!steps(s.id, lostForWhite(200, settledOwn(19, 1)), 20).some(Boolean), `${s.id} resigned`);
+      if (s > F.RESIGN_FROM_RANK) assert.ok(!steps(s, lostForWhite(200, settledOwn(19, 1)), 20).some(Boolean), `${s} resigned`);
     }
     // How open the board is sets the margin: a quarter of the open points
     // for the two strongest levels, half for the others.
     const halfOpen = new Float32Array(361).map((_, i) => (i < 200 ? 0.95 : 0.1)); // 161 open points
     assert.equal(F.openPoints(halfOpen), 161);
-    assert.deepEqual(steps("2d", lostForWhite(42, halfOpen), 3), [false, false, true]);
-    assert.ok(!steps("2d", lostForWhite(38, halfOpen), 6).some(Boolean));
-    assert.ok(!steps("10k", lostForWhite(78, halfOpen), 6).some(Boolean));
-    assert.deepEqual(steps("10k", lostForWhite(82, halfOpen), 3), [false, false, true]);
+    assert.deepEqual(steps(-3, lostForWhite(42, halfOpen), 3), [false, false, true]);
+    assert.ok(!steps(-3, lostForWhite(38, halfOpen), 6).some(Boolean));
+    assert.ok(!steps(12, lostForWhite(78, halfOpen), 6).some(Boolean));
+    assert.deepEqual(steps(12, lostForWhite(82, halfOpen), 3), [false, false, true]);
     // Without ownership every empty point counts as open.
-    assert.ok(!F.resignStep(2, { strengthId: "2d", analysis: { winrate: 0.99, scoreLead: 30 }, aiColor: WHITE, moveNumber: 150, size: 19, empty: 200 }).resign);
-    assert.ok(F.resignStep(2, { strengthId: "2d", analysis: { winrate: 0.99, scoreLead: 30 }, aiColor: WHITE, moveNumber: 250, size: 19, empty: 100 }).resign);
+    assert.ok(!F.resignStep(2, { rank: -3, analysis: { winrate: 0.99, scoreLead: 30 }, aiColor: WHITE, moveNumber: 150, size: 19, empty: 200 }).resign);
+    assert.ok(F.resignStep(2, { rank: -3, analysis: { winrate: 0.99, scoreLead: 30 }, aiColor: WHITE, moveNumber: 250, size: 19, empty: 100 }).resign);
   });
 
   /* ------------------------------------------------------- the count */
@@ -406,7 +409,7 @@ export default async function ({ test, assert, root }) {
    * C and D, White walls on F and G, column E empty. 36 moves; Black to play.
    */
   function wallsGame(strength) {
-    Play.newGame({ size: 9, color: BLACK, strength, rules: "japanese" });
+    Play.newGame({ size: 9, color: BLACK, opponentRank: strength, rules: "japanese" });
     const g = state.game;
     for (let y = 0; y < 9; y++) {
       g.game.play(2, y);
@@ -441,7 +444,7 @@ export default async function ({ test, assert, root }) {
   await test("v8 feel: the computer takes at least the minimum think time, and its pace follows the position", async () => {
     fast = false;
     try {
-      const g = wallsGame("30k");
+      const g = wallsGame(30);
       respond = () => dameReport();
       const t0 = Date.now();
       await humanThenReply(g, 4, 8);
@@ -454,7 +457,7 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("v8 feel: on a settled board the count is offered on the player's turn, with nothing pondering", async () => {
-    const g = wallsGame("2d");
+    const g = wallsGame(-3);
     respond = () => dameReport();
     assert.equal(g.proposal, false);
     await humanThenReply(g, 4, 8);
@@ -477,11 +480,11 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("v8 feel: no count offer while the board is open or a move is still worth points", async () => {
-    let g = wallsGame("2d");
+    let g = wallsGame(-3);
     respond = () => dameReport({ ownership: new Float32Array(81).fill(0.3) });
     await humanThenReply(g, 4, 8);
     assert.equal(g.proposal, false, "open board");
-    g = wallsGame("2d");
+    g = wallsGame(-3);
     respond = () => {
       const r = dameReport();
       // The best move gains three points over the next one.
@@ -493,7 +496,7 @@ export default async function ({ test, assert, root }) {
 
   await test("v8 feel: a clearly lost computer resigns on its third hopeless search; a winning or gentle one plays on", async () => {
     // 2d, White, 40 points behind on a settled board.
-    let g = wallsGame("2d");
+    let g = wallsGame(-3);
     respond = () => dameReport({ winrate: 0.998, lead: 40 });
     await humanThenReply(g, 4, 8);
     await humanThenReply(g, dameOf(g.game).x, dameOf(g.game).y);
@@ -504,7 +507,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(state.toasts.some((x) => /resigned/.test(x.message)), "it says so");
 
     // An undo forgets the streak.
-    g = wallsGame("2d");
+    g = wallsGame(-3);
     await humanThenReply(g, 4, 8);
     await humanThenReply(g, dameOf(g.game).x, dameOf(g.game).y);
     Play.undo();
@@ -513,7 +516,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(g.game.current.result, null, "the streak restarted after the undo");
 
     // The computer ahead: never.
-    g = wallsGame("2d");
+    g = wallsGame(-3);
     respond = () => dameReport({ winrate: 0.002, lead: -40 });
     for (let i = 0; i < 4; i++) await humanThenReply(g, dameOf(g.game).x, dameOf(g.game).y);
     assert.equal(g.game.current.result, null);

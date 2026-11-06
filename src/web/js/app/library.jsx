@@ -74,7 +74,7 @@ function ContinueCard() {
         <span class="gr-text">
           <strong>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</strong>
           <span>
-            {t("library.inProgress")} · {g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.strength)]) : t("library.twoPlayers")}
+            {t("library.inProgress")} · {g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.rank)]) : t("library.twoPlayers")}
           </span>
         </span>
         <Button size="sm" onClick={C.continueCurrent}>
@@ -97,7 +97,7 @@ function fmtDate(value) {
 function recordTitle(g) {
   if (g.name) return g.name;
   if (g.source === "import") return t("library.untitled");
-  return g.opponent === "ai" ? t("library.vsEngine", [g.strength ? rankLabel(g.strength) : "KataGo"]) : t("library.twoPlayers");
+  return g.opponent === "ai" ? t("library.vsEngine", [g.rank != null ? rankLabel(g.rank) : "KataGo"]) : t("library.twoPlayers");
 }
 
 function outcome(g) {

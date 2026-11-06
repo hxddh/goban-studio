@@ -129,8 +129,8 @@ export function wantsReport(rec) {
 
 /** The opponent as a job title names it. */
 function gameTitle(rec) {
-  if (rec.opponent === "ai" && rec.strength) {
-    const r = Engine.rankParts(rec.strength);
+  if (rec.opponent === "ai" && rec.rank != null) {
+    const r = Engine.rankParts(rec.rank);
     return t("sched.job.game", [t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n])]);
   }
   return t("sched.job.report");

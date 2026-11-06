@@ -353,7 +353,7 @@ export function explorerPlayFromHere() {
   remember();
   const humanColor = game.turn;
   update((s) => {
-    s.game = freshGameState(game, { opponent: "ai", humanColor, strength: s.settings.strength });
+    s.game = freshGameState(game, { opponent: "ai", humanColor });
     s.review = null;
     s.space = "play";
   });

@@ -136,7 +136,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
         for (let y = 0; y < 19 && i < moves; y += 2) for (let x = 0; x < 19 && i < moves; x++, i++) sgf += `;${i % 2 ? "W" : "B"}[${L[x]}${L[y]}]`;
         sgf += ")";
         const at = Date.now();
-        const game = { id: "v8-seed", createdAt: at, updatedAt: at, source: "game", opponent: "ai", strength: "10k", humanColor: 1, size: 19, moves, result: "W+R", name: "Seed", sgf, thumb: "" };
+        const game = { id: "v8-seed", createdAt: at, updatedAt: at, source: "game", opponent: "ai", rank: 12, impl: "L:10k", humanColor: 1, size: 19, moves, result: "W+R", name: "Seed", sgf, thumb: "" };
         if (report) game.report = report;
         localStorage.setItem("goban-studio.library.v2", JSON.stringify({ v: 2, games: [game] }));
       },

@@ -66,19 +66,19 @@ await test("ranks and ratings map both ways on the EGF scale", () => {
 await test("winning raises the rating, losing lowers it, and early games move it more", () => {
   // v6: the strength estimate (strength.js) replaces the v5 Elo update.
   const r0 = startEstimate(12, 0);
-  const won = rateGame(r0, { level: "10k", won: true, at: 0 });
-  const lost = rateGame(r0, { level: "10k", won: false, at: 0 });
+  const won = rateGame(r0, { impl: "L:10k", won: true, at: 0 });
+  const lost = rateGame(r0, { impl: "L:10k", won: false, at: 0 });
   assert.ok(won.r > r0.r && lost.r < r0.r);
   assert.equal(won.games, 1);
-  const late = rateGame(migrateEstimate({ r: 1000, games: 30, history: [] }, 0), { level: "10k", won: true, at: 0 });
-  const early = rateGame(migrateEstimate({ r: 1000, games: 0, history: [] }, 0), { level: "10k", won: true, at: 0 });
+  const late = rateGame(migrateEstimate({ r: 1000, games: 30, history: [] }, 0), { impl: "L:10k", won: true, at: 0 });
+  const early = rateGame(migrateEstimate({ r: 1000, games: 0, history: [] }, 0), { impl: "L:10k", won: true, at: 0 });
   assert.ok(early.r - 1000 > late.r - 1000);
   // Handicap makes the opponent effectively weaker: a win is worth less.
   const base = migrateEstimate({ r: 1000, games: 10, history: [] }, 0);
-  const withHc = rateGame(base, { level: "10k", handicap: 4, won: true, at: 0 });
-  const even = rateGame(base, { level: "10k", won: true, at: 0 });
+  const withHc = rateGame(base, { impl: "L:10k", handicap: 4, won: true, at: 0 });
+  const even = rateGame(base, { impl: "L:10k", won: true, at: 0 });
   assert.ok(withHc.r < even.r);
-  assert.ok(levelTheta("10k", { handicap: 4 }) < levelTheta("10k"));
+  assert.ok(levelTheta("L:10k", { handicap: 4 }) < levelTheta("L:10k"));
   assert.equal(won.history.length, 2);
   assert.equal(rankToRating(12), 900);
 });

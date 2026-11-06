@@ -7,7 +7,7 @@ import path from "node:path";
 import * as A from "../../src/web/js/capture-ai.js";
 import { bridgeAfter, CAPTURE_AFTER, FIRST_GAME, FIRST_GAME_AFTER } from "../../src/web/js/app/beginner.js";
 import { COURSE } from "../../src/web/js/content/course.js";
-import { STRENGTHS } from "../../src/web/js/engine.js";
+import { RANKS } from "../../src/web/js/engine.js";
 import { MESSAGES } from "../../src/web/js/messages.js";
 import { V8_BEGINNER } from "../../src/web/js/messages/v8-beginner.js";
 
@@ -167,7 +167,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(FIRST_GAME_AFTER.every((id) => life.includes(id)));
     assert.equal(FIRST_GAME_AFTER.at(-1), life.at(-1), "and at the end of the life unit");
     assert.equal(FIRST_GAME.size, 9);
-    assert.equal(FIRST_GAME.strength, STRENGTHS[0].id, "the gentlest level");
+    assert.equal(FIRST_GAME.opponentRank, RANKS[0], "the gentlest rank");
     const none = { settings: {}, progress: { games: [] } };
     assert.equal(bridgeAfter("stones-capture", none), "capture");
     assert.equal(bridgeAfter("stones-suicide", none), "capture");
