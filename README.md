@@ -463,6 +463,8 @@ scripts/patch-sdk.mjs         keeps the system Edit/Window menus beside app menu
 src/web/js/rules.js           game tree, legality, Japanese scoring, SGF export
 src/web/js/sgf.js             dependency-free FF[4] reader
 src/web/js/content/           course, problems (+ measured grades), classics, book
+src/web/js/content.js         content in two steps: a start-up index, then lesson steps,
+                              problem bodies and classic records fetched on idle or first use
 src/web/js/i18n.js            one key → four strings
 src/web/js/persist.js         guarded storage, spaced review
 src/web/js/library.js         saved games and the current game

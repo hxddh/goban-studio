@@ -9,7 +9,7 @@ import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, setDailyPlanner, t
 import { evidenceOf, focusLesson, focusTopic, planDaily, weekToKeep, weeklyModel } from "./plan.js";
 import { saveProgress } from "../persist.js";
 import { weekStart } from "./week.js";
-import { CLASSICS } from "../content/classics.js";
+import { CLASSICS } from "../content.js";
 
 // v8: drills of these games (by their gameKey) are not the player's own.
 let foreignKeys = null;

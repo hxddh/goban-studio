@@ -8,18 +8,13 @@ import * as S from "../solver.js";
 import { currentStreak, dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { COURSE } from "../content/course.js";
-import * as ProblemContent from "../content/problems.js";
-import GRADES from "../content/problem-grades.json";
+import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { pickNextLesson } from "./course-path.js";
 
-export const PROBLEMS = ProblemContent.PROBLEMS;
-export const THEMES = ProblemContent.THEMES || [];
-export const SHAPES = ProblemContent.SHAPES || [];
-export { COURSE, GRADES };
+export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
 export const gradeOf = (id) => GRADES[id]?.grade || 1;
 
@@ -134,7 +129,15 @@ function problemState(pz) {
   return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null };
 }
 
+/**
+ * v9: lesson steps and problem bodies arrive after start-up (content.js);
+ * whatever opens them waits for them, and runs at once when they are here.
+ */
 export function openLesson(lessonId, stepIndex = null) {
+  return withContent("course", () => showLesson(lessonId, stepIndex));
+}
+
+function showLesson(lessonId, stepIndex) {
   const found = allLessons().find((l) => l.lesson.id === lessonId);
   if (!found) return;
   if (!isRestoring()) remember();
@@ -216,6 +219,10 @@ export function practiceHome() {
 }
 
 export function openTopic(topic, theme = null) {
+  return withContent("problems", () => showTopic(topic, theme));
+}
+
+function showTopic(topic, theme) {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "practice";
@@ -225,6 +232,10 @@ export function openTopic(topic, theme = null) {
 
 /** A classic-shape collection, shown as a topic page. */
 export function openShape(shape) {
+  return withContent("problems", () => showShape(shape));
+}
+
+function showShape(shape) {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "practice";
@@ -258,6 +269,10 @@ export function themeName(id) {
 }
 
 export function openProblem(id, { daily = null } = {}) {
+  return withContent("problems", () => showProblem(id, daily));
+}
+
+function showProblem(id, daily) {
   const p = PROBLEMS.find((x) => x.id === id);
   if (!p) return;
   if (!isRestoring() && !daily) remember();
@@ -352,6 +367,11 @@ export function todaysDaily() {
 }
 
 export function startDaily() {
+  // The beginner pool reads the finished lessons' steps (dailyPool).
+  return withContent("course", () => withContent("problems", showDaily));
+}
+
+function showDaily() {
   let daily = todaysDaily();
   if (!daily) {
     daily = { date: todayKey(), items: buildDaily(), index: 0, done: [] };

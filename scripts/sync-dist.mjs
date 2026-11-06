@@ -27,6 +27,13 @@ fs.mkdirSync(path.join(dist, "content"), { recursive: true });
 for (const f of ["book.json"]) {
   fs.copyFileSync(path.join(src, "js", "content", f), path.join(dist, "content", f));
 }
+// v9: the course, problems and classics past the start-up index
+// (src/web/js/content.js), written by bundle.mjs.
+for (const f of ["course.json", "problems.json", "classics.json"]) {
+  const from = path.join(src, "js", "content-lazy", f);
+  if (!fs.existsSync(from)) throw new Error(`${from} is missing: run npm run build first`);
+  fs.copyFileSync(from, path.join(dist, "content", f));
+}
 if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
 }

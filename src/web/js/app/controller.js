@@ -15,7 +15,7 @@ import * as Backup from "../persist.js";
 import { APP_VERSION } from "../version.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
-import { CLASSICS } from "../content/classics.js";
+import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, setSetting, syncMenus, tx } from "./ctl-core.js";
 import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
@@ -70,6 +70,10 @@ export function boot() {
   setRestorer(restore);
   state.ready = true;
   update();
+  // v9: lesson steps, problem bodies and classic records follow on idle
+  // (content.js). Nothing on screen reads them before it is opened, and
+  // what opens them waits for them, so their arrival renders nothing.
+  preloadContent();
   Engine.info().then((info) => {
     update({ engine: info });
     maybeComputerMove();
@@ -168,6 +172,10 @@ export function openRecord(id) {
 }
 
 export function openClassic(id) {
+  return withContent("classics", () => showClassic(id));
+}
+
+function showClassic(id) {
   const c = CLASSICS.find((g) => g.id === id);
   if (!c) return;
   try {
