@@ -6,14 +6,6 @@
  * exists here.
  */
 import { m } from "./messages/m.js";
-import { V7_FIXES } from "./messages/v7-fixes.js";
-import { V7_SCHEDULER } from "./messages/v7-scheduler.js";
-import { V7_CALIBRATION } from "./messages/v7-calibration.js";
-import { V7_BOOK } from "./messages/v7-book.js";
-import { V8_BEGINNER } from "./messages/v8-beginner.js";
-import { V8_TEACHING } from "./messages/v8-teaching.js";
-import { V8_FEEL } from "./messages/v8-feel.js";
-import { V8_FIXES } from "./messages/v8-fixes.js";
 import { SHELL } from "./messages/shell.js";
 import { PLAY } from "./messages/play.js";
 import { LEARN } from "./messages/learn.js";
@@ -946,16 +938,6 @@ export const MESSAGES = {
     "컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.",
     "コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",
   ),
-  // v7: one file per area (src/web/js/messages/v7-*.js).
-  ...V7_FIXES,
-  ...V7_SCHEDULER,
-  ...V7_CALIBRATION,
-  ...V7_BOOK,
-  // v8: one file per area (src/web/js/messages/v8-*.js).
-  ...V8_BEGINNER,
-  ...V8_TEACHING,
-  ...V8_FEEL,
-  ...V8_FIXES,
   // v9: strings by area (src/web/js/messages/{shell,play,learn}.js).
   ...SHELL,
   ...PLAY,

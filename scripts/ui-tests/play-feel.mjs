@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dist = path.join(root, "frontend/dist");
 
-export const V8_BUDGET = {
+export const BUDGET = {
   bundleBytes: 1.3 * 1024 * 1024, // the one start-up script (2.71 MB in v7, 2.13 MB in v8, 1.04 MB in v9: content after start-up)
   contentFirstUse: 1500, // a problem opened before its part arrived on idle
   coldStart: 800, // median of three: navigation to the first screen
@@ -65,7 +65,7 @@ function fakeHost() {
 export default async function ({ check, assert, fresh, onboard, origin }) {
   await check("play budgets: one start-up script under 1.3 MB; the opening book and the content parts are served beside it", async () => {
     const bytes = fs.statSync(path.join(dist, "js/bundle.js")).size;
-    assert(bytes < V8_BUDGET.bundleBytes, `bundle.js ${bytes} bytes > ${V8_BUDGET.bundleBytes}`);
+    assert(bytes < BUDGET.bundleBytes, `bundle.js ${bytes} bytes > ${BUDGET.bundleBytes}`);
     const js = fs.readFileSync(path.join(dist, "js/bundle.js"), "utf8");
     assert(!js.includes(`symmetry: "all"`), "the book's data is in the bundle");
     const book = JSON.parse(fs.readFileSync(path.join(dist, "content/book.json"), "utf8"));
@@ -94,7 +94,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
       await page.close();
     }
     const med = times.sort((a, b) => a - b)[1];
-    assert(med < V8_BUDGET.coldStart, `cold start ${med} ms > ${V8_BUDGET.coldStart}`);
+    assert(med < BUDGET.coldStart, `cold start ${med} ms > ${BUDGET.coldStart}`);
     return `median ${med} ms (${times.join(", ")})`;
   });
 
@@ -128,7 +128,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     for (const r of held.splice(0)) await r.continue();
     await page.waitForSelector(".problem-card");
     const ms = Date.now() - t0;
-    assert(ms < V8_BUDGET.contentFirstUse, `topic ${ms} ms after its part was let through > ${V8_BUDGET.contentFirstUse}`);
+    assert(ms < BUDGET.contentFirstUse, `topic ${ms} ms after its part was let through > ${BUDGET.contentFirstUse}`);
     await page.click(".problem-card >> nth=0");
     await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.problem?.pz);
     // The rest arrives on idle, each part once.
@@ -152,7 +152,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.waitForFunction(() => window.__state.game?.game.moveNumber >= 1 && !window.__state.game.thinking, null, { timeout: 6000 });
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const ms = Date.now() - t0;
-    const [lo, hi] = V8_BUDGET.firstComputerMove;
+    const [lo, hi] = BUDGET.firstComputerMove;
     assert(ms >= lo && ms < hi, `first computer move ${ms} ms, want ${lo}–${hi}`);
     const mode = await page.evaluate(() => window.__state.game.opponentMode);
     assert(mode === "standard", `played by ${mode}, not the KataGo path`);
@@ -171,7 +171,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.click("[data-explorer=whole]");
     await page.waitForSelector(".explorer-panel .explorer-row");
     const ms = Date.now() - t0;
-    assert(ms < V8_BUDGET.explorerOpen, `explorer ${ms} ms > ${V8_BUDGET.explorerOpen}`);
+    assert(ms < BUDGET.explorerOpen, `explorer ${ms} ms > ${BUDGET.explorerOpen}`);
     assert(fetched.length === 1 && /\/content\/book\.json$/.test(fetched[0]), `book fetched: ${fetched.join(", ")}`);
     const n = await page.locator(".explorer-panel .explorer-row").count();
     assert(n >= 3, `${n} continuations`);
@@ -215,7 +215,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await onboard(page, 1);
     await seedGame(page, 150);
     const freshMs = await openFromHistory(page);
-    assert(freshMs < V8_BUDGET.reviewFresh, `analysed on the spot ${freshMs} ms > ${V8_BUDGET.reviewFresh}`);
+    assert(freshMs < BUDGET.reviewFresh, `analysed on the spot ${freshMs} ms > ${BUDGET.reviewFresh}`);
     // It is stored with its game now; opening it again is instant.
     await page.waitForFunction(() => !!JSON.parse(localStorage.getItem("goban9:games/seed.json")).review, null, { timeout: 3000 });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("goban9:games/seed.json")));
@@ -223,7 +223,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.reload();
     await page.waitForSelector(".page, canvas.board");
     const storedMs = await openFromHistory(page);
-    assert(storedMs < V8_BUDGET.reviewStored, `stored review ${storedMs} ms > ${V8_BUDGET.reviewStored}`);
+    assert(storedMs < BUDGET.reviewStored, `stored review ${storedMs} ms > ${BUDGET.reviewStored}`);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
     return `analysed ${freshMs} ms, stored ${storedMs} ms`;

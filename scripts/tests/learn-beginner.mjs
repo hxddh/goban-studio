@@ -10,7 +10,7 @@ import { bridgeAfter, CAPTURE_AFTER, FIRST_GAME, FIRST_GAME_AFTER, measuredRank,
 import { COURSE } from "../../src/web/js/content/course.js";
 import { RANKS } from "../../src/web/js/engine.js";
 import { MESSAGES } from "../../src/web/js/messages.js";
-import { V8_BEGINNER } from "../../src/web/js/messages/v8-beginner.js";
+import { LEARN } from "../../src/web/js/messages/learn.js";
 
 /** A board from rows of X (black), O (white) and dots. */
 function parse(rows) {
@@ -200,16 +200,16 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("learn beginner: strings in four languages; the first-count note is at most three sentences", () => {
-    for (const [key, v] of Object.entries(V8_BEGINNER)) {
+    for (const [key, v] of Object.entries(LEARN)) {
       assert.deepEqual(MESSAGES[key], v, key);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(v[lang]?.trim(), `${key} ${lang}`);
     }
-    const note = V8_BEGINNER["firstCount.note"];
+    const note = LEARN["firstCount.note"];
     for (const lang of ["zh", "ja"]) assert.ok((note[lang].match(/。/g) || []).length <= 3, lang);
     for (const lang of ["en", "ko"]) assert.ok((note[lang].match(/\.(\s|$)/g) || []).length <= 3, lang);
     assert.ok(note.zh.includes("死子") && note.zh.includes("贴目"), "the Chinese uses 死子 and 贴目");
-    assert.ok(V8_BEGINNER["capture.title"].zh === "吃子棋");
-    assert.ok(V8_BEGINNER["onboarding.rulesHelp"].en.includes("9×9"));
+    assert.ok(LEARN["capture.title"].zh === "吃子棋");
+    assert.ok(LEARN["onboarding.rulesHelp"].en.includes("9×9"));
     // The old 19×19 wording is gone from the base table (one source per key).
     const base = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
     assert.ok(!base.includes('"onboarding.rulesHelp"'));

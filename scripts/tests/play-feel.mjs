@@ -9,6 +9,8 @@
  * the count only on a settled board, and the end-of-game marking can be
  * corrected group by group.
  */
+import { register } from "./helpers.mjs";
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 8000, what = "condition") {
   const end = Date.now() + ms;
@@ -368,7 +370,7 @@ export default async function ({ test, assert, root }) {
     write: false,
     logLevel: "error",
   });
-  const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  const A = register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
   const { Play, Lib, P, state, PM, store } = A;
   // The store picks its backend on first use: the preview's, before any fake host.
   await store.open();

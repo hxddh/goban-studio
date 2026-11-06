@@ -9,6 +9,7 @@
  * process cannot answer; then what a game stores.
  */
 import fs from "node:fs";
+import { register } from "./helpers.mjs";
 import path from "node:path";
 
 import * as O from "../../src/web/js/opponents.js";
@@ -190,7 +191,7 @@ export default async function ({ test, assert, root }) {
     write: false,
     logLevel: "error",
   });
-  const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  const A = register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
   const { Play, Engine, Lib, P, PM, Game, BLACK, state, store } = A;
   // The store picks its backend on first use: the preview's, before the fake host below.
   await store.open();

@@ -7,6 +7,7 @@
  * host: a teaching warning shows and announces its reason, and costs no extra search.
  */
 import fs from "node:fs";
+import { register } from "./helpers.mjs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -31,7 +32,7 @@ export default async function ({ test, assert, root }) {
   const { warningReason, hintReason, warningText, hintText } = await import("../../src/web/js/app/teach-why.js");
   const { setLang } = await import("../../src/web/js/i18n.js");
   const { MESSAGES } = await import("../../src/web/js/messages.js");
-  const { V8_TEACHING } = await import("../../src/web/js/messages/v8-teaching.js");
+  const { PLAY } = await import("../../src/web/js/messages/play.js");
   setLang("en");
   const E = ". . . . . . . . .";
 
@@ -150,7 +151,7 @@ export default async function ({ test, assert, root }) {
 
   await test("play teaching: every reason string exists in four languages with matching placeholders", () => {
     const holes = (v) => [...new Set([...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]))].sort().join();
-    for (const k of Object.keys(V8_TEACHING)) {
+    for (const k of Object.keys(PLAY)) {
       assert.ok(MESSAGES[k], k);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
       for (const lang of ["zh", "ko", "ja"]) assert.equal(holes(MESSAGES[k][lang]), holes(MESSAGES[k].en), `${k} ${lang}`);
@@ -189,7 +190,7 @@ export default async function ({ test, assert, root }) {
     write: false,
     logLevel: "error",
   });
-  const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  const A = register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
   const { Play, Lib, P, BLACK, state, PM, store } = A;
   // The store picks its backend on first use: the preview's, before any fake host.
   await store.open();

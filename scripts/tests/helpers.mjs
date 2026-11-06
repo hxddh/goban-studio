@@ -82,7 +82,37 @@ export async function bundle(lines) {
     write: false,
     logLevel: "error",
   });
-  return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  return register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
+}
+
+/*
+ * A test file's bundles are stopped when the file ends (scripts/test.mjs
+ * calls teardown): its pending store writes are written, its scheduler jobs
+ * cancelled and its game and review let go, so none of its timers (a paced
+ * computer reply, a background analysis, a debounced write) fires later
+ * into the next file's fake native host.
+ */
+const live = new Set();
+export function register(mod) {
+  live.add(mod);
+  return mod;
+}
+export async function teardown() {
+  for (const mod of live) {
+    try {
+      await mod.store?.flush?.();
+    } catch (_) {}
+    try {
+      mod.Engine?.sched?.cancelAll?.("test-end");
+    } catch (_) {}
+    const st = mod.state;
+    if (st) {
+      st.game = null;
+      st.review = null;
+      if (st.learn) st.learn = { ...st.learn, capture: null };
+    }
+  }
+  live.clear();
 }
 
 export const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));

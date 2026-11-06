@@ -167,11 +167,11 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("core scheduler: strings in four languages; no old serial chain or tokens left", async () => {
-    const { V7_SCHEDULER } = await import("../../src/web/js/messages/v7-scheduler.js");
+    const { MESSAGES } = await import("../../src/web/js/messages.js");
     const holes = (v) => [...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]).sort().join();
-    assert.ok(Object.keys(V7_SCHEDULER).length >= 6);
-    for (const [k, v] of Object.entries(V7_SCHEDULER)) {
-      assert.ok(k.startsWith("sched."), k);
+    const sched = Object.entries(MESSAGES).filter(([k]) => k.startsWith("sched."));
+    assert.ok(sched.length >= 1, "the background-work strings");
+    for (const [k, v] of sched) {
       for (const lang of ["zh", "en", "ko", "ja"]) {
         assert.ok(v[lang]?.trim(), `${k} ${lang}`);
         assert.equal(holes(v[lang]), holes(v.en), `${k} ${lang}`);

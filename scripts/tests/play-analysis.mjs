@@ -10,6 +10,7 @@
  * Loaded by scripts/test.mjs; receives the runner's helpers.
  */
 import fs from "node:fs";
+import { register } from "./helpers.mjs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -54,7 +55,7 @@ export default async function ({ test, assert, root }) {
     write: false,
     logLevel: "error",
   });
-  const A = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  const A = register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
   const { C, Analysis, Image, Engine, Lib, P, PM, Game, BLACK, WHITE, state, store, loadSGF, reviewFits, tryMoments } = A;
   // The store picks its backend on first use: the preview's, before the fake host below.
   await store.open();

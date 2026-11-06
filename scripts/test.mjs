@@ -10,14 +10,17 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { assert, results, root, test } from "./tests/helpers.mjs";
+import { assert, results, root, teardown, test } from "./tests/helpers.mjs";
 
 // `node scripts/test.mjs play-,learn-` runs only the files whose names contain one of these.
 const only = (process.argv[2] || "").split(",");
 for (const f of fs.readdirSync(path.join(root, "scripts/tests")).filter((n) => n.endsWith(".mjs") && n !== "helpers.mjs" && only.some((o) => n.includes(o))).sort()) {
   const mod = await import("./tests/" + f);
   if (typeof mod.default === "function") await mod.default({ test, assert, root });
-  // A file's fake native host ends with it: the next file starts without one.
+  // A file's bundles stop with it (helpers.teardown), then its fake native
+  // host goes: the next file starts without one, and no stray timer of this
+  // file reaches the next file's host.
+  await teardown();
   delete globalThis.zero;
 }
 

@@ -5,6 +5,7 @@
  * quirks of real records. Loaded by scripts/test.mjs; receives the
  * runner's helpers.
  */
+import { register } from "./helpers.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 8000, what = "condition") {
@@ -30,7 +31,7 @@ async function bundle(root, lines) {
     write: false,
     logLevel: "error",
   });
-  return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  return register(await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64")));
 }
 
 export default async function ({ test, assert, root }) {
