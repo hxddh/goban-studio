@@ -356,6 +356,8 @@ export function explorerPlayFromHere() {
     s.game = freshGameState(game, { opponent: "ai", humanColor });
     s.review = null;
     s.space = "play";
+    // The new game on its board (the explorer would hide it).
+    s.play = { ...s.play, view: "game", explorer: null };
   });
   persistCurrent();
   maybeComputerMove();

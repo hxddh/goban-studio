@@ -56,6 +56,8 @@ await test("play explorer: book moves, out of the book, back/forward, reset and 
   // Play from here: a game against the computer with the setup and the line.
   X.explorerPlayFromHere();
   assert.equal(state.space, "play");
+  assert.equal(state.play.view, "game", "the new game is on its board");
+  assert.equal(state.play.explorer, null, "the explorer is closed");
   const g = state.game.game;
   assert.equal(g.mainLine().length, 3);
   assert.equal(g.root.board.signMap.flat().filter(Boolean).length, 4);
