@@ -748,11 +748,11 @@ export function evidence(profile, { problems = [], grades = {}, now = 0 } = {}) 
 export function evidenceOf(a) {
   const out = [];
   if (a.games?.claim) {
-    if (a.games.points != null) out.push({ key: "plan.why.points", params: [String(a.games.points), a.games.games] });
-    else out.push({ key: "plan.why.times", params: [a.games.mistakes, a.games.games] });
+    if (a.games.points != null) out.push({ key: "learn.why.points", params: [String(a.games.points), a.games.games] });
+    else out.push({ key: "learn.why.times", params: [a.games.mistakes, a.games.games] });
   }
-  if (a.endgame?.claim) out.push({ key: "plan.why.lateGame", params: [String(a.endgame.perGame), a.endgame.games] });
-  if (a.problems?.claim) out.push({ key: "plan.why.problems", params: [a.problems.missed, a.problems.tried] });
+  if (a.endgame?.claim) out.push({ key: "learn.why.lateGame", params: [String(a.endgame.perGame), a.endgame.games] });
+  if (a.problems?.claim) out.push({ key: "learn.why.problems", params: [a.problems.missed, a.problems.tried] });
   return out;
 }
 
@@ -860,18 +860,23 @@ export function dailySet(profile, problems, grades, limit = 5, now = 0) {
 }
 
 /**
- * Problems chosen by the focus (app/plan.js planDaily):
- *   1. due reviews (drills from your games, then problems), at most MAX_REVIEWS;
- *   2. problems from the focus themes around the solving level (the level
- *      and one above), the focuses taking turns; from `pool` (what the
- *      player has been taught), else the easiest of `bank`;
- *   3. one stretch problem two grades above the level;
- *   4. anything left as dailySet.
- * Null without a focus. Items: { kind: "mistake" | "problem", id, role:
- * "review" | "focus" | "stretch" | "new", why? }.
+ * The problems and drills of Learn's path:
+ *   1. due reviews (drills from your games, soonest first, then problems),
+ *      at most MAX_REVIEWS;
+ *   2. with a focus: problems from the focus themes around the solving
+ *      level (the level and one above), the focuses taking turns; from
+ *      `pool` (what the player has been taught), else the easiest of `bank`;
+ *   3. one stretch problem two grades above the level — with a focus, or
+ *      once the level is known (a new player gets none);
+ *   4. new problems at your level (within a grade of it) once the level is
+ *      known, then anything left as dailySet.
+ * The level is the measured solving level; before there is one, `prior`
+ * (a grade from the player's rank, gradeForRank), else the easiest unseen
+ * grade. Null with an empty pool. Items: { kind: "mistake" | "problem", id,
+ * role: "review" | "focus" | "stretch" | "new", why? }.
  */
-export function planProblems({ profile, model, pool, bank = null, grades = {}, now = 0, limit = 5 }) {
-  if (!model?.focus?.length || !pool?.length) return null;
+export function planProblems({ profile, model, pool, bank = null, grades = {}, now = 0, limit = 5, prior = null }) {
+  if (!pool?.length) return null;
   const gradeOf = (d) => grades[d.id]?.grade || 1;
   const entry = (d) => profile.problems?.[d.id];
   const items = [];
@@ -882,11 +887,11 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
     items.push(it);
     return true;
   };
-  const focusKeys = model.focus.map((a) => a.key);
+  const focusKeys = (model?.focus || []).map((a) => a.key);
   const keyOf = (d) => focusKey(d.theme || (d.topic === "endgame" ? "endgame" : null));
 
   // 1. Reviews.
-  const dueDrills = (profile.mistakes || []).filter((m) => (m.due || 0) <= now).slice(0, 2);
+  const dueDrills = (profile.mistakes || []).filter((m) => (m.due || 0) <= now).sort((a, b) => (a.due || 0) - (b.due || 0)).slice(0, 2);
   for (const m of dueDrills) add({ kind: "mistake", id: m.id, role: "review", ...(focusKeys.includes(focusKey(m.theme)) ? { why: focusKey(m.theme) } : {}) });
   const dueProblems = pool.filter((d) => entry(d)?.due && entry(d).due <= now).sort((a, b) => entry(a).due - entry(b).due);
   for (const d of dueProblems) {
@@ -896,7 +901,9 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
 
   // 2. Focus problems around the level.
   const unseen = pool.filter((d) => !entry(d));
-  const level = model.problems?.level ?? (unseen.length ? Math.min(...unseen.map(gradeOf)) : 1);
+  const measured = model?.problems?.level ?? null;
+  const known = measured != null || prior != null;
+  const level = measured ?? prior ?? (unseen.length ? Math.min(...unseen.map(gradeOf)) : 1);
   const rand = seeded(now, 7, 3);
   const all = bank?.length ? bank : pool;
   const order = new Map(all.map((d) => [d.id, rand()]));
@@ -927,15 +934,16 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
   // 3. One stretch problem: two grades up, a focus theme if there is one.
   const target = Math.min(5, level + 2);
   const stretchOf = (list) => rank(list.filter((d) => open(d) && gradeOf(d) === target))[0] || rank(list.filter((d) => open(d) && gradeOf(d) > level).sort((a, b) => gradeOf(b) - gradeOf(a)))[0];
-  const stretch = stretchOf(pool.filter((d) => focusKeys.includes(keyOf(d)))) || stretchOf(pool);
+  const stretch = focusKeys.length || known ? stretchOf(pool.filter((d) => focusKeys.includes(keyOf(d)))) || stretchOf(pool) : null;
   if (stretch) {
     const why = focusKeys.includes(keyOf(stretch)) ? keyOf(stretch) : null;
     add({ kind: "problem", id: stretch.id, role: "stretch", ...(why ? { why } : {}) });
   }
 
-  // 4. The rest as dailySet.
+  // 4. New problems at the level, then the rest as dailySet.
+  if (known) for (const d of rank(pool.filter((x) => !entry(x) && !taken.has(x.id) && Math.abs(gradeOf(x) - level) <= 1))) add({ kind: "problem", id: d.id, role: "new" });
   const rest = dailySet(profile, pool.filter((d) => !taken.has(d.id)), grades, limit - items.length, now);
-  for (const d of rest) add({ kind: "problem", id: d.id, role: "new" });
+  for (const d of rest) add({ kind: "problem", id: d.id, role: entry(d)?.due && entry(d).due <= now ? "review" : "new" });
   return items.slice(0, limit);
 }
 
@@ -1018,14 +1026,25 @@ export function bridgeAfter(lessonId, profile, { captureWins = 0 } = {}) {
 }
 
 /**
- * Learn's one ordered list:
- *   1. the next lesson                         { kind: "lesson", id, role: "next" }
- *   2. the beginner bridges, while they apply  { kind: "capture" | "game", role: "bridge", game? }
- *   3. due drills from your games and due problem reviews,
- *   4. focus problems around the solving level, and one stretch problem,
- *   5. new problems at your level              { kind: "mistake" | "problem", id, role, why? }
- * Steps 3–5 are the week's focus at work (planProblems); without a focus,
- * the due drills (two at most) and then dailySet.
+ * A first guess at the problem grade that suits a player of `rank` (kyu
+ * positive, 1 dan 0), before their solving level is measured: 20 kyu and
+ * weaker grade 1, 12–19 kyu 2, 6–11 kyu 3, 1–5 kyu 4, dan 5.
+ */
+export function gradeForRank(rank) {
+  if (!finite(rank)) return null;
+  return rank >= 20 ? 1 : rank >= 12 ? 2 : rank >= 6 ? 3 : rank >= 1 ? 4 : 5;
+}
+
+/**
+ * Learn's one ordered list, played as today's session (learn/session.js):
+ *   1. the next lesson                         { kind: "lesson", id, unit, role: "next" }
+ *   2. capture Go, while it applies (beginners) { kind: "capture", role: "bridge" }
+ *   3. due drills from your games (and from trying a moment again), due
+ *      problem reviews, focus problems around the solving level, one
+ *      stretch problem and new problems at your level (planProblems)
+ *                                              { kind: "mistake" | "problem", id, role, why? }
+ *   4. the first 9×9 game, while it applies    { kind: "game", role: "bridge", game }
+ * The first game comes last: it leaves Learn for Play.
  *
  * `content` = { course | lessons, problems, grades, settings: { experience,
  * playerRank }, captureWins, limit } (limit: problem items, 5 by default).
@@ -1043,21 +1062,18 @@ export function learnPath(profile, content = {}, now = 0) {
   const next = nextLesson(all, (id) => !!p.lessons[id]?.done, { experience: settings.experience, playerRank: settings.playerRank, rating: est.games > 0 ? est.r : null });
   if (next) items.push({ kind: "lesson", id: next.lesson.id, unit: next.unit.id, role: "next" });
 
+  // The bridges are for beginners: someone who already plays is not sent to capture Go.
+  const beginner = settings.experience === "new" || (settings.playerRank ?? 30) >= 25;
   const done = (id) => !!p.lessons[id]?.done;
-  if (CAPTURE_AFTER.some(done) && (content.captureWins || 0) < CAPTURE_WINS_ENOUGH) items.push({ kind: "capture", role: "bridge" });
-  if (FIRST_GAME_AFTER.some(done) && !p.games.length) items.push({ kind: "game", role: "bridge", game: { ...FIRST_GAME } });
+  if (beginner && CAPTURE_AFTER.some(done) && (content.captureWins || 0) < CAPTURE_WINS_ENOUGH) items.push({ kind: "capture", role: "bridge" });
 
   const model = focus(p, now, { problems, grades });
   const pool = taughtPool(p, { ...content, problems });
-  let picks = planProblems({ profile: p, model, pool, bank: problems, grades, now, limit });
-  if (!picks) {
-    picks = [];
-    for (const m of due(p, now).mistakes.slice(0, 2)) picks.push({ kind: "mistake", id: m.id, role: "review" });
-    const taken = new Set(picks.map((i) => i.id));
-    for (const d of dailySet(p, pool.filter((x) => !taken.has(x.id)), grades, limit - picks.length, now)) {
-      const e = p.problems[d.id];
-      picks.push({ kind: "problem", id: d.id, role: e?.due && e.due <= now ? "review" : "new" });
-    }
-  }
-  return [...items, ...picks.slice(0, limit)];
+  // Someone who already plays starts near their rank until their solving level is measured.
+  const prior = beginner ? null : gradeForRank(est.games > 0 ? est.rank : settings.playerRank);
+  const picks = planProblems({ profile: p, model, pool, bank: problems, grades, now, limit, prior }) || due(p, now).mistakes.slice(0, 2).map((m) => ({ kind: "mistake", id: m.id, role: "review" }));
+  items.push(...picks.slice(0, limit));
+
+  if (beginner && FIRST_GAME_AFTER.some(done) && !p.games.length) items.push({ kind: "game", role: "bridge", game: { ...FIRST_GAME } });
+  return items;
 }

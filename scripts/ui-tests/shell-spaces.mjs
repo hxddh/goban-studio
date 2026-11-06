@@ -29,11 +29,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     assert((await page.textContent(".play-home .hero")).includes("Game in progress"), "the game in progress leads the home");
     await page.click(".play-home .hero .btn.primary");
     await page.waitForFunction(() => window.__state.play.view === "game");
-    // Learn: the path first, one primary (its first row), then the catalog.
+    // Learn: the path, one primary (start it), then one row to the catalog.
     await page.keyboard.press("Control+2");
     await page.waitForSelector(".learn-path .path-row");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Learn");
-    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".units")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the course");
+    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".catalog-link")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
+    assert((await page.locator(".learn-home .units, .learn-home .topic-row").count()) === 0, "the catalog is one row away, not on the home");
     // Cmd+3 and Cmd+4 go nowhere now.
     for (const k of ["3", "4"]) {
       await page.keyboard.press("Control+" + k);

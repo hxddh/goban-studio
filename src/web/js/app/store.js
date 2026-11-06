@@ -31,8 +31,8 @@ export const state = {
   // finished game turns into its review); kind and query filter the
   // history; explorer is the opening explorer.
   play: { view: "home", kind: "all", query: "" },
-  // Learn: view "home" (the path, then the catalog) or one of its pages
-  // (lesson, problem, topic, mistake, capture, dailyDone).
+  // Learn: view "home" (the path) or one of its pages (catalog,
+  // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
   learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   models: initialModels(), // optional downloads (app/models-ctl.js)
 };

@@ -101,6 +101,10 @@ export default async function ({ test, assert, root }) {
           });
         });
       }
+      // A store that an earlier file left unopened writes to whatever host is there: nothing.
+      if (command === "studio.storeWrite" || command === "studio.storeRemove") return { ok: true };
+      if (command === "studio.storeList") return [];
+      if (command === "studio.storeRead") return null;
       throw new Error("unexpected command " + command);
     },
   };

@@ -270,7 +270,8 @@ await check("a wrong answer shows the refutation, then resets for another try", 
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+2");
-  await page.click(".topic-card >> nth=0");
+  await page.click(".catalog-link .group-row");
+  await page.click(".topic-row >> nth=0");
   await page.click(".problem-card >> nth=0");
   const wrong = await page.evaluate(() => {
     const P = window.__state.learn.problem;
@@ -313,6 +314,7 @@ await check("history: Back from a shape problem returns to its collection", asyn
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+2");
+  await page.click(".catalog-link .group-row");
   await page.click(".shape-chips .chip >> nth=0");
   await page.waitForSelector(".problem-card");
   const before = await page.locator(".problem-card").count();
@@ -481,11 +483,13 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await page.waitForSelector(".review-layer .chart");
     await audit(page, "review");
     await page.keyboard.press("Control+2");
+    await page.click(".catalog-link .group-row");
     await page.click(".lesson-row >> nth=0");
     await page.waitForSelector(".steps");
     await audit(page, "lesson");
     await page.keyboard.press("Control+2");
-    await page.click(".topic-card >> nth=0");
+    await page.click(".catalog-link .group-row");
+    await page.click(".topic-row >> nth=0");
     await audit(page, "topic");
     await page.click(".problem-card >> nth=0");
     await audit(page, "problem");
@@ -577,7 +581,8 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+2");
-  await page.click(".topic-card >> nth=0");
+  await page.click(".catalog-link .group-row");
+  await page.click(".topic-row >> nth=0");
   await page.click(".problem-card >> nth=0");
   const goal = await page.evaluate(() => document.querySelector(".goal").textContent.trim());
   await hear(page, "app", (s) => s.includes(goal), "the problem's goal");
@@ -597,6 +602,7 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   assert(/^Black [A-T]\d+/.test(heard[0] || ""), `the move was not spoken: ${heard.join(" | ")}`);
   assert(heard.some((h) => h.includes(verdict)), `the verdict "${verdict}" was not spoken: ${heard.join(" | ")}`);
   await page.keyboard.press("Control+2");
+  await page.click(".catalog-link .group-row");
   await page.click(".lesson-row >> nth=0");
   await page.waitForSelector(".steps");
   await hear(page, "app", (s) => s.includes("Step 1 of"), "the lesson step");
@@ -673,10 +679,13 @@ for (const vp of [
     await page.keyboard.press("Control+1");
     await page.waitForSelector(".play-home");
     out.push(await snap(page, `home-${vp.tag}`));
-    // Learn's home: the path (its problems change with the day) and the catalog.
+    // Learn's home: the path (its problems change with the day), then the catalog one row away.
     await page.keyboard.press("Control+2");
     await page.waitForSelector(".learn-home");
-    out.push(await snap(page, `learn-${vp.tag}`, [".learn-path .group"]));
+    out.push(await snap(page, `learn-${vp.tag}`, [".learn-path .path-list"]));
+    await page.click(".catalog-link .group-row");
+    await page.waitForSelector(".catalog .topic-row");
+    out.push(await snap(page, `learn-catalog-${vp.tag}`));
     await page.keyboard.press("Control+,");
     out.push(await snap(page, `settings-${vp.tag}`, [".about"]));
     await page.close();

@@ -397,7 +397,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(m.focus.map((a) => a.key), ["cut"], "a theme from a single game is not claimed");
     assert.equal(m.focus[0].games.points, 18);
     assert.equal(m.focus[0].games.games, 6);
-    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "plan.why.points", params: ["18", 6] }]);
+    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "learn.why.points", params: ["18", 6] }]);
     assert.equal(m.areas.find((a) => a.key === "ladder").claim, false);
   });
 
@@ -406,7 +406,7 @@ export default async function ({ test, assert, root }) {
     const race = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "race");
     assert.ok(race);
     assert.equal(race.games.points, null);
-    assert.deepEqual(P.evidenceOf(race), [{ key: "plan.why.times", params: [4, 3] }]);
+    assert.deepEqual(P.evidenceOf(race), [{ key: "learn.why.times", params: [4, 3] }]);
   });
 
   await test("model focus: recent games weigh more, old games drop out", () => {
@@ -427,7 +427,7 @@ export default async function ({ test, assert, root }) {
     const eg = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "endgame");
     assert.ok(eg);
     assert.equal(eg.endgame.perGame, 9);
-    assert.deepEqual(P.evidenceOf(eg)[0], { key: "plan.why.lateGame", params: ["9", 3] });
+    assert.deepEqual(P.evidenceOf(eg)[0], { key: "learn.why.lateGame", params: ["9", 3] });
     const low = P.evidence(profile({ games: games.map((g) => ({ ...g, confidence: "low" })) }), { ...content, now: NOW });
     assert.ok(!low.focus.some((a) => a.key === "endgame"));
   });
@@ -440,7 +440,7 @@ export default async function ({ test, assert, root }) {
     cutProblems.slice(0, 5).forEach((x, i) => (problems[x.id] = entry(i === 0, i === 0 ? 1 : 0)));
     const cut = P.evidence(profile({ problems }), { ...content, now: NOW }).focus.find((a) => a.key === "cut");
     assert.ok(cut);
-    assert.deepEqual(P.evidenceOf(cut), [{ key: "plan.why.problems", params: [4, 5] }]);
+    assert.deepEqual(P.evidenceOf(cut), [{ key: "learn.why.problems", params: [4, 5] }]);
     const few = {};
     cutProblems.slice(0, 3).forEach((x) => (few[x.id] = entry(false, 0)));
     assert.deepEqual(P.evidence(profile({ problems: few }), { ...content, now: NOW }).focus, []);
@@ -551,7 +551,12 @@ export default async function ({ test, assert, root }) {
     assert.equal(stretch.length, 1);
     assert.equal(GRADES[stretch[0].id].grade, 4);
     assert.deepEqual(P.planProblems({ profile: p, model, pool: PROBLEMS, grades: GRADES, now: NOW + 3600000 }), items);
-    assert.equal(P.planProblems({ profile: p, model: P.focus(profile(), NOW, content), pool: PROBLEMS, grades: GRADES, now: NOW }), null, "no focus: no plan");
+    // Without a focus: the reviews, no focus problems; the level is measured, so one stretch.
+    const plain = P.planProblems({ profile: p, model: { ...model, focus: [] }, pool: PROBLEMS, grades: GRADES, now: NOW });
+    assert.deepEqual(plain.slice(0, 2), [{ kind: "mistake", id: "m1", role: "review" }, { kind: "problem", id: dueOne.id, role: "review" }]);
+    assert.ok(!plain.some((i) => i.role === "focus" || i.why));
+    assert.equal(plain.filter((i) => i.role === "stretch").length, 1);
+    assert.equal(P.planProblems({ profile: p, model, pool: [], grades: GRADES, now: NOW }), null, "nothing to choose from");
     // The same, as Learn's list for a player: the next lesson, then these.
     const path_ = P.learnPath(p, { ...content, course: COURSE, settings: { experience: "player", playerRank: 10 } }, NOW);
     assert.deepEqual(path_[0], { kind: "lesson", id: COURSE.find((u) => u.level === "intermediate").lessons[0].id, unit: COURSE.find((u) => u.level === "intermediate").id, role: "next" });
@@ -602,7 +607,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.bridgeAfter("life-eye", empty), null);
     const played = P.recordGame(empty, { id: "1", at: 1, size: 9, won: false, moves: 30, level: "30k" });
     assert.equal(P.bridgeAfter("life-two-eyes", played), null, "not after a first game");
-    // In Learn's list, right after the next lesson while they apply.
+    // In Learn's list while they apply: capture Go right after the next lesson, the first game last (it leaves Learn).
     const beginner = { course: COURSE, ...content, settings: { experience: "new", playerRank: 30 } };
     let p = P.recordLesson(empty, "stones-capture", { done: true }, NOW);
     let list = P.learnPath(p, beginner, NOW);
@@ -610,7 +615,8 @@ export default async function ({ test, assert, root }) {
     assert.ok(!P.learnPath(p, { ...beginner, captureWins: 2 }, NOW).some((i) => i.kind === "capture"));
     p = P.recordLesson(p, "life-two-eyes", { done: true }, NOW);
     list = P.learnPath(p, { ...beginner, captureWins: 2 }, NOW);
-    assert.deepEqual(list[1], { kind: "game", role: "bridge", game: { size: 9, level: "30k", handicap: 0 } });
+    assert.deepEqual(list.at(-1), { kind: "game", role: "bridge", game: { size: 9, level: "30k", handicap: 0 } });
+    assert.equal(list.filter((i) => i.kind === "game").length, 1);
     assert.ok(!P.learnPath(P.recordGame(p, { id: "1", at: 1, size: 9, won: true, moves: 30, level: "30k" }), beginner, NOW).some((i) => i.kind === "game"));
   });
 

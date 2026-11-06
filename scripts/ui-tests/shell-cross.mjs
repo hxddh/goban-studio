@@ -59,7 +59,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.keyboard.press("Control+2");
       await page.waitForSelector(".learn-path");
       await inspect(page, "Learn's home");
-      await page.click(".topic-card >> nth=0");
+      await page.click(".catalog-link .group-row");
+      await page.waitForSelector(".catalog .topic-row");
+      await inspect(page, "Learn's catalog");
+      await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
       await page.waitForFunction(() => window.__state.learn.view === "problem");
       await inspect(page, "problem");

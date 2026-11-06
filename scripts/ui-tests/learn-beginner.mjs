@@ -13,10 +13,11 @@ const IDS = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
 export default async function ({ check, assert, fresh, onboard, clickPoint, audit }) {
   /**
    * A new player who has done every lesson before `id` and is on its last
-   * step: the lesson opens from Learn's path, its last problem's answer is shown
-   * and the lesson finished, leaving its lesson-complete page.
+   * step: the lesson opens from Learn's path (today's session, `session`) or
+   * from the catalog (on its own), its last problem's answer is shown and the
+   * lesson finished, leaving its lesson-complete page.
    */
-  async function lessonDone(page, id, settings = {}) {
+  async function lessonDone(page, id, settings = {}, { session = false } = {}) {
     const before = IDS.slice(0, IDS.indexOf(id));
     const steps = COURSE.flatMap((u) => u.lessons).find((l) => l.id === id).steps.length;
     await page.goto(ORIGIN + "/");
@@ -35,7 +36,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.waitForFunction(() => window.__state?.ready && document.querySelector(".page"));
     await page.keyboard.press("Control+2");
     await page.waitForFunction(() => window.__state.space === "learn" && window.__state.learn.view === "home" && document.querySelector(".learn-path .btn.primary"));
-    await page.click(".learn-path .btn.primary");
+    if (session) await page.click(".learn-path .btn.primary");
+    else {
+      await page.click(".catalog-link .group-row");
+      await page.click(".catalog .lesson-row.next");
+    }
     await page.waitForFunction((id) => window.__state.learn.lesson?.lesson.id === id, id);
     const kind = await page.evaluate(() => window.__state.learn.lesson.cur.kind);
     if (kind === "problem") await page.click(".panel .actions .btn.ghost >> nth=-1"); // Show answer
@@ -299,6 +304,41 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.waitForSelector(".score-card");
     await page.waitForTimeout(100);
     assert((await page.locator(".score-card .first-count").count()) === 0, "the note came back");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
+  await check("learn beginner: in today's session the bridge is the next item — the lesson's one primary plays it, then Continue goes on", async () => {
+    const page = await start();
+    await lessonDone(page, "stones-capture", {}, { session: true });
+    const card = await page.evaluate(() => ({
+      bridge: document.querySelector(".celebrate")?.dataset.bridge,
+      primary: [...document.querySelectorAll(".celebrate .btn.primary")].map((b) => b.textContent.trim()),
+      next: window.__state.learn.daily.items[1]?.kind,
+    }));
+    assert(card.bridge === "capture" && card.next === "capture", JSON.stringify(card));
+    assert(card.primary.length === 1 && card.primary[0] === "Play a game of capture Go", `primary ${card.primary}`);
+    await inspect(page, "lesson complete in the session");
+    await page.click(".celebrate .btn.primary");
+    await page.waitForFunction(() => window.__state.learn.view === "capture" && !!window.__state.learn.daily && window.__board?.geom?.cell > 20);
+    assert((await page.textContent(".toolbar")).includes("Today 2 of"), "the session's place in the toolbar");
+    // A win: Continue is the one primary, and goes to the next item of the path.
+    await page.evaluate(() => {
+      const K = window.__state.learn.capture;
+      K.game.setup([{ x: 4, y: 4, c: -1 }, { x: 3, y: 4, c: 1 }, { x: 5, y: 4, c: 1 }, { x: 4, y: 3, c: 1 }], 1);
+    });
+    await clickPoint(page, 4, 5);
+    await page.waitForSelector(".result-card");
+    const primary = await page.evaluate(() => [...document.querySelectorAll(".result-card .btn.primary")].map((b) => b.textContent.trim()));
+    assert(primary.length === 1 && primary[0] === "Continue", `after a win in the session: ${primary}`);
+    await inspect(page, "capture Go won, in the session");
+    await page.click(".result-card .btn.primary");
+    await page.waitForFunction(() => ["problem", "mistake"].includes(window.__state.learn.view) && window.__state.learn.daily?.done.includes("capture"));
+    // Learn's home: the first two rows are checked, the primary goes on.
+    await page.keyboard.press("Control+2");
+    await page.waitForSelector(".learn-path .path-row.done");
+    assert((await page.locator(".learn-path .path-row.done").count()) === 2, "two done");
+    assert((await page.textContent(".learn-path .btn.primary")).trim() === "Continue", "the primary goes on with the session");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

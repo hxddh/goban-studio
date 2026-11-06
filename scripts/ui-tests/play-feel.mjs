@@ -117,11 +117,12 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.keyboard.press("Control+1");
     await page.waitForSelector(".page h1");
     await page.keyboard.press("Control+2");
-    await page.waitForSelector(".topic-card");
+    await page.waitForSelector(".catalog-link");
     // A topic lists its problems by title (the problems part): it opens once that part arrives.
-    await page.click(".topic-card >> nth=0");
+    await page.click(".catalog-link .group-row");
+    await page.click(".topic-row >> nth=0");
     await page.waitForTimeout(150);
-    assert(await page.evaluate(() => window.__state.learn.view === "home"), "the topic opened without its problems");
+    assert(await page.evaluate(() => window.__state.learn.view === "catalog"), "the topic opened without its problems");
     const t0 = Date.now();
     hold = false;
     for (const r of held.splice(0)) await r.continue();

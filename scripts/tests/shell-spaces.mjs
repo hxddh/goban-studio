@@ -132,17 +132,17 @@ try {
   });
 
   await test("shell: Learn's top is the path, one ordered list, and its problems are one session", () => {
+    C.resetSession();
     const path0 = C.learnPath();
     assert.ok(path0.length >= 2);
     assert.equal(path0[0].kind, "lesson", "the next lesson first");
-    const items = C.buildDaily();
-    assert.deepEqual(items.map((i) => i.id), path0.filter((i) => i.kind === "problem" || i.kind === "mistake").map((i) => i.id), "the session is the path's problems, in its order");
-    const second = items[1].id;
-    C.openPathItem(second);
+    assert.deepEqual(C.pathNow().items, path0, "the home shows the path until a session starts");
+    const second = path0.find((i) => i.kind === "problem");
+    C.openPathItem(second.key);
     assert.equal(state.learn.view, "problem");
-    assert.equal(state.learn.problem.def.id, second);
-    assert.equal(state.learn.daily.index, 1);
-    assert.equal(C.todaysDaily().items.length, items.length);
+    assert.equal(state.learn.problem.def.id, second.id);
+    assert.deepEqual(C.todaysSession().items.map((i) => i.key), path0.map((i) => i.key), "the session is the path, in its order");
+    assert.equal(state.learn.daily.current, second.key);
   });
 
   await test("shell: a write that fails is one toast, however many keys fail", async () => {
