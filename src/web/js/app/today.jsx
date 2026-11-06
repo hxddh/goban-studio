@@ -37,7 +37,7 @@ export function DailyDots({ daily }) {
 
 function playSuggested(rec, quick) {
   const g = quick ? rec.quick : rec;
-  C.newGame({ size: g.size, strength: g.strength, handicap: g.handicap, opponent: "ai", color: 1 });
+  C.newGame({ size: g.size, opponentRank: g.opponentRank, handicap: g.handicap, opponent: "ai", color: 1 });
 }
 
 export function TodayView() {
@@ -77,7 +77,7 @@ export function TodayView() {
             <div class="hero-text">
               <span class="eyebrow">{t("library.inProgress")}</span>
               <h2>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</h2>
-              <p class="muted">{g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.strength)]) : t("library.twoPlayers")}</p>
+              <p class="muted">{g.opponent === "ai" ? t("library.vsEngine", [rankLabel(g.rank)]) : t("library.twoPlayers")}</p>
             </div>
             <Button kind="primary" size="lg" onClick={C.continueCurrent}>
               {t("library.continue")}
@@ -88,7 +88,7 @@ export function TodayView() {
             <EmptyBoard size={rec.size} />
             <div class="hero-text">
               <span class="eyebrow">{t("today.suggestedGame")}</span>
-              <h2>{t("today.suggestedTitle", [rec.size, rankLabel(rec.strength)])}</h2>
+              <h2>{t("today.suggestedTitle", [rec.size, rankLabel(rec.label)])}</h2>
               <p class="muted">{recText}</p>
             </div>
             <div class="hero-actions">
@@ -143,7 +143,7 @@ export function TodayView() {
                 <Icon name="play" size={18} />
               </span>
               <span class="gr-text">
-                <strong>{t("today.suggestedTitle", [rec.size, rankLabel(rec.strength)])}</strong>
+                <strong>{t("today.suggestedTitle", [rec.size, rankLabel(rec.label)])}</strong>
                 <span>{recText}</span>
               </span>
               <Button size="sm" onClick={() => playSuggested(rec)}>
@@ -177,7 +177,7 @@ export function TodayView() {
                   <button type="button" class="group-row game-row" onClick={() => C.openRecord(rg.id)}>
                     <Thumb thumb={rg.thumb} size={rg.size} />
                     <span class="gr-text">
-                      <strong>{rg.name || (rg.opponent === "ai" ? t("library.vsEngine", [rg.strength ? rankLabel(rg.strength) : "KataGo"]) : t("library.untitled"))}</strong>
+                      <strong>{rg.name || (rg.opponent === "ai" ? t("library.vsEngine", [rg.rank != null ? rankLabel(rg.rank) : "KataGo"]) : t("library.untitled"))}</strong>
                       <span>
                         {rg.size} × {rg.size} · {t("play.moveN", [rg.moves])}
                       </span>

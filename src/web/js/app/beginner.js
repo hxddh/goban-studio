@@ -17,7 +17,7 @@ export const FIRST_GAME_AFTER = ["life-two-eyes", "life-space"];
 /** Capture games won before the bridge stops offering capture Go. */
 export const CAPTURE_WINS_ENOUGH = 2;
 /** The first 9×9 game: the gentlest computer level. */
-export const FIRST_GAME = { size: 9, strength: "30k", handicap: 0 };
+export const FIRST_GAME = { size: 9, opponentRank: 30, handicap: 0 };
 
 /** "capture" | "firstGame" | null for the lesson just finished. */
 export function bridgeAfter(lessonId, { settings = {}, progress = {} } = {}) {

@@ -220,7 +220,7 @@ export default async function ({ test, assert, root }) {
     state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: true, showEval: false, onboarded: true, confirmMove: false };
     state.progress = P.loadProgress();
     state.engine = { kind: "katago", name: "KataGo test", available: true };
-    Play.newGame({ size: 9, color: BLACK, strength: "30k" });
+    Play.newGame({ size: 9, color: BLACK, opponentRank: 30 });
     const g = state.game;
     // B J1, W C9, B J2, W B8: now Black's B9 would have one liberty.
     for (const [x, y] of [[8, 8], [2, 0], [8, 7], [1, 1]]) assert.ok(g.game.play(x, y).ok);

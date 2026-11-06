@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { fitBT, mergeGames, parseShard, planMatrix, planTasks } from "../calibrate-strength.mjs";
-import { STRENGTHS, labelRank } from "../../src/web/js/engine.js";
+import { STRENGTHS, implLabel, implTheta, ladder } from "../../src/web/js/engine.js";
 import { MEASURED, thetaToGoR } from "../../src/web/js/app/strength.js";
 
 /** The names v7's games were played under → the shipped levels (docs/strength.md, v7). */
@@ -96,26 +96,23 @@ export default async function ({ test, assert, root }) {
         const m = MEASURED[mode][s.id];
         assert.ok(Number.isFinite(m?.[19]) && Number.isFinite(m?.[9]), `${mode} ${s.id}`);
       }
-      assert.ok(Number.isInteger(labelRank(s, "human")));
     }
   });
 
   test("v7 calibration: the human-style ladder has no gap and its labels follow the measurement", () => {
-    const ranks = STRENGTHS.map((s) => labelRank(s, "human"));
-    for (let i = 1; i < ranks.length; i++) {
-      assert.ok(ranks[i] < ranks[i - 1], `${STRENGTHS[i].id}: label not above the level below`);
-      assert.ok(ranks[i - 1] - ranks[i] <= 6, `${STRENGTHS[i].id}: a gap of ${ranks[i - 1] - ranks[i]} ranks`);
+    // v9: the ladder with the human-style network installed (opponents.js).
+    const entries = ladder({ human: true });
+    for (let i = 1; i < entries.length; i++) {
+      const [a, b] = [entries[i - 1].label, entries[i].label];
+      assert.ok(b < a, `${entries[i].impl}: label not above the rank below`);
+      assert.ok(a - b <= 6, `${entries[i].impl}: a gap of ${a - b} ranks`);
     }
-    // Each label is within a rank of the measured 19×19 rank (the bottom is
-    // shown at the 30-kyu floor; the top two are the lower ends of their intervals).
-    const near = (id, mode, label) => {
-      const measured = Math.round((2100 - thetaToGoR(MEASURED[mode][id][19])) / 100);
-      if (label === 30 && measured >= 30) return;
-      assert.ok(Math.abs(measured - label) <= 1, `${mode} ${id}: label ${label}, measured ${measured}`);
-    };
-    for (const s of STRENGTHS) near(s.id, "human", labelRank(s, "human"));
-    near("2d", "strong", labelRank("2d", "strong"));
-    assert.ok(labelRank("2d", "strong") <= labelRank("2d", "human"));
+    // Each label is the measured 19×19 rank (the 30-kyu floor aside).
+    for (const e of entries) {
+      const measured = Math.round((2100 - thetaToGoR(implTheta(e.impl, 19))) / 100);
+      assert.equal(e.label, Math.min(30, measured), e.impl);
+    }
+    assert.ok(implLabel("LS:2d") <= implLabel("HL:2d"));
     // The changed levels play exactly the measured candidates.
     const h = Object.fromEntries(STRENGTHS.map((s) => [s.id, s.human]));
     for (const [id, name] of [["15k", "r20kb12"], ["5k", "s7k24b12"], ["1k", "s4k32"]]) {

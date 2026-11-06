@@ -19,55 +19,15 @@
  * `r` (GoR of mu) keeps every v5 reader of progress.rating working; `lo`
  * and `hi` are GoR at mu ∓ sigma.
  */
-import { STRENGTHS, strengthById } from "../engine.js";
+import { STRENGTHS, MEASURED, gorToTheta, implTheta, ladder, thetaToGoR } from "../opponents.js";
 import { ratingToRank, rankToRating } from "./rating.js";
 
-/* ------------------------------------------------------ the θ ↔ GoR scale */
-
-/**
- * GoR(θ) = 4100 − K·e^(−θ/20): the EGF curve, anchored as the ladder is
- * (KataGo's human SL rank_10k profile at θ = 11.65 is 10 kyu, GoR 1100).
+/*
+ * v9: the θ ↔ GoR scale and the measured strengths live in opponents.js
+ * (MEASURED: the calibrated levels; implTheta: what each rank plays), so
+ * the opponent ladder and the rating read the same numbers.
  */
-export const ANCHOR_K = 3000 * Math.exp(11.65 / 20);
-export const thetaToGoR = (t) => 4100 - ANCHOR_K * Math.exp(-t / 20);
-export const gorToTheta = (g) => -20 * Math.log((4100 - Math.min(g, 3900)) / ANCHOR_K);
-
-/**
- * Measured strength of each level, θ on 19×19, 9×9 and 13×13 (each board
- * its own Bradley–Terry fit, all with the weakest standard level at 0).
- * standard: v4 (527 + 620 games); human and strong: v7 (docs/strength.md).
- * 13×13, every mode: v8, one fit of 960 games (docs/strength.md, "v8").
- * A missing entry falls back to the standard level.
- */
-export const MEASURED = {
-  standard: {
-    "30k": { 19: 0, 9: 0, 13: 0 },
-    "25k": { 19: 1.8, 9: 0.4, 13: 0.84 },
-    "20k": { 19: 4.59, 9: 2.06, 13: 3.22 },
-    "15k": { 19: 6.88, 9: 2.85, 13: 4.99 },
-    "10k": { 19: 10.21, 9: 6.13, 13: 8.33 },
-    "5k": { 19: 13.85, 9: 7.47, 13: 10.1 },
-    "1k": { 19: 17.9, 9: 12.08, 13: 14.91 },
-    "2d": { 19: 23.35, 9: 14.93, 13: 17.45 },
-  },
-  // v7, 708 games on 19×19 and 824 on 9×9 (with v6's 54 and 372 for the
-  // settings that did not change) against the standard levels held at
-  // their v4 values; 5k, 15k and 1k have v7 settings. The top two rest on
-  // a 400-visit bridge above the ladder and are the least certain.
-  human: {
-    "30k": { 19: 0.42, 9: 0.41, 13: 0.19 },
-    "25k": { 19: 1.39, 9: 1.15, 13: 1.04 },
-    "20k": { 19: 3.9, 9: 2.1, 13: 3.66 },
-    "15k": { 19: 6.77, 9: 4.64, 13: 5.45 },
-    "10k": { 19: 10.19, 9: 6.79, 13: 8.81 },
-    "5k": { 19: 13.68, 9: 8.03, 13: 10.13 },
-    "1k": { 19: 18.42, 9: 12.89, 13: 14.47 },
-    "2d": { 19: 26.99, 9: 14.99, 13: 17.82 },
-  },
-  strong: {
-    "2d": { 19: 28.11, 9: 16.82, 13: 22.78 },
-  },
-};
+export { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR } from "../opponents.js";
 
 /* ------------------------------------------------------------- parameters */
 
@@ -127,20 +87,18 @@ export function fromBoard(t, size) {
 const RANKS_PER_STONE = { 9: 5, 13: 2.5, 19: 1 };
 
 /**
- * A level's strength on the board it was played on, in that board's θ.
- * `handicap` stones were given to the player (negative: the player gave
- * them); as in v5, a handicap counts from two stones, each worth
- * RANKS_PER_STONE ranks of 100 GoR.
+ * An opponent's strength on the board it was played on, in that board's
+ * θ. `impl` is the implementation that played (opponents.js IMPLS; v9:
+ * games store it with their rank). `handicap` stones were given to the
+ * player (negative: the player gave them); as in v5, a handicap counts
+ * from two stones, each worth RANKS_PER_STONE ranks of 100 GoR.
  */
-export function levelTheta(id, { mode = "standard", size = 19, handicap = 0 } = {}) {
-  const s = strengthById(id);
+export function levelTheta(impl, { size = 19, handicap = 0 } = {}) {
   const sz = [9, 13, 19].includes(size) ? size : 19;
-  const m = MEASURED[mode]?.[s.id] || {};
-  const base = MEASURED.standard[s.id];
-  // A board a mode was not measured on uses the standard level there.
-  let t19 = m[19] ?? base[19];
+  let t19 = implTheta(impl, 19);
+  if (t19 == null) return null;
   // v8: 13×13 is measured too; each small board uses its own measurement.
-  const tSmall = sz === 19 ? null : m[sz] ?? base[sz];
+  const tSmall = sz === 19 ? null : implTheta(impl, sz);
   if (sz !== 19 && Math.abs(handicap) < 2) return tSmall;
   // On a small board the stones are counted on the 19×19 scale the ranks live on.
   if (sz !== 19) t19 = fromBoard(tSmall, sz);
@@ -204,10 +162,10 @@ export function updateEstimate(est, { opponent, size = 19, won, at = Date.now() 
   return pack(next, sigma, (prev.games || 0) + 1, at, [...(prev.history || []), point(next, sigma, at)]);
 }
 
-/** A rated game against level `id` (mode, board size and handicap as played). */
-export function rateGame(est, { level, mode = "standard", size = 19, handicap = 0, won, at = Date.now() }) {
+/** A rated game against implementation `impl` (board size and handicap as played). */
+export function rateGame(est, { impl, size = 19, handicap = 0, won, at = Date.now() }) {
   const sz = [9, 13, 19].includes(size) ? size : 19;
-  return updateEstimate(est, { opponent: levelTheta(level, { mode, size: sz, handicap }), size: sz, won, at });
+  return updateEstimate(est, { opponent: levelTheta(impl, { size: sz, handicap }), size: sz, won, at });
 }
 
 /* -------------------------------------------------------------- migration */
@@ -269,20 +227,20 @@ export function strengthSeries(est, n = 30) {
 }
 
 /**
- * The level to suggest: the one you are expected to score closest to 50%
- * against, on `size`, in the mode each level would be played in
- * (`modeOf(strength)`, e.g. engine.js opponentMode).
+ * The rank to suggest: the ladder entry (opponents.js, with what is
+ * `installed`) you are expected to score closest to 50% against on
+ * `size`, by what actually plays it.
  */
-export function recommendStrength(est, { size = 19, modeOf = () => "standard" } = {}) {
+export function recommendStrength(est, { size = 19, installed = {} } = {}) {
   const mu = est && Number.isFinite(est.mu) ? est.mu : startEstimate(30).mu;
-  let best = STRENGTHS[0];
+  let best = null;
   let gap = Infinity;
-  for (const s of STRENGTHS) {
-    const d = Math.abs(expectedScore(mu, levelTheta(s.id, { mode: modeOf(s), size }), size) - 0.5);
+  for (const e of ladder(installed)) {
+    const d = Math.abs(expectedScore(mu, levelTheta(e.impl, { size }), size) - 0.5);
     if (d < gap) {
       gap = d;
-      best = s;
+      best = e;
     }
   }
-  return best.id;
+  return best.rank;
 }

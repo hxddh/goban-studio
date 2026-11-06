@@ -214,7 +214,7 @@ export default async function ({ test, assert, root }) {
 
   /** A rated game against the computer that the player resigns. */
   function finishRatedGame(moves = 40) {
-    Play.newGame({ size: 19, color: BLACK, strength: "30k" });
+    Play.newGame({ size: 19, color: BLACK, opponentRank: 30 });
     const g = state.game;
     fill(g.game, moves);
     Play.requestResign();
@@ -230,11 +230,12 @@ export default async function ({ test, assert, root }) {
     await until(() => requests.filter((r) => r.visits === 32).length >= 3, 4000, "summary searches");
     const summaryJob = Engine.sched.listJobs().find((j) => j.kind === "summary");
     assert.ok(summaryJob, "the summary is a listed background job");
-    assert.match(summaryJob.title(), /Analysing your game against ≈ 30 kyu/);
+    // v9: the default rank, 30 kyu, is played by the standard level that measured 29 kyu.
+    assert.match(summaryJob.title(), /Analysing your game against ≈ 29 kyu/);
 
     // New game with the computer as Black: its first move comes next.
     const before = requests.length;
-    Play.newGame({ size: 19, color: WHITE, strength: "30k" });
+    Play.newGame({ size: 19, color: WHITE, opponentRank: 30 });
     const g2 = state.game;
     await until(() => requests.slice(before).some((r) => r.visits === 8), 2000, "the computer's search");
     const first = requests.slice(before).findIndex((r) => r.visits === 8);
@@ -249,7 +250,7 @@ export default async function ({ test, assert, root }) {
     // A third game: even with that report running, the computer goes next.
     await until(() => rep.progress > 0.1, 4000, "report progress");
     const mark = requests.length;
-    Play.newGame({ size: 19, color: WHITE, strength: "30k" });
+    Play.newGame({ size: 19, color: WHITE, opponentRank: 30 });
     const g3 = state.game;
     await until(() => requests.slice(mark).some((r) => r.visits === 8), 2000, "the computer's search");
     assert.ok(requests.slice(mark).findIndex((r) => r.visits === 8) <= 1);
@@ -278,7 +279,7 @@ export default async function ({ test, assert, root }) {
     const id1 = g1.recordId;
     assert.equal(trendOf(id1)?.phases ?? null, null, "no analysis in the trend record yet");
     await until(() => requests.filter((r) => r.visits === 32).length >= 1, 4000, "summary started");
-    Play.newGame({ size: 19, color: BLACK, strength: "30k" });
+    Play.newGame({ size: 19, color: BLACK, opponentRank: 30 });
     assert.notEqual(g1.summary?.status, "done");
     await until(() => Report.reportJob(id1), 3000, "background report");
     await Report.reportJob(id1).promise;
@@ -438,7 +439,7 @@ export default async function ({ test, assert, root }) {
       fill(game, 10);
       const a = await Engine.analyzeNode(game, game.current, 40);
       assert.equal(a, null, "no KataGo: the caller uses the estimate");
-      const r = await Engine.decide(game, "30k");
+      const r = await Engine.decide(game, 30);
       assert.equal(r.mode, "offline");
       assert.ok(r.move);
     } finally {

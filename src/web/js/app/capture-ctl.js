@@ -22,7 +22,7 @@ const SIZE = 9;
 
 /** The lesson bridge after the life basics: a normal 9×9 game against the gentlest level (teaching is on for new players). */
 export function startFirstGame() {
-  newGame({ size: FIRST_GAME.size, opponent: "ai", color: BLACK, strength: FIRST_GAME.strength, handicap: FIRST_GAME.handicap });
+  newGame({ size: FIRST_GAME.size, opponent: "ai", color: BLACK, opponentRank: FIRST_GAME.opponentRank, handicap: FIRST_GAME.handicap });
 }
 
 function fresh(from) {

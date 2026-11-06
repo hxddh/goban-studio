@@ -35,7 +35,7 @@ export const DEFAULT_SETTINGS = {
   coords: true,
   sound: true,
   numbers: false,
-  strength: "25k",
+  opponentRank: 30, // v9: the opponent, a rank of the ladder (opponents.js)
   playerRank: null, // self-assessed kyu (30…1) or dan as negative; null = new player
   experience: null, // "new" | "rules" | "player"
   onboarded: false,
@@ -51,8 +51,6 @@ export const DEFAULT_SETTINGS = {
   // v4
   boardSize: 19, // the size you last chose for a new game
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
-  // v5
-  humanStyle: true, // with the optional human SL model installed, the opponent plays human-style
   v4: true, // settings have been through the v4 migration
   // v5
   defaultRules: "japanese", // japanese | chinese | korean: new games use it unless the New game sheet chooses
@@ -102,7 +100,8 @@ export function removeKey(key) {
   } catch (_) {}
 }
 
-const LEVEL_TO_STRENGTH = { 1: "25k", 2: "20k", 3: "15k", 4: "10k", 5: "5k" };
+// v9: v1 levels as ranks of the opponent ladder (opponents.js RANKS; what their settings measured)
+const LEVEL_TO_RANK = { 1: 30, 2: 24, 3: 18, 4: 12, 5: 7 };
 
 /** Carry v1 data forward once. Safe to call on every start. */
 export function migrate() {
@@ -124,7 +123,7 @@ export function migrate() {
       next.appearance = "dark";
       next.board = "ink";
     } else if (v1.theme === "paper") next.board = "plain";
-    if (LEVEL_TO_STRENGTH[v1.level]) next.strength = LEVEL_TO_STRENGTH[v1.level];
+    if (LEVEL_TO_RANK[v1.level]) next.opponentRank = LEVEL_TO_RANK[v1.level];
     // Someone who used v1 has seen the rules and the board.
     next.onboarded = v1.firstRun === false;
     if (next.onboarded) next.experience = "rules";
@@ -153,7 +152,7 @@ export function migrate() {
         sgf: v1.sgf,
         humanColor: v1.humanColor,
         opponent: v1.opponent,
-        strength: LEVEL_TO_STRENGTH[v1.level] || DEFAULT_SETTINGS.strength,
+        rank: LEVEL_TO_RANK[v1.level] ?? DEFAULT_SETTINGS.opponentRank,
         name: v1.name || "",
         savedAt: v1.savedAt || Date.now(),
       });
@@ -165,7 +164,7 @@ export function migrate() {
       .filter((g) => g && typeof g.sgf === "string")
       .map((g) => ({
         ...g,
-        strength: LEVEL_TO_STRENGTH[g.level] || null,
+        rank: LEVEL_TO_RANK[g.level] ?? null,
         source: "game",
       }));
     writeJSON(KEYS.library, { v: 2, games });

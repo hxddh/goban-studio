@@ -29,6 +29,17 @@ import { hintReason, hintText, warningReason, warningText } from "./teach-why.js
 /** v7: the signal of everything a game queued (cancelled when it is replaced). */
 const gameSignal = (g) => Engine.sched.ownerSignal(g?.owner);
 
+/**
+ * v9: the opponent of a game from its meta: the implementation it was
+ * played with (`impl`) when the app still knows it, else what plays its
+ * `rank` now (the New game choice, or the `opponentRank` setting).
+ */
+export function opponentOf(meta = {}) {
+  if (meta.impl && Engine.impl(meta.impl)) return { rank: Engine.implLabel(meta.impl), impl: meta.impl };
+  const o = Engine.opponentFor(meta.rank ?? state.settings.opponentRank);
+  return { rank: o.label, impl: o.impl };
+}
+
 export function freshGameState(game, meta = {}) {
   // v7: a new game ends whatever the last one still had queued (its
   // pondering, its post-game summary); a rated game's report carries on in
@@ -41,7 +52,9 @@ export function freshGameState(game, meta = {}) {
     name: meta.name || "",
     opponent: meta.opponent === "human" ? "human" : "ai",
     humanColor: meta.humanColor === WHITE ? WHITE : BLACK,
-    strength: meta.strength || state.settings.strength,
+    // v9: the opponent is a rank; `impl` is what plays it (opponents.js),
+    // `rank` the measured rank of that implementation, as shown.
+    ...opponentOf(meta),
     thinking: false,
     pondering: false,
     gen: 0,
@@ -81,7 +94,7 @@ export function restoreCurrent() {
   }
   // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
   // brand-new board takes the default ruleset and its komi.
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", strength: state.settings.strength });
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai" });
 }
 
 export function persistCurrent() {
@@ -91,7 +104,8 @@ export function persistCurrent() {
     recordId: g.recordId,
     humanColor: g.humanColor,
     opponent: g.opponent,
-    strength: g.strength,
+    rank: g.rank,
+    impl: g.impl,
     name: g.name,
     undos: g.undos,
     hints: g.hints,
@@ -106,7 +120,8 @@ function recordMeta(g) {
     name: g.name,
     humanColor: g.humanColor,
     opponent: g.opponent,
-    strength: g.opponent === "ai" ? g.strength : null,
+    rank: g.opponent === "ai" ? g.rank : null,
+    impl: g.opponent === "ai" ? g.impl : null,
     undos: g.undos,
     hints: g.hints,
     source: "game",
@@ -147,25 +162,30 @@ function gameOver(g = state.game) {
 
 /* --------------------------------------------------------- new game */
 
-/** What to play next: size, strength and handicap from your rating. */
+/**
+ * What to play next: size, the opponent's rank and handicap from your
+ * rating. `rank` is yours; `opponentRank` is a rank of the ladder and
+ * `label` the measured rank of what plays it (opponents.js).
+ */
 export function recommendedGame() {
   const p = state.progress;
   const s = state.settings;
-  // v6: the level you are expected to score closest to even against, from
-  // the strength estimate and the levels' measured strengths (strength.js).
+  // v6: the rank you are expected to score closest to even against, from
+  // the strength estimate and the measured strengths (strength.js).
   const est = p.rating?.mu != null ? p.rating : startEstimate(s.playerRank ?? 30);
   const rank = ratingToRank(est.r);
-  const modeOf = (st) => Engine.opponentMode(st);
-  const strength = s.autoStrength ? recommendStrength(est, { size: 19, modeOf }) : s.strength;
+  const installed = Engine.installed();
+  const pick = (size) => Engine.nearest(s.autoStrength ? recommendStrength(est, { size, installed }) : s.opponentRank, installed);
   // The standard board, always; strength and handicap close the gap. A
-  // 9×9 game is offered beside it as the quick option (its own level: the
+  // 9×9 game is offered beside it as the quick option (its own rank: the
   // small board compresses the ladder).
   const size = 19;
-  const handicap = Engine.suggestHandicap(rank, strength, size);
+  const main = pick(size);
+  const handicap = Engine.suggestHandicap(rank, main.label, size);
   const weak = topWeaknesses(p.weakness, 1)[0] || null;
-  const quickStrength = s.autoStrength ? recommendStrength(est, { size: 9, modeOf }) : s.strength;
-  const quick = { size: 9, strength: quickStrength, handicap: Engine.suggestHandicap(rank, quickStrength, 9) };
-  return { size, strength, handicap, rank, weak, quick };
+  const q = pick(9);
+  const quick = { size: 9, opponentRank: q.rank, label: q.label, handicap: Engine.suggestHandicap(rank, q.label, 9) };
+  return { size, opponentRank: main.rank, label: main.label, handicap, rank, weak, quick };
 }
 
 export function newGame(opts = {}) {
@@ -186,15 +206,16 @@ export function newGame(opts = {}) {
     game.playerBlack = humanColor === BLACK ? t("play.you") : "KataGo";
     game.playerWhite = humanColor === WHITE ? t("play.you") : "KataGo";
   }
-  const strength = opts.strength || state.settings.strength;
-  if (opts.strength) setSetting("strength", opts.strength);
+  // v9: the opponent is a rank of the ladder (opts.opponentRank).
+  const opponentRank = opts.opponentRank ?? state.settings.opponentRank;
+  if (opts.opponentRank != null) setSetting("opponentRank", opts.opponentRank);
   const tc = opts.timeControl ?? state.settings.timeControl;
   if (opts.timeControl) setSetting("timeControl", opts.timeControl);
   Engine.cancel();
   if (state.game) state.game.gen++;
   remember();
   update((s) => {
-    s.game = freshGameState(game, { opponent, humanColor, strength, clock: newClock(tc), rated: opponent === "ai" });
+    s.game = freshGameState(game, { opponent, humanColor, rank: opponentRank, clock: newClock(tc), rated: opponent === "ai" });
     s.space = "play";
     s.sheet = null;
     s.review = null;
@@ -333,14 +354,21 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const started = performance.now();
   let result = { move: null, analysis: null };
   try {
-    result = await Engine.decide(g.game, g.strength, { signal: gameSignal(g) });
+    result = await Engine.decide(g.game, { rank: g.rank, impl: g.impl }, { signal: gameSignal(g) });
   } catch (_) {
     result = { move: null, analysis: null };
   }
   if (state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
   if (a) g.eval = a;
-  if (result.mode) g.opponentMode = result.mode; // v5: "human" | "strong" | "standard" | "offline"
+  if (result.mode) g.opponentMode = result.mode; // "human" | "strong" | "standard" | "offline"
+  // v9: what actually played (a standard level when an optional process
+  // could not answer): its measured rank is shown, and the game is rated
+  // against it.
+  if (result.impl && result.mode !== "offline") {
+    g.played = result.impl;
+    g.rank = Engine.implLabel(result.impl);
+  }
 
   // Teaching: a big drop after the player's move pauses the reply.
   if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {
@@ -369,7 +397,7 @@ async function reply(g, gen, result, started) {
   // out (feel.js resignStep).
   const aiColor = -g.humanColor;
   const empty = g.game.board.signMap.reduce((n, row) => n + row.filter((v) => !v).length, 0);
-  const verdict = resignStep(g.aiLow, { strengthId: g.strength, analysis: a, aiColor, moveNumber: g.game.moveNumber, size: g.game.size, empty });
+  const verdict = resignStep(g.aiLow, { rank: g.rank, analysis: a, aiColor, moveNumber: g.game.moveNumber, size: g.game.size, empty });
   g.aiLow = verdict.low;
   if (verdict.resign) {
     g.thinking = false;
@@ -385,7 +413,7 @@ async function reply(g, gen, result, started) {
   const quiet = !!a && !!mv && !mv.pass && a.moves.some((m) => m.visits > 0 && !m.pass && m.x === mv.x && m.y === mv.y);
   const ready = quiet && countReady(a, g.game.moveNumber + 1, g.game.size);
   // Pace the reply like a person: quick when obvious, slower when it is not.
-  const target = thinkTime(g.strength, a, g.game.moveNumber, g.game.size);
+  const target = thinkTime(g.rank, a, g.game.moveNumber, g.game.size);
   const wait = target - (performance.now() - started);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   if (state.game !== g || gen !== g.gen) return;
@@ -645,10 +673,10 @@ function finishGame() {
     const p = state.progress;
     const prev = p.rating || startEstimate(state.settings.playerRank ?? 30);
     const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
-    // v6: against the level as it played (human-style or stronger network
-    // have their own measured strength; the offline engine counts as standard).
-    const mode = g.opponentMode === "human" || g.opponentMode === "strong" ? g.opponentMode : "standard";
-    p.rating = rateGame(prev, { level: g.strength, mode, size: g.game.size, handicap, won });
+    // v9: against the implementation that played, by its measured strength
+    // (the offline engine counts as the standard level of the rank).
+    const impl = g.played || Engine.resolveOpponent({ rank: g.rank, impl: g.impl }, {}).id;
+    p.rating = rateGame(prev, { impl, size: g.game.size, handicap, won });
     g.ratingDelta = p.rating.r - prev.r;
     g.rated = false;
     rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
@@ -660,7 +688,7 @@ function finishGame() {
   if (g.ratingChange && g.recordId) Lib.patchGame(g.recordId, { rating: g.ratingChange });
   // v5: a compact record for the trends view; the analysis fills it in.
   if (rated) {
-    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.strength, won, rating: rated });
+    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.rank, won, rating: rated });
     if (addGameRecord(state.progress, rec)) g.trendId = rec.id;
   }
   announce(resultText(result));
@@ -681,9 +709,9 @@ export function ratingChange(before, after, now = Date.now()) {
   return { before: { r: a.r, rank: a.rank, pm: a.pm }, after: { r: b.r, rank: b.rank, pm: b.pm } };
 }
 
-/** The computer level as a title shows it ("≈ 12 kyu"). */
-function levelText(id) {
-  const r = Engine.rankParts(id);
+/** The opponent's rank as a title shows it ("≈ 12 kyu"). */
+function levelText(rank) {
+  const r = Engine.rankParts(rank);
   return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
 }
 
@@ -714,7 +742,7 @@ async function summarizeAnalysis(g, recordId) {
   const job = Engine.sched.startJob({
     kind: "summary",
     owner: g.owner,
-    title: () => t("sched.job.game", [levelText(g.strength)]),
+    title: () => t("sched.job.game", [levelText(g.rank)]),
     meta: { recordId },
     run: (job) =>
       analyzeLine(g.game, {

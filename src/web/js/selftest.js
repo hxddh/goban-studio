@@ -140,10 +140,10 @@ async function modelChecks(checks, report, cfg = {}) {
   checks.modelsResume = !!(partway.bytes > 0 && (paused.status === "partial" || paused.status === "ready") && resumed.ok && human.status === "ready" && human.bytes === Models.MODELS.human.bytes);
 
   await mark("human move");
-  Engine.setModels({ human: human.status === "ready", humanStyle: true });
+  Engine.setModels({ human: human.status === "ready" });
   const gH = playAll(new Game({ size: 19, komi: 6.5 }), [[15, 3], [3, 15], [16, 15]]);
   t = now();
-  const decided = await Engine.decide(gH, "10k");
+  const decided = await Engine.decide(gH, 12); // ≈ 12 kyu: human-style when installed
   out.humanMove = { mode: decided.mode, engine: decided.analysis?.engine ?? null, move: decided.move && !decided.move.pass ? `${decided.move.x},${decided.move.y}` : "", ms: Math.round(now() - t) };
   checks.modelsHuman = !!(decided.mode === "human" && decided.analysis?.engine === "human" && decided.move && !decided.move.pass && gH.canPlay(decided.move.x, decided.move.y).ok);
 

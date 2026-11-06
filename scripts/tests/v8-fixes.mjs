@@ -197,7 +197,7 @@ export default async function ({ test, assert, root }) {
       fill(game, 6);
       const before = requests.length;
       const t0 = Date.now();
-      const decided = Engine.decide(game, "30k");
+      const decided = Engine.decide(game, 30);
       await until(() => requests.length > before && requests.slice(before).some((r) => r.visits !== 40 && r.visits !== 80), 3000, "the computer's search");
       const mine = requests.slice(before).find((r) => r.visits !== 40 && r.visits !== 80);
       assert.ok(mine.at - t0 < 40, `the computer's search waited ${mine.at - t0} ms (a background search takes ${delay})`);
