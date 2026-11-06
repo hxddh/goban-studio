@@ -629,7 +629,12 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
   const was = await checked();
   await page.focus(".sheet .segmented button[aria-checked=true]");
   await page.keyboard.press("ArrowRight");
+  // The choice re-renders on the next frame; wait for it rather than read it at once.
+  await page
+    .waitForFunction((was) => [...document.querySelectorAll(".sheet .segmented")[0].querySelectorAll("[role=radio]")].findIndex((b) => b.getAttribute("aria-checked") === "true") !== was, was, { timeout: 2000 })
+    .catch(() => {});
   assert((await checked()) !== was, "→ did not choose the next segment");
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-checked") === "true", null, { timeout: 2000 }).catch(() => {});
   assert(await page.evaluate(() => document.activeElement.getAttribute("aria-checked") === "true"), "focus did not follow the choice");
   // Back to the board.
   await page.keyboard.press("Escape");
