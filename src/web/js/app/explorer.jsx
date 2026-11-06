@@ -42,7 +42,7 @@ function lineName(mode, id) {
 export function ExplorerView() {
   const e = X.explorerState();
   // v8: the book is fetched on first use; a moment's empty page until then.
-  if (!e) return <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
+  if (!e) return <Toolbar crumbs={[{ label: t("nav.play"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
   const mode = e.mode;
   const node = e.game.current;
   const cands = X.explorerCandidates(e);
@@ -58,7 +58,6 @@ export function ExplorerView() {
     variation: null,
     moveNumbers: null,
     showCoords: state.settings.coords,
-    material: state.settings.board,
     view: X.explorerView(e),
     hoverColor: node.turn,
     interactive: true,
@@ -66,7 +65,7 @@ export function ExplorerView() {
   const title = t(mode === "corner" ? "explorer.corner" : "explorer.whole");
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
+      <Toolbar crumbs={[{ label: t("nav.play"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
         <div class="tool-group">
           {X.explorerZoomable(e) && (
             <IconButton
@@ -196,30 +195,6 @@ function ExplorerPanel({ cands }) {
         </Button>
       </div>
     </aside>
-  );
-}
-
-/** The Library tab: two entries, one per tree. */
-export function ExplorerEntries() {
-  const b = X.theBook();
-  return (
-    <>
-      <p class="muted section-sub explorer-help">{t("explorer.help")}</p>
-      <ul class="group collection">
-        {X.EXPLORER_MODES.map((mode) => (
-          <li>
-            <button type="button" class="collection-row" data-explorer={mode} onClick={() => X.openExplorer(mode)}>
-              <span class="collection-main">
-                <strong>{t(mode === "corner" ? "explorer.corner" : "explorer.whole")}</strong>
-                <span class="muted">{t(mode === "corner" ? "explorer.cornerHelp" : "explorer.wholeHelp")}</span>
-              </span>
-              {b && <span class="fine">{t("explorer.positions", [b.trees[mode]?.nodes.length || 0])}</span>}
-              <Icon name="next" size={15} />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
   );
 }
 

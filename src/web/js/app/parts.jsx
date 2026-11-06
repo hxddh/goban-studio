@@ -168,7 +168,7 @@ export function Board({ model, onPlay, onHover, label }) {
     return () => view.current?.destroy();
   }, []);
   useEffect(() => {
-    view.current?.setModel({ ...model, flatStones: !!state.settings?.flatStones });
+    view.current?.setModel(model);
     window.__board = view.current;
   });
   // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
@@ -252,12 +252,9 @@ export function Thumb({ thumb, size }) {
       if (ch === "w") {
         g.strokeStyle = "rgba(0,0,0,0.25)";
         g.stroke();
-      } else if (state.settings?.board === "ink") {
-        g.strokeStyle = "rgba(235,230,220,0.4)";
-        g.stroke();
       }
     }
-  }, [thumb, size, state.settings?.board, state.settings?.appearance]);
+  }, [thumb, size, state.settings?.appearance]);
   return <canvas ref={ref} class="thumb" aria-hidden="true" />;
 }
 

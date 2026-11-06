@@ -10,6 +10,7 @@ src/web/js/worker-src.js
 
 frontend/dist/
 src/web/js/bundle.js
+src/web/js/content-lazy/
 .amp/
 
 # KataGo platform binaries are fetched/built by the release workflows

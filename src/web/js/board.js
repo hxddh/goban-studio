@@ -14,51 +14,21 @@
  * playable without a pointer.
  */
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
-import { loadMaterials, stoneVariant, surfaceFor } from "./materials.js";
+import { loadMaterials, stoneVariant } from "./materials.js";
 
 /**
- * v4 materials (docs/design.md §5): a calm plain board by default, a wood
- * board whose grain is a whisper (the kaya texture at 25 %), and an ink
- * board for dark rooms. Line colours are ink at ~70 %, never pure black.
+ * The board (docs/design.md §5): one calm plain surface. Line colours are
+ * ink at ~70 %, never pure black.
  */
-export const MATERIALS = {
-  plain: {
-    base: "#E4CB9A",
-    vignette: "rgba(70, 44, 12, 0.07)",
-    line: "rgba(40, 27, 12, 0.72)",
-    edge: "rgba(40, 27, 12, 0.85)",
-    star: "rgba(40, 27, 12, 0.85)",
-    text: "rgba(74, 52, 26, 0.6)",
-    shadow: "rgba(46, 28, 8, 0.3)",
-  },
-  wood: {
-    base: "#E2C795",
-    texture: "kaya",
-    textureAlpha: 0.25,
-    vignette: "rgba(70, 44, 12, 0.07)",
-    line: "rgba(40, 27, 12, 0.74)",
-    edge: "rgba(40, 27, 12, 0.86)",
-    star: "rgba(40, 27, 12, 0.86)",
-    text: "rgba(74, 52, 26, 0.62)",
-    shadow: "rgba(46, 28, 8, 0.3)",
-  },
-  ink: {
-    base: "#2D2E2C",
-    vignette: "rgba(0, 0, 0, 0.22)",
-    line: "rgba(232, 228, 218, 0.34)",
-    edge: "rgba(232, 228, 218, 0.52)",
-    star: "rgba(232, 228, 218, 0.62)",
-    text: "rgba(232, 228, 218, 0.46)",
-    shadow: "rgba(0, 0, 0, 0.5)",
-  },
+export const THEME = {
+  base: "#E4CB9A",
+  vignette: "rgba(70, 44, 12, 0.07)",
+  line: "rgba(40, 27, 12, 0.72)",
+  edge: "rgba(40, 27, 12, 0.85)",
+  star: "rgba(40, 27, 12, 0.85)",
+  text: "rgba(74, 52, 26, 0.6)",
+  shadow: "rgba(46, 28, 8, 0.3)",
 };
-
-/** v3 names still found in saved settings or callers. */
-const MATERIAL_V3 = { kaya: "plain", katsura: "wood", paper: "plain", slate: "ink" };
-
-export function materialName(name) {
-  return MATERIALS[name] ? name : MATERIAL_V3[name] || "plain";
-}
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
@@ -143,7 +113,6 @@ export class BoardView {
       variation: null,
       moveNumbers: null,
       showCoords: true,
-      material: "plain",
       view: null,
       hover: null,
       hoverColor: BLACK,
@@ -171,15 +140,14 @@ export class BoardView {
     this.mats = null;
     loadMaterials().then((m) => {
       this.mats = m;
-      this.grainCache = null;
       this.draw();
     });
     this.resize();
   }
 
-  /** Colours for the current material. */
+  /** The board's colours. */
   theme() {
-    return MATERIALS[materialName(this.model.material)];
+    return THEME;
   }
 
   destroy() {
@@ -331,6 +299,9 @@ export class BoardView {
 
   eventPoint(e) {
     const rect = this.canvas.getBoundingClientRect();
+    // The layout can change before the ResizeObserver has told us (it reports
+    // at the next frame): a click then would be read with the old geometry.
+    if (Math.round(rect.width) !== this.cssW || Math.round(rect.height) !== this.cssH) this.resize();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
@@ -368,10 +339,9 @@ export class BoardView {
     return this.model.cursor;
   }
 
-  /** The board surface, cached per size and material. */
+  /** The board surface, cached per size. */
   grain(theme, w, h) {
-    const tex = theme.texture && this.mats ? surfaceFor(this.mats, theme.texture) : null;
-    const key = `${materialName(this.model.material)}:${w}x${h}:${this.dpr}:${tex ? "tex" : "flat"}`;
+    const key = `${w}x${h}:${this.dpr}`;
     if (this.grainCache?.key === key) return this.grainCache.canvas;
     const c = document.createElement("canvas");
     c.width = Math.round(w * this.dpr);
@@ -380,15 +350,6 @@ export class BoardView {
     g.scale(this.dpr, this.dpr);
     g.fillStyle = theme.base;
     g.fillRect(0, 0, w, h);
-    if (tex) {
-      // The grain is a whisper: the texture at a quarter strength.
-      g.save();
-      g.globalAlpha = theme.textureAlpha;
-      g.imageSmoothingQuality = "high";
-      const side = Math.min(tex.naturalWidth || tex.width, tex.naturalHeight || tex.height);
-      g.drawImage(tex, 0, 0, side, side, 0, 0, w, h);
-      g.restore();
-    }
     // A barely-there falloff from the centre, so the surface is not dead flat.
     const r = Math.hypot(w, h) / 2;
     const v = g.createRadialGradient(w / 2, h / 2, r * 0.35, w / 2, h / 2, r);
@@ -641,7 +602,6 @@ export class BoardView {
     if (sprite) {
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
-      this.rim(ctx, cx, cy, r, color);
       ctx.restore();
       return;
     }
@@ -659,7 +619,6 @@ export class BoardView {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
-    this.rim(ctx, cx, cy, r, color);
     if (color === WHITE) {
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.lineWidth = 0.75;
@@ -668,21 +627,10 @@ export class BoardView {
     ctx.restore();
   }
 
-  /** On the ink board a black stone needs a hairline rim to read. */
-  rim(ctx, cx, cy, r, color) {
-    if (color !== BLACK || materialName(this.model.material) !== "ink") return;
-    ctx.strokeStyle = "rgba(235, 230, 220, 0.32)";
-    ctx.lineWidth = Math.max(0.75, r * 0.04);
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  /** Pre-rendered stone: shell/slate variants, or flat high-contrast discs. */
+  /** Pre-rendered stone: shell/slate variants. */
   sprite(x, y, color) {
     const m = this.mats;
     if (!m) return null;
-    if (this.model.flatStones) return color === BLACK ? m.flatBlack : m.flatWhite;
     const list = color === BLACK ? m.black : m.white;
     if (!list || !list.length) return null;
     return list[stoneVariant(x, y, color, list.length)] || list[0];

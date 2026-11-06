@@ -59,7 +59,7 @@ The window has three columns:
 | Content | remaining | toolbar (52 px) on top, then the place |
 | Panel (board places) | 320 px (352 px from 1600 px) | fixed slots, see §7 |
 
-List pages (Today, Practice home, Library) centre a 880 px column. Radii:
+List pages (Play's home, Learn's path and catalog) centre a 880 px column. Radii:
 `--r-1` 6 px (controls), `--r-2` 10 px (cards, rows), `--r-3` 14 px (sheets).
 
 ## 4. Colour
@@ -87,12 +87,8 @@ group per screen region.
 
 ## 5. The board
 
-* **Surface.** Three materials only:
-  * *Plain* (default): a flat warm honey (#E5CB98 light) with a 3 %
-    centre-to-edge falloff. No grain.
-  * *Wood*: the kaya texture at 25 % strength over the plain colour — the
-    grain is a whisper, never a stripe.
-  * *Ink*: a deep charcoal board (#2C2D2B) with light lines, for dark rooms.
+* **Surface.** One board (v9): a flat warm honey (#E5CB98 light) with a
+  3 % centre-to-edge falloff. No grain, no alternative materials.
 * **Lines.** Inner lines are whole device pixels (1 px at ≤ 30 px cells,
   2 px above on Retina), snapped to the pixel grid so they never blur. The
   outer frame is 1.6× the inner width. Line colour is 70 % ink, not black.
@@ -132,29 +128,38 @@ group per screen region.
   rows: stone, name, level, captures, clock), status (one line), actions
   (Pass, Undo, More), the move list (fills the rest), never empty space.
   Game facts (size, komi, handicap, time) live in the toolbar subtitle.
-* **Review.** Board left, panel right: the balance chart (the hero) and
-  the analysis line stay on top; below them three tabs (segmented control):
-  *Analysis* (key mistakes, each expandable into its explained line, and
-  variations), *Summary* (the game in three phases — only when KataGo
-  analysed the game; an offline estimate never shows phase numbers) and
-  *Notes* (comment, marks, variation tree). Tools (live analysis,
-  territory, guess, export) are icon buttons in the toolbar; *Play from
-  here* is the one primary action. A record opens on its final position
-  and moves to the first key moment when the analysis is done, unless the
-  player has already moved; a classic with a famous move opens on it.
-* **Today.** One hero (continue the game, or the suggested game) with the
-  only primary button; then one thing to learn (today's five until it is
-  done, then the next lesson); this week's focus; then your level with its
-  sparkline. Empty states collapse to a single line instead of an empty
-  card.
-* **Practice.** Hero row for the next lesson with progress; today's five as
-  a row; the course as grouped rows (title + check, no step counts); the
-  problem topics as a grid of quiet tiles.
-* **Library.** Toolbar holds Import. Three segmented tabs: my games
-  (rows with a thumbnail), classics, and openings (the explorer, then the
-  pro-opening drills in their own section). Reports of the player's games
-  are made in the background by themselves; a row says so only while its
-  report is being made.
+* **Review (v9: also the post-game review).** When a game ends, its board
+  turns into its review on the same page; a game opened from the history
+  opens in the same view. Board left, panel right: the result line (the
+  result, the game's facts, the change of the estimate), then the balance
+  chart (the hero) and the analysis line; below them three tabs
+  (segmented control): *Analysis* (up to three key moments, each
+  expandable into its explained line, and variations; an offline estimate
+  shows its turning points only, without a loss or a better move),
+  *Summary* (the game in three phases — only when KataGo analysed the
+  game) and *Notes* (comment, marks, variation tree). A key moment of a
+  KataGo-analysed game of your own has *Try again*: the board goes to the
+  position before it and the panel shows one card with KataGo's verdict
+  (no primary in it). Tools (live analysis, territory, export image,
+  Export SGF) are icon buttons in the toolbar; the one primary action is
+  *New game* after a game you just played, *Play from here* otherwise. A
+  record opens on its final position and moves to the first key moment
+  when the analysis is there, unless the player has already moved; a
+  classic with a famous move opens on it.
+* **Learn (v9).** One path chosen for you: a short ordered list of rows
+  (5–8: the next lesson, reviews due, the week's focus, one stretch
+  problem, the beginner bridges), each saying why it is there in a few
+  words; the week's focus and its reason in one line above it. One primary
+  (*Start* / *Continue*) plays the rows as one session; at the end a quiet
+  "done for today". One row below opens the catalog: the course as one
+  group of unit rows, the problem topics as rows, the basic shapes as chips.
+* **Play's home (v9).** Toolbar holds Import. One column, no tabs: the
+  game in progress or the suggested game (the one primary button, a quiet
+  9×9 link beside it), your level, then your games as compact rows with a
+  thumbnail (filter and search only once the list is long; the first eight
+  until *Show all*), the classics, and one row that opens the opening
+  explorer. The player's games are analysed in the background by
+  themselves; a row says so only while it is being analysed.
 * **Settings.** A wide sheet with two panes: a source list on the left
   (General, Board, Playing, Data, About; the opponents' networks close the
   Playing pane; arrow keys
@@ -163,12 +168,6 @@ group per screen region.
 * **Problems.** A problem window is widened towards the open side to at
   least eight lines, so stones keep a natural size and the corner keeps its
   surroundings.
-* **Report (v6).** A list-page column: the result as the page title with
-  the facts (result, rules, komi, size) under it; the three phases as one
-  table (only from KataGo — with the offline estimate a single plain
-  sentence instead); three key moments as small boards; then one card whose
-  button is the only primary action (*Practise this game*). *Export image*
-  is a quiet button in the toolbar.
 * **New game.** The recommended game is pre-selected and *Start* is the
   only primary action; size cards (19×19 first and standard; 13×13 and 9×9
   as quicker games); opponent, strength and colour on one row each; time,
@@ -177,9 +176,7 @@ group per screen region.
 * **Less on screen (v8).** Every element has to serve playing or learning.
   The play panel says nothing before the first move but one quiet line;
   the review keeps its status (analysis, where the game left the book) on
-  one line; there is no list of background work to manage; an empty
-  feature (imported problem collections) is a single quiet link until it
-  is used. A new element in a release comes with one taken away.
+  one line; there is no list of background work to manage. A new element in a release comes with one taken away.
 
 ## 8. Motion
 
@@ -219,9 +216,9 @@ dark, in all four languages, before every release:
 The automated part (`npm run ui-test`) checks contrast, primary-button
 count, layout budgets and pixel baselines; the rest is a human pass.
 
-Since v7 a cross check (`scripts/ui-tests/z-cross.mjs`) visits every place
-and page added since v5 — Today, Practice and a problem, Library, the
-explorer, a classic in review (every tab), a game report, every Settings
-pane — in four combinations of language, light/dark and larger text, and
+Since v7 a cross check (`scripts/ui-tests/shell-cross.mjs`) visits every place
+and page — Play's home, Learn and a problem, the explorer, a classic in
+review (every tab), a finished game's post-game review (every tab), every
+Settings pane — in four combinations of language, light/dark and larger text, and
 runs the accessibility audit, the raw-key, clipping, sideways-scroll and
 one-primary checks on each. A new page joins that list in the same change.

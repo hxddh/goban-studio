@@ -2,7 +2,7 @@
  * Native screenshot tour of a packaged Goban Studio (v4 release checks).
  *
  * Launches the packaged executable with GOBAN_TOUR_OUT set. The page
- * (src/web/js/tour.js) visits Today, a 19×19 game, its review, Practice and
+ * (src/web/js/tour.js) visits Play, a 19×19 game, its review, Learn and
  * Settings with the app's own controller; after each it writes
  * {step, name} to GOBAN_TOUR_OUT and waits for `<GOBAN_TOUR_OUT>.ack`.
  * This script captures the window with the operating system's tools

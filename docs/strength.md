@@ -28,6 +28,12 @@ v8 measured the whole ladder on 13×13 for the first time (960 games):
 no label changes, but 13×13 games now count on their measured scale
 ("v8: the ladder on 13×13" below).
 
+v9 drops the level IDs and the modes from the app: the player chooses a
+rank, and the app plays the measured setting closest to it ("v9: one
+opponent axis" below). The IDs below remain the names of calibrated
+settings (`L:<id>`, `HL:<id>`, `LS:<id>` in the calibration); nothing
+saved refers to them any more.
+
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `30k` | ≈30 kyu | 8 | 2 | 40 | 0.3 | 1 | 0 (reference) | −1272 (−2154 to −933) | 34k (43k–30k) |
@@ -1008,13 +1014,118 @@ node scripts/calibrate-strength.mjs fit docs/calibration/results/v8-13*.jsonl --
 | HL:2d vs C:v400 | 16 | 4–12 | 75 (51–90) | 129 | 3 | 0 |
 | C:v400 vs LS:2d | 16 | 0–16 | 100 (81–100) | 134 | 11 | 0 |
 
+## v9: one opponent axis
+
+**Short version.** No new games: v9 changes how levels are chosen and
+labelled, not how they play. New game offers one slider of ranks; each
+rank is played by the setting (an *implementation*) whose measured
+19×19 strength is closest, among what the installed networks can play,
+and the slider shows that setting's measured rank, not the rank asked
+for. There is no mode, no human-style switch and no per-mode label.
+`src/web/js/opponents.js` holds the tables; engine.js plays them; the
+rating reads the same numbers.
+
+**The ladder.** 30, 24, 18, 15, 12, 10, 7, 4 and 1 kyu, 4 dan, 7 dan:
+six ranks apart in the double-digit kyu (where the bottom levels are
+compressed and the measurements are coarse), then three. Each rank is
+within one rank of what plays it, on every combination of networks.
+
+| Rank | Nothing installed | Human-style network | Stronger network only |
+| --- | --- | --- | --- |
+| 30k | `L:25k` ≈29k | `HL:25k` ≈30k | `L:25k` ≈29k |
+| 24k | `L:20k` ≈23k | `HL:20k` ≈24k | `L:20k` ≈23k |
+| 18k | `L:15k` ≈18k | `HL:15k` ≈18k | `L:15k` ≈18k |
+| 15k | `C:b40` ≈15k | `CH:r20k` ≈15k | `C:b40` ≈15k |
+| 12k | `L:10k` ≈12k | `HL:10k` ≈12k | `L:10k` ≈12k |
+| 10k | `C:b18` ≈10k | `C:b18` ≈10k | `C:b18` ≈10k |
+| 7k | `L:5k` ≈7k | `HL:5k` ≈7k | `L:5k` ≈7k |
+| 4k | `C:b0` ≈5k | `CH:s7k24` ≈3k | `C:b0` ≈5k |
+| 1k | `L:1k` ≈2k | `HL:1k` ≈1k | `L:1k` ≈2k |
+| 4d | `L:2d` ≈4d | `L:2d` ≈4d | `L:2d` ≈4d |
+| 7d | — (the 4d entry) | `HL:2d` ≈7d | `LS:2d` ≈8d |
+
+With both networks the column is the human-style one. Without the
+optional networks 7 dan is out of reach and the ladder ends at 4 dan.
+
+**How a rank maps** (`levelFor(rank, installed)`): among the
+implementations the installed networks can play, the one whose measured
+19×19 rank is closest; a human-style implementation wins when it
+measured within one rank of the rank asked for and at most half a rank
+farther than the closest standard one, because it plays more like a
+person. That is why 10 kyu is standard even with the human network (its
+nearest human-style setting, `CH:s7k24b25`, measured 11 kyu, a rank off)
+and 4 dan is standard (human-style `2d` measured 7 dan). When a process
+cannot answer during a game, the nearest standard implementation plays
+the move and the player panel shows its rank.
+
+**The implementations.** All are settings that were measured, under
+their calibration names. Besides the shipped v4–v8 levels, v9 uses five
+bridge settings from the same games: `C:b40`, `C:b18`, `C:b0` (v4: the
+8-visit base level with 40%, 18% and no beginner's moves; `C:b40` was
+also measured on 13×13 in v8) and `CH:r20k`, `CH:s7k24` (v6's human-style
+`15k` and `5k`, which v7 measured again before replacing them; 19×19 and
+9×9). Rank intervals are the published 95% bootstrap intervals: the v4
+table for `L:` and `C:` (they include the anchor's sampling error), the
+v7 fit with the ladder held fixed for `HL:`, `CH:` and `LS:` (they do
+not include the ladder's own error).
+
+| Implementation | Kind | Settings | θ 19×19 | Rank (95% CI) | θ 13×13 | θ 9×9 |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| `HL:25k` | human | `rank_20k` raw, 70% beginner's moves | 1.39 | 30k (32k–28k) | 1.04 | 1.15 |
+| `L:25k` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.95 | 1.8 | 29k (36k–26k) | 0.84 | 0.40 |
+| `HL:20k` | human | `rank_20k` raw, 35% beginner's moves | 3.9 | 24k (26k–23k) | 3.66 | 2.10 |
+| `L:20k` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.75 | 4.59 | 23k (27k–21k) | 3.22 | 2.06 |
+| `HL:15k` | human | `rank_20k` raw, 12% beginner's moves | 6.77 | 18k (20k–17k) | 5.45 | 4.64 |
+| `L:15k` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.6 | 6.88 | 18k (21k–16k) | 4.99 | 2.85 |
+| `CH:r20k` | human | `rank_20k` raw | 8.37 | 15k (18k–13k) | 7.02* | 5.30 |
+| `C:b40` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.4 | 8.56 | 15k (17k–14k) | 6.36 | 4.50* |
+| `HL:10k` | human | `rank_12k` raw | 10.19 | 12k (14k–11k) | 8.81 | 6.79 |
+| `L:10k` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.25 | 10.21 | 12k (14k–11k) | 8.33 | 6.13 |
+| `C:b18` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.18 | 11.97 | 10k (11k–8k) | 9.19* | 6.78* |
+| `HL:5k` | human | `rank_7k` search 24, 12% beginner's moves | 13.68 | 7k (8k–6k) | 10.13 | 8.03 |
+| `L:5k` | standard | 8 visits, temp 2, window 40, slip 0.3, blunder 0.09 | 13.85 | 7k (8k–5k) | 10.10 | 7.47 |
+| `C:b0` | standard | 8 visits, temp 2, window 40, slip 0.3 | 14.98 | 5k (6k–4k) | 11.44* | 8.76* |
+| `CH:s7k24` | human | `rank_7k` search 24 | 16.81 | 3k (4k–2k) | 13.00* | 11.97 |
+| `L:1k` | standard | 32 visits, temp 0.7, window 6, slip 0.02 | 17.9 | 2k (3k–1d) | 14.91 | 12.08 |
+| `HL:1k` | human | `rank_4k` search 32 | 18.42 | 1k (2k–1d) | 14.47 | 12.89 |
+| `L:2d` | standard | 160 visits, best move | 23.35 | 4d (3d–6d) | 17.45 | 14.93 |
+| `HL:2d` | human | `rank_4d` search 200 | 26.99 | 7d (6d–8d) | 17.82 | 14.99 |
+| `LS:2d` | strong | stronger network, 64 visits | 28.11 | 8d (7d–8d) | 22.78 | 16.82 |
+
+\* Not measured on that board: derived from the implementation's 19×19 θ
+through the measured levels of the same kind (piecewise linear in their
+(θ 19×19, θ board) pairs, as `onBoard` does for the estimate). On 9×9 the
+ladder is compressed as before: `C:b18` and `HL:10k` are level there.
+
+**What changed against v8.** The labels are the measured ranks
+themselves: human-style `2d` shows 7 dan (v7 showed the lower end of its
+interval, 6 dan) and the stronger network 8 dan. The standard `30k`
+level (≈34 kyu, shown as 30 kyu since v4) and human-style `30k` are no
+longer offered: 30 kyu is played by the settings that measured 29–30 kyu.
+Human-style 1 kyu → 4 dan is no longer a seven-rank step; 4 dan sits
+between them. Pacing, resignation and the count proposal (`app/feel.js`)
+now read the measured rank played (from 15 kyu up the computer may
+resign; weaker ranks play every game out).
+
+**What a game stores.** Its `rank` (the measured rank shown) and `impl`
+(the implementation), never a level ID; Settings store `opponentRank`, a
+rank of the ladder. The rating (`app/strength.js rateGame`) uses the
+implementation that actually played, on the board it was played on, so
+`measured(rank, size, installed)` and the estimate agree.
+
+**Limitations.** Everything above still applies. The bridges have
+fewer games than the shipped levels (`C:b18` 58 on 19×19, `CH:r20k` 42,
+`C:b40` 70 plus 48 on 13×13), and those without a small-board
+measurement use a derived one; the 7-dan and 8-dan entries rest on one
+bridge player and the anchor's furthest extrapolation.
+
 ## v6: your strength — the estimate
 
 Until v5 the player's level was an Elo-style number that moved by a fixed
 step after each game against the computer, judged against the level's
 *label*. Since v6 it is an estimate with an uncertainty
-(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" with a chart of
-the estimate and its band over time (`app/strength-chart.jsx`).
+(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" (`app/estimate-label.js`; v9 removed the
+chart of the estimate over time).
 
 **Units.** The estimate lives on the scale the levels were measured on:
 θ, Bradley–Terry strength in nats on 19×19, with the same EGF mapping and
@@ -1090,8 +1201,8 @@ the estimate).
 start: μ is the old rating, σ what that many fair games would leave from
 the prior, and every old history point keeps its time and value and gets
 the band of its game count. `progress.rating.r` (the GoR of μ) and
-`history[].r` keep their meaning, so the week summary and the trends
-view read old and new data alike. Rank labels round to the nearest rank
+`history[].r` keep their meaning, so the trends view reads old and new
+data alike. Rank labels round to the nearest rank
 since v6 (v5 rounded a rating towards the weaker rank).
 
 ## Limitations

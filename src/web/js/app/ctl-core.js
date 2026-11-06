@@ -3,13 +3,41 @@
  * navigation history (back / forward across places, lessons, problems and
  * reviews).
  */
-import { saveSettings } from "../persist.js";
+import { store } from "../data/store.js";
+import { saveSettings } from "../data/settings.js";
+import { estimate } from "../model/player.js";
 import { setLang, t } from "../i18n.js";
 import { setSound } from "../audio.js";
-import * as Audio from "../audio.js";
-import { gorToTheta, recommendStrength } from "./strength.js";
-import { ratingToRank } from "./rating.js";
 import { state, update } from "./store.js";
+
+/* ------------------------------------------------------------ the player */
+
+/** Where the one player model is stored (model/player.js). */
+export const PROFILE_KEY = "profile.json";
+
+/**
+ * Change the player model: `fn(profile)` returns the next profile (the
+ * model's mutations are pure); it is kept in the state and written.
+ */
+export function changeProfile(fn) {
+  const next = fn(state.profile);
+  if (next && next !== state.profile) {
+    state.profile = next;
+    store.put(PROFILE_KEY, next);
+  }
+  return state.profile;
+}
+
+/** The player's strength now (model/player.js estimate). */
+export function playerEstimate(opts = {}) {
+  return estimate(state.profile, { now: Date.now(), ...opts });
+}
+
+/** The player's rank: the estimate once a game is rated, else the rank they gave. */
+export function playerRankNow() {
+  const e = playerEstimate();
+  return e.games > 0 ? e.rank : state.settings.playerRank ?? 30;
+}
 
 export const tx = (obj) => (obj ? obj[state.settings.lang] ?? obj.en ?? obj.zh ?? "" : "");
 
@@ -19,7 +47,6 @@ export function applyAppearance() {
   const dark = s.appearance === "dark" || (s.appearance === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
-  root.dataset.board = s.board || "plain";
   root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
 }
 
@@ -27,14 +54,10 @@ export function setSetting(key, value) {
   update((s) => {
     s.settings = { ...s.settings, [key]: value };
   });
-  saveSettings(state.settings);
+  saveSettings(store, state.settings);
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
   if (key === "appearance" || key === "largeText") applyAppearance();
-  if (key === "board") {
-    Audio.setMaterial?.(value);
-    applyAppearance();
-  }
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 
@@ -75,14 +98,7 @@ export function resultText(result) {
 export function teachingOn() {
   const s = state.settings;
   if (s.teaching === true || s.teaching === false) return s.teaching;
-  const r = state.progress?.rating?.r;
-  const rank = r != null ? ratingToRank(r) : s.playerRank ?? 30;
-  return rank >= 15;
-}
-
-/** The level nearest a rating (GoR), for "suggested opponent" (v6: by measured strength). */
-export function strengthForRating(r) {
-  return recommendStrength({ mu: gorToTheta(r) });
+  return playerRankNow() >= 15;
 }
 
 /* ------------------------------------------------------------ history */
@@ -96,16 +112,15 @@ export function setRestorer(fn) {
 }
 
 export function locationNow() {
-  const p = state.practice;
+  const p = state.learn;
   const r = state.review;
   return {
     space: state.space,
-    practice: {
+    learn: {
       view: p.view,
       topic: p.topic,
       theme: p.theme || null,
       shape: p.shape || null,
-      collection: p.collection || null, // v7
       lessonId: p.lesson?.lesson?.id || null,
       lessonIndex: p.lesson?.index ?? null,
       problemId: p.problem?.def?.id || null,
@@ -113,9 +128,7 @@ export function locationNow() {
       daily: !!p.daily,
       captureFrom: p.capture?.from || null, // v8
     },
-    library: { ...state.library },
-    // v6
-    report: state.report ? { recordId: state.report.recordId, space: state.report.space } : null,
+    play: { ...state.play },
     review: r
       ? {
           source: r.source,

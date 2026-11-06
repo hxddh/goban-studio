@@ -6,25 +6,14 @@
  * exists here.
  */
 import { m } from "./messages/m.js";
-import { V7_FIXES } from "./messages/v7-fixes.js";
-import { V7_SCHEDULER } from "./messages/v7-scheduler.js";
-import { V7_PLAN } from "./messages/v7-plan.js";
-import { V7_CALIBRATION } from "./messages/v7-calibration.js";
-import { V7_BOOK } from "./messages/v7-book.js";
-import { V7_PROBLEMS } from "./messages/v7-problems.js";
-import { V8_BEGINNER } from "./messages/v8-beginner.js";
-import { V8_TEACHING } from "./messages/v8-teaching.js";
-import { V8_FEEL } from "./messages/v8-feel.js";
-import { V8_FIXES } from "./messages/v8-fixes.js";
-import { V8_SIMPLIFY } from "./messages/v8-simplify.js";
+import { SHELL } from "./messages/shell.js";
+import { PLAY } from "./messages/play.js";
+import { LEARN } from "./messages/learn.js";
 
 export const MESSAGES = {
   "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
 
   "nav.main": m("主导航", "Main navigation", "주 메뉴", "メインナビゲーション"),
-  "nav.play": m("下棋", "Play", "대국", "対局"),
-  "nav.practice": m("练习", "Practice", "연습", "練習"),
-  "nav.library": m("棋谱", "Library", "기보", "棋譜"),
   "nav.settings": m("设置", "Settings", "설정", "設定"),
 
   "common.newGame": m("新对局", "New game", "새 대국", "新しい対局"),
@@ -83,8 +72,6 @@ export const MESSAGES = {
   "play.gameOver": m("对局结束", "Game over", "대국 종료", "終局"),
   "play.reviewGame": m("回看这盘", "Review this game", "이 대국 복기", "この対局を検討"),
   "play.playAgain": m("再来一局", "Play again", "한 판 더", "もう一局"),
-  "play.undosN": m("悔棋 {0} 次", "{0} undos", "무르기 {0}회", "待った {0}回"),
-  "play.hintsN": m("提示 {0} 次", "{0} hints", "힌트 {0}회", "ヒント {0}回"),
 
   "result.points": m("{0}胜 {1} 目", "{0} wins by {1}", "{0} {1}집 승", "{0}の{1}目勝ち"),
   "result.resign": m("{0}中盘胜", "{0} wins by resignation", "{0} 불계승", "{0}の中押し勝ち"),
@@ -102,7 +89,6 @@ export const MESSAGES = {
   "score.resume": m("继续下", "Keep playing", "계속 두기", "対局を続ける"),
 
   "review.title": m("复盘", "Review", "복기", "検討"),
-  "review.backToGame": m("回到对局", "Back to game", "대국으로", "対局に戻る"),
   "review.nav": m("手顺", "Moves", "수순", "手順"),
   "review.first": m("第一手", "First move", "처음", "最初"),
   "review.previous": m("上一手", "Previous move", "이전 수", "一手戻る"),
@@ -115,10 +101,7 @@ export const MESSAGES = {
   "review.whiteAhead": m("白优", "White ahead", "백 우세", "白優勢"),
   "review.analyzing": m("KataGo 分析中 {0}%", "KataGo is analyzing · {0}%", "KataGo 분석 중 {0}%", "KataGo 解析中 {0}%"),
   "review.estimating": m("估算中 {0}%", "Estimating · {0}%", "추정 중 {0}%", "推定中 {0}%"),
-  "review.analyzedBy": m("由 {0} 分析", "Analyzed by {0}", "{0} 분석", "{0}による解析"),
   "review.estimateNote": m("离线估算（浏览器预览没有 KataGo），只适合找转折点。", "Offline estimate (no KataGo in the browser preview); good for finding turning points only.", "오프라인 추정입니다(브라우저 미리보기에는 KataGo가 없음). 전환점을 찾는 정도로만 쓰세요.", "オフライン推定です（ブラウザ版にはKataGoがありません）。転換点を探す目安にしてください。"),
-  "review.keyMoves": m("关键失误", "Key mistakes", "결정적 실수", "大きな悪手"),
-  "review.waiting": m("分析完成后会列出最关键的三手。", "The three biggest mistakes appear once the analysis is done.", "분석이 끝나면 가장 큰 실수 세 수가 표시됩니다.", "解析が終わると大きな悪手を三つ示します。"),
   "review.noKeyMoves": m("没有明显的大失误，下得不错。", "No big mistakes. Well played.", "큰 실수가 없습니다. 잘 두었습니다.", "大きな悪手はありません。よく打てています。"),
   "review.moveLabel": m("第 {0} 手 · {1} {2}", "Move {0} · {1} {2}", "{0}수 · {1} {2}", "{0}手目 · {1} {2}"),
   "review.lossN": m("约损 {0} 目", "−{0} pts", "약 {0}집 손해", "約{0}目損"),
@@ -127,16 +110,8 @@ export const MESSAGES = {
   "review.showPlayed": m("实战", "As played", "실전", "実戦"),
   "review.showBetter": m("更好的下法", "Better line", "더 나은 수", "より良い手順"),
   "review.ownership": m("形势判断", "Show territory estimate", "형세 판단", "形勢判断"),
-  "review.guess": m("猜下一手", "Guess the next move", "다음 수 맞히기", "次の一手を当てる"),
   "review.playFromHere": m("从这里继续下", "Play from here", "여기서 이어 두기", "ここから打つ"),
 
-  "guess.prompt": m("下出你认为的下一手。", "Play the move you think comes next.", "다음 수라고 생각하는 곳에 두세요.", "次の一手だと思う所に打ってください。"),
-  "guess.right": m("对了。", "That's it.", "맞았습니다.", "正解です。"),
-  "guess.wrong": m("不是这里，再想想。", "Not this one. Try again.", "여기가 아닙니다. 다시 생각해 보세요.", "ここではありません。もう一度。"),
-  "guess.revealed": m("已经显示了这一手。", "Shown. On to the next.", "이 수를 보여 주었습니다.", "この手を表示しました。"),
-  "guess.reveal": m("看这一手", "Show the move", "이 수 보기", "この手を見る"),
-  "guess.done": m("看完了：猜中 {0} 手，共尝试 {1} 次。", "Finished: {0} right in {1} tries.", "끝났습니다. {1}번 시도해 {0}수를 맞혔습니다.", "終了：{1}回の挑戦で{0}手正解しました。"),
-  "guess.score": m("猜中 {0} / {1}", "{0} right of {1} tries", "{1}번 중 {0}번 정답", "{1}回中{0}回正解"),
 
   "area.top": m("上边", "on the top side", "위쪽 변", "上辺"),
   "area.bottom": m("下边", "on the bottom side", "아래쪽 변", "下辺"),
@@ -164,42 +139,26 @@ export const MESSAGES = {
   "newGame.advancedSummary": m("让子 {0} · 贴目 {1}", "Handicap {0} · komi {1}", "접바둑 {0} · 덤 {1}", "置き石 {0} · コミ {1}"),
   "newGame.start": m("开始", "Start", "시작", "開始"),
 
-  "practice.caption": m("一套从零开始的课程，和经过验证的死活题。", "A course that starts from zero, and verified problems.", "처음부터 배우는 과정과 검증된 문제.", "ゼロから始める講座と、検証済みの問題。"),
   "practice.course": m("课程", "Course", "과정", "講座"),
-  "practice.courseDone": m("课程全部完成", "Course complete", "과정을 모두 마쳤습니다", "講座をすべて終えました"),
-  "practice.lessonsDone": m("已完成 {0} / {1} 课", "{0} of {1} lessons done", "{1}강 중 {0}강 완료", "{1}課中{0}課完了"),
   "practice.start": m("开始", "Start", "시작", "始める"),
   "practice.continue": m("继续", "Continue", "계속", "続ける"),
   "practice.ofN": m("{0} / {1}", "{0} / {1}", "{0} / {1}", "{0} / {1}"),
-  "practice.stepsN": m("{0} 步", "{0} steps", "{0}단계", "{0}ステップ"),
   "practice.stepOf": m("第 {0} / {1} 步", "Step {0} of {1}", "{0} / {1}단계", "ステップ {0} / {1}"),
   "practice.prevStep": m("上一步", "Previous step", "이전 단계", "前のステップ"),
   "practice.finishLesson": m("完成本课", "Finish lesson", "이번 강 마치기", "この課を終える"),
   "practice.lessonDone": m("这一课完成了", "Lesson complete", "이번 강을 마쳤습니다", "この課は完了です"),
   "practice.nextLesson": m("下一课", "Next lesson", "다음 강", "次の課"),
-  "practice.backHome": m("回到练习", "Back to Practice", "연습으로", "練習に戻る"),
-  "practice.daily": m("每日五题", "Daily five", "오늘의 다섯 문제", "今日の五問"),
-  "practice.dailyTitle": m("今天的五道题", "Today's five problems", "오늘의 다섯 문제", "今日の五問"),
-  "practice.dailyHelp": m("先复习到期的题，再加新题。", "Problems due for review first, then new ones at your level.", "복습할 문제를 먼저, 그다음 새 문제를 냅니다.", "復習の問題を先に、そのあと新しい問題です。"),
-  "practice.dailyFinished": m("今天的题做完了", "Done for today", "오늘 문제를 마쳤습니다", "今日の問題は終わりです"),
-  "practice.dailySolved": m("解出 {0} / {1} 道", "{0} of {1} solved", "{1}문제 중 {0}문제 성공", "{1}問中{0}問正解"),
-  "practice.dailyOf": m("今日第 {0} / {1} 题", "Daily {0} of {1}", "오늘의 문제 {0} / {1}", "今日の{1}問中{0}問目"),
-  "practice.streak": m("连续 {0} 天", "{0}-day streak", "{0}일 연속", "{0}日連続"),
   "practice.problems": m("死活与手筋", "Problems", "사활과 맥", "詰碁と手筋"),
-  "practice.problemsCaption": m("{0} 道题，每一道都由求解器验证；难度按解题所需的步数和计算量测定。", "{0} problems, each verified by the solver; difficulty is measured from the length and size of the solution.", "{0}문제, 모두 솔버로 검증했습니다. 난이도는 정답 수순의 길이와 계산량으로 정했습니다.", "{0}問。すべてソルバーで検証済みで、難易度は正解手順の長さと読みの量から測っています。"),
   "practice.problem": m("题目", "Problem", "문제", "問題"),
   "practice.grade": m("难度 {0} / 5", "Difficulty {0} of 5", "난이도 {0} / 5", "難易度 {0} / 5"),
   "practice.nextProblem": m("下一题", "Next problem", "다음 문제", "次の問題"),
-  "practice.nextDaily": m("下一题", "Next", "다음", "次へ"),
   "practice.prev": m("上一题", "Previous", "이전", "前の問題"),
   "practice.skip": m("跳过", "Skip", "건너뛰기", "スキップ"),
   "practice.retry": m("重来", "Try again", "다시 하기", "やり直す"),
-  "practice.takeBack": m("退回一步", "Take back", "한 수 무르기", "一手戻す"),
   "practice.showAnswer": m("看答案", "Show answer", "정답 보기", "正解を見る"),
   "practice.answerShown": m("这是正解的下法。点“重来”自己再下一遍。", "This is the solution. Choose Try again to play it yourself.", "이것이 정답 수순입니다. '다시 하기'를 눌러 직접 두어 보세요.", "これが正解手順です。「やり直す」で自分で打ってみましょう。"),
   "practice.solved": m("解出来了。", "Solved.", "풀었습니다.", "正解です。"),
   "practice.wrong": m("不对。", "Not right.", "틀렸습니다.", "不正解です。"),
-  "practice.wrongExplained": m("对手的应法已经摆在棋盘上——这样下目标达不成。退回一步或重来。", "The opponent's answer is on the board: that move doesn't reach the goal. Take back or try again.", "상대의 응수가 판 위에 있습니다. 그 수로는 목표를 이룰 수 없습니다. 무르거나 다시 하세요.", "相手の応手が盤上にあります。その手では目的を果たせません。戻すかやり直しましょう。"),
   "practice.keepGoing": m("好，对手应了。继续。", "Good. The opponent answered — keep going.", "좋습니다. 상대가 응수했습니다. 계속하세요.", "いいですね。相手が応じました。続けましょう。"),
   "practice.answering": m("对手在想…", "The opponent is answering…", "상대가 응수하는 중…", "相手が考えています…"),
   "practice.right": m("对了。", "Right.", "맞습니다.", "正解です。"),
@@ -232,7 +191,6 @@ export const MESSAGES = {
   "topic.technique": m("手筋", "Techniques", "맥", "手筋"),
   "topic.technique.desc": m("扑、挤、夹等常用手筋。", "Throw-ins, squeezes and other tesuji.", "먹여치기, 조이기 같은 맥.", "ホウリコミ、シボリなどの手筋。"),
 
-  "library.caption": m("你的对局、名局和职业布局。", "Your games, classic games and pro openings.", "내 대국, 명국, 프로 포석.", "あなたの対局、名局、プロの布石。"),
   "library.import": m("导入 SGF", "Import SGF", "SGF 가져오기", "SGFを読み込む"),
   "library.inProgress": m("进行中的对局", "Game in progress", "진행 중인 대국", "対局中"),
   "library.continueTitle": m("{0} 路 · 第 {1} 手", "{0}×{0} · move {1}", "{0}줄 · {1}수째", "{0}路 · {1}手目"),
@@ -241,8 +199,6 @@ export const MESSAGES = {
   "library.twoPlayers": m("两人对局", "Two-player game", "두 사람 대국", "二人での対局"),
   "library.mine": m("我的棋局", "My games", "내 대국", "自分の対局"),
   "library.classics": m("名局", "Classic games", "명국", "名局"),
-  "library.openings": m("职业布局", "Pro openings", "프로 포석", "プロの布石"),
-  "library.openingsHelp": m("四十盘职业对局的前八手。打开后猜黑棋的每一手。", "The first eight moves of forty professional games. Open one and guess each black move.", "프로 대국 40판의 첫 여덟 수. 열고 흑의 수를 맞혀 보세요.", "プロの対局40局の最初の八手。開いて黒の手を当ててください。"),
   "library.filter": m("筛选", "Filter", "필터", "絞り込み"),
   "library.kind.all": m("全部", "All", "전체", "すべて"),
   "library.kind.won": m("赢", "Won", "승", "勝ち"),
@@ -250,7 +206,6 @@ export const MESSAGES = {
   "library.kind.imported": m("导入", "Imported", "가져온 기보", "読み込み"),
   "library.search": m("搜索棋谱", "Search games", "기보 검색", "棋譜を検索"),
   "library.noMatch": m("没有符合条件的棋谱。", "No games match.", "조건에 맞는 기보가 없습니다.", "該当する棋譜はありません。"),
-  "library.empty": m("还没有保存的棋局", "No saved games yet", "저장된 대국이 없습니다", "保存した対局はまだありません"),
   "library.emptyHelp": m("下完的对局会自动保存在这里，也可以导入 SGF。", "Finished games are saved here automatically. You can also import SGF files.", "끝난 대국은 자동으로 여기에 저장됩니다. SGF를 가져올 수도 있습니다.", "終局した対局は自動でここに保存されます。SGFも読み込めます。"),
   "library.untitled": m("未命名棋谱", "Untitled record", "제목 없는 기보", "無題の棋譜"),
   "library.unfinished": m("未下完", "Unfinished", "미완료", "未完"),
@@ -267,11 +222,6 @@ export const MESSAGES = {
   "settings.auto": m("跟随系统", "System", "시스템", "システム"),
   "settings.light": m("浅色", "Light", "밝게", "ライト"),
   "settings.dark": m("深色", "Dark", "어둡게", "ダーク"),
-  "settings.board": m("棋盘", "Board", "바둑판", "碁盤"),
-  "settings.material.plain": m("素", "Plain", "무지", "無地"),
-  "settings.material.wood": m("淡木", "Light wood", "옅은 나무", "淡い木目"),
-  "settings.material.ink": m("墨", "Ink", "먹", "墨"),
-  "settings.flatStones": m("高对比度棋子", "High-contrast stones", "고대비 바둑돌", "高コントラストの石"),
   "settings.coordinates": m("显示坐标", "Coordinates", "좌표 표시", "座標を表示"),
   "settings.moveNumbers": m("显示手数", "Move numbers", "수순 번호", "手数を表示"),
   "settings.sound": m("落子声音", "Stone sounds", "착수 소리", "石音"),
@@ -307,7 +257,6 @@ export const MESSAGES = {
   "onboarding.play19": m("开始 19 路对局", "Start a 19×19 game", "19줄 대국 시작", "19路で対局開始"),
   "onboarding.offline": m("完全离线，不需要账号。", "Fully offline. No account needed.", "완전 오프라인, 계정이 필요 없습니다.", "完全オフライン。アカウント不要です。"),
 
-  "toast.saved": m("已保存到棋谱", "Saved to Library", "기보에 저장했습니다", "棋譜に保存しました"),
   "toast.exported": m("已导出 SGF", "SGF exported", "SGF를 내보냈습니다", "SGFを書き出しました"),
 
   "error.illegal": m("这里不能落子。", "You can't play there.", "그곳에는 둘 수 없습니다.", "そこには打てません。"),
@@ -325,7 +274,6 @@ export const MESSAGES = {
   "a11y.newGame": m("新对局，{0} 路", "New {0}×{0} game", "새 {0}줄 대국", "新しい{0}路の対局"),
 
   // v3
-  "nav.today": m("今天", "Today", "오늘", "今日"),
   "nav.back": m("后退", "Back", "뒤로", "戻る"),
   "nav.forward": m("前进", "Forward", "앞으로", "進む"),
   "menu.game": m("对局", "Game", "대국", "対局"),
@@ -333,27 +281,6 @@ export const MESSAGES = {
   "menu.go": m("前往", "Go", "이동", "移動"),
   "menu.help": m("帮助", "Help", "도움말", "ヘルプ"),
 
-  "today.morning": m("早上好", "Good morning", "좋은 아침입니다", "おはようございます"),
-  "today.afternoon": m("下午好", "Good afternoon", "안녕하세요", "こんにちは"),
-  "today.evening": m("晚上好", "Good evening", "좋은 저녁 되세요", "こんばんは"),
-  "today.night": m("夜深了", "Late night", "늦은 밤이네요", "夜更けですね"),
-  "today.suggestedGame": m("推荐一盘", "Suggested game", "추천 대국", "おすすめの対局"),
-  "today.suggestedTitle": m("{0} 路 · 对 {1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
-  "today.withHandicap": m("让 {0} 子", "{0} handicap stones", "{0}점 접바둑", "{0}子局"),
-  "today.even": m("分先", "Even game", "호선", "互先"),
-  "today.because": m("练练最近的弱点：{0}", "works on a recent weak spot: {0}", "최근 약점 연습: {0}", "最近の弱点の練習：{0}"),
-  "today.becauseLevel": m("按你现在的棋力", "matched to your current level", "현재 기력에 맞춤", "今の棋力に合わせて"),
-  "today.play": m("开始对局", "Play", "대국 시작", "対局を始める"),
-  "today.nextLesson": m("继续课程", "Continue the course", "과정 계속하기", "講座を続ける"),
-  "today.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
-  "today.levelGames": m("根据 {0} 盘对局估计", "Estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
-  "today.levelStart": m("和电脑下几盘，这里会显示你的棋力变化。", "Play a few games against the computer and your level will appear here.", "컴퓨터와 몇 판 두면 기력 변화가 여기에 나타납니다.", "コンピュータと何局か打つと、棋力の変化がここに表示されます。"),
-  "today.progressLabel": m("棋力变化", "Level over time", "기력 변화", "棋力の推移"),
-  "today.workOn": m("值得练的地方", "Worth practising", "보완할 점", "練習ポイント"),
-  "today.seenN": m("最近出现 {0} 次", "came up {0} times lately", "최근 {0}번 나옴", "最近{0}回"),
-  "today.noWeak": m("复盘几盘棋后，这里会列出你常犯的错误类型。", "After a few reviewed games, the kinds of mistakes you make most will show up here.", "몇 판을 복기하면 자주 하는 실수 유형이 여기에 표시됩니다.", "何局か検討すると、よくある間違いの種類がここに表示されます。"),
-  "today.recent": m("最近的对局", "Recent games", "최근 대국", "最近の対局"),
-  "today.dailyMistakes": m("包括你对局里的 {0} 个失误", "Includes {0} mistakes from your own games", "내 대국의 실수 {0}개 포함", "自分の対局の悪手 {0} 個を含みます"),
 
   "play.proposeCount": m("棋局看起来已经结束了。数目吗？", "The game looks finished. Count it?", "대국이 끝난 것 같습니다. 계가할까요?", "終局のようです。整地しますか？"),
   "play.countNow": m("数目", "Count", "계가", "整地する"),
@@ -364,9 +291,6 @@ export const MESSAGES = {
   "play.evalLabel": m("形势", "Balance", "형세", "形勢"),
   "play.evalText": m("{0}领先约 {1} 目", "{0} ahead by about {1}", "{0}이 약 {1}집 앞섬", "{0}が約{1}目リード"),
   "play.moveList": m("手顺", "Moves", "수순", "手順"),
-  "play.noMoves": m("还没有落子。", "No moves yet.", "아직 둔 수가 없습니다.", "まだ着手はありません。"),
-  "play.showAll": m("全部 {0} 手", "All {0}", "전체 {0}수", "全{0}手"),
-  "play.collapse": m("收起", "Collapse", "접기", "閉じる"),
   "play.peek": m("在复盘中查看这一手", "Look at this move in review", "복기에서 이 수 보기", "検討でこの手を見る"),
   "play.confirmHint": m("再点一次同一个点落子，Esc 取消。", "Click the same point again to play. Esc cancels.", "같은 곳을 한 번 더 누르면 둡니다. Esc로 취소.", "同じ点をもう一度クリックで着手。Escで取消。"),
 
@@ -387,18 +311,6 @@ export const MESSAGES = {
   "newGame.time": m("用时", "Clock", "시간", "持ち時間"),
   "newGame.fromRating": m("对手棋力按你的棋力自动推荐。", "The opponent's strength follows your rating.", "상대 기력은 내 기력에 맞춰 추천합니다.", "相手の棋力はあなたの棋力から推奨しています。"),
 
-  "summary.title": m("三点讲评", "Three takeaways", "세 가지 강평", "三つのポイント"),
-  "summary.analyzing": m("KataGo 正在看这盘棋… {0}%", "KataGo is looking over the game… {0}%", "KataGo가 대국을 살펴보는 중… {0}%", "KataGoが対局を見ています… {0}%"),
-  "summary.mistake": m("最大的失误", "Biggest mistake", "가장 큰 실수", "一番の悪手"),
-  "summary.mistakeText": m("第 {0} 手，约损 {1} 目；更好的是 {2}。", "Move {0} cost about {1} points; {2} was better.", "{0}수째에서 약 {1}집 손해를 봤습니다. {2} 자리가 더 좋았습니다.", "{0}手目で約{1}目損。{2}が良かったです。"),
-  "summary.good": m("好棋", "A good move", "좋은 수", "好手"),
-  "summary.goodText": m("第 {0} 手 {1}：在关键处找到了最好的一手。", "Move {0} at {1}: you found the best move when it mattered.", "{0}수째 {1}: 중요한 순간에 최선의 수를 찾았습니다.", "{0}手目 {1}：大事な場面で最善手を見つけました。"),
-  "summary.tip": m("下一步练什么", "What to practise", "다음에 연습할 것", "次に練習すること"),
-  "summary.tipText": m("这盘的失误像是“{0}”。", "Your mistakes looked like “{0}”.", "이번 실수는 '{0}' 유형으로 보입니다.", "今回の悪手は「{0}」のようです。"),
-  "summary.tipReview": m("打开复盘，看看更好的下法。", "Open the review and play through the better line.", "복기를 열어 더 좋은 수순을 보세요.", "検討を開いて、より良い手順を見ましょう。"),
-  "summary.tipClean": m("没有大的失误，可以试试更强的对手。", "No big mistakes — try a stronger opponent.", "큰 실수가 없습니다. 더 강한 상대와 두어 보세요.", "大きな悪手はありません。もっと強い相手と打ってみましょう。"),
-  "summary.practice": m("去练习", "Practise", "연습하기", "練習する"),
-  "summary.rating": m("棋力 {0}（{1}）", "Level {0} ({1})", "기력 {0} ({1})", "棋力 {0}（{1}）"),
 
   "explain.group": m("{0}的 {1} 颗子因此变弱，很可能被吃。", "Your {1} stones {0} became weak and may be captured.", "{0}의 {1}점이 약해져 잡힐 수 있습니다.", "{0}の{1}子が弱くなり、取られそうです。"),
   "explain.area": m("对方在{0}多得了约 {1} 目。", "The opponent gained about {1} points {0}.", "상대가 {0}에서 약 {1}집을 더 얻었습니다.", "相手が{0}で約{1}目得しました。"),
@@ -412,14 +324,11 @@ export const MESSAGES = {
   "review.deleteVariation": m("删除这个变化", "Delete this variation", "이 변화 삭제", "この変化を削除"),
   "review.variations": m("变化", "Variations", "변화", "変化"),
   "review.branchAt": m("第 {0} 手有 {1} 个变化", "Variations at move {0}: {1}", "{0}수째 변화 {1}개", "{0}手目に変化 {1}"),
-  "review.tryHint": m("在棋盘上落子即可试下变化。", "Play on the board to try a variation.", "판 위에 두면 변화를 시험할 수 있습니다.", "盤上に打つと変化を試せます。"),
   "review.liveToggle": m("实时分析", "Live analysis", "실시간 분석", "リアルタイム解析"),
   "review.liveSearching": m("计算中", "searching", "계산 중", "計算中"),
   "review.candidatesLegend": m("棋盘上的数字：各候选点下一手后的胜率（%）。", "Numbers on the board: each candidate's win rate (%) for the side to move.", "판 위 숫자: 각 후보 수의 승률(%)입니다.", "盤上の数字：各候補手の勝率（%）です。"),
-  "review.practiceThis": m("练这一手", "Practise this", "이 수 연습", "この手を練習"),
 
   "mistakes.title": m("我的错题", "My mistakes", "나의 실수", "自分の悪手"),
-  "mistakes.caption": m("从你的对局里挑出的失误，找到更好的一手。会按间隔重复出现在每日五题里。", "Mistakes from your own games: find the better move. They come back in the daily five on a spaced schedule.", "내 대국의 실수입니다. 더 좋은 수를 찾아보세요. 간격을 두고 오늘의 다섯 문제에 다시 나옵니다.", "自分の対局の悪手です。より良い手を見つけましょう。間隔をあけて今日の五問に出ます。"),
   "mistakes.item": m("第 {0} 手 · {1} 路", "Move {0} · {1}×{1}", "{0}수째 · {1}줄", "{0}手目 · {1}路"),
   "mistakes.goal": m("找到更好的一手", "Find a better move", "더 좋은 수를 찾으세요", "より良い手を探してください"),
   "mistakes.prompt": m("实战这里损失了约 {0} 目。你会下在哪里？", "The game move here lost about {0} points. Where would you play?", "실전에서 약 {0}집을 손해 봤습니다. 어디에 두겠습니까?", "実戦では約{0}目損しました。どこに打ちますか？"),
@@ -462,8 +371,6 @@ export const MESSAGES = {
   "review.noKeyMovesNeutral": m("这盘棋没有超过 2 目的单手损失。", "No single move in this game lost more than 2 points.", "이 대국에서 2집 넘게 손해 본 수는 없습니다.", "この対局で2目以上損をした手はありません。"),
   "review.estimateAt": m("第 {0} 手的形势", "At move {0}", "{0}수째 형세", "{0}手目の形勢"),
   "practice.resetting": m("这步不对，看看对方怎么应。马上重来…", "Not this one — see the answer, then it resets…", "이 수는 아닙니다. 상대의 응수를 보세요. 곧 다시 시작합니다…", "この手ではありません。応手を見てください。すぐにやり直します…"),
-  "practice.finishDaily": m("完成", "Finish", "완료", "完了"),
-  "today.quick9": m("来盘 9 路快棋", "Or a quick 9×9", "9줄 속기 한 판", "9路で早碁を一局"),
 
   // v4 review
   // Story steps: {0} is the colour (common.black / common.white); {1} a count or an area.* string.
@@ -508,7 +415,6 @@ export const MESSAGES = {
   "story.better": m("更好的下法", "Better line", "더 나은 수순", "より良い手順"),
   "story.played": m("实战的后果", "What happens as played", "실전 수순의 결과", "実戦の結果"),
   "story.playedGame": m("（实战的后续手顺，没有引擎变化）", "(the game's own moves; no engine line)", "(실전 수순, 엔진 변화 없음)", "（実戦の手順。エンジンの変化はありません）"),
-  "story.step": m("第 {0} / {1} 步", "Step {0} of {1}", "{0} / {1}단계", "ステップ {0} / {1}"),
   "story.refining": m("正在深入分析关键失误…", "Taking a closer look at the key mistakes…", "결정적 실수를 더 깊이 분석하는 중…", "大きな悪手を詳しく解析中…"),
   "lossKind.group-died": m("棋子被吃", "Group died", "돌이 죽음", "石が死んだ"),
   "lossKind.semeai": m("对杀", "Capturing race", "수상전", "攻め合い"),
@@ -527,7 +433,6 @@ export const MESSAGES = {
   "phaseIn.middle": m("中盘", "the middle game", "중반", "中盤"),
   "phaseIn.endgame": m("官子", "the endgame", "끝내기", "ヨセ"),
   // Whole-game summary. {0}/{1} are move numbers or counts.
-  "gameSummary.title": m("全局总结", "Game summary", "대국 요약", "対局のまとめ"),
   "gameSummary.phaseMoves": m("第 {0}–{1} 手", "Moves {0}–{1}", "{0}–{1}수", "{0}〜{1}手"),
   "gameSummary.pointsLost": m("损失目数", "Points lost", "손해 본 집", "損した目数"),
   "gameSummary.mistakes": m("失误", "Mistakes", "실수", "悪手"),
@@ -535,10 +440,6 @@ export const MESSAGES = {
   "gameSummary.mistakesHelp": m("失误：一手损失超过 {0} 目；大失误：超过 {1} 目。", "Mistake: a move that lost more than {0} points. Blunder: more than {1}.", "실수: {0}집 넘게 손해 본 수. 큰 실수: {1}집 넘게 손해 본 수.", "悪手：{0}目以上損をした手。大悪手：{1}目以上損をした手。"),
   "gameSummary.accuracy": m("准确率", "Accuracy", "정확도", "正確さ"),
   "gameSummary.accuracyHelp": m("与最好的一手相差不到 1 目的着手所占的比例。", "Share of moves within 1 point of the best move.", "최선의 수와 1집 이내로 차이 나는 수의 비율입니다.", "最善手との差が1目以内だった手の割合です。"),
-  "gameSummary.worstMove": m("最大的失误", "Costliest move", "가장 큰 손해", "最大の損"),
-  "gameSummary.moveAt": m("第 {0} 手（{1}）", "Move {0} ({1})", "{0}수째 ({1})", "{0}手目（{1}）"),
-  "gameSummary.takeaways": m("三点心得", "Three takeaways", "기억할 세 가지", "三つのポイント"),
-  "gameSummary.noData": m("还没有分析结果。", "No analysis yet.", "아직 분석 결과가 없습니다.", "まだ解析結果がありません。"),
   "gameSummary.estimate": m("没有 KataGo，这些数字只是粗略估计。", "Without KataGo these numbers are only a rough estimate.", "KataGo 없이 계산한 대략적인 추정치입니다.", "KataGo なしの大まかな推定値です。"),
   // Takeaways. Plain keys speak to the player; *Of keys name the colour (the last parameter).
   "gameSummary.take.worstPhase": m("你的损失大多在{0}：约 {1} 目（占 {2}%）。", "Most of your points went in {0}: about {1} points ({2}% of the total).", "손해의 대부분은 {0}에서 나왔습니다. 약 {1}집({2}%)입니다.", "損の多くは{0}でした。約{1}目（全体の{2}%）です。"),
@@ -553,20 +454,6 @@ export const MESSAGES = {
   "gameSummary.take.steadyOf": m("{2}的{0}下得很稳：{1}% 的着手与最好的一手相差不到 1 目。", "{2}'s play in {0} was steady: {1}% of moves were within a point of the best.", "{2}의 {0} 단계는 안정적이었습니다. {1}%의 수가 최선의 수와 1집 이내였습니다.", "{2}の{0}は安定していました。{1}%の手が最善手との差1目以内でした。"),
   "gameSummary.take.clean": m("没有一手损失超过 {0} 目，下得好！", "No move lost more than {0} points. Well played.", "{0}집 넘게 손해 본 수가 없습니다. 잘 두셨습니다.", "{0}目以上損をした手はありません。お見事です。"),
   "gameSummary.take.cleanOf": m("{1}没有一手损失超过 {0} 目。", "{1} made no move that lost more than {0} points.", "{1}은 {0}집 넘게 손해 본 수가 없습니다.", "{1}は{0}目以上損をした手がありません。"),
-  // Trends across rated games against the computer.
-  "trend.title": m("最近的对局", "Recent games", "최근 대국", "最近の対局"),
-  "trend.games": m("最近 {0} 盘（{1} 盘有分析）", "Last {0} games ({1} analysed)", "최근 {0}판 (분석 {1}판)", "最近の{0}局（解析済み{1}局）"),
-  "trend.record": m("{0} 胜 {1} 负", "{0} won, {1} lost", "{0}승 {1}패", "{0}勝{1}敗"),
-  "trend.avgLoss": m("每盘平均损失", "Average points lost per game", "대국당 평균 손해", "1局あたりの平均の損"),
-  "trend.avgMistakes": m("每盘平均：失误 {0}，大失误 {1}", "Per game: {0} mistakes, {1} blunders", "대국당 평균: 실수 {0}, 큰 실수 {1}", "1局あたり平均：悪手{0}、大悪手{1}"),
-  "trend.better": m("在进步", "Improving", "좋아지는 중", "改善中"),
-  "trend.worse": m("在退步", "Getting worse", "나빠지는 중", "悪化中"),
-  "trend.same": m("持平", "About the same", "비슷함", "横ばい"),
-  "trend.themes": m("常见的失误", "Common mistakes", "자주 하는 실수", "よくある悪手"),
-  "trend.themeCount": m("{0} 次", "{0} times", "{0}번", "{0}回"),
-  "trend.rating": m("棋力变化：{0}", "Rating change: {0}", "기력 변화: {0}", "棋力の変化：{0}"),
-  "trend.none": m("和电脑下完几盘计入棋力的对局后，这里会显示你的变化。", "Finish a few rated games against the computer to see your trends here.", "컴퓨터와 기력에 반영되는 대국을 몇 판 마치면 여기에 변화가 나타납니다.", "コンピュータと棋力に反映される対局を何局か終えると、ここに傾向が表示されます。"),
-  "trend.needMore": m("至少需要 4 盘有分析的对局才能看出变化。", "At least four analysed games are needed to show a direction.", "변화를 보려면 분석된 대국이 4판 이상 필요합니다.", "傾向を見るには解析済みの対局が4局以上必要です。"),
   // Editing the record: comments, marks and variations.
   "edit.comment": m("注释", "Comment", "코멘트", "コメント"),
   "edit.commentPlaceholder": m("为这一手写点注释…", "Add a comment to this move…", "이 수에 코멘트 남기기…", "この手にコメントを書く…"),
@@ -577,12 +464,8 @@ export const MESSAGES = {
   "edit.mark.cross": m("叉", "Cross", "가위표", "バツ"),
   "edit.mark.label": m("字母", "Letter", "글자", "文字"),
   "edit.clearMarks": m("清除标记", "Clear marks", "표시 지우기", "マークを消す"),
-  "edit.deleteVariation": m("删除变化", "Delete variation", "변화 삭제", "変化を削除"),
-  "edit.deleteMainConfirm": m("删除这一手及之后的所有着手？", "Delete this move and every move after it?", "이 수와 그 뒤의 모든 수를 삭제할까요?", "この手とそれ以降の手をすべて削除しますか？"),
   "edit.promote": m("设为主线", "Make main line", "본선으로 지정", "本線にする"),
-  "edit.mainLine": m("主线", "Main line", "본선", "本線"),
   "edit.tree": m("变化树", "Variation tree", "변화도", "変化図"),
-  "edit.saved": m("修改已保存", "Changes saved", "변경 내용을 저장했습니다", "変更を保存しました"),
   "edit.notSaved": m("这是内置棋谱，修改不会保存。要保留请导出 SGF。", "This is a built-in record, so changes are not saved. Export an SGF to keep them.", "내장 기보라 변경 내용이 저장되지 않습니다. 보관하려면 SGF로 내보내세요.", "内蔵の棋譜のため変更は保存されません。残すには SGF を書き出してください。"),
   // end v5 review
   // v4 release
@@ -709,29 +592,18 @@ export const MESSAGES = {
   "practice.recordNew": m("第一次做", "First try", "처음 풉니다", "初挑戦"),
   "practice.recordSolved": m("已解出 · 尝试 {0} 次", "Solved · {0} tries", "해결 · {0}번 시도", "正解済み · {0} 回"),
   "practice.recordTried": m("尝试 {0} 次，还没解出", "{0} tries, not solved yet", "{0}번 시도, 아직 못 풂", "{0} 回挑戦、まだ未正解"),
-  "week.title": m("本周", "This week", "이번 주", "今週"),
-  "week.games": m("盘对局", "games", "대국", "局"),
-  "week.problems": m("道题解出", "problems solved", "문제 해결", "問 正解"),
-  "week.lessons": m("节课学完", "lessons", "강의 완료", "講座 修了"),
-  "week.level": m("棋力变化", "level change", "기력 변화", "棋力の変化"),
   "backup.title": m("备份", "Backup", "백업", "バックアップ"),
   "backup.export": m("导出备份…", "Export backup…", "백업 내보내기…", "バックアップを書き出す…"),
   "backup.import": m("从备份恢复…", "Restore from backup…", "백업에서 복원…", "バックアップから復元…"),
-  "backup.help": m("把设置、进度、棋力记录、错题和全部棋谱存成一个文件；换电脑时用它恢复。", "Saves your settings, progress, level, mistake drills and every game in one file. Use it to move to another computer.", "설정, 진도, 기력 기록, 오답 연습과 모든 기보를 파일 하나로 저장합니다. 다른 컴퓨터로 옮길 때 쓰세요.", "設定・進み具合・棋力の記録・間違えた問題・すべての棋譜を1つのファイルに保存します。別のコンピュータへ移るときに使います。"),
   "backup.confirmTitle": m("用这份备份替换现有数据？", "Replace your data with this backup?", "이 백업으로 현재 데이터를 바꿀까요?", "このバックアップで今のデータを置き換えますか？"),
-  "backup.confirmBody": m("备份里有 {0} 盘棋谱、{1} 节完成的课、{2} 道解出的题。现在的数据会被全部替换。", "The backup holds {0} games, {1} finished lessons and {2} solved problems. Everything you have now will be replaced.", "백업에는 기보 {0}개, 마친 강의 {1}개, 푼 문제 {2}개가 있습니다. 지금의 데이터는 모두 바뀝니다.", "バックアップには棋譜 {0} 局、終えた講座 {1}、解いた問題 {2} があります。今のデータはすべて置き換わります。"),
   "backup.restore": m("恢复", "Restore", "복원", "復元"),
   "backup.error.notBackup": m("这不是 Goban Studio 的备份文件。", "That isn't a Goban Studio backup.", "Goban Studio 백업 파일이 아닙니다.", "Goban Studio のバックアップではありません。"),
-  "backup.error.newerFormat": m("这份备份来自更新的版本，请先更新 Goban Studio。", "This backup is from a newer version. Update Goban Studio first.", "더 새 버전에서 만든 백업입니다. 먼저 Goban Studio를 업데이트하세요.", "新しいバージョンのバックアップです。先に Goban Studio を更新してください。"),
-  "backup.error.storage": m("无法写入数据，未作任何更改。请释放磁盘空间后重试。", "Couldn't save the data, so nothing was changed. Free some disk space and try again.", "데이터를 저장할 수 없어 아무것도 바꾸지 않았습니다. 디스크 공간을 확보한 뒤 다시 시도하세요.", "データを保存できなかったため、何も変更していません。ディスクの空きを増やしてもう一度お試しください。"),
   "backup.error.damaged": m("备份文件已损坏，无法恢复。", "The backup file is damaged and can't be restored.", "백업 파일이 손상되어 복원할 수 없습니다.", "バックアップが壊れているため復元できません。"),
   // v6 ui
   "review.tabs": m("复盘内容", "Review sections", "복기 항목", "検討の項目"),
   "review.tab.analysis": m("分析", "Analysis", "분석", "分析"),
   "review.tab.summary": m("总结", "Summary", "요약", "まとめ"),
   "review.tab.notes": m("注释", "Notes", "메모", "メモ"),
-  "play.hint.click": m("点击", "Click", "클릭", "クリック"),
-  "play.hint.place": m("在棋盘上落子", "Place a stone", "바둑판에 돌 놓기", "盤に石を置く"),
   "settings.pane.general": m("通用", "General", "일반", "一般"),
   "settings.pane.board": m("棋盘", "Board", "바둑판", "碁盤"),
   "settings.pane.playing": m("对局", "Playing", "대국", "対局"),
@@ -739,7 +611,6 @@ export const MESSAGES = {
   "settings.pane.data": m("数据", "Data", "데이터", "データ"),
   "settings.pane.about": m("关于", "About", "정보", "情報"),
   "settings.boardGroup": m("棋盘与棋子", "Board and stones", "바둑판과 돌", "碁盤と石"),
-  "week.empty": m("这周还没有下棋或做题。", "Nothing played or solved yet this week.", "이번 주에는 아직 대국이나 문제 풀이가 없습니다.", "今週はまだ対局も問題もありません。"),
   // v5 rules
   "rules.title": m("规则", "Rules", "규칙", "ルール"),
   "rules.default": m("新对局的规则", "Rules for new games", "새 대국의 규칙", "新しい対局のルール"),
@@ -809,15 +680,6 @@ export const MESSAGES = {
   "models.readyToast": m("“{0}”已安装", "“{0}” is installed", "‘{0}’ 설치 완료", "「{0}」をインストールしました"),
   "models.stalled": m("下载停住了。可以停止后重试。", "The download has stalled. Stop it and try again.", "다운로드가 멈췄습니다. 중지한 뒤 다시 시도하세요.", "ダウンロードが止まっています。停止してからもう一度お試しください。"),
   "models.unavailable": m("只有桌面版应用可以下载", "Downloads are available in the desktop app only", "다운로드는 데스크톱 앱에서만 할 수 있습니다", "ダウンロードはデスクトップアプリでのみ行えます"),
-  "models.humanStyle": m("对手像人一样下棋", "Opponent plays human-style", "상대가 사람처럼 두기", "相手を人間らしく打たせる"),
-  "models.humanStyleHelp": m(
-    "开启后，各级电脑对手按同级别人类的方式下棋；关闭则使用标准的电脑对手。级别标签是近似值。",
-    "When on, each opponent level plays the way people of that level do; when off, the standard computer opponent plays. Level labels are approximate.",
-    "켜면 각 급수의 상대가 그 급수의 사람처럼 둡니다. 끄면 표준 컴퓨터 상대가 둡니다. 급수 표시는 대략적입니다.",
-    "オンにすると各レベルの相手がその棋力の人のように打ちます。オフでは標準のコンピュータの相手が打ちます。レベル表示は目安です。",
-  ),
-  "models.mode.human": m("拟人", "Human-style", "사람 같은", "人間らしい"),
-  "models.mode.strong": m("强网络", "Stronger network", "강한 네트워크", "強いネットワーク"),
   "models.error.DiskFull": m("磁盘空间不足：还需要 {0} MB", "Not enough disk space: {0} MB needed", "디스크 공간이 부족합니다. {0} MB가 필요합니다", "ディスクの空きが足りません。{0} MB 必要です"),
   "models.error.Network": m("下载中断了。请检查网络后重试，已下载的部分会保留。", "The download was interrupted. Check your connection and try again; what was downloaded is kept.", "다운로드가 끊겼습니다. 연결을 확인하고 다시 시도하세요. 받은 부분은 남아 있습니다.", "ダウンロードが中断しました。接続を確認してもう一度お試しください。取得済みの部分は残ります。"),
   "models.error.ChecksumMismatch": m("下载的文件与校验值不符，已丢弃。请重试。", "The downloaded file did not match its checksum and was discarded. Try again.", "받은 파일이 검사값과 맞지 않아 버렸습니다. 다시 시도하세요.", "ダウンロードしたファイルがチェックサムと一致しなかったため破棄しました。もう一度お試しください。"),
@@ -829,10 +691,6 @@ export const MESSAGES = {
   "models.error.generic": m("下载失败（{0}）。", "The download failed ({0}).", "다운로드에 실패했습니다 ({0}).", "ダウンロードに失敗しました（{0}）。"),
   // v6 report
   // The report of one game. {0} is a move number, a count, a coordinate or points.
-  "report.title": m("对局报告", "Game report", "대국 리포트", "対局レポート"),
-  "report.open": m("查看报告", "See the report", "리포트 보기", "レポートを見る"),
-  "report.analyzing": m("正在分析这盘棋… {0}%", "Going over the game… {0}%", "대국을 살펴보는 중… {0}%", "対局を解析しています… {0}%"),
-  "report.missing": m("找不到这盘棋了。", "This game can no longer be found.", "이 대국을 더 이상 찾을 수 없습니다.", "この対局は見つかりません。"),
   "report.phases": m("三个阶段", "The game in three phases", "세 단계로 본 대국", "三つの局面"),
   "report.lossHelp": m("按 KataGo 的判断，这一阶段大约损失的目数。", "About how many points this phase cost, as KataGo sees it.", "KataGo가 본 이 단계의 대략적인 손해(집)입니다.", "KataGo の見立てで、この局面で損したおおよその目数です。"),
   "report.estimate": m(
@@ -844,24 +702,10 @@ export const MESSAGES = {
   "report.noAnalysis": m("这盘棋太短，没有什么可分析的。", "The game is too short to analyse.", "대국이 너무 짧아 분석할 내용이 없습니다.", "対局が短すぎて解析できません。"),
   "report.moments": m("关键的三手", "Key moments", "결정적인 순간", "勝負どころ"),
   "report.turningPoints": m("转折点", "Turning points", "전환점", "分かれ目"),
-  "report.momentsNone": m("没有一手损失超过 {0} 目。", "No move lost more than {0} points.", "{0}집 넘게 손해 본 수가 없습니다.", "{0}目以上損をした手はありません。"),
   "report.move": m("第 {0} 手", "Move {0}", "{0}수째", "{0}手目"),
   "report.played": m("实战 {0}", "Played {0}", "실전 {0}", "実戦 {0}"),
   "report.better": m("更好 {0}", "Better {0}", "더 좋은 수 {0}", "より良い手 {0}"),
   "report.lost": m("约损 {0} 目", "≈ {0} points lost", "약 {0}집 손해", "約{0}目の損"),
-  "report.openMove": m("在复盘中打开第 {0} 手", "Open move {0} in the review", "복기에서 {0}수째 열기", "検討で{0}手目を開く"),
-  "report.practise": m("练习这盘棋", "Practise this game", "이 대국 연습하기", "この対局を練習する"),
-  "report.practiseNow": m("开始练习", "Start practising", "연습 시작", "練習を始める"),
-  "report.practiseText": m(
-    "把这盘棋里损失最大的 {0} 手变成练习题，之后会出现在每日五题里。",
-    "Turn the {0} costliest moves of this game into practice positions. They come back in your Daily five.",
-    "이 대국에서 가장 크게 손해 본 {0}수를 연습 문제로 만듭니다. 나중에 오늘의 다섯 문제에 다시 나옵니다.",
-    "この対局で損が大きかった{0}手を練習問題にします。あとで今日の五問に出てきます。",
-  ),
-  "report.practiseHave": m("这盘棋的失误已经在你的练习里了。", "The mistakes of this game are already in your practice.", "이 대국의 실수는 이미 연습에 들어 있습니다.", "この対局の悪手はすでに練習に入っています。"),
-  "report.practiseNone": m("没有一手损失超过 {0} 目，这盘棋没有需要练习的局面。", "No move lost more than {0} points, so there is nothing to practise from this game.", "{0}집 넘게 손해 본 수가 없어, 이 대국에서 연습할 장면이 없습니다.", "{0}目以上損をした手がないので、この対局から練習する場面はありません。"),
-  "report.practiseNeedsKatago": m("练习题需要 KataGo 的分析：粗略估计不知道更好的一手在哪里。", "Practice positions need KataGo's analysis: the rough estimate does not know the better move.", "연습 문제를 만들려면 KataGo 분석이 필요합니다. 대략적인 추정으로는 더 좋은 수를 알 수 없습니다.", "練習問題には KataGo の解析が必要です。大まかな推定では、より良い手が分かりません。"),
-  "report.added": m("已加入练习：{0} 题", "Added to practice: {0}", "연습에 추가함: {0}문제", "練習に追加しました：{0}問"),
   "report.exportImage": m("导出图片", "Export image", "이미지 내보내기", "画像を書き出す"),
   "report.exported": m("已导出图片", "Image exported", "이미지를 내보냈습니다", "画像を書き出しました"),
   "report.exportFailed": m("无法导出图片。", "The image could not be exported.", "이미지를 내보낼 수 없습니다.", "画像を書き出せませんでした。"),
@@ -930,15 +774,11 @@ export const MESSAGES = {
   "course.advanced": m("高级", "Advanced", "고급", "上級"),
 
   // v6 explorer
-  "explorer.tab": m("定式与布局", "Explorer", "정석과 포석", "定石と布石"),
   "explorer.title": m("布局与定式探索", "Opening explorer", "포석·정석 탐색", "布石・定石エクスプローラー"),
   "explorer.whole": m("全局布局", "Whole board", "전체 포석", "全局の布石"),
   "explorer.corner": m("角部定式", "Corner joseki", "귀의 정석", "隅の定石"),
   "explorer.mode": m("棋谱库", "Book", "기보 책", "定石集"),
   "explorer.help": m("在棋盘上落子，看看 KataGo 对常见布局和定式的评价。不联网也能用。", "Click moves on the board and see how KataGo rates the common openings and joseki. Works offline.", "판에 수를 두며 흔한 포석과 정석을 KataGo가 어떻게 평가하는지 보세요. 오프라인에서도 됩니다.", "盤に石を置いて、よくある布石と定石をKataGoがどう評価するかを見ます。オフラインでも使えます。"),
-  "explorer.wholeHelp": m("星位、小目、三连星、中国流等，前十手左右", "Star points, 3-4 points, sanrensei, the Chinese opening and more, about ten moves deep", "화점, 소목, 삼연성, 중국류 등 약 열 수까지", "星、小目、三連星、中国流など、十手ほどまで"),
-  "explorer.cornerHelp": m("星位的挂角和点三三，小目的小飞挂和一间高挂", "Star point approaches and the 3-3 invasion; the 3-4 point's small knight's and one-space high approaches", "화점 걸침과 삼삼 침입, 소목의 날일자 걸침과 한 칸 높은 걸침", "星へのカカリと三々入り、小目への小ゲイマガカリと一間高ガカリ"),
-  "explorer.positions": m("{0} 个局面", "{0} positions", "{0}개 국면", "{0}局面"),
   "explorer.boardLabel": m("探索棋盘。用方向键移动，回车落子。", "Explorer board. Arrow keys move, Enter plays.", "탐색 바둑판. 화살표로 이동하고 Enter로 둡니다.", "エクスプローラーの盤。矢印キーで移動、Enterで着手。"),
   "explorer.reset": m("回到开始", "Back to the start", "처음으로", "最初に戻る"),
   "explorer.moveN": m("第 {0} 手", "Move {0}", "{0}수째", "{0}手目"),
@@ -1098,17 +938,8 @@ export const MESSAGES = {
     "컴퓨터 상대들과의 승패로 추정합니다. ±는 대략 세 번 중 두 번 들어맞는 범위입니다.",
     "コンピュータの各レベルとの勝敗から推定しています。± はおよそ3回に2回収まる範囲です。",
   ),
-  // v7: one file per area (src/web/js/messages/v7-*.js).
-  ...V7_FIXES,
-  ...V7_SCHEDULER,
-  ...V7_PLAN,
-  ...V7_CALIBRATION,
-  ...V7_BOOK,
-  ...V7_PROBLEMS,
-  // v8: one file per area (src/web/js/messages/v8-*.js).
-  ...V8_BEGINNER,
-  ...V8_TEACHING,
-  ...V8_FEEL,
-  ...V8_FIXES,
-  ...V8_SIMPLIFY,
+  // v9: strings by area (src/web/js/messages/{shell,play,learn}.js).
+  ...SHELL,
+  ...PLAY,
+  ...LEARN,
 };

@@ -2,8 +2,8 @@
  * Release gate for the content and packaging promises.
  *
  * Counts what is real: a course of at least 13 units / 60 lessons / 240
- * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades, 40 pro
- * openings with unique titles and lines, 20 classics, four languages
+ * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades,
+ * 20 classics, four languages
  * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
  * licences and one version string.
  */
@@ -13,7 +13,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { COURSE } from "../src/web/js/content/course.js";
 import { PROBLEMS, THEMES } from "../src/web/js/content/problems.js";
-import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { APP_VERSION } from "../src/web/js/version.js";
 
@@ -46,12 +45,8 @@ assert.ok(fs.existsSync(path.join(root, "docs/glossary.md")), "glossary present"
 assert.ok(fs.existsSync(path.join(root, "docs/usability.md")), "usability protocol present");
 const histogram = [1, 2, 3, 4, 5].map((g) => PROBLEMS.filter((p) => grades[p.id].grade === g).length);
 
-assert.equal(OPENINGS.length, 40, "40 openings");
 assert.equal(CLASSICS.length, 20, "20 classic games");
-for (const opening of OPENINGS) assertLocalized(opening, ["title", "text"], opening.id);
 for (const classic of CLASSICS) assertLocalized(classic, ["title", "note"], classic.id);
-assert.equal(new Set(OPENINGS.map((o) => o.title.en)).size, 40, "40 distinct opening titles");
-assert.equal(new Set(OPENINGS.map((o) => JSON.stringify(o.line))).size, 40, "40 distinct opening lines");
 
 for (const file of [
   "engine/model/model.txt.gz",
@@ -93,5 +88,5 @@ assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html
 assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");
 
 console.log(
-  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 40 openings · 20 classics · 4 languages · Japanese, Chinese and Korean rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
+  `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 20 classics · 4 languages · Japanese, Chinese and Korean rules · KataGo analysis bridge · licences · v${APP_VERSION}`,
 );

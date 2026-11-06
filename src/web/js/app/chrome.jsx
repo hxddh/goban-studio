@@ -1,5 +1,6 @@
 /**
- * Window chrome (docs/design.md §3, §7): the sidebar with the four places,
+ * Window chrome (docs/design.md §3, §7): the sidebar with the two spaces
+ * (docs/v9.md: Play and Learn) and Settings,
  * and the toolbar every place starts with — back/forward, breadcrumbs and
  * title, then the place's own actions. On macOS the toolbar shares its row
  * with the traffic lights and drags the window.
@@ -10,10 +11,8 @@ import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
 
 export const SPACES = [
-  { id: "today", icon: "today", key: "nav.today" },
   { id: "play", icon: "play", key: "nav.play" },
-  { id: "practice", icon: "practice", key: "nav.practice" },
-  { id: "library", icon: "library", key: "nav.library" },
+  { id: "learn", icon: "practice", key: "nav.learn" },
 ];
 
 export function Sidebar() {
@@ -84,5 +83,5 @@ export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) 
 }
 
 export function isFocus() {
-  return !!state.settings.focus && state.space === "play" && !C.playReviewing();
+  return !!state.settings.focus && state.space === "play" && state.play.view === "game" && !C.playReviewing();
 }

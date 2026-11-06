@@ -4,7 +4,8 @@
  * summarizeGame(review) splits a reviewed game into opening, middle game and
  * endgame and says, per player and phase, how many points went where; then
  * picks three takeaways. gameRecord() turns a summary into the compact
- * record kept in progress.games, and trends(progress) reads the last games.
+ * record kept in the player model's games (model/player.js), and
+ * trends(profile) reads the last games.
  *
  * Pure (no engine, no DOM, no app state). Text is returned as i18n keys with
  * params; a param may be a `{ key, params }` object to translate first, the
@@ -28,8 +29,7 @@
  */
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { lossesOf } from "./explain.js";
-import { THEME_TOPIC } from "./insight.js";
-import { PHASES, normalizeGameRecord, normalizeGameRecords } from "../persist.js";
+import { PHASES, THEME_TOPIC, normalizeGame, normalizeGames } from "../model/player.js";
 
 export { PHASES };
 /** A move losing more than this many points is a mistake… */
@@ -294,7 +294,7 @@ const recordPhases = (summary, who) => {
 
 /**
  * The compact record of one rated game against the computer, as stored in
- * progress.games (persist.normalizeGameRecord documents the shape).
+ * the player model's games (model/player.js normalizeGame documents the shape).
  * `summary` (summarizeGame) and `themes` (theme → count, see themeCounts)
  * may be missing: play-ctl writes the record when the game ends and merges
  * recordAnalysis() into it when the post-game analysis is done.
@@ -302,7 +302,7 @@ const recordPhases = (summary, who) => {
 export function gameRecord({ id, game, color, opponent = null, won = null, rating = null, summary = null, themes = null, at = Date.now() }) {
   const line = game.mainLine();
   const phases = recordPhases(summary, KEY[color]);
-  return normalizeGameRecord({
+  return normalizeGame({
     id: String(id || at),
     at,
     size: game.size,
@@ -321,7 +321,7 @@ export function gameRecord({ id, game, color, opponent = null, won = null, ratin
   });
 }
 
-/** The analysis part of a record, to merge with persist.updateGameRecord. */
+/** The analysis part of a record, to merge into it with player.recordGame. */
 export function recordAnalysis(summary, color, themes = null) {
   const phases = recordPhases(summary, KEY[color]);
   const out = {};
@@ -350,7 +350,7 @@ function direction(earlier, recent, tol) {
 }
 
 /**
- * Aggregates over the last `n` records (progress.games, newest first):
+ * Aggregates over the last `n` records (profile.games, newest first):
  *   { games, analysed, highConfidence, window, record: { won, lost, other },
  *     avgLoss: { opening, middle, endgame, total } (points per game),
  *     avgMistakes, avgBlunders (per game),
@@ -362,8 +362,8 @@ function direction(earlier, recent, tol) {
  * the analysed games in the window; direction is "better" | "worse" |
  * "same" | null (too few games).
  */
-export function trends(progress, { n = 10, highOnly = false } = {}) {
-  const all = normalizeGameRecords(progress?.games);
+export function trends(profile, { n = 10, highOnly = false } = {}) {
+  const all = normalizeGames(profile?.games);
   const win = all.slice(0, n);
   const analysed = win.filter((g) => g.phases && (!highOnly || g.confidence === "high"));
   const half = Math.ceil(analysed.length / 2);
@@ -403,9 +403,6 @@ export function trends(progress, { n = 10, highOnly = false } = {}) {
     const newest = rated[0];
     const from = oldest.rating.before ?? oldest.rating.after - oldest.rating.delta;
     rating = { from, to: newest.rating.after, delta: newest.rating.after - from, games: rated.length };
-  } else if (progress?.rating?.history?.length >= 2) {
-    const h = progress.rating.history.slice(-(n + 1));
-    rating = { from: h[0].r, to: h[h.length - 1].r, delta: h[h.length - 1].r - h[0].r, games: h.length - 1 };
   }
 
   return {

@@ -8,7 +8,7 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
-import { bridgeAfter } from "./beginner.js";
+import { bridgeAfter } from "../model/player.js";
 import { Board, Button, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 
@@ -17,10 +17,14 @@ import { Toolbar } from "./chrome.jsx";
 /**
  * "Lesson complete". One primary action: the game the lesson leads to when
  * there is one (capture Go, or the first 9×9 game), else the next lesson.
+ * Inside today's session the bridge is an item of the session (capture Go
+ * next, the first game at its end), and the one primary is "Continue" to
+ * the next item — named after the bridge when the bridge is next.
  */
 export function LessonDone({ L }) {
+  if (state.learn.daily) return <SessionLessonDone L={L} />;
   const next = C.nextLesson();
-  const bridge = bridgeAfter(L.lesson.id, { settings: state.settings, progress: state.progress });
+  const bridge = bridgeAfter(L.lesson.id, state.profile, { captureWins: state.settings.captureWins });
   const nextLesson = next && (
     <Button kind={bridge ? "secondary" : "primary"} onClick={() => C.openLesson(next.lesson.id)}>
       {t("practice.nextLesson")}
@@ -28,7 +32,7 @@ export function LessonDone({ L }) {
   );
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} />
+      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} />
       <div class="page center-page">
         <section class="card celebrate" data-bridge={bridge || undefined}>
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
@@ -47,8 +51,42 @@ export function LessonDone({ L }) {
               </Button>
             )}
             {nextLesson}
-            <Button kind="ghost" onClick={C.practiceHome}>
-              {t("practice.backHome")}
+            <Button kind="ghost" onClick={C.learnHome}>
+              {t("learn.backHome")}
+            </Button>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+/** The label of "Continue" in today's session: the bridge's own name when it comes next. */
+function continueLabel(next) {
+  if (next?.kind === "capture") return t("capture.play");
+  if (next?.kind === "game") return t("firstGame.play");
+  return t("common.continue");
+}
+
+function SessionLessonDone({ L }) {
+  const next = C.upNext();
+  const bridge = next?.kind === "capture" ? "capture" : next?.kind === "game" ? "firstGame" : null;
+  const at = C.sessionPlace();
+  return (
+    <>
+      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} sub={at ? t("learn.session.of", [at.n, at.total]) : ""} />
+      <div class="page center-page">
+        <section class="card celebrate" data-bridge={bridge || undefined}>
+          <span class="eyebrow">{C.tx(L.unit.title)}</span>
+          <h1>{t("practice.lessonDone")}</h1>
+          <p class="muted">{C.tx(L.lesson.title)}</p>
+          {bridge && <p class="bridge-lead">{t(bridge === "capture" ? "capture.invite" : "firstGame.invite")}</p>}
+          <div class="actions center wrap">
+            <Button kind="primary" onClick={C.continuePath}>
+              {continueLabel(next)}
+            </Button>
+            <Button kind="ghost" onClick={C.learnHome}>
+              {t("learn.backHome")}
             </Button>
           </div>
         </section>
@@ -60,7 +98,7 @@ export function LessonDone({ L }) {
 /* ----------------------------------------------------------- capture Go */
 
 export function CaptureView() {
-  const K = state.practice.capture;
+  const K = state.learn.capture;
   if (!K) return null;
   const game = K.game;
   const node = game.current;
@@ -83,7 +121,6 @@ export function CaptureView() {
     variation: null,
     moveNumbers: null,
     showCoords: false,
-    material: state.settings.board,
     view: null,
     hoverColor: myTurn ? game.turn : null,
     interactive: myTurn,
@@ -91,9 +128,11 @@ export function CaptureView() {
   const next = C.nextLesson();
   const won = over && over.winner === K.human;
   const title = t("capture.title");
+  const daily = state.learn.daily;
+  const at = C.sessionPlace();
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={title} sub={`${game.size} × ${game.size}`} />
+      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={title} sub={at ? t("learn.session.of", [at.n, at.total]) : `${game.size} × ${game.size}`} />
       <div class={`workspace capture ${over ? "is-over" : ""}`}>
         <section class="stage" aria-label={title}>
           <Board model={model} onPlay={C.capturePlay} onHover={(v) => (v ? C.captureCanPlay(v.x, v.y) : true)} />
@@ -119,6 +158,24 @@ export function CaptureView() {
               <section class="card result-card enter-up" aria-live="polite">
                 <span class="eyebrow">{title}</span>
                 <strong class="result-big">{C.captureResultLine(K)}</strong>
+                {daily ? (
+                  <div class="actions center wrap">
+                    {/* Today's session: on to its next item after a win; after a loss, again first. */}
+                    {won && (
+                      <Button kind="primary" onClick={C.continuePath}>
+                        {t("common.continue")}
+                      </Button>
+                    )}
+                    <Button kind={won ? "secondary" : "primary"} onClick={C.captureAgain}>
+                      {t("play.playAgain")}
+                    </Button>
+                    {!won && (
+                      <Button kind="secondary" onClick={C.continuePath}>
+                        {t("common.continue")}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
                 <div class="actions center wrap">
                   {/* One primary, first: move on after a win, try again after a loss. */}
                   {won && next && (
@@ -135,6 +192,7 @@ export function CaptureView() {
                     </Button>
                   )}
                 </div>
+                )}
               </section>
             )}
           </div>

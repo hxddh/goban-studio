@@ -18,10 +18,16 @@
  * drive them without a host.
  */
 import { APP_VERSION } from "./version.js";
-import { readJSON, writeJSON } from "./persist.js";
+import { store } from "./data/store.js";
 import * as Host from "./host.js";
 
-export const UPDATE_KEY = "goban-studio.update.v1";
+/** When the last check was, in the store (data/store.js). */
+export const UPDATE_KEY = "update.json";
+const readJSON = (key, fallback) => {
+  const v = store.get(key);
+  return v && typeof v === "object" ? v : fallback;
+};
+const writeJSON = (key, value) => store.put(key, value);
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** The setting that turns the weekly check on (default false). */
 export const AUTO_SETTING = "autoUpdateCheck";

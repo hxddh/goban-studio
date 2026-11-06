@@ -2,9 +2,9 @@
  * v8 capture Go (吃子棋): the beginner's first game, on 9×9, against the
  * small opponent in ../capture-ai.js. The first capture wins.
  *
- * It lives in Practice (state.practice.capture), never in state.game: it is
- * not saved, rated, reported or analysed, and it never reaches the Library,
- * the strength estimate, the training plan or "this week". The only thing
+ * It lives in Learn (state.learn.capture), never in state.game: it is
+ * not saved, rated, reported or analysed, and it never reaches the history of games,
+ * the strength estimate or the player model. The only thing
  * kept is how many the player has won (settings.captureWins), which picks
  * the computer's level and tells the lesson bridge when to stop offering it.
  */
@@ -16,13 +16,14 @@ import { chooseCaptureMove, fromSignMap, hasLegalMove, levelFor } from "../captu
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring, setSetting } from "./ctl-core.js";
 import { newGame } from "./play-ctl.js";
-import { FIRST_GAME } from "./beginner.js";
+import { FIRST_GAME, measuredRank } from "../model/player.js";
+import { itemDone } from "../learn/session.js";
 
 const SIZE = 9;
 
 /** The lesson bridge after the life basics: a normal 9×9 game against the gentlest level (teaching is on for new players). */
 export function startFirstGame() {
-  newGame({ size: FIRST_GAME.size, opponent: "ai", color: BLACK, strength: FIRST_GAME.strength, handicap: FIRST_GAME.handicap });
+  newGame({ size: FIRST_GAME.size, opponent: "ai", color: BLACK, opponentRank: measuredRank(FIRST_GAME.level) ?? 30, handicap: FIRST_GAME.handicap });
 }
 
 function fresh(from) {
@@ -38,30 +39,30 @@ function fresh(from) {
   };
 }
 
-/** Open a capture game (from the lesson-complete page). */
-export function startCapture({ from = null } = {}) {
-  if (!isRestoring()) remember();
-  const prev = state.practice.capture;
+/** Open a capture game (from the lesson-complete page, or as an item of today's session). */
+export function startCapture({ from = null, daily = null } = {}) {
+  if (!isRestoring() && !daily) remember();
+  const prev = state.learn.capture;
   if (prev) prev.gen++;
   const cap = fresh(from ?? prev?.from ?? null);
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "capture", capture: cap, problem: null, mistake: null, daily: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "capture", capture: cap, problem: null, mistake: null, daily };
   });
   announce(t("capture.goal"));
 }
 
 /**
  * Back or Forward to a capture game: the game the player left, as it was
- * (state.practice.capture stays while they visit other places); a new one
+ * (state.learn.capture stays while they visit other places); a new one
  * only when there is none.
  */
 export function resumeCapture({ from = null } = {}) {
-  const cap = state.practice.capture;
+  const cap = state.learn.capture;
   if (!cap) return startCapture({ from });
   update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "capture", problem: null, mistake: null, daily: null };
+    s.space = "learn";
+    s.learn = { ...s.learn, view: "capture", problem: null, mistake: null, daily: null };
   });
   // The computer was thinking when the player left: let it move now.
   if (!cap.over && cap.game.turn !== cap.human && !cap.thinking) computerMove(cap);
@@ -69,22 +70,22 @@ export function resumeCapture({ from = null } = {}) {
 
 /** "Play again": a new game in place (no new history entry). */
 export function captureAgain() {
-  const prev = state.practice.capture;
+  const prev = state.learn.capture;
   if (prev) prev.gen++;
   update((s) => {
-    s.practice = { ...s.practice, capture: fresh(prev?.from) };
+    s.learn = { ...s.learn, capture: fresh(prev?.from) };
   });
   announce(t("capture.goal"));
 }
 
 export function captureCanPlay(x, y) {
-  const C = state.practice.capture;
+  const C = state.learn.capture;
   return !C || C.game.canPlay(x, y).ok;
 }
 
 /** The player's move. */
 export function capturePlay(x, y) {
-  const C = state.practice.capture;
+  const C = state.learn.capture;
   if (!C || C.over || C.thinking || C.game.turn !== C.human) return;
   const res = C.game.canPlay(x, y);
   if (!res.ok) {
@@ -122,6 +123,8 @@ function finish(C, over) {
   C.over = over;
   C.thinking = false;
   const won = over.winner === C.human;
+  // A game played to its end is done in today's session, won or lost.
+  itemDone("capture");
   if (won) {
     setSetting("captureWins", (state.settings.captureWins || 0) + 1);
     Audio.win();
@@ -149,7 +152,7 @@ function computerMove(C) {
   });
   const wait = m?.why === "capture" ? 520 : 380 + Math.random() * 360;
   setTimeout(() => {
-    if (state.practice.capture !== C || C.gen !== gen || C.over) return;
+    if (state.learn.capture !== C || C.gen !== gen || C.over) return;
     C.thinking = false;
     if (!m) {
       finish(C, { winner: C.human, by: "noMove", stones: [] });

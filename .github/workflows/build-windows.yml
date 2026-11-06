@@ -113,6 +113,8 @@ jobs:
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
           test -f dist/GobanStudio/resources/frontend/dist/licenses/Goban-Studio-MIT.txt
           test -f dist/GobanStudio/resources/frontend/dist/content/book.json
+          # v9: the course, problems and classics past the start-up index (src/web/js/content.js)
+          for f in course problems classics; do test -s "dist/GobanStudio/resources/frontend/dist/content/$f.json"; done
           ls -R dist/GobanStudio | head -40
       - name: signing mode
         id: mode
@@ -283,6 +285,8 @@ jobs:
           assert any(n.endswith("engine/windows/libcrypto-3-x64.dll") for n in names), "missing OpenSSL runtime"
           assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"
           assert any(n.endswith("frontend/dist/content/book.json") for n in names), "missing opening book"
+          for part in ("course", "problems", "classics"):
+              assert any(n.endswith(f"frontend/dist/content/{part}.json") for n in names), f"missing content/{part}.json"
           assert not any(".WebView2/" in n or "/EBWebView/" in n for n in names), "WebView2 test profile leaked"
           # v5: the in-app updater unpacks this archive and expects every
           # entry under GobanStudio/ (src/install.zig safeEntryName).

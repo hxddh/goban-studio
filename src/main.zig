@@ -6,6 +6,7 @@ const engine_mod = @import("engine.zig");
 const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
 const models_mod = @import("models.zig");
+const store_mod = @import("store.zig");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
@@ -133,9 +134,11 @@ const App = struct {
     staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     /// Optional networks (v5, models.zig): the page polls their state.
     models: *models_mod.Manager = undefined,
-    handlers: [18]native_sdk.BridgeHandler = undefined,
+    /// v9 file storage (store.zig): `<app data>/data`, set up in `main`.
+    store: store_mod.Store = undefined,
+    handlers: [22]native_sdk.BridgeHandler = undefined,
     async_handlers: [4]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [22]native_sdk.BridgeCommandPolicy = undefined,
+    policies: [26]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
@@ -327,6 +330,27 @@ const App = struct {
             .name = "studio.updateApply",
             .context = self,
             .invoke_fn = updateApply,
+        };
+        // v9 file storage (store.zig).
+        self.handlers[18] = .{
+            .name = "studio.storeRead",
+            .context = self,
+            .invoke_fn = storeRead,
+        };
+        self.handlers[19] = .{
+            .name = "studio.storeWrite",
+            .context = self,
+            .invoke_fn = storeWrite,
+        };
+        self.handlers[20] = .{
+            .name = "studio.storeList",
+            .context = self,
+            .invoke_fn = storeList,
+        };
+        self.handlers[21] = .{
+            .name = "studio.storeRemove",
+            .context = self,
+            .invoke_fn = storeRemove,
         };
         for (self.handlers, 0..) |handler, i| {
             self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
@@ -538,52 +562,54 @@ fn jsonUnescape(raw: []const u8, out: []u8) ?[]const u8 {
     return out[0..wi];
 }
 
+/// The payload of the two user-file commands.
+const FilePayload = struct {
+    path: []const u8 = "",
+    b64: []const u8 = "",
+    offset: u64 = 0,
+    done: bool = true,
+};
+
+/// `studio.writeTextFile {path, b64, offset?, done?}` → true. Without
+/// `offset` and `done` it is one write of at most `store.chunk_bytes`
+/// (written beside, then renamed over); a larger file is sent as chunks from
+/// offset 0 in order, the last with `done: true` (as `studio.storeWrite`).
 fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = output;
     const self: *App = @ptrCast(@alignCast(context));
-    const path_raw = jsonStringField(invocation.request.payload, "path") orelse return error.InvalidRequest;
-    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
-    // Paths need JSON unescape (Windows `C:\…` arrives as `C:\\…`); base64 is
-    // ASCII without escapes under JSON.stringify, so the raw slice is fine.
-    var path_buf: [4096]u8 = undefined;
-    const path = jsonUnescape(path_raw, &path_buf) orelse return error.InvalidRequest;
-    if (path.len == 0 or path.len > 4096) return error.InvalidRequest;
-    if (b64.len == 0 or b64.len > 512 * 1024) return error.InvalidRequest;
-
-    var decoded_buf: [384 * 1024]u8 = undefined;
+    const parsed = std.json.parseFromSlice(FilePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const v = parsed.value;
+    if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
     const dec = std.base64.standard.Decoder;
-    const dec_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
-    if (dec_len > decoded_buf.len) return error.InvalidRequest;
-    dec.decode(decoded_buf[0..dec_len], b64) catch return error.InvalidRequest;
-
-    var file = std.Io.Dir.createFileAbsolute(self.io, path, .{ .truncate = true }) catch return error.HandlerFailed;
-    defer file.close(self.io);
-    file.writeStreamingAll(self.io, decoded_buf[0..dec_len]) catch return error.HandlerFailed;
-
-    return std.fmt.bufPrint(output, "true", .{}) catch "true";
+    const n = dec.calcSizeForSlice(v.b64) catch return error.InvalidRequest;
+    if (n > store_mod.chunk_bytes) return error.TooLarge;
+    const bytes = try self.allocator.alloc(u8, n);
+    defer self.allocator.free(bytes);
+    dec.decode(bytes, v.b64) catch return error.InvalidRequest;
+    store_mod.writePath(self.io, v.path, bytes, v.offset, v.done) catch return error.HandlerFailed;
+    return "true";
 }
 
+/// `studio.readTextFile {path, offset?}` → `{size, b64}`: the file's size
+/// and up to `store.chunk_bytes` of it from `offset`, as base64. A larger
+/// file is read in several calls (as `studio.storeRead`).
 fn readTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
-    const path_raw = jsonStringField(invocation.request.payload, "path") orelse return error.InvalidRequest;
-    var path_buf: [4096]u8 = undefined;
-    const path = jsonUnescape(path_raw, &path_buf) orelse return error.InvalidRequest;
-    if (path.len == 0 or path.len > 4096) return error.InvalidRequest;
-
-    var file = std.Io.Dir.openFileAbsolute(self.io, path, .{}) catch return error.HandlerFailed;
-    defer file.close(self.io);
-
-    var raw_buf: [256 * 1024]u8 = undefined;
-    const n = file.readPositionalAll(self.io, &raw_buf, 0) catch return error.HandlerFailed;
-    if (n == 0) return error.InvalidRequest;
-
-    var b64_buf: [360 * 1024]u8 = undefined;
+    const parsed = std.json.parseFromSlice(FilePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const v = parsed.value;
+    if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
+    const raw = try self.allocator.alloc(u8, store_mod.chunk_bytes);
+    defer self.allocator.free(raw);
+    const chunk = store_mod.readPath(self.io, v.path, v.offset, raw) catch return error.HandlerFailed;
     const enc = std.base64.standard.Encoder;
-    const enc_len = enc.calcSize(n);
-    if (enc_len > b64_buf.len) return error.InvalidRequest;
-    const encoded = enc.encode(b64_buf[0..enc_len], raw_buf[0..n]);
-
-    // JSON string result
-    return native_sdk.bridge.writeJsonStringValue(output, encoded);
+    const b64_len = enc.calcSize(chunk.bytes.len);
+    const head = std.fmt.bufPrint(output, "{{\"size\":{d},\"b64\":\"", .{chunk.size}) catch return error.TooLarge;
+    if (head.len + b64_len + 2 > output.len) return error.TooLarge;
+    _ = enc.encode(output[head.len..][0..b64_len], chunk.bytes);
+    @memcpy(output[head.len + b64_len ..][0..2], "\"}");
+    return output[0 .. head.len + b64_len + 2];
 }
 
 /// 隐藏标题栏(macOS hidden_inset_tall)下,前端顶栏的空白处就是标题栏:mousedown 时
@@ -1369,6 +1395,98 @@ fn modelRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, ou
     return modelReply(self, output, true, "");
 }
 
+// ------------------------------------------------------- v9 file storage
+
+/// The payload of the four store commands (each reads the fields it needs).
+const StorePayload = struct {
+    key: []const u8 = "",
+    prefix: []const u8 = "",
+    b64: []const u8 = "",
+    offset: u64 = 0,
+    done: bool = true,
+};
+
+fn parseStorePayload(self: *App, payload: []const u8) !std.json.Parsed(StorePayload) {
+    return std.json.parseFromSlice(StorePayload, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+}
+
+/// `studio.storeRead {key, offset?}` → null when the file does not exist,
+/// else `{size, b64}`: the file's size and up to `store.chunk_bytes` of it
+/// from `offset`, as base64. A larger file is read in several calls.
+fn storeRead(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const parsed = try parseStorePayload(self, invocation.request.payload);
+    defer parsed.deinit();
+    const raw = try self.allocator.alloc(u8, store_mod.chunk_bytes);
+    defer self.allocator.free(raw);
+    const chunk = (try self.store.read(parsed.value.key, parsed.value.offset, raw)) orelse return "null";
+    const enc = std.base64.standard.Encoder;
+    const b64_len = enc.calcSize(chunk.bytes.len);
+    const head = std.fmt.bufPrint(output, "{{\"size\":{d},\"b64\":\"", .{chunk.size}) catch return error.TooLarge;
+    if (head.len + b64_len + 2 > output.len) return error.TooLarge;
+    _ = enc.encode(output[head.len..][0..b64_len], chunk.bytes);
+    @memcpy(output[head.len + b64_len ..][0..2], "\"}");
+    return output[0 .. head.len + b64_len + 2];
+}
+
+/// `studio.storeWrite {key, b64, offset?, done?}` → true. Without `offset`
+/// and `done` it is one atomic write (temporary file, then rename). A file
+/// larger than one chunk is sent as chunks from offset 0 in order, the last
+/// with `done: true`; the target changes only then.
+fn storeWrite(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = output;
+    const self: *App = @ptrCast(@alignCast(context));
+    const parsed = try parseStorePayload(self, invocation.request.payload);
+    defer parsed.deinit();
+    const v = parsed.value;
+    const dec = std.base64.standard.Decoder;
+    const n = dec.calcSizeForSlice(v.b64) catch return error.InvalidRequest;
+    if (n > store_mod.chunk_bytes) return error.TooLarge;
+    const bytes = try self.allocator.alloc(u8, n);
+    defer self.allocator.free(bytes);
+    dec.decode(bytes, v.b64) catch return error.InvalidRequest;
+    try self.store.write(v.key, bytes, v.offset, v.done);
+    return "true";
+}
+
+/// `studio.storeList {prefix}` → the keys under `prefix` ("" for all,
+/// "games/" for the games), as a JSON array.
+fn storeList(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const parsed = try parseStorePayload(self, invocation.request.payload);
+    defer parsed.deinit();
+    return self.store.listJson(parsed.value.prefix, output);
+}
+
+/// `studio.storeRemove {key}` → true (also when there was nothing to remove).
+fn storeRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = output;
+    const self: *App = @ptrCast(@alignCast(context));
+    const parsed = try parseStorePayload(self, invocation.request.payload);
+    defer parsed.deinit();
+    try self.store.remove(parsed.value.key);
+    return "true";
+}
+
+/// `<app data>/data` (beside `models`), or GOBAN_DATA_DIR (tests, development).
+fn resolveDataDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
+    if (env_map.get("GOBAN_DATA_DIR")) |dir| {
+        if (dir.len > 0 and dir.len <= out.len and std.fs.path.isAbsolute(dir)) {
+            @memcpy(out[0..dir.len], dir);
+            return out[0..dir.len];
+        }
+    }
+    var data_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const data = native_sdk.app_dirs.resolveOne(
+        .{ .name = bundle_id },
+        native_sdk.app_dirs.currentPlatform(),
+        native_sdk.debug.envFromMap(env_map),
+        .data,
+        &data_buf,
+    ) catch return "";
+    return std.fmt.bufPrint(out, "{s}{c}data", .{ data, std.fs.path.sep }) catch "";
+}
+
 /// `<app data>/models`, or GOBAN_MODELS_DIR (self-test, development).
 fn resolveModelsDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
     if (env_map.get("GOBAN_MODELS_DIR")) |dir| {
@@ -1575,6 +1693,9 @@ pub fn main(init: std.process.Init) !void {
     const models = try std.heap.page_allocator.create(models_mod.Manager);
     models.init(init.io, resolveModelsDir(init.environ_map, &models_dir_buf));
     app_state.models = models;
+    // v9 file storage: the page's settings, profile and games (store.zig).
+    var data_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    app_state.store.init(init.io, resolveDataDir(init.environ_map, &data_dir_buf));
     var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const strong_model = models.modelPath(.strong, &strong_buf) orelse "";
@@ -1618,6 +1739,7 @@ test {
     std.testing.refAllDecls(update_mod);
     std.testing.refAllDecls(install_mod);
     std.testing.refAllDecls(models_mod);
+    std.testing.refAllDecls(store_mod);
 }
 
 test "production source uses frontend assets" {

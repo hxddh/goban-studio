@@ -18,15 +18,15 @@
  *   stalled   downloading with no progress for 30 s
  *   needed    bytes the disk needs (DiskFull)
  *
- * The engine is told what is installed (`Engine.setModels`), and the
- * setting `humanStyle` (default true) decides whether an installed human
- * model plays the opponent.
+ * The engine is told what is installed (`Engine.setModels`); v9: that only
+ * changes which implementations the opponent ladder can reach
+ * (opponents.js), never a mode the player picks.
  */
 import { t } from "../i18n.js";
 import * as M from "../models.js";
 import * as Engine from "../engine.js";
 import { state, update, toast } from "./store.js";
-import { confirmAction, setSetting } from "./ctl-core.js";
+import { confirmAction } from "./ctl-core.js";
 
 export const canDownloadModels = M.canDownload;
 
@@ -37,7 +37,6 @@ function syncEngine() {
   Engine.setModels({
     strong: M.isInstalled(m, "strong"),
     human: M.isInstalled(m, "human"),
-    humanStyle: state.settings?.humanStyle !== false,
   });
 }
 
@@ -126,18 +125,4 @@ export function removeModel(kind, { confirm = true } = {}) {
     onConfirm: run,
   });
   return null;
-}
-
-/** The "Play human-style" switch. */
-export function setHumanStyle(on) {
-  setSetting("humanStyle", !!on);
-  syncEngine();
-}
-
-/**
- * How the opponent at `strengthId` plays now: "human" | "strong" |
- * "standard" (for a badge next to the level).
- */
-export function opponentStyle(strengthId) {
-  return Engine.opponentMode(strengthId);
 }

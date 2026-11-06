@@ -15,7 +15,6 @@
  * Every analysis is Black's point of view (katago.js).
  */
 import { BLACK } from "../rules.js";
-import { strengthById } from "../engine.js";
 import { complexity, settled } from "./insight.js";
 
 /** The computer never answers faster than this (ms), nor slower than THINK_MAX. */
@@ -26,11 +25,11 @@ export const THINK_MAX = 3500;
  * How long the computer seems to think (ms). Tuned for the 19×19 game that
  * is the default: the opening is brisk, fighting takes longer, the endgame
  * is quicker again (docs/design.md §8). Stronger levels take a little
- * longer; a jitter of ±15% keeps it from feeling mechanical.
+ * longer; a jitter of ±15% keeps it from feeling mechanical. `rank` is
+ * the rank the opponent plays at (v9: the measured rank shown).
  */
-export function thinkTime(strengthId, a, moveNumber, size, rnd = Math.random) {
-  const st = strengthById(strengthId);
-  const base = st.rank >= 20 ? 520 : st.rank >= 10 ? 820 : st.rank >= 1 ? 1150 : 1500;
+export function thinkTime(rank, a, moveNumber, size, rnd = Math.random) {
+  const base = rank >= 20 ? 520 : rank >= 10 ? 820 : rank >= 1 ? 1150 : 1500;
   const c = complexity(a);
   const opening = moveNumber < (size >= 19 ? 30 : size) ? 0.55 : 1;
   const endgame = size >= 13 && moveNumber > size * size * 0.6 ? 0.75 : 1;
@@ -38,7 +37,7 @@ export function thinkTime(strengthId, a, moveNumber, size, rnd = Math.random) {
   return Math.max(THINK_MIN, Math.min(THINK_MAX, Math.round(base * (0.55 + c * 1.5) * opening * endgame * jitter)));
 }
 
-/** Levels at or below this strength (label rank, kyu) play every game out. */
+/** Opponents weaker than this rank (kyu) play every game out; from this rank up they may resign. */
 export const RESIGN_FROM_RANK = 15;
 /** Consecutive hopeless searches before the computer resigns. */
 export const RESIGN_STREAK = 3;
@@ -62,16 +61,15 @@ export function openPoints(ownership) {
  * rarely give a lead back). So a weak level does not resign a game its
  * opponent could still throw away, and no level resigns while ahead.
  */
-export function resignStep(low, { strengthId, analysis, aiColor, moveNumber, size, empty = size * size }) {
-  const st = strengthById(strengthId);
-  if (st.rank > RESIGN_FROM_RANK) return { low: 0, resign: false };
+export function resignStep(low, { rank, analysis, aiColor, moveNumber, size, empty = size * size }) {
+  if (!(rank <= RESIGN_FROM_RANK)) return { low: 0, resign: false };
   if (!analysis || !Number.isFinite(analysis.winrate) || !Number.isFinite(analysis.scoreLead)) return { low: 0, resign: false };
   if (moveNumber <= (size * size) / 5) return { low: 0, resign: false };
   const aiWin = aiColor === BLACK ? analysis.winrate : 1 - analysis.winrate;
   const behind = -aiColor * analysis.scoreLead;
   // Without ownership, every empty point counts as open.
   const open = openPoints(analysis.ownership) ?? empty;
-  const margin = Math.max(15, open * (st.rank <= 2 ? 0.25 : 0.5));
+  const margin = Math.max(15, open * (rank <= 2 ? 0.25 : 0.5));
   const hopeless = aiWin < 0.03 && behind > margin;
   const next = hopeless ? low + 1 : 0;
   return { low: next, resign: next >= RESIGN_STREAK };

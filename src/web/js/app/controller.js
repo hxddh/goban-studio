@@ -1,33 +1,31 @@
 /**
- * Everything the app does, as plain functions over the store.
+ * Everything the app does, as plain functions over the state.
  *
- * This file is the hub the views import: it boots the app, owns places,
- * history restore, the library and onboarding, and re-exports the play,
- * review and practice controllers. None of it touches the DOM.
+ * This file is the hub the views import: it boots the app (the store
+ * first), owns the two spaces (Play and Learn) and history restore, the
+ * games' history, backups and onboarding, and re-exports the play, review
+ * and learn controllers. None of it touches the DOM.
  */
-import { BLACK, Game, formatPoints } from "../rules.js";
+import { BLACK, formatPoints } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
-import * as Lib from "../library.js";
-import { DEFAULT_SETTINGS, clearAll, loadProgress, loadSettings, markClassic, migrate, saveProgress, saveSettings } from "../persist.js";
+import * as Games from "../data/games.js";
+import { store } from "../data/store.js";
+import { loadSettings } from "../data/settings.js";
+import { exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, parseBackup } from "../data/backup.js";
+import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.js";
 import { detectLang, setLang, t } from "../i18n.js";
-import * as Backup from "../persist.js";
-import { APP_VERSION } from "../version.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
-import { OPENINGS } from "../content/openings.js";
-import { CLASSICS } from "../content/classics.js";
+import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
-import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, setSetting, syncMenus, tx } from "./ctl-core.js";
-import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
-import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
+import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
+import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, openCollection, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
-import { dropReport, forgetReportCheck, restoreReport } from "./report-ctl.js";
-import { resumeBackground } from "./report-batch.js";
-
+import { resumeBackground } from "../play/analysis.js";
 import { closeExplorer } from "./explorer-ctl.js";
 
 export * from "./ctl-core.js";
@@ -36,83 +34,118 @@ export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
-export * from "./report-ctl.js";
-export * from "./report-batch.js";
-export * from "./collections-ctl.js";
+export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
-export * from "./plan-ctl.js";
-export * from "./capture-ctl.js"; // v8 beginner path
+export * from "../learn/session.js"; // Learn's path, today's session
+import { itemKey, todaysSession } from "../learn/session.js";
+export * from "./capture-ctl.js"; // the beginner bridges (Learn)
 import { resumeCapture } from "./capture-ctl.js";
-export { OPENINGS, CLASSICS, formatPoints };
+export { CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
 
-export function boot() {
-  migrate();
-  const settings = loadSettings();
+/** A file that could not be read or written: one toast, however many failed. */
+function storeError(e) {
+  console.error("store:", e);
+  const read = e.op === "read" || e.op === "list";
+  toast(t(read ? "store.readFailed" : "store.writeFailed"), "error", 5000, { key: "store" });
+}
+
+/**
+ * Start the app: open the store (every file into memory) before the first
+ * render; settings, the player model and the game on the board come from
+ * it. v9 reads nothing saved by earlier versions.
+ */
+export async function boot() {
+  store.setErrorHandler(storeError);
+  await store.open();
+  const settings = loadSettings(store);
   if (!settings.lang) settings.lang = detectLang();
   state.settings = settings;
-  state.progress = loadProgress();
-  // v6: a v2–v5 rating becomes an estimate with an uncertainty (strength.js).
-  if (state.progress.rating && state.progress.rating.v !== 6) {
-    state.progress.rating = migrateEstimate(state.progress.rating);
-    saveProgress(state.progress);
-  }
-  if (!state.progress.rating && settings.onboarded) {
-    state.progress.rating = startEstimate(settings.playerRank ?? 30);
-    saveProgress(state.progress);
-  }
+  state.profile = normalizeProfile(store.get(PROFILE_KEY));
   setLang(settings.lang);
   Audio.setSound(settings.sound);
-  Audio.setMaterial?.(settings.board);
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
-  state.space = "today";
+  // Play opens on the board when a game is in progress, else on its home.
+  const g = state.game?.game;
+  state.space = "play";
+  state.play = { ...state.play, view: g && g.moveNumber > 0 && !g.current.result ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
   update();
+  // Lesson steps, problem bodies and classic records follow on idle
+  // (content.js). Nothing on screen reads them before it is opened, and
+  // what opens them waits for them, so their arrival renders nothing.
+  preloadContent(() => update());
   Engine.info().then((info) => {
     update({ engine: info });
     maybeComputerMove();
     ponder();
-    // v7: background reports and "Analyse all" that quitting interrupted.
+    // The background analyses quitting interrupted (play/analysis.js).
     resumeBackground();
   });
-  // v5: which optional networks are installed (a local status call, no
-  // network request).
+  // Which optional networks are installed (a local status call).
   initModels().catch(() => {});
-  // v4: the opt-in weekly update check (no request unless it is on and due).
+  // The opt-in weekly update check (no request unless it is on and due).
   if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
-  // v5: how the last in-app update went (no request), and tell a waiting
-  // update helper that this new version is up.
+  // How the last in-app update went (no request).
   if (hasNative()) setTimeout(() => restoreUpdateState().catch(() => {}), 600);
 }
 
-/* --------------------------------------------------------------- places */
+/* --------------------------------------------------------------- spaces */
 
-export const SPACES = ["today", "play", "practice", "library"];
+/** The two spaces (docs/v9.md, "Two spaces"), in sidebar order. */
+export const SPACES = ["play", "learn"];
+
+/** Play's home: the game in progress or the suggested game, then the history. */
+export function playHome() {
+  if (state.space === "play" && state.play.view === "home" && !state.review && !state.play.explorer) return;
+  remember();
+  if (state.review) dropReview();
+  update((s) => {
+    s.space = "play";
+    s.play = { ...s.play, view: "home", explorer: null };
+    s.menu = null;
+  });
+  syncMenus();
+}
+
+/** The board of the game on it (Play). */
+export function playBoard() {
+  if (state.space === "play" && state.play.view === "game" && !state.review) return showFinished();
+  remember();
+  if (state.review && (state.review.meta.space || "play") === "play") dropReview();
+  update((s) => {
+    s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
+    s.menu = null;
+  });
+  // A finished game's board is its review.
+  showFinished();
+  maybeComputerMove();
+  ponder();
+  syncMenus();
+}
 
 export function goSpace(space) {
-  // Clicking the place you are in returns to its top level.
+  if (!SPACES.includes(space)) return;
+  // The space you are in again: back to its top level.
   if (space === state.space) {
-    // v6: the report page closes back to the place.
-    if (state.report && state.report.space === space) {
-      remember();
-      dropReport();
-      return update();
+    if (space === "learn") {
+      if (state.review && (state.review.meta.space || "play") === "learn") {
+        remember();
+        dropReview();
+        return update();
+      }
+      if (state.learn.view !== "home") return learnHome();
+      return;
     }
-    if (space === "practice" && state.practice.view !== "home") return practiceHome();
-    if (state.review && (state.review.meta.space || "play") === space) {
-      remember();
-      dropReview();
-      return update();
-    }
-    // v6 explorer: Library again closes the explorer.
-    if (space === "library" && state.library.explorer) return closeExplorer();
-    return;
+    if (state.play.explorer && !state.review) return closeExplorer();
+    return playHome();
   }
   remember();
   update((s) => {
@@ -131,42 +164,51 @@ export function toggleFocus() {
 }
 
 /** Put the app back where a history entry says it was. */
-function restore(loc) {
+export function restore(loc) {
   if (state.review) dropReview();
   state.space = loc.space;
-  state.library = { ...state.library, ...loc.library };
-  const p = loc.practice;
-  if (loc.space === "practice") {
-    if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
-    else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
-    else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
-    else if (p.view === "collection" && p.collection) openCollection(p.collection);
+  state.play = { ...state.play, ...loc.play };
+  const p = loc.learn;
+  if (loc.space === "learn") {
+    // An item of today's session comes back inside the session.
+    const s = p.daily ? todaysSession() : null;
+    const within = (kind, id) => {
+      if (!s) return undefined;
+      const key = itemKey({ kind, id });
+      if (!s.items.some((it) => it.key === key)) return undefined;
+      s.current = key;
+      return { daily: s };
+    };
+    if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex, within("lesson", p.lessonId));
+    else if (p.view === "problem" && p.problemId) openProblem(p.problemId, within("problem", p.problemId));
+    else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId, within("mistake", p.mistakeId));
     else if (p.view === "capture") resumeCapture({ from: p.captureFrom });
+    else if (p.view === "catalog") openCatalog();
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
-    else practiceHome();
+    else learnHome();
   }
   const rv = loc.review;
   if (rv) {
     if (rv.source === "current") reviewCurrentGame();
     else if (rv.source === "record" && rv.recordId) openRecord(rv.recordId);
     else if (rv.source === "classic" && rv.classicId) openClassic(rv.classicId);
-    else if (rv.source === "opening" && rv.openingId) openOpening(rv.openingId);
     if (state.review && rv.index >= 0) reviewGoto(rv.index);
   }
-  // v6: the report page, when the entry had one open.
-  restoreReport(loc);
+  // A finished game's board is its review.
+  showFinished();
   update();
 }
 
-/* --------------------------------------------------------------- library */
+/* ---------------------------------------------------- the games' history */
 
 export function openRecord(id) {
-  const rec = Lib.getGame(id);
+  const rec = Games.getGame(id);
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", autoJump: true });
+    // The same review as after a game: its stored analysis opens at once.
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "play", back: "play", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
@@ -174,24 +216,19 @@ export function openRecord(id) {
 }
 
 export function openClassic(id) {
+  return withContent("classics", () => showClassic(id));
+}
+
+function showClassic(id) {
   const c = CLASSICS.find((g) => g.id === id);
   if (!c) return;
   try {
     const { game } = loadSGF(c.sgf);
-    markClassic(state.progress, c.id);
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moment, autoJump: c.moment == null, space: "library", back: "library" });
+    changeProfile((p) => recordClassic(p, c.id, Date.now()));
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moment, autoJump: c.moment == null, space: "play", back: "play" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }
-}
-
-export function openOpening(id) {
-  const o = OPENINGS.find((g) => g.id === id);
-  if (!o) return;
-  const game = new Game({ size: o.size || 19, komi: o.komi ?? 6.5 });
-  if (o.setup?.length) game.setup(o.setup, o.toMove);
-  for (const m of o.line) game.play(m.x, m.y, { color: m.c, force: true });
-  openReview(game, { source: "opening", opening: o, openingId: o.id, startAt: 0, guess: true, guessColor: o.toMove, space: "library", back: "library" });
 }
 
 export function deleteRecord(id) {
@@ -200,19 +237,19 @@ export function deleteRecord(id) {
     confirm: t("common.delete"),
     danger: true,
     onConfirm: () => {
-      Lib.deleteGame(id);
+      Games.deleteGame(id);
       update();
     },
   });
 }
 
 export function renameRecord(id, name) {
-  Lib.renameGame(id, name);
+  Games.renameGame(id, name);
   update();
 }
 
 export async function exportRecord(id) {
-  const rec = Lib.getGame(id);
+  const rec = Games.getGame(id);
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
@@ -225,20 +262,16 @@ export async function exportRecord(id) {
 
 export async function importSGFText(text, name = "goban-studio.sgf") {
   const { game, warnings } = loadSGF(text);
-  const rec = Lib.saveGame(game, { name: String(name).replace(/\.sgf$/i, ""), source: "import" });
-  if (!rec) {
-    toast(t("toast.saveFailed"), "error");
-    return;
-  }
+  const rec = Games.saveGame(game, { name: String(name).replace(/\.sgf$/i, ""), source: "import" });
   if (!state.settings.onboarded) {
     setSetting("onboarded", true);
     update({ sheet: null });
   }
-  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
+  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "play", back: "play", autoJump: true });
   if (warnings.length) toast(warnings[0], "warn");
 }
 
-/** v5: a record under rules the app cannot score names those rules. */
+/** A record under rules the app cannot score names those rules. */
 function importErrorText(e) {
   if (e?.code !== "unsupported-rules") return t("library.importError");
   const name = String(e.rules || "").replace(/\s+/g, " ").trim().slice(0, 40) || "?";
@@ -278,14 +311,16 @@ export async function pickImport() {
 
 /* ----------------------------------------------------------------- backup */
 
+/** Every stored file as one JSON document (data/backup.js). */
 export async function exportBackup() {
   const { saveText } = await import("./play-ctl.js");
-  const doc = Backup.exportBackup(APP_VERSION);
+  await store.flush();
+  const doc = backupDoc(store);
   const day = new Date().toISOString().slice(0, 10);
   await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json");
 }
 
-/** Pick a backup file, show what it holds, and replace everything on confirm. */
+/** Pick a backup file, say what it holds, and replace everything on confirm. */
 export async function importBackup() {
   let text = null;
   if (hasNative() && hasFileDialogs()) {
@@ -307,23 +342,18 @@ export async function importBackup() {
     });
   }
   if (text == null) return;
-  let doc = null;
-  try {
-    doc = JSON.parse(text);
-  } catch (_) {
-    doc = null;
-  }
-  const c = Backup.checkBackup(doc);
+  const doc = parseBackup(text);
+  const c = checkBackup(doc);
   if (!c.ok) return toast(t("backup.error." + c.error), "warn");
   confirmAction({
     title: t("backup.confirmTitle"),
-    body: t("backup.confirmBody", [c.summary.games, c.summary.lessons, c.summary.problems]),
+    body: t("backup.confirmFiles", [c.summary.games, c.summary.keys]),
     confirm: t("backup.restore"),
     danger: true,
-    onConfirm: () => {
-      const r = Backup.restoreBackup(doc);
+    onConfirm: async () => {
+      const r = await restoreDoc(store, doc);
       if (!r.ok) return toast(t("backup.error." + r.error), "warn");
-      forgetReportCheck();
+      if (!r.written) return; // the store's toast has said so
       location.reload();
     },
   });
@@ -335,47 +365,52 @@ export function clearData() {
     body: t("settings.clearBody"),
     confirm: t("common.delete"),
     danger: true,
-    onConfirm: () => {
-      clearAll();
-      location.reload();
+    onConfirm: async () => {
+      for (const key of store.list("")) store.remove(key);
+      if (await store.flush()) location.reload();
     },
   });
 }
 
 /* ----------------------------------------------------------- onboarding */
 
+/**
+ * The last onboarding answer: language and experience are known; open
+ * Learn for a new player (lesson one, with the beginner bridges after it),
+ * Play for everyone else (a 9×9 game for someone who knows the rules, the
+ * full board for a player).
+ */
 export function finishOnboarding(choice, rank = null) {
   const s = state.settings;
   const next = { ...s, onboarded: true, experience: choice };
   if (choice === "new") next.playerRank = 30;
   else if (choice === "rules") next.playerRank = 25;
   else next.playerRank = rank ?? 15;
-  state.progress.rating = startEstimate(next.playerRank);
-  const strength = choice === "new" ? "30k" : choice === "rules" ? "25k" : recommendStrength(state.progress.rating, { size: 19, modeOf: (st) => Engine.opponentMode(st) });
-  next.strength = strength;
-  saveProgress(state.progress);
+  changeProfile((p) => setPriorRank(p, next.playerRank, Date.now()));
+  // The gentlest rank of the ladder for a beginner, else the suggested game's.
+  const opponentRank = choice === "new" || choice === "rules" ? 30 : suggestedOpponent(19).opponentRank;
+  next.opponentRank = opponentRank;
   update((st) => {
     st.settings = next;
     st.sheet = null;
   });
-  saveSettings(next);
+  setSetting("onboarded", true);
   if (choice === "new") {
-    const first = allLessons()[0];
-    if (first) openLesson(first.lesson.id, 0);
+    withContent("course", () => {
+      const first = allLessons()[0];
+      if (first) openLesson(first.lesson.id, 0);
+    });
   } else if (choice === "rules") {
-    // v8: the small board first, against a gentle level, teaching on (teachingOn).
-    newGame({ size: 9, opponent: "ai", color: BLACK, strength, handicap: 0 });
+    // The small board first, against a gentle level, teaching on (teachingOn).
+    newGame({ size: 9, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
   } else {
-    newGame({ size: 19, opponent: "ai", color: BLACK, strength, handicap: 0 });
+    newGame({ size: 19, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
   }
 }
 
-/** Your level changed by hand in Settings: restart the rating from it. */
+/** Your level changed by hand in Settings: the estimate starts from it again. */
 export function setPlayerRank(rank) {
   setSetting("playerRank", rank);
-  state.progress.rating = startEstimate(rank ?? 30);
-  saveProgress(state.progress);
+  changeProfile((p) => setPriorRank(p, rank ?? 30, Date.now()));
   update();
 }
-
-export { DEFAULT_SETTINGS };

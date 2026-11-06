@@ -11,8 +11,9 @@ place or a setting: the path is a few choices made at the right moments.
 | `life-two-eyes`, `life-space` (unit 5, 眼与活棋) | Play your first 9×9 game | the player has finished a game against the computer |
 
 When a game is offered, *Next lesson* becomes the secondary button; the page
-keeps one primary action. The rules live in `src/web/js/app/beginner.js`
-(`bridgeAfter`), the page in `app/beginner.jsx` (`LessonDone`).
+keeps one primary action. The rules live in `src/web/js/model/player.js`
+(`bridgeAfter`), the page in `app/beginner.jsx` (`LessonDone`); in v9 the
+bridges are also items of Learn's path (`learn/session.js`).
 
 Onboarding's *I know the rules* starts a 9×9 game against a gentle level
 (25 kyu) instead of 19×19. Teaching mode is on for these players

@@ -1,10 +1,13 @@
 /**
- * Play: the live game, scoring, the result; and the review layer over any
- * game (whole-game analysis, live analysis, variations, key mistakes).
+ * Play: the live game and scoring; and the review over any game, which is
+ * also the post-game review the board turns into when a game ends
+ * (docs/v9.md, "Two spaces → Play"): the result, the balance chart, the
+ * three phases when KataGo analysed the game, the key moments with their
+ * stories, trying a moment again, comments and variations.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
-import { areaOf, rankParts, strengthById } from "../engine.js";
+import { areaOf } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
@@ -12,21 +15,16 @@ import { ataris } from "./insight.js";
 import { storyText } from "./story.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
-import { ratingParts } from "./rating.js";
+import { rankText } from "./estimate-label.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
+import { BLUNDER, MISTAKE } from "./summary.js";
+import { accuracyText, lossText, momentWords, ratingChangeText, reviewFacts, reviewHeadline } from "../play/review-image.js";
 import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { FirstCountNote } from "./beginner.jsx";
 
-export function rankLabel(id) {
-  const r = rankParts(id);
-  return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
-}
-
-export function ratingLabel(r) {
-  const p = ratingParts(r);
-  return t(p.unit === "kyu" ? "rank.kyu" : "rank.dan", [p.n]);
-}
+/** A rank (kyu 30…1, 1 dan = 0 …) as shown: "≈ 12 kyu", "≈ 4 dan". */
+export const rankLabel = rankText;
 
 function moveNumbers(game) {
   if (!state.settings.numbers) return null;
@@ -76,7 +74,6 @@ export function PlayView() {
     variation: null,
     moveNumbers: moveNumbers(game),
     showCoords: s.settings.coords,
-    material: s.settings.board,
     view: null,
     ghost: g.ghost ? { ...g.ghost, color: game.turn } : null,
     hoverColor: scoring ? null : game.turn,
@@ -177,12 +174,11 @@ function PlayerRow({ color }) {
   let sub = "";
   if (g.opponent === "ai" && color !== g.humanColor) {
     name = state.engine.available ? "KataGo" : t("play.offlineEngine");
-    sub = rankLabel(g.strength);
-    if (g.opponentMode === "human" || g.opponentMode === "strong") sub += " · " + t("models.mode." + g.opponentMode);
+    sub = rankLabel(g.rank);
   } else if (g.opponent === "ai") {
     name = t("play.you");
-    const r = state.progress.rating?.r;
-    if (r != null) sub = ratingLabel(r);
+    const e = C.playerEstimate({ size: game.size });
+    if (e.games > 0) sub = rankLabel(e.rank);
   } else name = colorName(color);
   const fx = g.captureFx && g.captureFx.color === color && performance.now() - g.captureFx.at < 1200 ? g.captureFx : null;
   const side = g.clock ? g.clock[color === BLACK ? "b" : "w"] : null;
@@ -419,89 +415,22 @@ function lines(text) {
   return text.split(" · ").map((x) => <i>{x}</i>);
 }
 
-function SummaryBlock() {
-  const g = state.game;
-  const sm = g.summary;
-  if (!sm) return null;
-  if (sm.status === "analyzing") {
-    return (
-      <div class="summary pending" aria-live="polite">
-        <span class="fine">{t("summary.analyzing", [Math.round((sm.progress || 0) * 100)])}</span>
-        <div class="progress">
-          <i style={{ width: `${Math.round((sm.progress || 0) * 100)}%` }} />
-        </div>
-      </div>
-    );
-  }
-  const size = g.game.size;
-  return (
-    <ol class="summary enter-up" aria-label={t("summary.title")}>
-      {sm.big && (
-        <li>
-          <strong>{t("summary.mistake")}</strong>
-          <span>
-            {t("summary.mistakeText", [sm.big.index, formatPoints(Math.round(sm.big.loss * 2) / 2), sm.big.best && !sm.big.best.pass ? coordLabel(sm.big.best.x, sm.big.best.y, size) : "—"])}
-          </span>
-        </li>
-      )}
-      {sm.good && (
-        <li>
-          <strong>{t("summary.good")}</strong>
-          <span>{t("summary.goodText", [sm.good.index, coordLabel(sm.good.move.x, sm.good.move.y, size)])}</span>
-        </li>
-      )}
-      <li>
-        <strong>{t("summary.tip")}</strong>
-        {sm.topic ? (
-          <span>
-            {t("summary.tipText", [C.themeName(sm.theme)])}{" "}
-            <button type="button" class="link" onClick={() => C.openTopic(sm.topic, sm.theme)}>
-              {t("summary.practice")}
-            </button>
-          </span>
-        ) : (
-          <span>{sm.big ? t("summary.tipReview") : t("summary.tipClean")}</span>
-        )}
-      </li>
-    </ol>
-  );
-}
-
+/**
+ * A finished game on the board without its review (rare: the review opens
+ * by itself when a game ends): the result and the way into the review.
+ */
 function ResultCard() {
   const g = state.game;
-  const r = g.game.current.result;
-  const aids = [];
-  if (g.undos) aids.push(t("play.undosN", [g.undos]));
-  if (g.hints) aids.push(t("play.hintsN", [g.hints]));
   const headline = C.resultHeadline(g);
   return (
     <section class="card result-card enter-up" aria-live="polite">
       <span class="eyebrow">{t("play.gameOver")}</span>
       <strong class="result-big">{headline}</strong>
-      {headline !== C.resultText(r) && <span class="muted">{C.resultText(r)}</span>}
-      {g.ratingDelta != null && (
-        <span class={`rating-delta ${g.ratingDelta >= 0 ? "up" : "down"}`}>
-          {t("summary.rating", [ratingLabel(state.progress.rating.r), (g.ratingDelta >= 0 ? "+" : "") + g.ratingDelta])}
-        </span>
-      )}
-      {aids.length > 0 && <span class="fine">{aids.join(" · ")}</span>}
-      <SummaryBlock />
-      <div class={`actions center ${g.ratingDelta != null ? "wrap" : ""}`}>
-        {/* v6: after a rated game against the computer, the report is the next step. */}
-        {g.ratingDelta != null ? (
-          <>
-            <Button kind="primary" icon="chart" class="block" onClick={C.openCurrentReport}>
-              {t("report.open")}
-            </Button>
-            <Button kind="ghost" onClick={C.reviewCurrentGame}>
-              {t("play.reviewGame")}
-            </Button>
-          </>
-        ) : (
-          <Button kind="primary" icon="chart" onClick={C.reviewCurrentGame}>
-            {t("play.reviewGame")}
-          </Button>
-        )}
+      {headline !== C.resultText(g.game.current.result) && <span class="muted">{C.resultText(g.game.current.result)}</span>}
+      <div class="actions center">
+        <Button kind="primary" icon="chart" onClick={() => C.openPostGame(g, { inPlace: false })}>
+          {t("play.reviewGame")}
+        </Button>
         <Button kind="ghost" onClick={() => C.openNewGame()}>
           {t("play.playAgain")}
         </Button>
@@ -518,7 +447,6 @@ export function ReviewView() {
   const game = r.game;
   const node = game.current;
   const marks = [];
-  if (r.guess?.last === "wrong" && r.guess.wrongAt) marks.push({ ...r.guess.wrongAt, type: "cross", tone: "bad" });
   // Marks recorded on this move (SGF TR/SQ/CR/MA/LB).
   if (!r.variation) for (const mk of node.marks || []) marks.push({ x: mk.x, y: mk.y, type: mk.type, label: mk.text });
   const focusKm = r.focus != null ? r.keyMoves.find((k) => k.index === r.focus) : null;
@@ -527,9 +455,9 @@ export function ReviewView() {
     const km = r.keyMoves.find((k) => k.index === r.variation.index);
     if (km?.best && !km.best.pass && r.variation.kind === "played") marks.push({ ...km.best, type: "circle", tone: "good" });
   }
-  // Live candidates on the board (not during guessing or while a line is shown).
+  // Live candidates on the board (not while a line is shown).
   const live = r.live && r.live.nodeId === node.id ? r.live : null;
-  if (live && !r.variation && !r.guess) {
+  if (live && !r.variation) {
     const total = live.moves.reduce((a, m) => a + (m.visits || 0), 0) || 1;
     live.moves
       .filter((m) => !m.pass && (m.visits || 0) / total >= 0.03)
@@ -554,21 +482,28 @@ export function ReviewView() {
       varMoves = varMoves.filter((m, i) => lastAt.get(m.x + "," + m.y) === i && !steps.slice(m.n).some((st) => (st.captured || []).some((p) => p.x === m.x && p.y === m.y)));
     }
   }
+  const tr = r.trial;
+  if (tr) {
+    // Trying a moment again: the position before it, the move tried, and
+    // KataGo's better move once the try is judged a mistake.
+    marks.length = 0;
+    varMoves = tr.tried ? [{ ...tr.tried, c: tr.color, n: 1 }] : null;
+    if (tr.status === "bad" && tr.best) marks.push({ ...tr.best, type: "circle", tone: "good" });
+  }
   const model = {
     size: game.size,
     board,
-    lastMove: node.move,
+    lastMove: tr ? null : node.move,
     marks,
-    ownership: C.reviewOwnershipMap(),
+    ownership: tr ? null : C.reviewOwnershipMap(),
     territory: null,
     deadStones: [],
     variation: varMoves,
-    moveNumbers: r.variation ? null : moveNumbers(game),
+    moveNumbers: r.variation || tr ? null : moveNumbers(game),
     showCoords: s.settings.coords,
-    material: s.settings.board,
     view: null,
-    hoverColor: r.guess?.done ? null : game.turn,
-    interactive: !(r.guess && r.guess.done),
+    hoverColor: tr ? tr.color : game.turn,
+    interactive: !tr || tr.status === "open",
   };
   const h = reviewHeading(r);
   return (
@@ -592,14 +527,14 @@ function reviewHeading(r) {
   const line = r.game.mainLine();
   const result = line[line.length - 1].result;
   const space = meta.space || "play";
-  const crumbs = [{ label: t(space === "library" ? "nav.library" : space === "practice" ? "nav.practice" : "nav.play"), onClick: C.closeReview }];
+  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");
-  let sub = result ? C.resultText(result) : "";
+  // A game with a result says it at the top of the panel (ResultLine).
+  let sub = "";
   if (meta.classic) {
     title = C.tx(meta.classic.title);
     sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
-  } else if (meta.opening) title = C.tx(meta.opening.title);
-  else if (meta.name) title = meta.name;
+  } else if (meta.name) title = meta.name;
   return { crumbs, title, sub };
 }
 
@@ -609,9 +544,9 @@ function ReviewTools() {
   const meta = r.meta;
   return (
     <div class="tool-group">
-      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis && !r.guess} onClick={C.toggleLive} />}
+      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis} onClick={C.toggleLive} />}
       <IconButton icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
-      <IconButton icon="target" label={t("review.guess")} active={!!r.guess} onClick={C.toggleGuess} />
+      {!meta.classic && <IconButton icon="upload" label={t("report.exportImage")} onClick={C.exportReviewImage} disabled={r.analyzing || !r.model || r.model.confidence === "none"} />}
       <IconButton icon="download" label={t("common.exportSgf")} onClick={() => C.exportSGF(r.game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
       <span class="tool-sep" />
       <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
@@ -638,13 +573,25 @@ function ReviewNav() {
         aria-label={t("review.position")}
         aria-valuetext={t("review.moveOf", [i, max])}
         onInput={(e) => C.reviewGoto(Number(e.currentTarget.value))}
-        disabled={!!r.guess || inVar}
+        disabled={inVar}
       />
-      <IconButton icon="next" label={`${t("review.next")} (→)`} onClick={() => C.reviewStep(1)} disabled={!r.game.current.children.length || !!r.guess} />
-      <IconButton icon="last" label={t("review.last")} onClick={() => C.reviewGoto(max)} disabled={(!inVar && i >= max) || !!r.guess} />
+      <IconButton icon="next" label={`${t("review.next")} (→)`} onClick={() => C.reviewStep(1)} disabled={!r.game.current.children.length} />
+      <IconButton icon="last" label={t("review.last")} onClick={() => C.reviewGoto(max)} disabled={!inVar && i >= max} />
       <span class="nav-count">{inVar ? t("review.variationDepth", [depth]) : t("review.moveOf", [i, max])}</span>
     </div>
   );
+}
+
+/**
+ * The moments the chart marks: KataGo's key mistakes (with their stories),
+ * or the offline estimate's turning points (v6: nothing more), never while
+ * the analysis is still running.
+ */
+function chartMoments(r) {
+  const m = r.model;
+  if (r.analyzing || !m || m.confidence === "none") return [];
+  if (m.confidence === "high") return r.keyMoves.map((km) => ({ index: km.index, color: km.move.color, played: km.move, km }));
+  return m.moments.map((mo) => ({ index: mo.index, color: mo.color, played: mo.played, km: null }));
 }
 
 function Chart() {
@@ -693,7 +640,7 @@ function Chart() {
           {started && <path d={d} class="chart-line" />}
           {cur >= 0 && <line x1={x(cur)} x2={x(cur)} y1="0" y2={H} class="chart-cursor" />}
           {hover != null && <line x1={x(hover)} x2={x(hover)} y1="0" y2={H} class="chart-hover" />}
-          {r.keyMoves.map(
+          {chartMoments(r).map(
             (k) =>
               pts[k.index] && (
                 <circle
@@ -703,10 +650,11 @@ function Chart() {
                   class="chart-key"
                   onClick={(e) => {
                     e.stopPropagation();
-                    C.focusMistake(k);
+                    if (k.km) C.focusMistake(k.km);
+                    else C.reviewGoto(k.index);
                   }}
                 >
-                  <title>{t("review.moveLabel", [k.index, colorName(k.move.color), coordLabel(k.move.x, k.move.y, r.game.size)])}</title>
+                  <title>{t("review.moveLabel", [k.index, colorName(k.color), coordLabel(k.played.x, k.played.y, r.game.size)])}</title>
                 </circle>
               ),
           )}
@@ -792,9 +740,9 @@ function KeyMove({ km }) {
                 {t("review.showPlayed")}
               </button>
             )}
-            {km.best && !km.best.pass && (
-              <button type="button" onClick={() => C.practiceThis(km)}>
-                {t("review.practiceThis")}
+            {C.canTry(km.index) && (
+              <button type="button" class="try-again" onClick={() => C.tryAgain(km.index)}>
+                {t("try.again")}
               </button>
             )}
           </div>
@@ -832,7 +780,7 @@ function LiveLine() {
         {t("review.estimateAt", [Math.max(0, C.reviewIndex())])} · {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
         {live && !r.live.done ? ` · ${t("review.liveSearching")}` : ""}
       </span>
-      {live && !r.variation && !r.guess && <span class="fine">{t("review.candidatesLegend")}</span>}
+      {live && !r.variation && <span class="fine">{t("review.candidatesLegend")}</span>}
     </div>
   );
 }
@@ -877,15 +825,129 @@ function Variations() {
 
 /** No key mistakes: praise only a player who did not fall behind. */
 function noMistakesText(r) {
-  if (r.meta.classic || r.meta.opening || r.meta.source === "import") return t("review.noKeyMovesNeutral");
+  if (r.meta.classic || !C.ownGame(r)) return t("review.noKeyMovesNeutral");
   const line = r.game.mainLine();
   const res = line[line.length - 1].result || "";
   const pts = r.points.filter(Boolean);
   const lead = pts.length ? pts[pts.length - 1].scoreLead : 0;
-  const me = r.meta.humanColor ?? (r.source === "current" && state.game?.opponent === "ai" ? state.game.humanColor : null);
+  const me = r.meta.humanColor ?? null;
   if (me == null) return t("review.noKeyMovesNeutral");
   const lost = res ? res.startsWith("B") !== (me === BLACK) : me * lead < -2;
   return lost ? t("review.noKeyMovesBehind") : t("review.noKeyMoves");
+}
+
+/** The result of the game, its facts and the change of your estimate: the review's first line. */
+function ResultLine() {
+  const r = state.review;
+  if (r.meta.classic) return null;
+  const line = r.game.mainLine();
+  const result = line[line.length - 1].result;
+  if (!result) return null;
+  const m = r.model;
+  const headline = m ? reviewHeadline(m) : C.resultText(result);
+  const rating = ratingChangeText(C.reviewRating());
+  return (
+    <header class="review-result" aria-live="polite">
+      <h2 class="result-big">{headline}</h2>
+      {m && <span class="fine">{reviewFacts(m)}</span>}
+      {rating && <span class="fine review-rating">{rating}</span>}
+    </header>
+  );
+}
+
+/** The key moments: KataGo's key mistakes, or the offline estimate's turning points only. */
+function Moments() {
+  const r = state.review;
+  const m = r.model;
+  if (r.analyzing) return null;
+  if (!m || m.confidence === "none") return <p class="muted">{t("report.noAnalysis")}</p>;
+  if (m.confidence !== "high") {
+    // v6 honesty: no loss and no better move from the estimate.
+    if (!m.moments.length) return <p class="muted">{t("review.noTurningPoints")}</p>;
+    return (
+      <section class="key-moves turning-points">
+        <h2 class="slot-title">{t("report.turningPoints")}</h2>
+        <ol>
+          {m.moments.map((mo) => {
+            const w = momentWords(m, mo);
+            return (
+              <li class={`key-move ${r.focus === mo.index ? "on" : ""}`}>
+                <button type="button" class="key-head" onClick={() => C.reviewGoto(mo.index)}>
+                  <Stone color={mo.color} size={12} />
+                  <span>
+                    {w.title} · {w.played}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    );
+  }
+  return (
+    <section class="key-moves">
+      {r.refining && <p class="fine">{t("story.refining")}</p>}
+      {r.keyMoves.length ? (
+        <>
+          <h2 class="slot-title">{t("report.moments")}</h2>
+          <ol>
+            {r.keyMoves.map((km) => (
+              <KeyMove km={km} />
+            ))}
+          </ol>
+        </>
+      ) : (
+        <p class="muted">{noMistakesText(r)}</p>
+      )}
+    </section>
+  );
+}
+
+/** A key moment tried again: the prompt, then KataGo's verdict. */
+function TryCard() {
+  const r = state.review;
+  const tr = r.trial;
+  const size = r.game.size;
+  const next = C.triable(r).some((m) => m.index > tr.index);
+  let text;
+  let tone = "";
+  if (tr.status === "open") text = t("try.prompt", [colorName(tr.color)]);
+  else if (tr.status === "judging") text = t("try.judging");
+  else if (tr.status === "good") {
+    text = t("try.good");
+    tone = "good";
+  } else {
+    text = t("try.bad", [formatPoints(tr.loss), tr.best ? coordLabel(tr.best.x, tr.best.y, size) : "—"]);
+    tone = "bad";
+  }
+  return (
+    <section class={`card try-card enter-up ${tone}`} aria-labelledby="try-title">
+      <h2 id="try-title" class="slot-title">
+        {t("try.title", [tr.index])}
+      </h2>
+      <p class="try-verdict" aria-live="polite">
+        {text}
+      </p>
+      <div class="actions wrap">
+        {tr.status === "bad" && (
+          <Button icon="undo" onClick={C.tryRetry}>
+            {t("try.again")}
+          </Button>
+        )}
+        {(tr.status === "good" || tr.status === "bad") && (
+          <Button kind={tr.status === "good" ? "secondary" : "ghost"} icon="next" onClick={C.tryNext}>
+            {next ? t("try.next") : t("try.done")}
+          </Button>
+        )}
+        {(tr.status === "open" || tr.status === "judging") && (
+          <Button kind="ghost" onClick={C.closeTrial}>
+            {t("try.stop")}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
 }
 
 /** Which review tab is open; remembered for the session, not saved. */
@@ -896,9 +958,9 @@ function ReviewPanel() {
   const meta = r.meta;
   const line = r.game.mainLine();
   const progress = r.analyzing ? Math.round((r.analyzed / line.length) * 100) : 100;
-  // The summary only says what the analysis can back: never for the
-  // offline estimate, which can only point at turning points.
-  const hasSummary = r.summary?.confidence === "high" && r.summary.phases?.length > 0;
+  // The phases only say what the analysis can back: never for the offline
+  // estimate, which can only point at turning points.
+  const hasSummary = !r.analyzing && !!r.model?.phases?.length;
   const tabs = [
     { value: "analysis", label: t("review.tab.analysis") },
     ...(hasSummary ? [{ value: "summary", label: t("review.tab.summary") }] : []),
@@ -909,47 +971,34 @@ function ReviewPanel() {
     reviewTab = v;
     update();
   };
+  // The game that just ended: the next game is the one primary action.
+  const ended = r.source === "current" && !!line[line.length - 1].result;
   return (
     <aside class="panel review-panel" aria-label={t("review.title")}>
-      {r.guess ? (
-        <GuessCard />
+      <ResultLine />
+      <Chart />
+      <LiveLine />
+      {/* v8: one quiet status line — the analysis, then where the game left the book. */}
+      <p class="fine review-status" aria-live="polite">
+        {(r.analyzing || r.engine !== "katago") && (
+          <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
+        )}
+        <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
+      </p>
+      {r.trial ? (
+        <TryCard />
       ) : (
         <>
-          <Chart />
-          <LiveLine />
-          {/* v8: one quiet status line — the analysis, then where the game left the book. */}
-          <p class="fine review-status" aria-live="polite">
-            {(r.analyzing || r.engine !== "katago") && (
-              <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
-            )}
-            <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
-          </p>
           <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
               <>
-                <section class="key-moves">
-                  {r.refining && <p class="fine">{t("story.refining")}</p>}
-                  {r.keyMoves.length ? (
-                    <ol>
-                      {r.keyMoves.map((km) => (
-                        <KeyMove km={km} />
-                      ))}
-                    </ol>
-                  ) : (
-                    !r.analyzing && <p class="muted">{noMistakesText(r)}</p>
-                  )}
-                </section>
+                <Moments />
                 <Variations />
                 {meta.classic && (
                   <section class="quiet-note">
                     <p>{C.tx(meta.classic.note)}</p>
                     {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
-                  </section>
-                )}
-                {meta.opening && (
-                  <section class="quiet-note">
-                    <p>{C.tx(meta.opening.text)}</p>
                   </section>
                 )}
               </>
@@ -966,51 +1015,71 @@ function ReviewPanel() {
       )}
 
       <div class="panel-foot">
-        <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
-          {t("review.playFromHere")}
-        </Button>
+        {ended ? (
+          <div class="actions">
+            <Button kind="primary" icon="plus" class="block" onClick={() => C.openNewGame()}>
+              {t("common.newGame")}
+            </Button>
+            <Button kind="ghost" icon="resume" onClick={C.playFromHere}>
+              {t("review.playFromHere")}
+            </Button>
+          </div>
+        ) : (
+          <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
+            {t("review.playFromHere")}
+          </Button>
+        )}
       </div>
     </aside>
   );
 }
 
-/** The game in three phases, and three things to remember. */
+/** The game in three phases (KataGo only), per player, and three things to remember. */
 function GameSummary() {
-  const r = state.review;
-  const sm = r.summary;
-  if (!sm || sm.confidence === "none" || !sm.phases?.length) return null;
-  const me = sm.humanColor === WHITE ? "white" : sm.humanColor === BLACK ? "black" : null;
-  const cols = me ? [me] : ["black", "white"];
-  const fmt = (v) => (v == null ? "—" : formatPoints(Math.round(v * 2) / 2));
+  const m = state.review.model;
+  if (!m?.phases?.length) return null;
   return (
     <section class="game-summary">
-      <table class="phase-table">
-        <thead>
-          <tr>
-            <th />
-            {cols.map((c) => (
-              <th>{me ? t("gameSummary.pointsLost") : <Stone color={c === "black" ? BLACK : WHITE} size={10} />}</th>
-            ))}
-            {me && <th>{t("gameSummary.mistakes")}</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {sm.phases.map((ph) =>
-            ph.from > ph.to ? null : (
-              <tr>
-                <th title={t("gameSummary.phaseMoves", [ph.from, ph.to])}>{t("phase." + ph.id)}</th>
-                {cols.map((c) => (
-                  <td>{fmt(ph.players[c].loss)}</td>
-                ))}
-                {me && <td>{ph.players[me].mistakes + ph.players[me].blunders || "—"}</td>}
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
-      {sm.takeaways?.length > 0 && (
+      {m.players.map((who) => (
+        <table class="phase-table">
+          <caption class="sr-only">{t("report.phasesOf", [t("common." + who)])}</caption>
+          <thead>
+            <tr>
+              <th scope="col">
+                {m.players.length > 1 && <Stone color={who === "black" ? BLACK : WHITE} size={10} />}
+                <span class="sr-only">{t("common." + who)}</span>
+              </th>
+              <th scope="col" title={t("report.lossHelp")}>
+                {t("gameSummary.pointsLost")}
+              </th>
+              <th scope="col" title={t("gameSummary.mistakesHelp", [MISTAKE, BLUNDER])}>
+                {t("gameSummary.mistakes")}
+              </th>
+              <th scope="col" title={t("gameSummary.accuracyHelp")}>
+                {t("gameSummary.accuracy")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {m.phases.map((ph) => {
+              const st = ph.players[who];
+              return (
+                <tr>
+                  <th scope="row" title={t("gameSummary.phaseMoves", [ph.from, ph.to])}>
+                    {t("phase." + ph.id)}
+                  </th>
+                  <td>{lossText(st.loss)}</td>
+                  <td>{st.mistakes + st.blunders || "—"}</td>
+                  <td>{accuracyText(st.accuracy)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ))}
+      {m.takeaways.length > 0 && (
         <ol class="takeaways">
-          {sm.takeaways.filter((tk) => tk.kind !== "estimate").slice(0, 3).map((tk) => (
+          {m.takeaways.slice(0, 3).map((tk) => (
             <li class={tk.tone}>
               {tk.index != null ? (
                 <button type="button" class="link" onClick={() => C.reviewGoto(tk.index)}>
@@ -1100,31 +1169,6 @@ function EditSection() {
       {r.edits?.target === null && <p class="fine">{t("edit.notSaved")}</p>}
     </section>
   );
-}
-
-function GuessCard() {
-  const r = state.review;
-  const g = r.guess;
-  const msg =
-    g.done ? t("guess.done", [g.right, g.tries]) : g.last === "right" ? t("guess.right") : g.last === "wrong" ? t("guess.wrong") : g.last === "revealed" ? t("guess.revealed") : t("guess.prompt");
-  return (
-    <section class={`card guess ${g.last || ""}`} aria-live="polite">
-      <h2>{t("review.guess")}</h2>
-      <p>{msg}</p>
-      <p class="fine">{t("guess.score", [g.right, g.tries])}</p>
-      {!g.done && (
-        <div class="actions">
-          <Button kind="ghost" onClick={C.revealGuess}>
-            {t("guess.reveal")}
-          </Button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-export function strengthName(id) {
-  return rankLabel(strengthById(id).id);
 }
 
 export { SHIFT, update };

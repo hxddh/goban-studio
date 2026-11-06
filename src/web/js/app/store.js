@@ -15,21 +15,26 @@ let scheduled = false;
 
 export const state = {
   ready: false,
-  space: "play", // play | practice | library
+  space: "play", // play | learn (docs/v9.md, "Two spaces")
   playMode: "game", // game | review
-  settings: null,
-  progress: null,
+  settings: null, // data/settings.js
+  profile: null, // the one player model (model/player.js), stored as profile.json
   engine: { kind: "offline", name: "", available: false },
   sheet: null, // null | { kind, ...props }
   menu: null, // open popover id
   toasts: [],
   announce: "",
-  game: null,
-  review: null,
-  report: null, // v6 report page (app/report-ctl.js)
-  practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
-  library: { tab: "mine", kind: "all", query: "" },
-  models: initialModels(), // v5 optional downloads (app/models-ctl.js)
+  game: null, // the game on the board (app/play-ctl.js)
+  review: null, // the review over a game, and the post-game review (app/review-ctl.js)
+  // Play: view "home" (the game in progress or the suggested game, the
+  // history, the classics, the explorer) or "game" (the board, which a
+  // finished game turns into its review); kind and query filter the
+  // history; explorer is the opening explorer.
+  play: { view: "home", kind: "all", query: "" },
+  // Learn: view "home" (the path) or one of its pages (catalog,
+  // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
+  learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },
+  models: initialModels(), // optional downloads (app/models-ctl.js)
 };
 
 export function update(fn) {
@@ -54,10 +59,15 @@ export function useAppState() {
 }
 
 let toastId = 0;
-export function toast(message, tone = "info", ms = 2600) {
+/**
+ * A short message. With `key`, a toast of that key already on screen is
+ * not shown again (a burst of failed writes is one toast).
+ */
+export function toast(message, tone = "info", ms = 2600, { key = null } = {}) {
+  if (key && state.toasts.some((x) => x.key === key)) return;
   const id = ++toastId;
   update((s) => {
-    s.toasts = [...s.toasts, { id, message, tone }];
+    s.toasts = [...s.toasts, { id, message, tone, key }];
   });
   setTimeout(() => {
     update((s) => {

@@ -1,27 +1,23 @@
 /**
  * Playing a game: the live board, the computer's replies and how they feel,
- * teaching aids, clocks, scoring, the end of the game and what follows it.
+ * teaching aids, clocks, scoring, and the end of the game: the same board
+ * turns into the post-game review (review-ctl.js), in place.
  */
 import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
-import * as Lib from "../library.js";
-import { addGameRecord, addMistake, saveProgress, updateGameRecord } from "../persist.js";
+import * as Games from "../data/games.js";
+import { addMistake, estimate, focus, implOpponent, recordGame, suggestedGame, themeLosses } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
-import { confirmAction, openSheet, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
-import { addWeakness, topWeaknesses, THEME_TOPIC } from "./insight.js";
+import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { ratingToRank } from "./rating.js";
-import { estimateNow, rateGame, recommendStrength, startEstimate } from "./strength.js";
-import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
-import { gameRecord, recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
-import { notePoints, queueReport } from "./report-ctl.js";
-import { themeLosses } from "./plan.js";
+import { describeMistakes, dropReview, openReview } from "./review-ctl.js";
+import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
 /* ------------------------------------------------------------ state */
@@ -29,10 +25,21 @@ import { hintReason, hintText, warningReason, warningText } from "./teach-why.js
 /** v7: the signal of everything a game queued (cancelled when it is replaced). */
 const gameSignal = (g) => Engine.sched.ownerSignal(g?.owner);
 
+/**
+ * v9: the opponent of a game from its meta: the implementation it was
+ * played with (`impl`) when the app still knows it, else what plays its
+ * `rank` now (the New game choice, or the `opponentRank` setting).
+ */
+export function opponentOf(meta = {}) {
+  if (meta.impl && Engine.impl(meta.impl)) return { rank: Engine.implLabel(meta.impl), impl: meta.impl };
+  const o = Engine.opponentFor(meta.rank ?? state.settings.opponentRank);
+  return { rank: o.label, impl: o.impl };
+}
+
 export function freshGameState(game, meta = {}) {
   // v7: a new game ends whatever the last one still had queued (its
-  // pondering, its post-game summary); a rated game's report carries on in
-  // the background (report-ctl queueReport).
+  // pondering); the last game's analysis carries on in the background
+  // (play/analysis.js).
   if (state.game?.owner) Engine.sched.cancelOwner(state.game.owner);
   return {
     owner: Engine.sched.newOwner("game"),
@@ -41,7 +48,9 @@ export function freshGameState(game, meta = {}) {
     name: meta.name || "",
     opponent: meta.opponent === "human" ? "human" : "ai",
     humanColor: meta.humanColor === WHITE ? WHITE : BLACK,
-    strength: meta.strength || state.settings.strength,
+    // v9: the opponent is a rank; `impl` is what plays it (opponents.js),
+    // `rank` the measured rank of that implementation, as shown.
+    ...opponentOf(meta),
     thinking: false,
     pondering: false,
     gen: 0,
@@ -59,14 +68,13 @@ export function freshGameState(game, meta = {}) {
     aiLow: 0,
     ghost: null, // two-click placement
     captureFx: null,
-    summary: null,
     analysis: null, // whole-game analysis, shared with review
     rated: !!meta.rated,
   };
 }
 
 export function restoreCurrent() {
-  const saved = Lib.loadCurrent();
+  const saved = Games.loadCurrent();
   if (saved?.sgf) {
     try {
       const { game } = loadSGF(saved.sgf);
@@ -81,17 +89,18 @@ export function restoreCurrent() {
   }
   // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
   // brand-new board takes the default ruleset and its komi.
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", strength: state.settings.strength });
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai" });
 }
 
 export function persistCurrent() {
   const g = state.game;
   if (!g) return;
-  Lib.saveCurrent(g.game, {
+  Games.saveCurrent(g.game, {
     recordId: g.recordId,
     humanColor: g.humanColor,
     opponent: g.opponent,
-    strength: g.strength,
+    rank: g.rank,
+    impl: g.impl,
     name: g.name,
     undos: g.undos,
     hints: g.hints,
@@ -106,23 +115,22 @@ function recordMeta(g) {
     name: g.name,
     humanColor: g.humanColor,
     opponent: g.opponent,
-    strength: g.opponent === "ai" ? g.strength : null,
+    rank: g.opponent === "ai" ? g.rank : null,
+    impl: g.opponent === "ai" ? g.impl : null,
     undos: g.undos,
     hints: g.hints,
     source: "game",
   };
 }
 
-/** Finished or explicitly saved games go to the library; nothing else does. */
+/**
+ * Finished or explicitly saved games go to the history (data/games.js);
+ * nothing else does. A write that fails is said once by the store's toast.
+ */
 export function saveToLibrary({ quiet = false } = {}) {
   const g = state.game;
   if (!g || g.game.moveNumber === 0) return null;
-  const rec = Lib.saveGame(g.game, recordMeta(g));
-  if (!rec) {
-    // v8: storage is full; say so instead of "Saved".
-    toast(t("toast.saveFailed"), "error");
-    return null;
-  }
+  const rec = Games.saveGame(g.game, recordMeta(g));
   g.recordId = rec.id;
   g.saved = true;
   persistCurrent();
@@ -147,25 +155,40 @@ function gameOver(g = state.game) {
 
 /* --------------------------------------------------------- new game */
 
-/** What to play next: size, strength and handicap from your rating. */
-export function recommendedGame() {
-  const p = state.progress;
+/**
+ * The opponent to suggest on one board: the player model's suggestion
+ * (model/player.js suggestedGame: the level you are expected to score
+ * about even against, and a handicap for what remains), as the rank of the
+ * ladder that plays it here (opponents.js). With autoStrength off, the
+ * rank last chosen. { size, opponentRank, label, handicap }.
+ */
+export function suggestedOpponent(size = 19) {
+  const installed = Engine.installed();
+  // The human-style levels play where they are installed (opponents.js prefers them).
+  const sg = suggestedGame(state.profile, { size, modeOf: () => (installed.human ? "human" : "standard") });
   const s = state.settings;
-  // v6: the level you are expected to score closest to even against, from
-  // the strength estimate and the levels' measured strengths (strength.js).
-  const est = p.rating?.mu != null ? p.rating : startEstimate(s.playerRank ?? 30);
-  const rank = ratingToRank(est.r);
-  const modeOf = (st) => Engine.opponentMode(st);
-  const strength = s.autoStrength ? recommendStrength(est, { size: 19, modeOf }) : s.strength;
-  // The standard board, always; strength and handicap close the gap. A
-  // 9×9 game is offered beside it as the quick option (its own level: the
-  // small board compresses the ladder).
-  const size = 19;
-  const handicap = Engine.suggestHandicap(rank, strength, size);
-  const weak = topWeaknesses(p.weakness, 1)[0] || null;
-  const quickStrength = s.autoStrength ? recommendStrength(est, { size: 9, modeOf }) : s.strength;
-  const quick = { size: 9, strength: quickStrength, handicap: Engine.suggestHandicap(rank, quickStrength, 9) };
-  return { size, strength, handicap, rank, weak, quick };
+  const pick = Engine.nearest(s.autoStrength === false ? s.opponentRank : sg.rank, installed);
+  const handicap = s.autoStrength === false ? Engine.suggestHandicap(playerRankNow(), pick.label, size) : sg.handicap;
+  return { size, opponentRank: pick.rank, label: pick.label, handicap };
+}
+
+/** Players around 20 kyu and weaker start on 9×9 (about ten minutes a game). */
+export const BEGINNER_RANK = 20;
+
+/**
+ * What to play next (Play's suggested game), and why: the week's first
+ * focus (model/player.js focus) or the player's level. A beginner is
+ * offered 9×9 with the standard board as the other option; everyone else
+ * the standard board, with a quick 9×9 game beside it.
+ * { size, opponentRank, label, handicap, rank, weak: { theme } | null, quick }.
+ */
+export function recommendedGame() {
+  const rank = playerRankNow();
+  const small = rank == null || rank >= BEGINNER_RANK;
+  const main = suggestedOpponent(small ? 9 : 19);
+  const view = focus(state.profile, Date.now());
+  const key = view.focus?.[0]?.key || null;
+  return { ...main, rank, weak: key ? { theme: key } : null, quick: suggestedOpponent(small ? 19 : 9) };
 }
 
 export function newGame(opts = {}) {
@@ -186,16 +209,20 @@ export function newGame(opts = {}) {
     game.playerBlack = humanColor === BLACK ? t("play.you") : "KataGo";
     game.playerWhite = humanColor === WHITE ? t("play.you") : "KataGo";
   }
-  const strength = opts.strength || state.settings.strength;
-  if (opts.strength) setSetting("strength", opts.strength);
+  // v9: the opponent is a rank of the ladder (opts.opponentRank).
+  const opponentRank = opts.opponentRank ?? state.settings.opponentRank;
+  if (opts.opponentRank != null) setSetting("opponentRank", opts.opponentRank);
   const tc = opts.timeControl ?? state.settings.timeControl;
   if (opts.timeControl) setSetting("timeControl", opts.timeControl);
   Engine.cancel();
-  if (state.game) state.game.gen++;
   remember();
+  // The last game's review: its analysis goes on in the background.
+  if (state.review) dropReview();
+  if (state.game) state.game.gen++;
   update((s) => {
-    s.game = freshGameState(game, { opponent, humanColor, strength, clock: newClock(tc), rated: opponent === "ai" });
+    s.game = freshGameState(game, { opponent, humanColor, rank: opponentRank, clock: newClock(tc), rated: opponent === "ai" });
     s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
     s.sheet = null;
     s.review = null;
   });
@@ -333,14 +360,21 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const started = performance.now();
   let result = { move: null, analysis: null };
   try {
-    result = await Engine.decide(g.game, g.strength, { signal: gameSignal(g) });
+    result = await Engine.decide(g.game, { rank: g.rank, impl: g.impl }, { signal: gameSignal(g) });
   } catch (_) {
     result = { move: null, analysis: null };
   }
   if (state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
   if (a) g.eval = a;
-  if (result.mode) g.opponentMode = result.mode; // v5: "human" | "strong" | "standard" | "offline"
+  if (result.mode) g.opponentMode = result.mode; // "human" | "strong" | "standard" | "offline"
+  // v9: what actually played (a standard level when an optional process
+  // could not answer): its measured rank is shown, and the game is rated
+  // against it.
+  if (result.impl && result.mode !== "offline") {
+    g.played = result.impl;
+    g.rank = Engine.implLabel(result.impl);
+  }
 
   // Teaching: a big drop after the player's move pauses the reply.
   if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {
@@ -369,7 +403,7 @@ async function reply(g, gen, result, started) {
   // out (feel.js resignStep).
   const aiColor = -g.humanColor;
   const empty = g.game.board.signMap.reduce((n, row) => n + row.filter((v) => !v).length, 0);
-  const verdict = resignStep(g.aiLow, { strengthId: g.strength, analysis: a, aiColor, moveNumber: g.game.moveNumber, size: g.game.size, empty });
+  const verdict = resignStep(g.aiLow, { rank: g.rank, analysis: a, aiColor, moveNumber: g.game.moveNumber, size: g.game.size, empty });
   g.aiLow = verdict.low;
   if (verdict.resign) {
     g.thinking = false;
@@ -385,7 +419,7 @@ async function reply(g, gen, result, started) {
   const quiet = !!a && !!mv && !mv.pass && a.moves.some((m) => m.visits > 0 && !m.pass && m.x === mv.x && m.y === mv.y);
   const ready = quiet && countReady(a, g.game.moveNumber + 1, g.game.size);
   // Pace the reply like a person: quick when obvious, slower when it is not.
-  const target = thinkTime(g.strength, a, g.game.moveNumber, g.game.size);
+  const target = thinkTime(g.rank, a, g.game.moveNumber, g.game.size);
   const wait = target - (performance.now() - started);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   if (state.game !== g || gen !== g.gen) return;
@@ -557,7 +591,8 @@ export function clockTick() {
   lastTick = now;
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
-  if (state.space !== "play" || playReviewing() || document.hidden) return;
+  // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
+  if (state.space !== "play" || state.play.view !== "game" || state.play.explorer || playReviewing() || document.hidden) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.
@@ -639,170 +674,111 @@ function finishGame() {
   if (won === true) Audio.win();
   else if (won === false) Audio.lose();
   else Audio.gameEnd?.();
-  // Rating: games against the computer with enough moves to mean something.
-  let rated = null;
-  if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
-    const p = state.progress;
-    const prev = p.rating || startEstimate(state.settings.playerRank ?? 30);
-    const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
-    // v6: against the level as it played (human-style or stronger network
-    // have their own measured strength; the offline engine counts as standard).
-    const mode = g.opponentMode === "human" || g.opponentMode === "strong" ? g.opponentMode : "standard";
-    p.rating = rateGame(prev, { level: g.strength, mode, size: g.game.size, handicap, won });
-    g.ratingDelta = p.rating.r - prev.r;
-    g.rated = false;
-    rated = { before: prev.r, after: p.rating.r, delta: g.ratingDelta };
-    saveProgress(p);
-    // v7: the estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
-    g.ratingChange = ratingChange(prev, p.rating);
-  }
   saveToLibrary({ quiet: true });
-  if (g.ratingChange && g.recordId) Lib.patchGame(g.recordId, { rating: g.ratingChange });
-  // v5: a compact record for the trends view; the analysis fills it in.
-  if (rated) {
-    const rec = gameRecord({ id: g.recordId, game: g.game, color: g.humanColor, opponent: g.strength, won, rating: rated });
-    if (addGameRecord(state.progress, rec)) g.trendId = rec.id;
+  // Rating: games against the computer with enough moves to mean something
+  // (model/player.js recordGame rates a game once, by its measured opponent).
+  if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
+    const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
+    // Against the implementation that played, by its measured strength
+    // (the offline engine counts as the standard level of the rank).
+    const impl = g.played || Engine.resolveOpponent({ rank: g.rank, impl: g.impl }, {}).id;
+    const size = g.game.size;
+    const now = Date.now();
+    const before = estimate(state.profile, { size, now });
+    const id = g.recordId || String(now);
+    changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent: implOpponent(impl, { size, handicap }) }));
+    const rec = state.profile.games.find((x) => x.id === id);
+    g.rated = false;
+    g.trendId = id;
+    if (rec?.rating) {
+      const after = estimate(state.profile, { size, now });
+      g.ratingDelta = rec.rating.delta;
+      // The estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
+      g.ratingChange = ratingChange(before, after);
+    }
   }
+  if (g.ratingChange && g.recordId) Games.patchGame(g.recordId, { rating: g.ratingChange });
   announce(resultText(result));
-  update();
-  // v7: a rated game gets its report in the background, so opening it is
-  // instant (report-ctl queueReport, after the summary's analysis).
-  const autoReport = !!rated && !!g.recordId;
-  // v6: the report waits for this analysis (report-ctl).
-  if (g.opponent === "ai") g.summaryJob = summarize(g, { autoReport });
-  else if (autoReport) queueReport(g.recordId);
+  // The same board turns into the post-game review, in place: its analysis
+  // is the game's one analysis (stored with it, play/analysis.js). Away
+  // from the board (the computer resigned meanwhile), when it is back.
+  showFinished();
 }
 
-/** v7: the strength estimate before and after a rated game, as the report shows it. */
-export function ratingChange(before, after, now = Date.now()) {
-  const a = estimateNow(before, now);
-  const b = estimateNow(after, now);
-  if (!a || !b) return null;
-  return { before: { r: a.r, rank: a.rank, pm: a.pm }, after: { r: b.r, rank: b.rank, pm: b.pm } };
-}
-
-/** The computer level as a title shows it ("≈ 12 kyu"). */
-function levelText(id) {
-  const r = Engine.rankParts(id);
-  return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
+/** The finished game on the board as its review: the result, the balance, the key moments. */
+export function openPostGame(g = state.game, { inPlace = true } = {}) {
+  if (!g || !g.game.mainLine().at(-1).result || g.game.mainLine().length < 2) return;
+  Engine.cancel();
+  g.gen++;
+  g.thinking = false;
+  openReview(g.game, { source: "current", humanColor: g.opponent === "ai" ? g.humanColor : null, points: g.analysis || null, inPlace, autoJump: true, space: "play" });
 }
 
 /**
- * After a game against the computer: analyse it in the background and say
- * three things — the biggest mistake, a good move, and what to practise.
- *
- * v7: a background job owned by the game (scheduler.js): a new game cancels
- * it, and its computer's move never waits behind it. The positions analysed
- * so far are handed to the report (report-ctl notePoints), which finishes
- * the analysis in the background when the game was rated.
+ * The board of Play shows the game in play; a finished one is its review.
+ * Called where Play's board comes back (history, the sidebar).
  */
-async function summarize(g, { autoReport = false } = {}) {
-  const recordId = g.recordId;
-  try {
-    if (!state.engine.available || g.game.mainLine().length < 8) return;
-    await summarizeAnalysis(g, recordId);
-  } finally {
-    if (autoReport) queueReport(recordId);
-  }
+export function showFinished() {
+  const g = state.game;
+  if (state.space !== "play" || state.play.view !== "game" || state.review || state.play.explorer) return;
+  if (g?.game.mainLine().at(-1).result && !g.scoring) openPostGame(g);
 }
 
-async function summarizeAnalysis(g, recordId) {
-  g.summary = { status: "analyzing", progress: 0 };
-  update();
-  const partial = new Array(g.game.mainLine().length).fill(null);
-  if (recordId) notePoints(recordId, partial, g.game);
-  const job = Engine.sched.startJob({
-    kind: "summary",
-    owner: g.owner,
-    title: () => t("sched.job.game", [levelText(g.strength)]),
-    meta: { recordId },
-    run: (job) =>
-      analyzeLine(g.game, {
-        visits: g.game.size === 19 ? 32 : 48,
-        signal: job.signal,
-        onPoint: (i, p) => {
-          partial[i] = p;
-        },
-        onProgress: (k, n) => {
-          job.setProgress(k / n);
-          if (state.game !== g || !g.summary) return;
-          g.summary.progress = k / n;
-          update();
-        },
-      }),
-  });
-  const points = await job.promise;
-  if (!points) {
-    // Cancelled (a new game, or from Settings): no summary.
-    if (g.summary?.status === "analyzing") g.summary = null;
-    if (state.game === g) update();
-    return;
-  }
-  if (recordId) notePoints(recordId, points, g.game);
-  if (state.game !== g) return;
-  g.analysis = points;
-  const mistakes = describeMistakes(g.game, points, g.humanColor);
-  const losses = mistakes.all;
-  const big = mistakes.top[0] || null;
-  // A good move: the player's move with the best result where it mattered most.
-  let good = null;
-  for (const m of losses) {
-    if (m.move.color !== g.humanColor || m.move.pass) continue;
-    const a = points[m.index - 1];
-    const spread = a?.moves?.length > 1 ? Math.abs(a.moves[0].scoreLead - a.moves[1].scoreLead) : 0;
-    if (m.loss <= 0.5 && spread >= 2 && (!good || spread > good.spread)) good = { ...m, spread };
-  }
-  learnFromGame({ game: g.game, points, humanColor: g.humanColor, recordId: g.recordId, trendId: g.trendId, mistakes });
-  const theme = mistakes.top.find((m) => m.theme)?.theme || null;
-  g.summary = { status: "done", big, good, theme, topic: theme ? THEME_TOPIC[theme] || null : null };
-  update();
+/** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */
+export function ratingChange(before, after) {
+  if (!before || !after) return null;
+  return { before: { r: before.r, rank: before.rank, pm: before.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } };
 }
 
 /**
- * What a rated game teaches, from its whole-game analysis: the trend record
- * in progress.games (per-phase losses, themes, v7 plan themeLoss), the
- * weaknesses, and the two costliest mistakes as drills (ids
- * `${recordId}-${index}`). The post-game summary does it; when a new game
- * cancelled the summary, the game's background report does (report-ctl).
- * Once per record: the library record is marked `learned`. Returns false
+ * What a game against the computer teaches, from its whole-game analysis:
+ * the game's record in the player model (per-phase losses, themes and what
+ * each cost, model/player.js recordGame), and the two costliest mistakes
+ * as drills (ids `${gameId}-${index}`). The analysis does it when it is
+ * stored (play/analysis.js storeAnalysis), in the review or in the
+ * background. Once per game: its file is marked `learned`. Returns false
  * when it was already done.
  */
 export function learnFromGame({ game, points, humanColor, recordId = null, trendId = recordId, mistakes = null }) {
-  const lib = recordId ? Lib.getGame(recordId) : null;
+  const lib = recordId ? Games.getGame(recordId) : null;
   if (lib?.learned) return false;
   mistakes = mistakes || describeMistakes(game, points, humanColor);
-  // v5: complete the game's trend record with per-phase losses and the
-  // themes of up to ten explained mistakes.
-  if (trendId && (state.progress.games || []).some((r) => r.id === String(trendId))) {
-    const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
-    const ten = describeMistakes(game, points, humanColor, 10).top;
-    const themes = themeCounts(ten, humanColor);
-    // v7 plan: also what each theme cost, for "this week's focus".
-    updateGameRecord(state.progress, trendId, { ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) }, { save: false });
-  }
-  // Record weaknesses and keep the two costliest mistakes as drills.
-  let weak = state.progress.weakness;
-  for (const m of mistakes.top) if (m.theme) weak = addWeakness(weak, m.theme);
-  state.progress.weakness = weak;
-  const key = recordId || String(Date.now());
-  const sgf = game.toSGF();
-  for (const m of mistakes.top.slice(0, 2)) {
-    if (m.loss < 4 || !m.best || m.best.pass) continue;
-    addMistake(state.progress, {
-      gameKey: key,
-      index: m.index,
-      sgf,
-      color: m.move.color,
-      played: { x: m.move.x, y: m.move.y },
-      best: { x: m.best.x, y: m.best.y },
-      accept: m.accept,
-      loss: m.loss,
-      theme: m.theme,
-      size: game.size,
-    });
-  }
-  saveProgress(state.progress);
-  if (lib) Lib.patchGame(recordId, { learned: true });
+  const now = Date.now();
+  changeProfile((profile) => {
+    let p = profile;
+    // Complete the game's record with per-phase losses and the themes of
+    // up to ten explained mistakes, and what each theme cost (the focus).
+    if (trendId && p.games.some((r) => r.id === String(trendId))) {
+      const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
+      const ten = describeMistakes(game, points, humanColor, 10).top;
+      const themes = themeCounts(ten, humanColor);
+      p = recordGame(p, { id: String(trendId), ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) });
+    }
+    // The two costliest mistakes become drills.
+    const gameId = recordId || String(now);
+    const sgf = game.toSGF();
+    for (const m of mistakes.top.slice(0, 2)) {
+      if (m.loss < 4 || !m.best || m.best.pass) continue;
+      p = addMistake(
+        p,
+        {
+          gameId,
+          index: m.index,
+          sgf,
+          color: m.move.color,
+          played: { x: m.move.x, y: m.move.y },
+          best: { x: m.best.x, y: m.best.y },
+          accept: m.accept,
+          loss: m.loss,
+          theme: m.theme,
+          size: game.size,
+        },
+        now,
+      );
+    }
+    return p;
+  });
+  if (lib) Games.patchGame(recordId, { learned: true });
   return true;
 }
 
@@ -814,7 +790,7 @@ export function resultHeadline(g) {
   return won === null ? resultText(r) : won ? t("result.youWon") : t("result.youLost");
 }
 
-/** Open the review of the game just played, reusing the summary analysis. */
+/** Open the review of the game on the board ("Review so far", or the game that ended). */
 export function reviewCurrentGame() {
   const g = state.game;
   if (!g || g.game.mainLine().length < 2) return;
@@ -856,10 +832,13 @@ export async function saveText(filename, text, mime = "text/plain") {
 
 export function continueCurrent() {
   remember();
+  if (state.review) dropReview();
   update((s) => {
     s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
     s.review = null;
   });
+  showFinished();
   maybeComputerMove();
   ponder();
 }
