@@ -700,7 +700,7 @@ function finishGame() {
 
 /** The finished game on the board as its review: the result, the balance, the key moments. */
 export function openPostGame(g = state.game, { inPlace = true } = {}) {
-  if (!g || !g.game.current.result || g.game.mainLine().length < 2) return;
+  if (!g || !g.game.mainLine().at(-1).result || g.game.mainLine().length < 2) return;
   Engine.cancel();
   g.gen++;
   g.thinking = false;
@@ -714,7 +714,7 @@ export function openPostGame(g = state.game, { inPlace = true } = {}) {
 export function showFinished() {
   const g = state.game;
   if (state.space !== "play" || state.play.view !== "game" || state.review || state.play.explorer) return;
-  if (g?.game.current.result && !g.scoring) openPostGame(g);
+  if (g?.game.mainLine().at(-1).result && !g.scoring) openPostGame(g);
 }
 
 /** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */

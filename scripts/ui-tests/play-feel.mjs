@@ -21,8 +21,8 @@ export const V8_BUDGET = {
   coldStart: 800, // median of three: navigation to the first screen
   firstComputerMove: [350, 2500], // a fake KataGo host: the reply is paced, never instant
   explorerOpen: 1500, // first use of the opening book, fetched on demand
-  reportStored: 500, // a report made in the background opens at once
-  reportFresh: 4000, // a 150-move game without one, made on the spot (offline estimate)
+  reviewStored: 500, // a game whose analysis is stored opens in its review at once
+  reviewFresh: 4000, // a 150-move game without one, analysed on the spot (offline estimate)
 };
 
 /**
@@ -166,7 +166,6 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     page.on("request", (r) => r.url().includes("book.json") && fetched.push(r.url()));
     await onboard(page, 1);
     await page.keyboard.press("Control+1");
-    await page.locator(".tabs-row .segmented button").filter({ hasText: "Explorer" }).click();
     const t0 = Date.now();
     await page.click("[data-explorer=whole]");
     await page.waitForSelector(".explorer-panel .explorer-row");
@@ -181,9 +180,9 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
   });
 
   /** A finished 19×19 game of `moves` moves against the computer, in storage. */
-  async function seedGame(page, moves, report = null) {
+  async function seedGame(page, moves) {
     await page.evaluate(
-      ({ moves, report }) => {
+      ({ moves }) => {
         const L = "abcdefghijklmnopqrs";
         let sgf = "(;GM[1]FF[4]SZ[19]KM[6.5]RU[Japanese]RE[W+R]PB[You]PW[KataGo]";
         let i = 0;
@@ -192,40 +191,40 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
         const at = Date.now();
         // One game file in the browser preview's store (data/games.js).
         const game = { id: "seed", createdAt: at, updatedAt: at, finishedAt: at, source: "game", sgf, meta: { opponent: "ai", rank: 12, impl: "L:10k", humanColor: 1, size: 19, moves, result: "W+R", name: "Seed", thumb: "" } };
-        if (report) game.review = report;
         localStorage.setItem("goban9:games/seed.json", JSON.stringify(game));
       },
-      { moves, report },
+      { moves },
     );
     await page.reload();
     await page.waitForSelector(".page, canvas.board");
   }
-  async function openReport(page) {
+  /** Open the game from Play's history: its review, with the analysis done. */
+  async function openFromHistory(page) {
     await page.keyboard.press("Control+1");
-    await page.locator(".game-item [aria-haspopup]").first().click();
+    await page.waitForSelector(".game-row");
     const t0 = Date.now();
-    await page.locator("[role=menuitem]").filter({ hasText: "Report" }).first().click();
-    await page.waitForFunction(() => window.__state.report?.status === "done", null, { timeout: 15000 });
-    await page.waitForSelector(".report");
+    await page.click(".game-row >> nth=0");
+    await page.waitForFunction(() => window.__state.review && !window.__state.review.analyzing && window.__state.review.model, null, { timeout: 15000 });
+    await page.waitForSelector(".review-layer .review-result");
     return Date.now() - t0;
   }
 
-  await check("play budgets: a game's report opens within budget, made on the spot or in the background", async () => {
+  await check("play budgets: a game from the history opens in its review within budget, analysed on the spot or stored", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await seedGame(page, 150);
-    const freshMs = await openReport(page);
-    assert(freshMs < V8_BUDGET.reportFresh, `report made on the spot ${freshMs} ms > ${V8_BUDGET.reportFresh}`);
+    const freshMs = await openFromHistory(page);
+    assert(freshMs < V8_BUDGET.reviewFresh, `analysed on the spot ${freshMs} ms > ${V8_BUDGET.reviewFresh}`);
     // It is stored with its game now; opening it again is instant.
     await page.waitForFunction(() => !!JSON.parse(localStorage.getItem("goban9:games/seed.json")).review, null, { timeout: 3000 });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("goban9:games/seed.json")));
-    assert(stored.review && Array.isArray(stored.analysis) && stored.analysis.length === 151, "the report and its analysis were stored in the game's file");
+    assert(stored.review && Array.isArray(stored.analysis) && stored.analysis.length === 151, "the review and its analysis were stored in the game's file");
     await page.reload();
     await page.waitForSelector(".page, canvas.board");
-    const storedMs = await openReport(page);
-    assert(storedMs < V8_BUDGET.reportStored, `stored report ${storedMs} ms > ${V8_BUDGET.reportStored}`);
+    const storedMs = await openFromHistory(page);
+    assert(storedMs < V8_BUDGET.reviewStored, `stored review ${storedMs} ms > ${V8_BUDGET.reviewStored}`);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
-    return `made ${freshMs} ms, stored ${storedMs} ms`;
+    return `analysed ${freshMs} ms, stored ${storedMs} ms`;
   });
 }

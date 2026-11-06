@@ -582,6 +582,18 @@ function ReviewNav() {
   );
 }
 
+/**
+ * The moments the chart marks: KataGo's key mistakes (with their stories),
+ * or the offline estimate's turning points (v6: nothing more), never while
+ * the analysis is still running.
+ */
+function chartMoments(r) {
+  const m = r.model;
+  if (r.analyzing || !m || m.confidence === "none") return [];
+  if (m.confidence === "high") return r.keyMoves.map((km) => ({ index: km.index, color: km.move.color, played: km.move, km }));
+  return m.moments.map((mo) => ({ index: mo.index, color: mo.color, played: mo.played, km: null }));
+}
+
 function Chart() {
   const r = state.review;
   const pts = r.points;
@@ -628,7 +640,7 @@ function Chart() {
           {started && <path d={d} class="chart-line" />}
           {cur >= 0 && <line x1={x(cur)} x2={x(cur)} y1="0" y2={H} class="chart-cursor" />}
           {hover != null && <line x1={x(hover)} x2={x(hover)} y1="0" y2={H} class="chart-hover" />}
-          {r.keyMoves.map(
+          {chartMoments(r).map(
             (k) =>
               pts[k.index] && (
                 <circle
@@ -638,10 +650,11 @@ function Chart() {
                   class="chart-key"
                   onClick={(e) => {
                     e.stopPropagation();
-                    C.focusMistake(k);
+                    if (k.km) C.focusMistake(k.km);
+                    else C.reviewGoto(k.index);
                   }}
                 >
-                  <title>{t("review.moveLabel", [k.index, colorName(k.move.color), coordLabel(k.move.x, k.move.y, r.game.size)])}</title>
+                  <title>{t("review.moveLabel", [k.index, colorName(k.color), coordLabel(k.played.x, k.played.y, r.game.size)])}</title>
                 </circle>
               ),
           )}

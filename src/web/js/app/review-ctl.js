@@ -245,7 +245,7 @@ export function closeReview() {
   if (!r) return;
   settleLive(r);
   saveEdits(r);
-  if (r.source === "current" && state.game?.game === r.game && state.game.game.current.result) {
+  if (r.source === "current" && state.game?.game === r.game && r.game.mainLine().at(-1).result) {
     remember();
     dropReview(r);
     update((s) => {
