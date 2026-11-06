@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { weekStart, weekSummary } from "../src/web/js/app/week.js";
+import { weekStart } from "../src/web/js/app/week.js";
 import { rankToRating, ratingToRank } from "../src/web/js/app/rating.js";
 import { expectedScore, levelTheta, migrateEstimate, rateGame, startEstimate } from "../src/web/js/app/strength.js";
 import { newClock, tick, moveMade, formatClock } from "../src/web/js/app/clock.js";
@@ -36,18 +36,12 @@ async function test(name, fn) {
 
 const empty = (n) => Array.from({ length: n }, () => Array(n).fill(0));
 
-await test("v5: this week counts games, problems, lessons and the level change since Monday", () => {
+await test("the week begins on Monday at 00:00 local time", () => {
   const now = new Date(2026, 10, 4, 15, 0); // Wednesday
   const mon = weekStart(now);
   assert.equal(new Date(mon).getDay(), 1);
-  const prog = {
-    problems: { a: { solved: true, last: mon + 1000 }, b: { solved: true, last: mon - 1000 }, c: { solved: false, last: mon + 5 } },
-    lessons: { x: { done: true, at: mon + 10 }, y: { done: false, at: mon + 10 } },
-    rating: { history: [{ at: mon - 5000, r: 100 }, { at: mon + 100, r: 130 }] },
-  };
-  const games = [{ result: "B+R", updatedAt: mon + 1 }, { result: null, updatedAt: mon + 2 }, { result: "W+3", updatedAt: mon - 2, source: "game" }, { result: "B+1", source: "import", updatedAt: mon + 3 }];
-  assert.deepEqual(weekSummary(prog, games, now), { since: mon, played: 1, solved: 1, lessons: 1, delta: 30 });
-  assert.equal(weekSummary({}, [], now).delta, null);
+  assert.equal(new Date(mon).getHours(), 0);
+  assert.equal(weekStart(new Date(mon)), mon);
 });
 
 await test("ranks and ratings map both ways on the EGF scale", () => {

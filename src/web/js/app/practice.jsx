@@ -1,5 +1,5 @@
 /**
- * Practice: the course, problem collections and today's five.
+ * Practice: the course, problem topics and today's five.
  */
 import { useState } from "preact/hooks";
 import { BLACK } from "../rules.js";
@@ -11,7 +11,6 @@ import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { DailyDots, FocusRow } from "./today.jsx";
-import { CollectionPage, YourCollections } from "./collections.jsx";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
@@ -24,7 +23,6 @@ export function PracticeView() {
   if (v === "topic") return <TopicPage />;
   if (v === "mistake") return <MistakeView />;
   if (v === "dailyDone") return <DailyDone />;
-  if (v === "collection") return <CollectionPage />;
   if (v === "capture") return <CaptureView />;
   return <PracticeHome />;
 }
@@ -158,8 +156,6 @@ function PracticeHome() {
             </div>
           </section>
         )}
-
-        <YourCollections />
       </div>
     </>
   );
@@ -330,7 +326,6 @@ function MistakeView() {
     lastMove: D.status === "right" ? D.last : node.move,
     marks,
     showCoords: state.settings.coords,
-    material: state.settings.board,
     view: null,
     hoverColor: m.color,
     interactive: D.status !== "right" && D.status !== "revealed",
@@ -400,7 +395,6 @@ function puzzleModel(P, extra = {}) {
     variation,
     moveNumbers: null,
     showCoords: false,
-    material: state.settings.board,
     view: pz.view,
     hoverColor: P.st.toMove,
     interactive: P.status === "open" && !P.busy && !P.answer,
@@ -528,14 +522,11 @@ function ProblemView() {
   const P = pr.problem;
   const def = P.def;
   const daily = pr.daily;
-  // v7: a problem from your own collection is browsed in that collection.
-  const own = def.collection ? C.getCollection(def.collection) : null;
-  const list = own ? own.problems : state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
+  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
   const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
-  if (!daily && own) crumbs.push({ label: own.name, onClick: () => C.openCollection(own.id) });
-  else if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
+  if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
     <Toolbar crumbs={crumbs} title={daily ? t("practice.daily") : C.tx(def.title)} sub={daily ? t("practice.dailyOf", [daily.index + 1, daily.items.length]) : t("practice.ofN", [n, list.length])} />
@@ -604,7 +595,6 @@ function LessonView() {
       variation: null,
       moveNumbers: null,
       showCoords: false,
-      material: state.settings.board,
       view: cur.pz.view,
       hoverColor: cur.kind === "place" && cur.result !== "right" ? cur.toMove : null,
       interactive: cur.kind === "place" && cur.result !== "right",

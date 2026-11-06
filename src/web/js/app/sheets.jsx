@@ -11,7 +11,7 @@ import * as Models from "../models.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel } from "./play.jsx";
-import { estimateLabel } from "./strength-chart.jsx";
+import { estimateLabel } from "./estimate-label.js";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 
@@ -342,18 +342,6 @@ function SettingsSheet({ pane: open }) {
             <>
               <section class="settings-group">
                 <h3>{t("settings.boardGroup")}</h3>
-                <div class="row">
-                  <span>{t("settings.board")}</span>
-                  <div class="swatches" role="radiogroup" aria-label={t("settings.board")}>
-                    {["plain", "wood", "ink"].map((m) => (
-                      <button type="button" role="radio" aria-checked={s.board === m} class={`swatch ${m} ${s.board === m ? "on" : ""}`} onClick={() => set("board", m)}>
-                        <i />
-                        <span>{t("settings.material." + m)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Switch label={t("settings.flatStones")} checked={!!s.flatStones} onChange={(v) => set("flatStones", v)} />
                 <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
                 <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
               </section>
@@ -724,17 +712,15 @@ function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   );
 }
 
-function RenameSheet({ id, name, title, onSave }) {
+function RenameSheet({ id, name }) {
   const [value, setValue] = useState(name || "");
   const save = () => {
-    // v7: a collection (or anything else) can bring its own save.
-    if (onSave) onSave(value.trim());
-    else C.renameRecord(id, value.trim());
+    C.renameRecord(id, value.trim());
     update({ sheet: null });
   };
   return (
     <Modal
-      title={title || t("library.rename")}
+      title={t("library.rename")}
       footer={
         <>
           <Button kind="ghost" onClick={C.closeSheet}>

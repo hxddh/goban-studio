@@ -11,7 +11,6 @@ import { V7_SCHEDULER } from "./messages/v7-scheduler.js";
 import { V7_PLAN } from "./messages/v7-plan.js";
 import { V7_CALIBRATION } from "./messages/v7-calibration.js";
 import { V7_BOOK } from "./messages/v7-book.js";
-import { V7_PROBLEMS } from "./messages/v7-problems.js";
 import { V8_BEGINNER } from "./messages/v8-beginner.js";
 import { V8_TEACHING } from "./messages/v8-teaching.js";
 import { V8_FEEL } from "./messages/v8-feel.js";
@@ -127,16 +126,8 @@ export const MESSAGES = {
   "review.showPlayed": m("实战", "As played", "실전", "実戦"),
   "review.showBetter": m("更好的下法", "Better line", "더 나은 수", "より良い手順"),
   "review.ownership": m("形势判断", "Show territory estimate", "형세 판단", "形勢判断"),
-  "review.guess": m("猜下一手", "Guess the next move", "다음 수 맞히기", "次の一手を当てる"),
   "review.playFromHere": m("从这里继续下", "Play from here", "여기서 이어 두기", "ここから打つ"),
 
-  "guess.prompt": m("下出你认为的下一手。", "Play the move you think comes next.", "다음 수라고 생각하는 곳에 두세요.", "次の一手だと思う所に打ってください。"),
-  "guess.right": m("对了。", "That's it.", "맞았습니다.", "正解です。"),
-  "guess.wrong": m("不是这里，再想想。", "Not this one. Try again.", "여기가 아닙니다. 다시 생각해 보세요.", "ここではありません。もう一度。"),
-  "guess.revealed": m("已经显示了这一手。", "Shown. On to the next.", "이 수를 보여 주었습니다.", "この手を表示しました。"),
-  "guess.reveal": m("看这一手", "Show the move", "이 수 보기", "この手を見る"),
-  "guess.done": m("看完了：猜中 {0} 手，共尝试 {1} 次。", "Finished: {0} right in {1} tries.", "끝났습니다. {1}번 시도해 {0}수를 맞혔습니다.", "終了：{1}回の挑戦で{0}手正解しました。"),
-  "guess.score": m("猜中 {0} / {1}", "{0} right of {1} tries", "{1}번 중 {0}번 정답", "{1}回中{0}回正解"),
 
   "area.top": m("上边", "on the top side", "위쪽 변", "上辺"),
   "area.bottom": m("下边", "on the bottom side", "아래쪽 변", "下辺"),
@@ -232,7 +223,6 @@ export const MESSAGES = {
   "topic.technique": m("手筋", "Techniques", "맥", "手筋"),
   "topic.technique.desc": m("扑、挤、夹等常用手筋。", "Throw-ins, squeezes and other tesuji.", "먹여치기, 조이기 같은 맥.", "ホウリコミ、シボリなどの手筋。"),
 
-  "library.caption": m("你的对局、名局和职业布局。", "Your games, classic games and pro openings.", "내 대국, 명국, 프로 포석.", "あなたの対局、名局、プロの布石。"),
   "library.import": m("导入 SGF", "Import SGF", "SGF 가져오기", "SGFを読み込む"),
   "library.inProgress": m("进行中的对局", "Game in progress", "진행 중인 대국", "対局中"),
   "library.continueTitle": m("{0} 路 · 第 {1} 手", "{0}×{0} · move {1}", "{0}줄 · {1}수째", "{0}路 · {1}手目"),
@@ -241,8 +231,6 @@ export const MESSAGES = {
   "library.twoPlayers": m("两人对局", "Two-player game", "두 사람 대국", "二人での対局"),
   "library.mine": m("我的棋局", "My games", "내 대국", "自分の対局"),
   "library.classics": m("名局", "Classic games", "명국", "名局"),
-  "library.openings": m("职业布局", "Pro openings", "프로 포석", "プロの布石"),
-  "library.openingsHelp": m("四十盘职业对局的前八手。打开后猜黑棋的每一手。", "The first eight moves of forty professional games. Open one and guess each black move.", "프로 대국 40판의 첫 여덟 수. 열고 흑의 수를 맞혀 보세요.", "プロの対局40局の最初の八手。開いて黒の手を当ててください。"),
   "library.filter": m("筛选", "Filter", "필터", "絞り込み"),
   "library.kind.all": m("全部", "All", "전체", "すべて"),
   "library.kind.won": m("赢", "Won", "승", "勝ち"),
@@ -267,11 +255,6 @@ export const MESSAGES = {
   "settings.auto": m("跟随系统", "System", "시스템", "システム"),
   "settings.light": m("浅色", "Light", "밝게", "ライト"),
   "settings.dark": m("深色", "Dark", "어둡게", "ダーク"),
-  "settings.board": m("棋盘", "Board", "바둑판", "碁盤"),
-  "settings.material.plain": m("素", "Plain", "무지", "無地"),
-  "settings.material.wood": m("淡木", "Light wood", "옅은 나무", "淡い木目"),
-  "settings.material.ink": m("墨", "Ink", "먹", "墨"),
-  "settings.flatStones": m("高对比度棋子", "High-contrast stones", "고대비 바둑돌", "高コントラストの石"),
   "settings.coordinates": m("显示坐标", "Coordinates", "좌표 표시", "座標を表示"),
   "settings.moveNumbers": m("显示手数", "Move numbers", "수순 번호", "手数を表示"),
   "settings.sound": m("落子声音", "Stone sounds", "착수 소리", "石音"),
@@ -348,7 +331,6 @@ export const MESSAGES = {
   "today.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
   "today.levelGames": m("根据 {0} 盘对局估计", "Estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
   "today.levelStart": m("和电脑下几盘，这里会显示你的棋力变化。", "Play a few games against the computer and your level will appear here.", "컴퓨터와 몇 판 두면 기력 변화가 여기에 나타납니다.", "コンピュータと何局か打つと、棋力の変化がここに表示されます。"),
-  "today.progressLabel": m("棋力变化", "Level over time", "기력 변화", "棋力の推移"),
   "today.workOn": m("值得练的地方", "Worth practising", "보완할 점", "練習ポイント"),
   "today.seenN": m("最近出现 {0} 次", "came up {0} times lately", "최근 {0}번 나옴", "最近{0}回"),
   "today.noWeak": m("复盘几盘棋后，这里会列出你常犯的错误类型。", "After a few reviewed games, the kinds of mistakes you make most will show up here.", "몇 판을 복기하면 자주 하는 실수 유형이 여기에 표시됩니다.", "何局か検討すると、よくある間違いの種類がここに表示されます。"),
@@ -709,11 +691,6 @@ export const MESSAGES = {
   "practice.recordNew": m("第一次做", "First try", "처음 풉니다", "初挑戦"),
   "practice.recordSolved": m("已解出 · 尝试 {0} 次", "Solved · {0} tries", "해결 · {0}번 시도", "正解済み · {0} 回"),
   "practice.recordTried": m("尝试 {0} 次，还没解出", "{0} tries, not solved yet", "{0}번 시도, 아직 못 풂", "{0} 回挑戦、まだ未正解"),
-  "week.title": m("本周", "This week", "이번 주", "今週"),
-  "week.games": m("盘对局", "games", "대국", "局"),
-  "week.problems": m("道题解出", "problems solved", "문제 해결", "問 正解"),
-  "week.lessons": m("节课学完", "lessons", "강의 완료", "講座 修了"),
-  "week.level": m("棋力变化", "level change", "기력 변화", "棋力の変化"),
   "backup.title": m("备份", "Backup", "백업", "バックアップ"),
   "backup.export": m("导出备份…", "Export backup…", "백업 내보내기…", "バックアップを書き出す…"),
   "backup.import": m("从备份恢复…", "Restore from backup…", "백업에서 복원…", "バックアップから復元…"),
@@ -739,7 +716,6 @@ export const MESSAGES = {
   "settings.pane.data": m("数据", "Data", "데이터", "データ"),
   "settings.pane.about": m("关于", "About", "정보", "情報"),
   "settings.boardGroup": m("棋盘与棋子", "Board and stones", "바둑판과 돌", "碁盤と石"),
-  "week.empty": m("这周还没有下棋或做题。", "Nothing played or solved yet this week.", "이번 주에는 아직 대국이나 문제 풀이가 없습니다.", "今週はまだ対局も問題もありません。"),
   // v5 rules
   "rules.title": m("规则", "Rules", "규칙", "ルール"),
   "rules.default": m("新对局的规则", "Rules for new games", "새 대국의 규칙", "新しい対局のルール"),
@@ -1104,7 +1080,6 @@ export const MESSAGES = {
   ...V7_PLAN,
   ...V7_CALIBRATION,
   ...V7_BOOK,
-  ...V7_PROBLEMS,
   // v8: one file per area (src/web/js/messages/v8-*.js).
   ...V8_BEGINNER,
   ...V8_TEACHING,

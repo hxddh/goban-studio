@@ -5,24 +5,23 @@
  * history restore, the library and onboarding, and re-exports the play,
  * review and practice controllers. None of it touches the DOM.
  */
-import { BLACK, Game, formatPoints } from "../rules.js";
+import { BLACK, formatPoints } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Lib from "../library.js";
-import { DEFAULT_SETTINGS, clearAll, loadProgress, loadSettings, markClassic, migrate, saveProgress, saveSettings } from "../persist.js";
+import { DEFAULT_SETTINGS, clearAll, loadProgress, loadSettings, markClassic, saveProgress, saveSettings } from "../persist.js";
 import { detectLang, setLang, t } from "../i18n.js";
 import * as Backup from "../persist.js";
 import { APP_VERSION } from "../version.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
-import { OPENINGS } from "../content/openings.js";
 import { CLASSICS } from "../content/classics.js";
 import { state, update, toast } from "./store.js";
 import { applyAppearance, confirmAction, remember, isRestoring, setRestorer, setSetting, syncMenus, tx } from "./ctl-core.js";
 import { migrateEstimate, recommendStrength, startEstimate } from "./strength.js";
 import { continueCurrent, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, openCollection, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
+import { allLessons, openLesson, openMistakeDrill, openProblem, openShape, openTopic, practiceHome, startDaily } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { dropReport, forgetReportCheck, restoreReport } from "./report-ctl.js";
@@ -38,18 +37,16 @@ export * from "./update-ctl.js";
 export * from "./models-ctl.js";
 export * from "./report-ctl.js";
 export * from "./report-batch.js";
-export * from "./collections-ctl.js";
 
 export * from "./explorer-ctl.js";
 export * from "./plan-ctl.js";
 export * from "./capture-ctl.js"; // v8 beginner path
 import { resumeCapture } from "./capture-ctl.js";
-export { OPENINGS, CLASSICS, formatPoints };
+export { CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
 
 export function boot() {
-  migrate();
   const settings = loadSettings();
   if (!settings.lang) settings.lang = detectLang();
   state.settings = settings;
@@ -65,7 +62,6 @@ export function boot() {
   }
   setLang(settings.lang);
   Audio.setSound(settings.sound);
-  Audio.setMaterial?.(settings.board);
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
@@ -140,7 +136,6 @@ function restore(loc) {
     if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
     else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
     else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
-    else if (p.view === "collection" && p.collection) openCollection(p.collection);
     else if (p.view === "capture") resumeCapture({ from: p.captureFrom });
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
@@ -151,7 +146,6 @@ function restore(loc) {
     if (rv.source === "current") reviewCurrentGame();
     else if (rv.source === "record" && rv.recordId) openRecord(rv.recordId);
     else if (rv.source === "classic" && rv.classicId) openClassic(rv.classicId);
-    else if (rv.source === "opening" && rv.openingId) openOpening(rv.openingId);
     if (state.review && rv.index >= 0) reviewGoto(rv.index);
   }
   // v6: the report page, when the entry had one open.
@@ -183,15 +177,6 @@ export function openClassic(id) {
   } catch (e) {
     toast(t("library.importError"), "error");
   }
-}
-
-export function openOpening(id) {
-  const o = OPENINGS.find((g) => g.id === id);
-  if (!o) return;
-  const game = new Game({ size: o.size || 19, komi: o.komi ?? 6.5 });
-  if (o.setup?.length) game.setup(o.setup, o.toMove);
-  for (const m of o.line) game.play(m.x, m.y, { color: m.c, force: true });
-  openReview(game, { source: "opening", opening: o, openingId: o.id, startAt: 0, guess: true, guessColor: o.toMove, space: "library", back: "library" });
 }
 
 export function deleteRecord(id) {

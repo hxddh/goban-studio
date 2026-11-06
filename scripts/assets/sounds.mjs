@@ -211,17 +211,6 @@ export function placeWood(seed, { pitch, hard }) {
   return finish(room(out, r));
 }
 
-export function placeSoft(seed, { pitch, hard }) {
-  const r = rng(seed);
-  const exc = buffer(0.32);
-  const t0 = 0.002;
-  pulse(exc, t0, 0.7 + (1 - hard) * 0.5, 1);
-  burst(exc, t0, 0.5, 0.06, r);
-  const body = modal(exc, boardModes(r, { pitch: pitch * 0.92, top: 2600, bright: 0.55, damp: 0.6 }));
-  const stone = modal(exc, stoneModes(r, 0.9));
-  return finish(room(lowpass(add(body, stone, 0.12), 3800), r));
-}
-
 /** Stones dropped into a wooden lid: a short rattle of stone-on-stone clicks. */
 export function capture(seed, count) {
   const r = rng(seed);
@@ -336,7 +325,6 @@ export const PLACE_VARIANTS = [
 
 export const LOUDNESS = {
   place: -15,
-  soft: -20,
   capture: -19,
   pass: -24,
   correct: -21,

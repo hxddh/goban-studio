@@ -83,7 +83,6 @@ export function CaptureView() {
     variation: null,
     moveNumbers: null,
     showCoords: false,
-    material: state.settings.board,
     view: null,
     hoverColor: myTurn ? game.turn : null,
     interactive: myTurn,

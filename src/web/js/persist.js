@@ -7,31 +7,18 @@
  * is guarded: a corrupt value falls back to a fresh default instead of
  * breaking the first frame.
  *
- * v2 keys replace the v1 keys. `migrate()` runs once at start: it carries
- * settings, opening/classic progress, the streak, the current game and the
- * library forward, and leaves the v1 keys untouched so a downgrade still
- * finds them.
+ * v9 reads no data saved under older keys: there are no migrations here.
  */
 export const KEYS = {
   settings: "goban-studio.settings.v2",
   progress: "goban-studio.progress.v2",
   current: "goban-studio.current.v2",
   library: "goban-studio.library.v2",
-  // v7: your own problem collections (problem-import.js, app/collections-store.js)
-  collections: "goban-studio.collections.v1",
-};
-
-export const V1_KEYS = {
-  settings: "goban-studio.settings.v1",
-  progress: "goban-studio.progress.v1",
-  current: "goban-studio.current.v1",
-  library: "goban-studio.library.v1",
 };
 
 export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
-  board: "plain", // plain | wood | ink (v4)
   coords: true,
   sound: true,
   numbers: false,
@@ -47,19 +34,14 @@ export const DEFAULT_SETTINGS = {
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the rating when suggesting an opponent
-  flatStones: false, // high-contrast flat stones (accessibility)
   // v4
   boardSize: 19, // the size you last chose for a new game
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
   // v5
   humanStyle: true, // with the optional human SL model installed, the opponent plays human-style
-  v4: true, // settings have been through the v4 migration
   // v5
   defaultRules: "japanese", // japanese | chinese | korean: new games use it unless the New game sheet chooses
 };
-
-/** v3 surfaces → v4 materials. */
-const BOARD_V4 = { kaya: "plain", wood: "plain", katsura: "wood", paper: "plain", slate: "ink" };
 
 const memory = new Map();
 
@@ -102,88 +84,10 @@ export function removeKey(key) {
   } catch (_) {}
 }
 
-const LEVEL_TO_STRENGTH = { 1: "25k", 2: "20k", 3: "15k", 4: "10k", 5: "5k" };
-
-/** Carry v1 data forward once. Safe to call on every start. */
-export function migrate() {
-  const has = (k) => {
-    try {
-      return storage().getItem(k) != null;
-    } catch (_) {
-      return false;
-    }
-  };
-  if (!has(KEYS.settings) && has(V1_KEYS.settings)) {
-    const v1 = readJSON(V1_KEYS.settings, {});
-    const next = { ...DEFAULT_SETTINGS };
-    if (v1.lang) next.lang = v1.lang;
-    if (typeof v1.coords === "boolean") next.coords = v1.coords;
-    if (typeof v1.sound === "boolean") next.sound = v1.sound;
-    if (typeof v1.numbers === "boolean") next.numbers = v1.numbers;
-    if (v1.theme === "night") {
-      next.appearance = "dark";
-      next.board = "ink";
-    } else if (v1.theme === "paper") next.board = "plain";
-    if (LEVEL_TO_STRENGTH[v1.level]) next.strength = LEVEL_TO_STRENGTH[v1.level];
-    // Someone who used v1 has seen the rules and the board.
-    next.onboarded = v1.firstRun === false;
-    if (next.onboarded) next.experience = "rules";
-    writeJSON(KEYS.settings, next);
-  }
-  if (!has(KEYS.progress) && has(V1_KEYS.progress)) {
-    const v1 = readJSON(V1_KEYS.progress, {});
-    // v1 lessons and drills no longer exist; openings, classics and the
-    // streak do.
-    writeJSON(KEYS.progress, {
-      ...emptyProgress(),
-      openings: v1.openings && typeof v1.openings === "object" ? v1.openings : {},
-      classics: v1.classics && typeof v1.classics === "object" ? v1.classics : {},
-      streak: v1.streak && typeof v1.streak === "object" ? v1.streak : { count: 0, last: null },
-    });
-  }
-  // v5: progress gains per-game records (and a version).
-  if (has(KEYS.progress)) {
-    const p = readJSON(KEYS.progress, null);
-    if (p && !(p.v >= 5)) writeJSON(KEYS.progress, migrateProgress(p));
-  }
-  if (!has(KEYS.current) && has(V1_KEYS.current)) {
-    const v1 = readJSON(V1_KEYS.current, null);
-    if (v1 && v1.sgf) {
-      writeJSON(KEYS.current, {
-        sgf: v1.sgf,
-        humanColor: v1.humanColor,
-        opponent: v1.opponent,
-        strength: LEVEL_TO_STRENGTH[v1.level] || DEFAULT_SETTINGS.strength,
-        name: v1.name || "",
-        savedAt: v1.savedAt || Date.now(),
-      });
-    }
-  }
-  if (!has(KEYS.library) && has(V1_KEYS.library)) {
-    const v1 = readJSON(V1_KEYS.library, { games: [] });
-    const games = (Array.isArray(v1.games) ? v1.games : [])
-      .filter((g) => g && typeof g.sgf === "string")
-      .map((g) => ({
-        ...g,
-        strength: LEVEL_TO_STRENGTH[g.level] || null,
-        source: "game",
-      }));
-    writeJSON(KEYS.library, { v: 2, games });
-  }
-}
-
 export function loadSettings() {
   const s = readJSON(KEYS.settings, {});
   const out = { ...DEFAULT_SETTINGS, ...s };
   if (!["auto", "light", "dark"].includes(out.appearance)) out.appearance = "auto";
-  // v4: three materials, and coordinates on for the standard board. A v3
-  // user who never touched them had the old defaults (kaya, no coordinates).
-  if (!s.v4) {
-    out.board = BOARD_V4[out.board] || "plain";
-    if (s.coords === false && (s.board === undefined || s.board === "kaya")) out.coords = true;
-    out.v4 = true;
-  }
-  if (!["plain", "wood", "ink"].includes(out.board)) out.board = "plain";
   if (![9, 13, 19].includes(out.boardSize)) out.boardSize = 19;
   // v5: anything but the three rulesets (missing, old, corrupt) is Japanese.
   if (!["japanese", "chinese", "korean"].includes(out.defaultRules)) out.defaultRules = "japanese";
@@ -192,10 +96,6 @@ export function loadSettings() {
 
 export function saveSettings(settings) {
   return writeJSON(KEYS.settings, settings);
-}
-
-function emptyProgress() {
-  return { v: 5, lessons: {}, problems: {}, openings: {}, classics: {}, daily: null, streak: { count: 0, last: null }, rating: null, weakness: {}, mistakes: [], games: [] };
 }
 
 /* ------------------------------------------- v5: per-game records */
@@ -299,25 +199,12 @@ export function updateGameRecord(progress, id, patch, { save = true } = {}) {
   return rec;
 }
 
-/**
- * v5 progress migration. v2–v4 progress has no `v` and no `games`; it gains
- * an empty list. Rating history is kept as it is: the trend view reads it
- * for games that were played before records existed.
- */
-export function migrateProgress(p) {
-  const out = p && typeof p === "object" ? p : {};
-  out.games = normalizeGameRecords(out.games);
-  out.v = 5;
-  return out;
-}
-
 export function loadProgress() {
   const p = readJSON(KEYS.progress, {});
   const obj = (v) => (v && typeof v === "object" ? v : {});
   return {
     lessons: obj(p.lessons),
     problems: obj(p.problems),
-    openings: obj(p.openings),
     classics: obj(p.classics),
     daily: p.daily && typeof p.daily === "object" ? p.daily : null,
     streak: p.streak && typeof p.streak === "object" ? p.streak : { count: 0, last: null },
@@ -368,12 +255,6 @@ export function markLesson(progress, id, { step = null, done = false } = {}) {
   if (step != null) next.step = Math.max(prev.step || 0, step);
   if (done) next.done = true;
   progress.lessons[id] = next;
-  saveProgress(progress);
-  return progress;
-}
-
-export function markOpening(progress, id) {
-  progress.openings[id] = { done: true, at: Date.now() };
   saveProgress(progress);
   return progress;
 }
@@ -486,7 +367,7 @@ export function touchStreak(progress, now = Date.now()) {
 }
 
 export function clearAll() {
-  for (const k of [...Object.values(KEYS), ...Object.values(V1_KEYS)]) removeKey(k);
+  for (const k of Object.values(KEYS)) removeKey(k);
 }
 
 /* ---------------------------------------------------------------- backup */

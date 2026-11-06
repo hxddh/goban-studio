@@ -5,8 +5,8 @@
  *   node scripts/make-assets.mjs surfaces   # one group: surfaces | stones | sounds | brand
  *
  * Output (src/web/assets):
- *   surfaces/kaya.webp                         2048² wood grain (v4 shows it at 25 %)
- *   stones/{white-0..7,black-0..3,flat-black,flat-white}.png   256² sprites
+ *   surfaces/kaya.webp                         2048² wood grain (for the app icon only)
+ *   stones/{white-0..7,black-0..3}.png          256² sprites
  *   sounds/*.wav                                 16-bit mono 44.1 kHz
  *   brand.svg                                    the mark
  * and assets/icon.svg + assets/icon.png (the app icon).
@@ -27,7 +27,9 @@ import * as Surf from "./assets/surfaces.mjs";
 import * as Stones from "./assets/stones.mjs";
 import * as Snd from "./assets/sounds.mjs";
 import { brandSVG, iconHTML, iconSVG } from "./assets/brand.mjs";
-import { SURFACES, THEME_COLORS } from "../src/web/js/materials.js";
+import { THEME_COLORS } from "../src/web/js/materials.js";
+
+const SURFACES = Object.keys(THEME_COLORS);
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, "src/web/assets");
@@ -163,10 +165,6 @@ if (want("stones")) {
     write(`stones/black-${i}.png`, encodePNG(256, 256, Stones.blackStone(256, 200 + i, v)));
     note(`stones/black-${i}.png`);
   });
-  for (const c of ["black", "white"]) {
-    write(`stones/flat-${c}.png`, encodePNG(256, 256, Stones.flatStone(256, c)));
-    note(`stones/flat-${c}.png`);
-  }
 }
 
 if (want("sounds")) {
@@ -177,7 +175,6 @@ if (want("sounds")) {
     note(`sounds/${name}.wav`, `${(n.samples.length / Snd.RATE).toFixed(2)} s  ${n.lufs.toFixed(1)} LU  peak ${n.peakDb.toFixed(1)} dBFS`);
   };
   Snd.PLACE_VARIANTS.forEach((v, i) => emit(`place-wood-${i}`, Snd.placeWood(500 + i, v), Snd.LOUDNESS.place, 1 + i));
-  Snd.PLACE_VARIANTS.forEach((v, i) => emit(`place-soft-${i}`, Snd.placeSoft(600 + i, v), Snd.LOUDNESS.soft, 11 + i));
   emit("capture-1", Snd.capture(701, 1), Snd.LOUDNESS.capture, 21);
   emit("capture-2", Snd.capture(702, 3), Snd.LOUDNESS.capture, 22);
   emit("capture-3", Snd.capture(703, 7), Snd.LOUDNESS.capture, 23);

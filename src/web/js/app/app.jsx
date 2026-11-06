@@ -250,7 +250,7 @@ function onKeyDown(e) {
     e.preventDefault();
     return C.storyStep(e.key === "ArrowLeft" ? -1 : 1);
   }
-  if (reviewing && !state.review.guess) {
+  if (reviewing) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       return C.reviewStep(-1);

@@ -127,17 +127,6 @@ export function blackStone(size, seed, { tint, sheen }) {
   });
 }
 
-/** Accessibility set: flat fills with a crisp ring, no texture or highlight. */
-export function flatStone(size, color) {
-  const fill = color === "black" ? [0, 0, 0] : [1, 1, 1];
-  const ring = color === "black" ? [0.9, 0.9, 0.9] : [0, 0, 0];
-  const width = color === "black" ? 0.035 : 0.06;
-  return render(size, (x, y) => {
-    const rho = Math.hypot(x, y);
-    return rho > 1 - width ? ring : fill;
-  });
-}
-
 export const WHITE_VARIANTS = [
   { angle: 0.35, spacing: 10, curve: 3.2 },
   { angle: 1.2, spacing: 8.5, curve: 4.5 },

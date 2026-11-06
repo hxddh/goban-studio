@@ -367,8 +367,6 @@ select, .text-input {
 .move-grid li.last button { color: var(--text); font-weight: 500; }
 .move-grid .mn { min-width: 22px; text-align: right; color: var(--text-3); }
 .moves-empty { font: var(--t-small); color: var(--text-3); margin: 0; }
-/* v8: the import link at the foot of Practice, before any collection. */
-.collections-section.quiet { margin-top: var(--s-6); }
 /* v8: the review's one status line: analysis progress · where the game left the book. */
 .review-status { display: flex; flex-wrap: wrap; gap: 0 var(--s-2); margin: 0; }
 .review-status:empty { display: none; }
@@ -442,9 +440,6 @@ select, .text-input {
 .var-bar { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; padding: var(--s-2) var(--s-3); border-radius: var(--r-1); background: var(--accent-soft); color: var(--text); }
 .var-bar .icon { color: var(--accent); }
 .branch-list { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-.guess { text-align: left; }
-.guess.right { border-color: var(--good); }
-.guess.wrong { border-color: var(--bad); }
 
 /* practice panels */
 .goal { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-2); background: var(--fill); font: 500 14px/20px var(--font); }
@@ -511,9 +506,6 @@ button.group-row:hover { background: var(--fill); }
 .level { display: flex; align-items: center; gap: var(--s-5); padding: var(--s-4) var(--s-4); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); }
 .level-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .level-text strong { font: var(--t-title); }
-.spark { width: 160px; height: 32px; overflow: visible; }
-.spark path { fill: none; stroke: var(--text-2); stroke-width: 1.5; stroke-linejoin: round; }
-.spark circle { fill: var(--text); }
 
 /* course */
 .units { display: flex; flex-direction: column; gap: var(--s-3); }
@@ -606,14 +598,6 @@ button.group-row:hover { background: var(--fill); }
 .lang-grid button { height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface); cursor: pointer; font-weight: 500; }
 .lang-grid button.on { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .lang-grid.big button { height: 44px; font-size: 14px; }
-.swatches { display: flex; gap: var(--s-2); }
-.swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; border: 0; background: none; cursor: pointer; color: var(--text-2); font: var(--t-small); }
-.swatch i { width: 44px; height: 30px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); }
-.swatch.plain i { background: #e4cb9a; }
-.swatch.wood i { background: linear-gradient(90deg, #e2c795, #d9bb84 30%, #e3c896 55%, #dbbe89 80%, #e2c795); }
-.swatch.ink i { background: #2d2e2c; }
-.swatch.on { color: var(--text); }
-.swatch.on i { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--text); }
 .about { display: flex; flex-direction: column; gap: 4px; }
 .shortcuts { display: grid; grid-template-columns: 10em 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
 .shortcuts dd { margin: 0; color: var(--text-2); }
@@ -680,14 +664,7 @@ button.group-row:hover { background: var(--fill); }
 .score-detail i { font-style: normal; white-space: nowrap; }
 .celebrate .fine { display: inline-flex; align-items: center; gap: 4px; }
 
-/* v5: this week on Today */
-.week-grid { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
-.week-grid li { display: flex; flex-direction: column; gap: 2px; padding: var(--s-4); }
-.week-grid li + li { border-left: 1px solid var(--line); }
-.week-grid strong { font: 600 22px/28px var(--font); font-variant-numeric: tabular-nums; }
-.week-grid strong.up { color: var(--good); }
-.week-grid strong.down { color: var(--bad); }
-.week-grid span { font: var(--t-small); color: var(--text-3); }
+/* v5: facts lists */
 .facts { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); margin: 0; padding-top: var(--s-3); border-top: 1px solid var(--line); font: var(--t-small); }
 .facts dt { color: var(--text-3); }
 .facts dd { margin: 0; display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
@@ -705,11 +682,8 @@ button.group-row:hover { background: var(--fill); }
 .unit.now .unit-no { background: var(--text); color: var(--on-primary); }
 .unit.todo .unit-text h3 { color: var(--text-2); }
 
-/* v5: thumbnails and mini boards follow the board material */
+/* v5: thumbnails and mini boards */
 :root { --thumb-line: rgba(60, 40, 20, 0.35); }
-:root[data-board="ink"] { --thumb-board: #2d2e2c; --thumb-line: rgba(232, 228, 218, 0.35); }
-:root[data-board="ink"] .empty-board line, :root[data-board="ink"] .mini-grid line { stroke: rgba(232, 228, 218, 0.45); }
-:root[data-board="ink"] .empty-board circle { fill: rgba(232, 228, 218, 0.6); }
 .opening-tip { font: var(--t-small); margin-bottom: var(--s-2); }
 
 /* v5 review: summary, tree, comments */
@@ -848,20 +822,8 @@ button.group-row:hover { background: var(--fill); }
 .plan-mark { font: var(--t-caption); color: var(--text-2); background: var(--fill); border-radius: var(--r-1); padding: 1px 6px; }
 
 /* v7 problems */
-.collections-actions { margin-top: var(--s-3); align-items: center; }
-.collection-item .mini-progress { width: 64px; flex: none; }
-.collection-item .fine { min-width: 40px; text-align: right; }
-.collection-head { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: var(--s-4); }
-.collection-head > div { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
-.problem-card .due-mark { margin-left: auto; color: var(--text-2); font-weight: 500; }
 .problem-card .problem-title { display: inline-flex; align-items: center; gap: var(--s-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .problem-card .grade-dots { margin-left: auto; }
-.import-report .fine { margin: 0 0 var(--s-2); }
-.report-row { align-items: flex-start; }
-.report-row .gr-text .wrap-text { white-space: normal; color: var(--text-2); }
-.report-row .verdict { flex: none; min-width: 96px; font: var(--t-caption); padding-top: 3px; color: var(--text-2); }
-.report-row .verdict.accepted { color: var(--good); }
-.report-row .verdict.rejected { color: var(--bad); }
 
 /* v8 beginner path: the lesson bridge's one line, and the first count's note */
 .celebrate .bridge-lead { max-width: 360px; font: var(--t-body); color: var(--text-2); }

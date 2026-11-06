@@ -25,7 +25,7 @@ README.
 - every UI string present in zh/en/ko/ja
 - the eight basics cards present in all four languages
 - Moka 9×9 assets present, model size matches its manifest, attribution files shipped
-- 60 lessons, 40 openings and 300 drills: every setup/solution legal
+- 60 lessons and 300 drills: every setup/solution legal
 - 20 classic games parse with four-language notes and preserved results
 - the native KataGo bridge sends a Japanese position and parses the reply
 - opponent legality on 9×9 and 19×19 (local fallback)
@@ -74,8 +74,6 @@ Static asset checks are intentionally limited to source inputs; the bundle and
   captures the white stone, `1/1` and “lesson complete” appear, Next works
 - tsumego `cap-1`: setup renders, correct move is accepted, progress is
   persisted, Next opens the next puzzle
-- Openings tab: 40 cards, first card opens a 19×19 professional opening and
-  advances through eight scripted moves
 - Classics tab: 20 cards, first card opens at move 0 with the four-language
   note, review curve, players, date and result; Back returns to Classics
 - daily session starts from the Daily tab
@@ -86,7 +84,7 @@ Static asset checks are intentionally limited to source inputs; the bundle and
   Delete removes a record
 - SGF import via the hidden file input loads the record and shows a warning
   toast only on failure
-- theme switching to Night and back to Wood; coordinates toggle; move-number
+- appearance switching to dark and back; coordinates toggle; move-number
   toggle draws numbers on stones
 - 390×844 and 720×720 layouts: rail collapses to icons, board remains
   playable, side panel moves below the board, no horizontal page overflow

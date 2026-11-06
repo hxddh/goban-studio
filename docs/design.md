@@ -87,12 +87,8 @@ group per screen region.
 
 ## 5. The board
 
-* **Surface.** Three materials only:
-  * *Plain* (default): a flat warm honey (#E5CB98 light) with a 3 %
-    centre-to-edge falloff. No grain.
-  * *Wood*: the kaya texture at 25 % strength over the plain colour — the
-    grain is a whisper, never a stripe.
-  * *Ink*: a deep charcoal board (#2C2D2B) with light lines, for dark rooms.
+* **Surface.** One board (v9): a flat warm honey (#E5CB98 light) with a
+  3 % centre-to-edge falloff. No grain, no alternative materials.
 * **Lines.** Inner lines are whole device pixels (1 px at ≤ 30 px cells,
   2 px above on Retina), snapped to the pixel grid so they never blur. The
   outer frame is 1.6× the inner width. Line colour is 70 % ink, not black.
@@ -138,21 +134,20 @@ group per screen region.
   variations), *Summary* (the game in three phases — only when KataGo
   analysed the game; an offline estimate never shows phase numbers) and
   *Notes* (comment, marks, variation tree). Tools (live analysis,
-  territory, guess, export) are icon buttons in the toolbar; *Play from
+  territory, export) are icon buttons in the toolbar; *Play from
   here* is the one primary action. A record opens on its final position
   and moves to the first key moment when the analysis is done, unless the
   player has already moved; a classic with a famous move opens on it.
 * **Today.** One hero (continue the game, or the suggested game) with the
   only primary button; then one thing to learn (today's five until it is
-  done, then the next lesson); this week's focus; then your level with its
-  sparkline. Empty states collapse to a single line instead of an empty
+  done, then the next lesson); this week's focus; then your level as one
+  number with its ± ("≈ 12 kyu (±1)"). Empty states collapse to a single line instead of an empty
   card.
 * **Practice.** Hero row for the next lesson with progress; today's five as
   a row; the course as grouped rows (title + check, no step counts); the
   problem topics as a grid of quiet tiles.
 * **Library.** Toolbar holds Import. Three segmented tabs: my games
-  (rows with a thumbnail), classics, and openings (the explorer, then the
-  pro-opening drills in their own section). Reports of the player's games
+  (rows with a thumbnail), classics, and the opening explorer. Reports of the player's games
   are made in the background by themselves; a row says so only while its
   report is being made.
 * **Settings.** A wide sheet with two panes: a source list on the left
@@ -177,9 +172,7 @@ group per screen region.
 * **Less on screen (v8).** Every element has to serve playing or learning.
   The play panel says nothing before the first move but one quiet line;
   the review keeps its status (analysis, where the game left the book) on
-  one line; there is no list of background work to manage; an empty
-  feature (imported problem collections) is a single quiet link until it
-  is used. A new element in a release comes with one taken away.
+  one line; there is no list of background work to manage. A new element in a release comes with one taken away.
 
 ## 8. Motion
 

@@ -1,13 +1,11 @@
 /**
  * v8 tests: simplification and the small library fixes found on the way
- * (a game counts for "this week" when it is finished, not when it is
- * edited; edits keep a record in place; a save that cannot be written
- * says so). Loaded by scripts/test.mjs; receives the runner's helpers.
+ * (a game keeps its finishing time when it is edited; edits keep a record
+ * in place; a save that cannot be written says so). Loaded by scripts/test.mjs; receives the runner's helpers.
  */
 export default async function ({ test, assert }) {
   const Lib = await import("../../src/web/js/library.js");
   const { Game } = await import("../../src/web/js/rules.js");
-  const { weekSummary } = await import("../../src/web/js/app/week.js");
 
   function withStorage(fail, fn) {
     const map = new Map();
@@ -51,8 +49,6 @@ export default async function ({ test, assert }) {
         const edited = Lib.saveGame(finished(), { id: a.id, keepPlace: true });
         assert.equal(edited.finishedAt, old, "finishedAt is not moved by an edit");
         assert.deepEqual(Lib.listGames().map((g) => g.name), ["b", "a"], "an edit keeps the record in place");
-        const w = weekSummary({ problems: {}, lessons: {} }, Lib.listGames());
-        assert.equal(w.games ?? w.played, 1, `only b was played this week: ${JSON.stringify(w)}`);
         // Without keepPlace (a game saved again from play), it moves to the top as before.
         Lib.patchGame(b.id, { updatedAt: Date.now() - 1000 });
         Lib.saveGame(finished(), { id: a.id });
