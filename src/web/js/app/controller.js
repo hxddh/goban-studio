@@ -38,6 +38,7 @@ export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
 export * from "../learn/session.js"; // Learn's path, today's session
+import { itemKey, todaysSession } from "../learn/session.js";
 export * from "./capture-ctl.js"; // the beginner bridges (Learn)
 import { resumeCapture } from "./capture-ctl.js";
 export { CLASSICS, formatPoints };
@@ -163,15 +164,24 @@ export function toggleFocus() {
 }
 
 /** Put the app back where a history entry says it was. */
-function restore(loc) {
+export function restore(loc) {
   if (state.review) dropReview();
   state.space = loc.space;
   state.play = { ...state.play, ...loc.play };
   const p = loc.learn;
   if (loc.space === "learn") {
-    if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex);
-    else if (p.view === "problem" && p.problemId) openProblem(p.problemId);
-    else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId);
+    // An item of today's session comes back inside the session.
+    const s = p.daily ? todaysSession() : null;
+    const within = (kind, id) => {
+      if (!s) return undefined;
+      const key = itemKey({ kind, id });
+      if (!s.items.some((it) => it.key === key)) return undefined;
+      s.current = key;
+      return { daily: s };
+    };
+    if (p.view === "lesson" && p.lessonId) openLesson(p.lessonId, p.lessonIndex, within("lesson", p.lessonId));
+    else if (p.view === "problem" && p.problemId) openProblem(p.problemId, within("problem", p.problemId));
+    else if (p.view === "mistake" && p.mistakeId) openMistakeDrill(p.mistakeId, within("mistake", p.mistakeId));
     else if (p.view === "capture") resumeCapture({ from: p.captureFrom });
     else if (p.view === "catalog") openCatalog();
     else if (p.view === "topic" && p.shape) openShape(p.shape);

@@ -47,6 +47,22 @@ function giveUp() {
 const keyNow = () => state.learn.daily?.current;
 
 try {
+  await test("learn session: Back to an item of today's session reopens it inside the session", async () => {
+    beginner("stones-capture");
+    C.setRestorer(C.restore); // what boot installs
+    C.startPath();
+    const key = keyNow();
+    assert.equal(state.learn.view, "lesson");
+    C.goSpace("play");
+    assert.equal(state.space, "play");
+    assert.equal(C.back(), true);
+    await sleep(0);
+    assert.equal(state.space, "learn");
+    assert.equal(state.learn.view, "lesson");
+    assert.ok(state.learn.daily, "inside the session");
+    assert.equal(keyNow(), key);
+  });
+
   await test("learn session: a restart keeps what is done today; another day starts afresh", async () => {
     beginner("stones-capture");
     C.startPath();
