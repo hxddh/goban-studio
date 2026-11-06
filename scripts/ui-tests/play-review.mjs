@@ -14,8 +14,9 @@
  * A KataGo host in the page, with a file store in memory (window.__files).
  * On 9×9 the position after k moves has Black's lead 0.5, and 6.5 points
  * less once Black's 5th move is on the board (k ≥ 5): that move is the one
- * key mistake. KataGo's best move is always A1, the second candidate B1 is
- * one point worse. The computer plays the first empty point near the
+ * key mistake. KataGo's best move is the first empty point of the first
+ * line (A1, B1 …), the second candidate the next one, a point worse. (The
+ * computer may play them: it picks among the candidates like a person.) The computer plays the first empty point near the
  * centre.
  */
 function reviewHost() {
@@ -64,7 +65,9 @@ function reviewHost() {
         const second = k % 2 === 0 ? lead - 1 : lead + 1;
         const wr = (l) => 1 / (1 + Math.exp(-l / 8));
         const own = Array(p.size * p.size).fill("0").join(" ");
-        const info = `info move A1 visits ${p.visits} winrate ${wr(lead)} scoreLead ${lead} order 0 pv A1 info move B1 visits ${Math.max(1, p.visits >> 2)} winrate ${wr(second)} scoreLead ${second} order 1 pv B1 ownership ${own}`;
+        const row = [...L.slice(0, p.size)].map((c) => c + "1").filter((v) => !taken.has(v));
+        const [a, b] = row;
+        const info = `info move ${a} visits ${p.visits} winrate ${wr(lead)} scoreLead ${lead} order 0 pv ${a} info move ${b} visits ${Math.max(1, p.visits >> 2)} winrate ${wr(second)} scoreLead ${second} order 1 pv ${b} ownership ${own}`;
         return { ok: true, id: p.id, play: v, info };
       }
       return null;
@@ -85,10 +88,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.waitForFunction((was) => window.__state.game?.owner !== was && window.__board?.model.size === 9 && window.__board.geom?.cell > 30 && window.__state.game.opponent === "ai", was);
     const mine = [[2, 2], [6, 6], [6, 2], [2, 6], [5, 3]];
     for (let i = 0; i < n; i++) {
-      await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, i * 2, { timeout: 8000 });
+      await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, i * 2, { timeout: 15000 }); // the reply is paced like a person (feel.js thinkTime, up to a few seconds)
       await clickPoint(page, ...mine[i]);
     }
-    await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, n * 2, { timeout: 8000 });
+    await page.waitForFunction((m) => window.__state.game.game.moveNumber === m && !window.__state.game.thinking, n * 2, { timeout: 15000 });
     await page.click(".panel .menu-wrap > button");
     await page.click(".menu [role=menuitem].danger");
     await page.click(".sheet-foot .btn.primary");
@@ -101,7 +104,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     } catch (_) {
       const at = await page.evaluate(() => {
         const tr = window.__state.review?.trial;
-        return tr && { status: tr.status, tried: tr.tried, loss: tr.loss, before: !!tr.before, interactive: window.__board.model.interactive, jobs: window.__state.toasts.map((x) => x.message) };
+        return tr && { status: tr.status, tried: tr.tried, loss: tr.loss, before: !!tr.before, index: tr.index, board: tr.pos.current.board.signMap.map((r) => r.map((v) => (v > 0 ? "X" : v < 0 ? "O" : ".")).join("")), toasts: window.__state.toasts.map((x) => x.message) };
       });
       throw new Error(`no "${status}" verdict: ${JSON.stringify(at)}`);
     }
@@ -176,15 +179,18 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await clickPoint(page, 8, 0);
     await verdict(page, "bad");
     // The board shows KataGo's move once the verdict is drawn.
-    await page.waitForFunction(() => window.__board.model.marks.some((m) => m.x === 0 && m.y === 8 && m.tone === "good"), null, { timeout: 3000 });
+    const best = await page.evaluate(() => window.__state.review.trial.best);
+    const bestLabel = "ABCDEFGHJ"[best.x] + (9 - best.y);
+    assert(best.y === 8, `KataGo's move on the first line: ${JSON.stringify(best)}`);
+    await page.waitForFunction((b) => window.__board.model.marks.some((m) => m.x === b.x && m.y === b.y && m.tone === "good"), best, { timeout: 3000 });
     const bad = await page.evaluate(() => ({ text: document.querySelector(".try-card").innerText, marks: window.__board.model.marks, judged: window.__judged }));
-    assert(/loses about 6\.5 points/.test(bad.text) && /A1/.test(bad.text), `verdict: ${bad.text}`);
-    assert(bad.marks.some((m) => m.x === 0 && m.y === 8 && m.tone === "good"), "KataGo's move on the board");
+    assert(/loses about 6\.5 points/.test(bad.text) && bad.text.includes(bestLabel), `verdict: ${bad.text}`);
+    assert(bad.marks.some((m) => m.x === best.x && m.y === best.y && m.tone === "good"), "KataGo's move on the board");
     assert(bad.judged >= 1, "a search of the position after the try");
     // Try again: KataGo's own move is good.
     await page.click(".try-card .btn >> nth=0");
     await page.waitForFunction(() => window.__state.review.trial.status === "open" && window.__board.model.interactive && !window.__board.model.variation);
-    await clickPoint(page, 0, 8);
+    await clickPoint(page, best.x, best.y);
     await verdict(page, "good");
     assert((await page.textContent(".try-card")).includes("Good move"), "the good verdict");
     // Both tries are in the player model, as one drill of this game.
