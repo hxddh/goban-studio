@@ -144,21 +144,10 @@ function parseSize(raw) {
 
 /**
  * SGF columns are a, b, c … in order, the letter i included (FF[4]); only
- * the board's labels skip I. Goban Studio before v7 wrote (and read)
- * columns without the i — a..h, j..t — so records it saved, which carry
- * AP[Goban Studio:<version>] with a version below 7, are read that way.
+ * the board's labels skip I.
  */
-let legacyColumns = false;
-
-/** True for a record written by Goban Studio before v7 (columns skip i). */
-export function isLegacyGobanSgf(ap) {
-  const m = /^Goban Studio:(\d+)/.exec(String(ap || "").trim());
-  return !!m && Number(m[1]) < 7;
-}
-
 function sgfColumn(code) {
   if (code < 97) return -1;
-  if (legacyColumns) return code - 97 - (code > 105 ? 1 : 0);
   return code - 97;
 }
 
@@ -265,7 +254,6 @@ export function loadSGF(text) {
     for (const c of child.children) c.parent = child;
     root.children = [child];
   }
-  legacyColumns = isLegacyGobanSgf(first(data, "AP"));
   // v5: Japanese, Chinese and Korean records are read under their own
   // rules (spellings and the rulesets that stay rejected are listed at
   // rulesFromSgf). No RU means Japanese, as every record before v5.
@@ -381,12 +369,6 @@ export function loadSGF(text) {
     n.phase = "ended";
   }
   return { game, warnings };
-}
-
-/** v7: the raw game trees of an SGF text (problem import, problem-import.js). */
-export function parseSgfTrees(text) {
-  nodeSeq = 1;
-  return parseTree(String(text || ""));
 }
 
 /** A fresh game with handicap stones on the standard points. */

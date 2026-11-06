@@ -16,7 +16,8 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dist = path.join(root, "frontend/dist");
 
 export const V8_BUDGET = {
-  bundleBytes: 2.4 * 1024 * 1024, // the one start-up script (2.71 MB in v7, 2.13 MB in v8)
+  bundleBytes: 1.3 * 1024 * 1024, // the one start-up script (2.71 MB in v7, 2.13 MB in v8, 1.04 MB in v9: content after start-up)
+  contentFirstUse: 1500, // a problem opened before its part arrived on idle
   coldStart: 800, // median of three: navigation to the first screen
   firstComputerMove: [350, 2500], // a fake KataGo host: the reply is paced, never instant
   explorerOpen: 1500, // first use of the opening book, fetched on demand
@@ -58,13 +59,22 @@ function fakeHost() {
 }
 
 export default async function ({ check, assert, fresh, onboard, origin }) {
-  await check("v8 budgets: one start-up script under 2.4 MB; the opening book is served beside it", async () => {
+  await check("v8 budgets: one start-up script under 1.3 MB; the opening book and the content parts are served beside it", async () => {
     const bytes = fs.statSync(path.join(dist, "js/bundle.js")).size;
     assert(bytes < V8_BUDGET.bundleBytes, `bundle.js ${bytes} bytes > ${V8_BUDGET.bundleBytes}`);
     const js = fs.readFileSync(path.join(dist, "js/bundle.js"), "utf8");
     assert(!js.includes(`symmetry: "all"`), "the book's data is in the bundle");
     const book = JSON.parse(fs.readFileSync(path.join(dist, "content/book.json"), "utf8"));
     assert(book.trees?.whole && book.trees?.corner, "content/book.json");
+    // v9: lesson steps, problem bodies and classic records are not in the script (content.js).
+    const part = (name) => JSON.parse(fs.readFileSync(path.join(dist, `content/${name}.json`), "utf8"));
+    const someProblem = Object.values(part("problems"))[0];
+    const someClassic = Object.values(part("classics"))[0];
+    assert(!js.includes(JSON.stringify(someProblem.hint.en)), "a problem's hint is in the bundle");
+    assert(!js.includes(someClassic.sgf.slice(40, 120)), "a classic's record is in the bundle");
+    assert(Object.values(part("course")).every((steps) => Array.isArray(steps) && steps.length), "content/course.json");
+    assert(Object.values(part("problems")).every((p) => Array.isArray(p.diagram)), "content/problems.json");
+    assert(Object.values(part("classics")).every((c) => typeof c.sgf === "string"), "content/classics.json");
     return `${(bytes / 1024).toFixed(0)} KB`;
   });
 
@@ -82,6 +92,46 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     const med = times.sort((a, b) => a - b)[1];
     assert(med < V8_BUDGET.coldStart, `cold start ${med} ms > ${V8_BUDGET.coldStart}`);
     return `median ${med} ms (${times.join(", ")})`;
+  });
+
+  await check("v9 budgets: the first screen needs no content part; a problem waits for its part; each part comes once", async () => {
+    const page = await fresh();
+    const asked = [];
+    const held = [];
+    let hold = true;
+    await page.route(/\/content\/(course|problems|classics)\.json$/, (route) => {
+      asked.push(route.request().url().split("/").pop());
+      if (hold) held.push(route);
+      else route.continue();
+    });
+    // Onboarding, a first game and Today come up with every part held back.
+    await page.goto(origin + "/");
+    await page.waitForSelector(".ob-card");
+    await page.click(".ob-card .btn.primary");
+    await page.click(".choice >> nth=1");
+    await page.waitForSelector("canvas.board");
+    await page.keyboard.press("Control+1");
+    await page.waitForSelector(".page h1");
+    await page.keyboard.press("Control+3");
+    await page.waitForSelector(".topic-card");
+    // A topic lists its problems by title (the problems part): it opens once that part arrives.
+    await page.click(".topic-card >> nth=0");
+    await page.waitForTimeout(150);
+    assert(await page.evaluate(() => window.__state.practice.view === "home"), "the topic opened without its problems");
+    const t0 = Date.now();
+    hold = false;
+    for (const r of held.splice(0)) await r.continue();
+    await page.waitForSelector(".problem-card");
+    const ms = Date.now() - t0;
+    assert(ms < V8_BUDGET.contentFirstUse, `topic ${ms} ms after its part was let through > ${V8_BUDGET.contentFirstUse}`);
+    await page.click(".problem-card >> nth=0");
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.problem?.pz);
+    // The rest arrives on idle, each part once.
+    await page.waitForFunction(() => performance.getEntriesByType("resource").filter((e) => /content\/(course|problems|classics)\.json$/.test(e.name)).length >= 3, null, { timeout: 10000 });
+    assert(asked.length === 3 && new Set(asked).size === 3, `asked: ${asked.join(", ")}`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+    return `topic ${ms} ms after its part`;
   });
 
   await check("v8 budgets: the computer's first move with a KataGo host is paced, never instant, never slow", async () => {

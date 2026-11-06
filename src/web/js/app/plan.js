@@ -344,7 +344,7 @@ function seeded(now) {
  * Returns null without a focus, so the caller keeps its own choice.
  * Items: { kind: "m" | "p", id, role: "review" | "focus" | "stretch" | "new", why? }.
  */
-export function planDaily({ progress, model, pool, bank = null, grades = {}, now = Date.now(), limit = 5, reviews = [] }) {
+export function planDaily({ progress, model, pool, bank = null, grades = {}, now = Date.now(), limit = 5 }) {
   if (!model?.focus?.length || !pool?.length) return null;
   const gradeOf = (p) => grades[p.id]?.grade || 1;
   const entry = (p) => progress.problems?.[p.id];
@@ -362,10 +362,7 @@ export function planDaily({ progress, model, pool, bank = null, grades = {}, now
   // 1. Reviews.
   const dueDrills = (progress.mistakes || []).filter((m) => (m.due || 0) <= now).slice(0, 2);
   for (const m of dueDrills) add({ kind: "m", id: m.id, role: "review", ...(focusKeys.includes(focusKey(m.theme)) ? { why: focusKey(m.theme) } : {}) });
-  // v8: `reviews` are more problems that may come back for review (your
-  // imported ones); they only take review slots, never new or focus ones.
-  const inPool = new Set(pool.map((p) => p.id));
-  const dueProblems = [...pool, ...reviews.filter((p) => !inPool.has(p.id))].filter((p) => entry(p)?.due && entry(p).due <= now).sort((a, b) => entry(a).due - entry(b).due);
+  const dueProblems = pool.filter((p) => entry(p)?.due && entry(p).due <= now).sort((a, b) => entry(a).due - entry(b).due);
   for (const p of dueProblems) {
     if (items.length >= Math.min(RULES.MAX_REVIEWS, limit - 2)) break;
     add({ kind: "p", id: p.id, role: "review" });

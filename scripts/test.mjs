@@ -34,7 +34,6 @@ import { analyse, anchorMap, egfExpected, egfNats, fitBT, goRLabel, humanStylePa
 import { enginePayload, parseInfo, parseVertex, positionPayload, katagoRules } from "../src/web/js/katago.js";
 import * as M from "../src/web/js/models.js";
 import * as S from "../src/web/js/solver.js";
-import { OPENINGS } from "../src/web/js/content/openings.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { PROBLEMS } from "../src/web/js/content/problems.js";
 import { COURSE } from "../src/web/js/content/course.js";
@@ -46,12 +45,10 @@ import {
   MAX_GAME_RECORDS,
   addGameRecord,
   updateGameRecord,
-  V1_KEYS,
   dailySet,
   loadProgress,
   loadSettings,
   markProblem,
-  migrate,
   readJSON,
   removeKey,
   touchStreak,
@@ -296,7 +293,7 @@ await test("SGF import accepts pass, setup, comments and four-digit dates", () =
   assert.equal(line[3].move.color, WHITE);
 });
 
-await test("SGF columns are a..s with the i (FF[4]); pre-v7 Goban Studio records are read without it", () => {
+await test("SGF columns are a..s with the i (FF[4])", () => {
   // Standard: i is the ninth column, j the tenth, s the nineteenth.
   const { game } = loadSGF("(;GM[1]FF[4]SZ[19];B[id];W[jd];B[sd])");
   const line = game.mainLine();
@@ -304,12 +301,9 @@ await test("SGF columns are a..s with the i (FF[4]); pre-v7 Goban Studio records
   assert.equal(line[1].move.y, 3);
   const sgf = game.toSGF();
   assert.match(sgf, /;B\[id\];W\[jd\];B\[sd\]/);
-  // Written by Goban Studio 6 or earlier: a..h, j..t.
-  const old = loadSGF("(;GM[1]FF[4]AP[Goban Studio:6.0.0]SZ[19];B[jd];W[td])").game.mainLine();
-  assert.deepEqual([old[1].move.x, old[2].move.x], [8, 18]);
-  // Read back under the new rule, a re-saved old record keeps its moves.
-  const again = loadSGF(loadSGF("(;GM[1]FF[4]AP[Goban Studio:5.1.0]SZ[19];B[jd];W[td])").game.toSGF()).game.mainLine();
-  assert.deepEqual([again[1].move.x, again[2].move.x], [8, 18]);
+  // v9: the application tag never changes how columns are read.
+  const tagged = loadSGF("(;GM[1]FF[4]AP[Goban Studio:6.0.0]SZ[19];B[id];W[sd])").game.mainLine();
+  assert.deepEqual([tagged[1].move.x, tagged[2].move.x], [8, 18]);
   // Every bundled classic now loads without an illegal move.
   for (const c of CLASSICS) assert.deepEqual(loadSGF(c.sgf).warnings, [], c.id);
 });
@@ -644,7 +638,6 @@ await test("every key the interface uses is in the string table", () => {
     "goal.": ["capture", "save", "kill", "live", "seki", "place"],
     "grade.": ["1", "2", "3", "4", "5"],
     "library.kind.": ["all", "won", "lost", "imported"],
-    "settings.material.": ["plain", "wood", "ink"],
     "newGame.": ["quick", "medium", "full"],
     "tip.opening.": ["1", "2", "3"],
   };
@@ -674,31 +667,6 @@ await test("all 20 classic games parse and carry four-language notes", () => {
     assert.equal(game.size, 19, `${classic.id} board size`);
     assert.ok(game.mainLine().length > 100, `${classic.id} move count`);
     assert.equal(game.current.result, classic.result, `${classic.id} result preserved`);
-  }
-});
-
-await test("all 40 openings are well-formed and legal in four languages", () => {
-  assert.equal(OPENINGS.length, 40);
-  const seen = new Set();
-  const titles = new Set();
-  const lines = new Set();
-  for (const opening of OPENINGS) {
-    for (const lang of LANG_IDS) {
-      assert.ok(opening.title[lang]?.trim(), `${opening.id} title ${lang}`);
-      assert.ok(opening.text[lang]?.trim(), `${opening.id} text ${lang}`);
-    }
-    assert.ok(!seen.has(opening.id), `${opening.id} duplicate id`);
-    seen.add(opening.id);
-    assert.ok(!titles.has(opening.title.en), `${opening.id} duplicate title`);
-    titles.add(opening.title.en);
-    const lineKey = JSON.stringify(opening.line);
-    assert.ok(!lines.has(lineKey), `${opening.id} duplicate line`);
-    lines.add(lineKey);
-    const game = new Game({ size: opening.size || 19, komi: opening.komi ?? 6.5 });
-    game.setup(opening.setup, opening.toMove);
-    for (const move of opening.line) {
-      assert.equal(game.play(move.x, move.y, { color: move.c }).ok, true, `${opening.id} illegal line`);
-    }
   }
 });
 
@@ -1289,29 +1257,6 @@ await test("async KataGo hosts get a structured position, stream partial reports
   }
 });
 
-await test("v1 data migrates to v2 without losing games or settings", () => {
-  for (const k of [...Object.values(KEYS), ...Object.values(V1_KEYS)]) removeKey(k);
-  const g = newGame(9);
-  g.play(4, 4);
-  writeJSON(V1_KEYS.settings, { lang: "ja", theme: "night", coords: true, sound: false, level: 4, firstRun: false });
-  writeJSON(V1_KEYS.progress, { openings: { a: { done: true } }, classics: {}, streak: { count: 3, last: "2026-10-31" }, puzzles: { "cap-1": {} } });
-  writeJSON(V1_KEYS.library, { games: [{ id: "x", sgf: g.toSGF(), size: 9, moves: 1, level: 2 }] });
-  migrate();
-  const s = loadSettings();
-  assert.equal(s.lang, "ja");
-  assert.equal(s.appearance, "dark");
-  assert.equal(s.board, "ink");
-  assert.equal(s.opponentRank, 12);
-  assert.equal(s.onboarded, true);
-  const p = loadProgress();
-  assert.equal(p.streak.count, 3);
-  assert.equal(p.openings.a.done, true);
-  assert.deepEqual(p.problems, {});
-  const games = Lib.listGames();
-  assert.equal(games.length, 1);
-  assert.equal(games[0].rank, 24);
-});
-
 await test("the library holds finished and saved games; the current game is separate", () => {
   writeJSON(KEYS.library, { games: [] });
   const g = newGame();
@@ -1867,14 +1812,8 @@ await test("v5: deleting and promoting variations edit the tree and the SGF", ()
   assert.equal(treeLayout(g).nodes.length, 4);
 });
 
-await test("v5: progress gains bounded, validated per-game records (migrated from v4)", () => {
+await test("v5: progress keeps bounded, validated per-game records", () => {
   for (const k of Object.values(KEYS)) removeKey(k);
-  writeJSON(KEYS.progress, { problems: { a: { solved: true } }, rating: { r: 1200, games: 3, history: [{ at: 1, r: 1100 }, { at: 2, r: 1200 }] } });
-  migrate();
-  const raw = readJSON(KEYS.progress, {});
-  assert.equal(raw.v, 5);
-  assert.deepEqual(raw.games, []);
-  assert.equal(raw.problems.a.solved, true, "nothing else changes");
   const p = loadProgress();
   assert.deepEqual(p.games, []);
   const rec = (i, extra = {}) => ({ id: "g" + i, at: 1000 + i, size: 9, color: -1, result: "W+3.5", won: true, phases: { opening: { loss: 1, mistakes: 0, blunders: 0, moves: 5 }, middle: { loss: "4" }, endgame: null }, themes: { ladder: 1, bad: -2 }, ...extra });
@@ -3199,21 +3138,13 @@ await test("v6 strength: v5 ratings and their history migrate to an estimate wit
   assert.equal(SE.migrateEstimate({ r: "x" }), null);
   // A v5 rating without history still gets one point.
   assert.equal(SE.migrateEstimate({ r: 800, games: 0 }, 5).history.length, 1);
-  // Through storage: v4/v5 progress keeps its rating, and it migrates.
-  for (const k of Object.values(KEYS)) removeKey(k);
-  writeJSON(KEYS.progress, { problems: {}, rating: old });
-  migrate();
-  const p = loadProgress();
-  const m = SE.migrateEstimate(p.rating);
+  const m = est;
   assert.equal(m.r, 1200);
   // The migrated estimate keeps updating.
   const next = SE.rateGame(m, { impl: "L:10k", won: true, at: 60 });
   assert.equal(next.games, 4);
   assert.equal(next.history.length, 5);
-  for (const k of Object.values(KEYS)) removeKey(k);
-  // The app migrates at boot and rates with the new model.
-  const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
-  assert.match(ctl, /migrateEstimate\(state\.progress\.rating\)/);
+  // The app rates with the new model.
   const play = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
   assert.match(play, /rateGame\(prev, \{ impl, size: g\.game\.size, handicap, won \}\)/);
 });
@@ -3294,7 +3225,7 @@ await test("v6 strength: human-style and stronger-network labels follow the meas
   assert.ok(SE.levelTheta("LS:2d", { size: 9 }) > SE.levelTheta("L:2d", { size: 9 }));
 });
 
-await test("v6 strength: strings in one block, four languages; the chart uses design tokens", () => {
+await test("v6 strength: strings in one block, four languages", () => {
   const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
   const block = src.slice(src.indexOf("// v6 strength"));
   for (const k of ["strength.label", "strength.about"]) {
@@ -3302,9 +3233,6 @@ await test("v6 strength: strings in one block, four languages; the chart uses de
     for (const lang of LANG_IDS) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);
   }
   for (const lang of LANG_IDS) assert.ok(MESSAGES["strength.label"][lang].includes("±{1}"), lang);
-  const chart = fs.readFileSync(path.join(root, "src/web/js/app/strength-chart.jsx"), "utf8");
-  assert.doesNotMatch(chart, /#[0-9a-fA-F]{3,6}\b/, "no literal colours");
-  for (const tok of ["--text-2", "--text-3", "--text"]) assert.ok(chart.includes(`var(${tok})`), tok);
 });
 
 // v7: each area's tests live in scripts/tests/*.mjs (in name order).

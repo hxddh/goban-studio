@@ -19,7 +19,6 @@ export function applyAppearance() {
   const dark = s.appearance === "dark" || (s.appearance === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
-  root.dataset.board = s.board || "plain";
   root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
 }
 
@@ -31,10 +30,6 @@ export function setSetting(key, value) {
   if (key === "lang") setLang(value);
   if (key === "sound") setSound(value);
   if (key === "appearance" || key === "largeText") applyAppearance();
-  if (key === "board") {
-    Audio.setMaterial?.(value);
-    applyAppearance();
-  }
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 
@@ -105,7 +100,6 @@ export function locationNow() {
       topic: p.topic,
       theme: p.theme || null,
       shape: p.shape || null,
-      collection: p.collection || null, // v7
       lessonId: p.lesson?.lesson?.id || null,
       lessonIndex: p.lesson?.index ?? null,
       problemId: p.problem?.def?.id || null,

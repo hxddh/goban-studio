@@ -157,7 +157,6 @@ export function reviewNodeText(r) {
   let number = 0;
   for (let n = node; n && n.parent; n = n.parent) number++;
   if (!node.parent || !node.move) return A.reviewMoveText({ number: 0 });
-  if (r.guess) return t("a11y.moveN", [number]);
   const before = captureTotals(game, node.parent);
   const after = captureTotals(game, node);
   const captured = after.black + after.white - before.black - before.white;

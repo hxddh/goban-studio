@@ -1,5 +1,5 @@
 /**
- * Practice: the course, problem collections, today's five (problems, your
+ * Practice: the course, problem topics, today's five (problems, your
  * own mistakes and your weak themes), and mistake drills.
  */
 import { BLACK } from "../rules.js";
@@ -8,21 +8,15 @@ import * as S from "../solver.js";
 import { currentStreak, dailySet, markLesson, markMistake, markProblem, markSolvedLate, saveProgress, todayKey, touchStreak } from "../persist.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { COURSE } from "../content/course.js";
-import * as ProblemContent from "../content/problems.js";
-import GRADES from "../content/problem-grades.json";
+import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring } from "./ctl-core.js";
 import { topWeaknesses, THEME_TOPIC } from "./insight.js";
 import { pickNextLesson } from "./course-path.js";
-import { collectionProblems, dueUserProblems, findUserProblem, userProblemDef } from "./collections-store.js";
 
-export const PROBLEMS = ProblemContent.PROBLEMS;
-export const THEMES = ProblemContent.THEMES || [];
-export const SHAPES = ProblemContent.SHAPES || [];
-export { COURSE, GRADES };
+export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
-export const gradeOf = (id) => GRADES[id]?.grade || findUserProblem(id)?.grade || 1;
+export const gradeOf = (id) => GRADES[id]?.grade || 1;
 
 /* -------------------------------------------------------------- course */
 
@@ -135,7 +129,15 @@ function problemState(pz) {
   return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null };
 }
 
+/**
+ * v9: lesson steps and problem bodies arrive after start-up (content.js);
+ * whatever opens them waits for them, and runs at once when they are here.
+ */
 export function openLesson(lessonId, stepIndex = null) {
+  return withContent("course", () => showLesson(lessonId, stepIndex));
+}
+
+function showLesson(lessonId, stepIndex) {
   const found = allLessons().find((l) => l.lesson.id === lessonId);
   if (!found) return;
   if (!isRestoring()) remember();
@@ -217,6 +219,10 @@ export function practiceHome() {
 }
 
 export function openTopic(topic, theme = null) {
+  return withContent("problems", () => showTopic(topic, theme));
+}
+
+function showTopic(topic, theme) {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "practice";
@@ -226,6 +232,10 @@ export function openTopic(topic, theme = null) {
 
 /** A classic-shape collection, shown as a topic page. */
 export function openShape(shape) {
+  return withContent("problems", () => showShape(shape));
+}
+
+function showShape(shape) {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "practice";
@@ -259,30 +269,23 @@ export function themeName(id) {
 }
 
 export function openProblem(id, { daily = null } = {}) {
-  // v7: a problem from one of your own collections opens the same way.
-  const p = PROBLEMS.find((x) => x.id === id) || userProblemDef(id);
+  return withContent("problems", () => showProblem(id, daily));
+}
+
+function showProblem(id, daily) {
+  const p = PROBLEMS.find((x) => x.id === id);
   if (!p) return;
   if (!isRestoring() && !daily) remember();
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
   update((s) => {
     s.space = "practice";
-    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.practice.topic : p.topic, collection: p.collection || null };
+    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.practice.topic : p.topic };
   });
 }
 
-/** v7: one of your own problem collections, as a page. */
-export function openCollection(id) {
-  if (!isRestoring()) remember();
-  update((s) => {
-    s.space = "practice";
-    s.practice = { ...s.practice, view: "collection", collection: id, topic: null, theme: null, shape: null, problem: null, daily: null, mistake: null };
-  });
-}
-
-/** The list a problem is browsed in: its collection, theme or topic. */
+/** The list a problem is browsed in: its theme or topic. */
 function browseList(def) {
-  if (def.collection) return collectionProblems(def.collection);
   return state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(def.topic);
 }
 
@@ -326,9 +329,7 @@ export function setDailyPlanner(fn) {
 
 export function buildDaily(now = Date.now()) {
   const p = state.progress;
-  // v8: due reviews of imported problems share the review slots.
-  const reviews = dueUserProblems(p, now);
-  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now, reviews }) : null;
+  const planned = dailyPlanner ? dailyPlanner({ progress: p, pool: dailyPool(), grades: GRADES, now }) : null;
   if (Array.isArray(planned) && planned.length) return planned;
   const items = [];
   const due = p.mistakes.filter((m) => (m.due || 0) <= now).slice(0, 2);
@@ -338,7 +339,7 @@ export function buildDaily(now = Date.now()) {
     const pool = problemsOfTheme(weak.theme).filter((x) => !p.problems[x.id]?.solved);
     for (const x of pool.slice(0, 2)) if (items.length < 4) items.push({ kind: "p", id: x.id, why: weak.theme });
   }
-  const rest = dailySet(p, [...dailyPool(), ...reviews].filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
+  const rest = dailySet(p, dailyPool().filter((x) => !items.some((i) => i.id === x.id)), GRADES, 5 - items.length, now);
   for (const x of rest) items.push({ kind: "p", id: x.id });
   return items.slice(0, 5);
 }
@@ -353,9 +354,8 @@ export function todaysDaily() {
   if (!(d && d.date === todayKey() && Array.isArray(d.items))) return null;
   // A saved set may name a problem a later version removed: drop it, and
   // keep the position in the set on the item the learner was at.
-  // v8: a drill can go too (only the newest 200 are kept), and an imported
-  // problem with its collection.
-  const known = (it) => (it?.kind === "m" ? state.progress.mistakes.some((m) => m.id === it.id) : it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id) || !!findUserProblem(it.id));
+  // v8: a drill can go too (only the newest 200 are kept).
+  const known = (it) => (it?.kind === "m" ? state.progress.mistakes.some((m) => m.id === it.id) : it?.kind !== "p" || PROBLEMS.some((x) => x.id === it.id));
   if (!d.items.every(known)) {
     const before = d.items.slice(0, d.index || 0).filter(known).length;
     d.items = d.items.filter(known);
@@ -367,6 +367,11 @@ export function todaysDaily() {
 }
 
 export function startDaily() {
+  // The beginner pool reads the finished lessons' steps (dailyPool).
+  return withContent("course", () => withContent("problems", showDaily));
+}
+
+function showDaily() {
   let daily = todaysDaily();
   if (!daily) {
     daily = { date: todayKey(), items: buildDaily(), index: 0, done: [] };
@@ -662,7 +667,6 @@ export function nextProblem() {
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i >= 0 && i + 1 < list.length) openProblem(list[i + 1].id);
-  else if (P.def.collection) openCollection(P.def.collection);
   else openTopic(P.def.topic, state.practice.theme);
 }
 

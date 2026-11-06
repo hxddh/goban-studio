@@ -221,11 +221,6 @@ export function estimateNow(est, now = Date.now()) {
   return { r: Math.round(r), lo: Math.round(lo), hi: Math.round(hi), rank, pm: Math.max(1, Math.round((hi - lo) / 200)), sigma, games: est.games || 0 };
 }
 
-/** The last `n` history points ({ at, r, lo, hi }), for the chart. */
-export function strengthSeries(est, n = 30) {
-  return (est?.history || []).filter((h) => Number.isFinite(h.r)).slice(-n).map((h) => ({ at: h.at, r: h.r, lo: h.lo ?? h.r, hi: h.hi ?? h.r }));
-}
-
 /**
  * The rank to suggest: the ladder entry (opponents.js, with what is
  * `installed`) you are expected to score closest to 50% against on

@@ -1,6 +1,6 @@
 /**
- * Library: the game in progress, my games, classic games, and openings
- * (the explorer and the pro-opening drills, v8: one tab).
+ * Library: the game in progress, my games, classic games, and the opening
+ * explorer.
  */
 import * as Lib from "../library.js";
 import { t } from "../i18n.js";
@@ -16,8 +16,7 @@ export function LibraryView() {
   if (state.review && state.review.meta.space === "library") return <ReviewView />;
   const L = state.library;
   if (L.explorer) return <ExplorerView />;
-  // v8: the pro openings live with the explorer (one place for openings).
-  const tab = L.tab === "openings" ? "explorer" : L.tab;
+  const tab = L.tab;
   return (
     <>
     <Toolbar>
@@ -45,12 +44,7 @@ export function LibraryView() {
       </div>
       {tab === "mine" && <MyGames />}
       {tab === "classics" && <Classics />}
-      {tab === "explorer" && (
-        <>
-          <ExplorerEntries />
-          <Openings />
-        </>
-      )}
+      {tab === "explorer" && <ExplorerEntries />}
     </div>
     </>
   );
@@ -207,29 +201,5 @@ function Classics() {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Openings() {
-  const p = state.progress;
-  return (
-    <section class="section">
-      <h2 class="section-title">{t("library.openings")}</h2>
-      <p class="muted section-sub">{t("library.openingsHelp")}</p>
-      <ul class="group collection">
-        {C.OPENINGS.map((o, i) => (
-          <li>
-            <button type="button" class={`collection-row ${p.openings[o.id]?.done ? "done" : ""}`} onClick={() => C.openOpening(o.id)}>
-              <span class="collection-no">{String(i + 1).padStart(2, "0")}</span>
-              <span class="collection-main">
-                {/* The heading already says "Pro openings": the rows keep the players. */}
-                <strong>{C.tx(o.title).replace(/^[^：:]+[：:]\s*/, "")}</strong>
-              </span>
-              {p.openings[o.id]?.done && <Icon name="check" size={15} />}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

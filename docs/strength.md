@@ -1124,8 +1124,8 @@ bridge player and the anchor's furthest extrapolation.
 Until v5 the player's level was an Elo-style number that moved by a fixed
 step after each game against the computer, judged against the level's
 *label*. Since v6 it is an estimate with an uncertainty
-(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" with a chart of
-the estimate and its band over time (`app/strength-chart.jsx`).
+(`src/web/js/app/strength.js`), shown as "≈ 12 kyu (±1)" (`app/estimate-label.js`; v9 removed the
+chart of the estimate over time).
 
 **Units.** The estimate lives on the scale the levels were measured on:
 θ, Bradley–Terry strength in nats on 19×19, with the same EGF mapping and
@@ -1201,8 +1201,8 @@ the estimate).
 start: μ is the old rating, σ what that many fair games would leave from
 the prior, and every old history point keeps its time and value and gets
 the band of its game count. `progress.rating.r` (the GoR of μ) and
-`history[].r` keep their meaning, so the week summary and the trends
-view read old and new data alike. Rank labels round to the nearest rank
+`history[].r` keep their meaning, so the trends view reads old and new
+data alike. Rank labels round to the nearest rank
 since v6 (v5 rounded a rating towards the weaker rank).
 
 ## Limitations

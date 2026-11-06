@@ -8,19 +8,17 @@
  * instead, so every call always makes an appropriate sound (or none when
  * sound is off).
  *
- * Exports: setSound(on), setVolume(v), setMaterial(name), stone(capture),
+ * Exports: setSound(on), setVolume(v), stone(capture),
  * capture(count), pass(), correct(), wrong(), gameEnd(), win(), lose().
  */
 let ctx = null;
 let master = null;
 let enabled = true;
 let volume = 0.8;
-let material = "kaya";
 let base = "assets/sounds/";
 
 const FILES = {
   placeWood: ["place-wood-0", "place-wood-1", "place-wood-2", "place-wood-3", "place-wood-4", "place-wood-5"],
-  placeSoft: ["place-soft-0", "place-soft-1", "place-soft-2", "place-soft-3", "place-soft-4", "place-soft-5"],
   capture1: ["capture-1"],
   capture2: ["capture-2"],
   capture3: ["capture-3"],
@@ -36,9 +34,6 @@ const FILES = {
  * result −3 dB, everything that is not the board −4.5 dB.
  */
 export const LEVEL = { stone: 1, capture: 0.5, result: 0.71, ui: 0.6 };
-
-/** Surfaces that take the softer placement set. */
-const SOFT = new Set(["paper", "slate", "ink"]);
 
 const buffers = {};
 const last = {};
@@ -155,11 +150,6 @@ export function setVolume(v) {
   if (master) master.gain.value = volume;
 }
 
-/** Board surface: "kaya" / "katsura" / "wood" ring out; "paper" / "slate" are softer. */
-export function setMaterial(name) {
-  material = String(name || "kaya");
-}
-
 /** Where the sounds folder lives relative to the page (default "assets/sounds/"). */
 export function setSoundBase(path) {
   base = path.endsWith("/") ? path : path + "/";
@@ -191,8 +181,7 @@ function tone(freq, duration, gainValue, type = "sine", at = 0) {
 /** A stone is placed; `capture` (boolean or count) also drops prisoners into the lid. */
 export function stone(captureFlag = false) {
   if (!context()) return;
-  const key = SOFT.has(material) ? "placeSoft" : "placeWood";
-  if (!play(key)) tone(320, 0.06, 0.08, "triangle");
+  if (!play("placeWood")) tone(320, 0.06, 0.08, "triangle");
   if (captureFlag) capture(typeof captureFlag === "number" ? captureFlag : 1, 0.12);
 }
 

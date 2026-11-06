@@ -58,7 +58,6 @@ export function ExplorerView() {
     variation: null,
     moveNumbers: null,
     showCoords: state.settings.coords,
-    material: state.settings.board,
     view: X.explorerView(e),
     hoverColor: node.turn,
     interactive: true,

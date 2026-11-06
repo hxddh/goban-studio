@@ -121,9 +121,7 @@ export default async function ({ test, assert, root }) {
     'export * as P from "./src/web/js/persist.js";',
     'export * as Practice from "./src/web/js/app/practice-ctl.js";',
     'export * as PlanCtl from "./src/web/js/app/plan-ctl.js";',
-    'export * as Store from "./src/web/js/app/collections-store.js";',
     'export * as Review from "./src/web/js/app/review-ctl.js";',
-    'export * as I from "./src/web/js/problem-import.js";',
     'export * as Upd from "./src/web/js/app/update-ctl.js";',
     'export { Game, BLACK, WHITE } from "./src/web/js/rules.js";',
     'export { setLang } from "./src/web/js/i18n.js";',
@@ -132,7 +130,7 @@ export default async function ({ test, assert, root }) {
     'export { loadSGF } from "./src/web/js/sgf.js";',
     'export { reportFits, buildReport } from "./src/web/js/app/report-model.js";',
   ]);
-  const { Report, Engine, Lib, P, Practice, PlanCtl, Store, Review, I, Game, BLACK, state, loadSGF, reportFits } = A;
+  const { Report, Engine, Lib, P, Practice, PlanCtl, Review, Game, BLACK, state, loadSGF, reportFits } = A;
 
   const requests = [];
   const cancels = [];
@@ -259,52 +257,6 @@ export default async function ({ test, assert, root }) {
       for (const r of Lib.listGames()) Lib.deleteGame(r.id);
     });
 
-    /* --------------------------- A3: imported problems in the Daily five */
-
-    const dir = path.join(root, "tests/fixtures/problems");
-    const files = fs
-      .readdirSync(dir)
-      .filter((n) => n.endsWith(".sgf"))
-      .sort()
-      .map((name) => ({ name, text: fs.readFileSync(path.join(dir, name), "utf8") }));
-    const rows = I.readProblemFiles(files).map((e) => I.analyseEntry(e));
-    const col = I.buildCollection(rows, { name: "Mine", id: "cdaily" });
-    Store.addCollection(col);
-
-    await test("v8 fix: due reviews of imported problems take part in the Daily five; new ones stay in their collection", () => {
-      const now = Date.now();
-      state.progress = { ...P.loadProgress(), games: [], mistakes: [], problems: {}, daily: null };
-      // Nothing tried: no imported problem in today's five.
-      const fresh = Practice.buildDaily(now);
-      assert.equal(fresh.length, 5);
-      assert.ok(fresh.every((i) => !i.id.startsWith("u-")), "new imported problems are not offered");
-      // One imported problem missed two days ago, now due; another tried and not due.
-      const [u1, u2] = col.problems;
-      state.progress.problems[u1.id] = { solved: false, attempts: 1, streak: 0, due: now - DAY, last: now - 2 * DAY };
-      state.progress.problems[u2.id] = { solved: true, attempts: 1, streak: 1, due: now + 3 * DAY, last: now - DAY };
-      const due = Practice.buildDaily(now);
-      assert.ok(due.some((i) => i.id === u1.id), "the due imported problem is a review");
-      assert.ok(!due.some((i) => i.id === u2.id), "one not yet due is not");
-      assert.equal(due.length, 5);
-      // With a focus (the plan chooses): it takes a review slot.
-      state.progress.games = [0, 1, 2, 3].map((i) => ({ id: "g" + i, at: now - (i + 8) * DAY, size: 19, color: 1, won: false, moves: 200, confidence: "high", phases: { opening: { loss: 2 }, middle: { loss: 6 }, endgame: { loss: 2 } }, themes: { cut: 1 }, themeLoss: { cut: 5 } }));
-      const planned = Practice.buildDaily(now);
-      const item = planned.find((i) => i.id === u1.id);
-      assert.ok(item, "the plan keeps the imported review");
-      assert.equal(item.role, "review");
-      assert.ok(!planned.some((i) => i.id === u2.id));
-      // A set saved with it stays whole when read back today.
-      state.progress.daily = { date: P.todayKey(), items: planned, index: 0, done: [] };
-      assert.equal(Practice.todaysDaily().items.length, 5, "an imported problem is not dropped as unknown");
-      Practice.startDaily();
-      if (planned[0].id === u1.id) assert.equal(state.practice.problem.def.id, u1.id);
-      state.progress.daily = { date: P.todayKey(), items: [{ kind: "p", id: u1.id }], index: 0, done: [] };
-      Practice.startDaily();
-      assert.equal(state.practice.view, "problem");
-      assert.equal(state.practice.problem.def.id, u1.id, "the imported problem opens from the Daily five");
-      state.progress.games = [];
-    });
-
     /* ------------------------ A2: classic-game drills and the weak themes */
 
     await test("v8 fix: drills from reviewed classic games do not count toward the weak themes", () => {
@@ -389,33 +341,6 @@ export default async function ({ test, assert, root }) {
       assert.equal(g.game.moveNumber, 3);
       assert.equal(g.game.mainLine().length, 4);
       assert.equal(g.game.mainLine()[1].children.length, 2, "the variation at move 1 is kept");
-    });
-
-    await test("v8 fix: 'Guess the next move' turned on at a game's last move starts from the beginning instead of failing", () => {
-      const game = new Game({ size: 9 });
-      fill(game, 6);
-      game.setResult("B+R");
-      Review.openReview(game, { source: "record", recordId: "none", space: "library" }); // opens on the last move
-      assert.equal(game.moveNumber, 6);
-      Review.toggleGuess();
-      assert.equal(game.moveNumber, 0, "from the start");
-      Review.revealGuess(); // threw before: there was no next move to reveal
-      assert.equal(game.moveNumber, 1);
-      for (let k = 0; k < 10; k++) Review.revealGuess();
-      assert.equal(state.review.guess.done, true);
-      assert.equal(game.moveNumber, 6);
-      Review.revealGuess(); // done: nothing more
-      assert.equal(game.moveNumber, 6);
-      // From a variation: back to the main-line move it left.
-      Review.toggleGuess();
-      Review.reviewGoto(2);
-      Review.reviewPlay(7, 7);
-      assert.ok(!Review.onMainLine());
-      Review.toggleGuess();
-      assert.equal(Review.reviewIndex(), 2);
-      Review.guessPlay(...[game.mainLine()[3].move.x, game.mainLine()[3].move.y]);
-      assert.equal(state.review.guess.right, 1);
-      state.review = null;
     });
 
     await test("v8 fix: a game saved during the count opens counting again, not stuck without controls", async () => {

@@ -77,7 +77,6 @@ export function PlayView() {
     variation: null,
     moveNumbers: moveNumbers(game),
     showCoords: s.settings.coords,
-    material: s.settings.board,
     view: null,
     ghost: g.ghost ? { ...g.ghost, color: game.turn } : null,
     hoverColor: scoring ? null : game.turn,
@@ -518,7 +517,6 @@ export function ReviewView() {
   const game = r.game;
   const node = game.current;
   const marks = [];
-  if (r.guess?.last === "wrong" && r.guess.wrongAt) marks.push({ ...r.guess.wrongAt, type: "cross", tone: "bad" });
   // Marks recorded on this move (SGF TR/SQ/CR/MA/LB).
   if (!r.variation) for (const mk of node.marks || []) marks.push({ x: mk.x, y: mk.y, type: mk.type, label: mk.text });
   const focusKm = r.focus != null ? r.keyMoves.find((k) => k.index === r.focus) : null;
@@ -527,9 +525,9 @@ export function ReviewView() {
     const km = r.keyMoves.find((k) => k.index === r.variation.index);
     if (km?.best && !km.best.pass && r.variation.kind === "played") marks.push({ ...km.best, type: "circle", tone: "good" });
   }
-  // Live candidates on the board (not during guessing or while a line is shown).
+  // Live candidates on the board (not while a line is shown).
   const live = r.live && r.live.nodeId === node.id ? r.live : null;
-  if (live && !r.variation && !r.guess) {
+  if (live && !r.variation) {
     const total = live.moves.reduce((a, m) => a + (m.visits || 0), 0) || 1;
     live.moves
       .filter((m) => !m.pass && (m.visits || 0) / total >= 0.03)
@@ -565,10 +563,9 @@ export function ReviewView() {
     variation: varMoves,
     moveNumbers: r.variation ? null : moveNumbers(game),
     showCoords: s.settings.coords,
-    material: s.settings.board,
     view: null,
-    hoverColor: r.guess?.done ? null : game.turn,
-    interactive: !(r.guess && r.guess.done),
+    hoverColor: game.turn,
+    interactive: true,
   };
   const h = reviewHeading(r);
   return (
@@ -598,8 +595,7 @@ function reviewHeading(r) {
   if (meta.classic) {
     title = C.tx(meta.classic.title);
     sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
-  } else if (meta.opening) title = C.tx(meta.opening.title);
-  else if (meta.name) title = meta.name;
+  } else if (meta.name) title = meta.name;
   return { crumbs, title, sub };
 }
 
@@ -609,9 +605,8 @@ function ReviewTools() {
   const meta = r.meta;
   return (
     <div class="tool-group">
-      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis && !r.guess} onClick={C.toggleLive} />}
+      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis} onClick={C.toggleLive} />}
       <IconButton icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
-      <IconButton icon="target" label={t("review.guess")} active={!!r.guess} onClick={C.toggleGuess} />
       <IconButton icon="download" label={t("common.exportSgf")} onClick={() => C.exportSGF(r.game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
       <span class="tool-sep" />
       <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
@@ -638,10 +633,10 @@ function ReviewNav() {
         aria-label={t("review.position")}
         aria-valuetext={t("review.moveOf", [i, max])}
         onInput={(e) => C.reviewGoto(Number(e.currentTarget.value))}
-        disabled={!!r.guess || inVar}
+        disabled={inVar}
       />
-      <IconButton icon="next" label={`${t("review.next")} (→)`} onClick={() => C.reviewStep(1)} disabled={!r.game.current.children.length || !!r.guess} />
-      <IconButton icon="last" label={t("review.last")} onClick={() => C.reviewGoto(max)} disabled={(!inVar && i >= max) || !!r.guess} />
+      <IconButton icon="next" label={`${t("review.next")} (→)`} onClick={() => C.reviewStep(1)} disabled={!r.game.current.children.length} />
+      <IconButton icon="last" label={t("review.last")} onClick={() => C.reviewGoto(max)} disabled={!inVar && i >= max} />
       <span class="nav-count">{inVar ? t("review.variationDepth", [depth]) : t("review.moveOf", [i, max])}</span>
     </div>
   );
@@ -832,7 +827,7 @@ function LiveLine() {
         {t("review.estimateAt", [Math.max(0, C.reviewIndex())])} · {t("play.evalText", [e.scoreLead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(e.scoreLead) * 2) / 2)])}
         {live && !r.live.done ? ` · ${t("review.liveSearching")}` : ""}
       </span>
-      {live && !r.variation && !r.guess && <span class="fine">{t("review.candidatesLegend")}</span>}
+      {live && !r.variation && <span class="fine">{t("review.candidatesLegend")}</span>}
     </div>
   );
 }
@@ -877,7 +872,7 @@ function Variations() {
 
 /** No key mistakes: praise only a player who did not fall behind. */
 function noMistakesText(r) {
-  if (r.meta.classic || r.meta.opening || r.meta.source === "import") return t("review.noKeyMovesNeutral");
+  if (r.meta.classic || r.meta.source === "import") return t("review.noKeyMovesNeutral");
   const line = r.game.mainLine();
   const res = line[line.length - 1].result || "";
   const pts = r.points.filter(Boolean);
@@ -911,59 +906,48 @@ function ReviewPanel() {
   };
   return (
     <aside class="panel review-panel" aria-label={t("review.title")}>
-      {r.guess ? (
-        <GuessCard />
-      ) : (
-        <>
-          <Chart />
-          <LiveLine />
-          {/* v8: one quiet status line — the analysis, then where the game left the book. */}
-          <p class="fine review-status" aria-live="polite">
-            {(r.analyzing || r.engine !== "katago") && (
-              <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
+      <Chart />
+      <LiveLine />
+      {/* v8: one quiet status line — the analysis, then where the game left the book. */}
+      <p class="fine review-status" aria-live="polite">
+        {(r.analyzing || r.engine !== "katago") && (
+          <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
+        )}
+        <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
+      </p>
+      <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
+      <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
+        {tab === "analysis" && (
+          <>
+            <section class="key-moves">
+              {r.refining && <p class="fine">{t("story.refining")}</p>}
+              {r.keyMoves.length ? (
+                <ol>
+                  {r.keyMoves.map((km) => (
+                    <KeyMove km={km} />
+                  ))}
+                </ol>
+              ) : (
+                !r.analyzing && <p class="muted">{noMistakesText(r)}</p>
+              )}
+            </section>
+            <Variations />
+            {meta.classic && (
+              <section class="quiet-note">
+                <p>{C.tx(meta.classic.note)}</p>
+                {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
+              </section>
             )}
-            <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
-          </p>
-          <Segmented class="review-tabs" value={tab} options={tabs} onChange={setTab} label={t("review.tabs")} />
-          <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
-            {tab === "analysis" && (
-              <>
-                <section class="key-moves">
-                  {r.refining && <p class="fine">{t("story.refining")}</p>}
-                  {r.keyMoves.length ? (
-                    <ol>
-                      {r.keyMoves.map((km) => (
-                        <KeyMove km={km} />
-                      ))}
-                    </ol>
-                  ) : (
-                    !r.analyzing && <p class="muted">{noMistakesText(r)}</p>
-                  )}
-                </section>
-                <Variations />
-                {meta.classic && (
-                  <section class="quiet-note">
-                    <p>{C.tx(meta.classic.note)}</p>
-                    {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
-                  </section>
-                )}
-                {meta.opening && (
-                  <section class="quiet-note">
-                    <p>{C.tx(meta.opening.text)}</p>
-                  </section>
-                )}
-              </>
-            )}
-            {tab === "summary" && <GameSummary />}
-            {tab === "notes" && (
-              <>
-                <EditSection />
-                <TreeView />
-              </>
-            )}
-          </div>
-        </>
-      )}
+          </>
+        )}
+        {tab === "summary" && <GameSummary />}
+        {tab === "notes" && (
+          <>
+            <EditSection />
+            <TreeView />
+          </>
+        )}
+      </div>
 
       <div class="panel-foot">
         <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
@@ -1098,27 +1082,6 @@ function EditSection() {
         )}
       </div>
       {r.edits?.target === null && <p class="fine">{t("edit.notSaved")}</p>}
-    </section>
-  );
-}
-
-function GuessCard() {
-  const r = state.review;
-  const g = r.guess;
-  const msg =
-    g.done ? t("guess.done", [g.right, g.tries]) : g.last === "right" ? t("guess.right") : g.last === "wrong" ? t("guess.wrong") : g.last === "revealed" ? t("guess.revealed") : t("guess.prompt");
-  return (
-    <section class={`card guess ${g.last || ""}`} aria-live="polite">
-      <h2>{t("review.guess")}</h2>
-      <p>{msg}</p>
-      <p class="fine">{t("guess.score", [g.right, g.tries])}</p>
-      {!g.done && (
-        <div class="actions">
-          <Button kind="ghost" onClick={C.revealGuess}>
-            {t("guess.reveal")}
-          </Button>
-        </div>
-      )}
     </section>
   );
 }

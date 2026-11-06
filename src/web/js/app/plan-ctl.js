@@ -9,12 +9,11 @@ import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, setDailyPlanner, t
 import { evidenceOf, focusLesson, focusTopic, planDaily, weekToKeep, weeklyModel } from "./plan.js";
 import { saveProgress } from "../persist.js";
 import { weekStart } from "./week.js";
-import { CLASSICS } from "../content/classics.js";
-import { OPENINGS } from "../content/openings.js";
+import { CLASSICS } from "../content.js";
 
 // v8: drills of these games (by their gameKey) are not the player's own.
 let foreignKeys = null;
-const foreign = () => (foreignKeys ||= new Set([...CLASSICS, ...OPENINGS].map((g) => g.id)));
+const foreign = () => (foreignKeys ||= new Set(CLASSICS.map((g) => g.id)));
 
 /** The model behind this week's focus (see plan.weeklyModel). */
 export function planModel(now = Date.now()) {
@@ -66,7 +65,7 @@ export function openFocusProblems(item) {
 }
 
 /** Today's five: the plan chooses when it has a focus (else practice-ctl's own choice). */
-setDailyPlanner(({ progress, pool, grades, now, reviews = [] }) => {
+setDailyPlanner(({ progress, pool, grades, now }) => {
   const model = weekly(progress, grades, now);
-  return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now, reviews });
+  return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now });
 });

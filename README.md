@@ -145,7 +145,7 @@ are ad-hoc signed (macOS) and unsigned (Windows).
 ## Places, one board
 
 - **Today** — one starting screen: continue (or the suggested game), today's
-  five, the next lesson, what to work on, your level over time.
+  five, the next lesson, what to work on, your level ("≈ 12 kyu (±1)").
 - **Play** — a game against KataGo at a rank-like strength (≈30 kyu to ≈2
   dan), or two players on one board. Handicap is suggested from your level.
   The panel shows only the players, whose turn it is, **Pass** (with a
@@ -157,27 +157,27 @@ are ad-hoc signed (macOS) and unsigned (Windows).
   game, an imported SGF, a classic. KataGo analyses every position (win rate
   and score lead), draws the balance of the game, and lists the three moves
   that lost the most, each with the move played and KataGo's better line to
-  play through on the board. Territory estimate, “guess the next move” and
-  “play from here” are one click away.
+  play through on the board. Territory estimate and “play from here” are
+  one click away.
 - **Practice** — a course that starts from zero and goes on to intermediate
   play (opening principles, basic joseki, shape, endgame, middle-game
   fighting) and, since v6, an advanced course for players around 5 kyu to
   1 dan (whole-board judgement, invasion and reduction, life and death with
   ko and seki, tesuji in combination, middle-game strategy; 5 units, 15
   lessons), 18 units and 82 lessons in all, in multi-step lessons with
-  explanation, placement exercises and live problems; problem
-  collections by topic, and a daily five with spaced review. Every problem is
+  explanation, placement exercises and live problems; problems by topic,
+  and a daily five with spaced review. Every problem is
   answered live by a built-in solver: a wrong move is met with the real
   refutation on the board, a right move with the most stubborn defence.
 - **Library** — the game in progress (“Continue”), your games with
   thumbnails, filters (won / lost / imported) and search, 20 classic games
-  and 40 professional openings to replay as guess-the-move drills. SGF import
+  and the opening explorer. SGF import
   and export; double-clicking an `.sgf` opens it on macOS and Windows; records
   under Japanese, Chinese or Korean rules keep their ruleset, and one that
   declares another ruleset (AGA, Ing, New Zealand…) is rejected with an
   explanation rather than silently re-scored.
 - **Settings** (⌘, / Ctrl+,) — language, light/dark/system appearance,
-  Plain / Light wood / Ink board, coordinates, move numbers, sound, your
+  coordinates, move numbers, sound, your
   level, and update checks.
 - **Keyboard** — ⌘N new game, ⌘Z undo, ⇧⌘P pass, ⇧⌘H hint, ⌘. focus mode,
   ⌘1/2/3/4 places, ←/→ through a review, and the board itself is playable with
@@ -349,7 +349,7 @@ and rules rejection, every UI string in four languages (and that every key
 the interface uses exists), the solver on classic shapes and ladders,
 Benson's unconditional life, every practice problem and course lesson, the
 KataGo report parser and strength picker, the native bridge request,
-handicap suggestion, v1 → v2 data migration, library rules and the
+handicap suggestion, library rules and the
 spaced-review ladder. It runs in Node without a browser or native SDK.
 
 ## Desktop shell
@@ -443,7 +443,7 @@ src/web/js/engine.js          one engine interface: strength ladder, hints, revi
 src/web/js/katago.js          native bridge client and KataGo report parser
 src/web/js/ai.js              offline fallback: Moka 9×9 and the heuristic engine
 src/web/js/solver.js          life-and-death / capturing solver (nets, snapbacks, ko)
-src/web/js/materials.js       the wood grain and stone sprites (src/web/assets)
+src/web/js/materials.js       the stone sprites (src/web/assets)
 src/web/js/selftest.js        packaged-app self-test (async, stream, incremental, cancel)
 src/web/js/tour.js            packaged-app screenshot tour (GOBAN_TOUR_OUT)
 src/web/js/update.js          update check: version compare, opt-in weekly schedule
@@ -462,9 +462,11 @@ scripts/make-assets.mjs       regenerates every texture, stone, sound and icon
 scripts/patch-sdk.mjs         keeps the system Edit/Window menus beside app menus
 src/web/js/rules.js           game tree, legality, Japanese scoring, SGF export
 src/web/js/sgf.js             dependency-free FF[4] reader
-src/web/js/content/           course, problems (+ measured grades), openings, classics
+src/web/js/content/           course, problems (+ measured grades), classics, book
+src/web/js/content.js         content in two steps: a start-up index, then lesson steps,
+                              problem bodies and classic records fetched on idle or first use
 src/web/js/i18n.js            one key → four strings
-src/web/js/persist.js         guarded storage, v1 → v2 migration, spaced review
+src/web/js/persist.js         guarded storage, spaced review
 src/web/js/library.js         saved games and the current game
 src/engine.zig                persistent KataGo GTP child process
 src/main.zig                  Native SDK entry, bridge, window, open-file queue

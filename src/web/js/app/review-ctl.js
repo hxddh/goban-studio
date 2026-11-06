@@ -11,7 +11,7 @@
 import { Game, influenceMap, MARK_KINDS, treeLayout as layoutTree } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
-import { markClassic, markOpening, addMistake } from "../persist.js";
+import { addMistake } from "../persist.js";
 import * as Lib from "../library.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
@@ -144,7 +144,6 @@ export function openReview(game, meta = {}) {
     focus: null, // highlighted key move
     live: null,
     hover: null,
-    guess: meta.guess ? { color: meta.guessColor ?? null, right: 0, tries: 0, last: null } : null,
     // v7: the review owns its searches; leaving it aborts this (scheduler.js).
     ctl: new AbortController(),
     // v4: deeper analyses after the top mistakes (index → analysis), and
@@ -171,8 +170,8 @@ export function openReview(game, meta = {}) {
     s.sheet = null;
     s.menu = null;
   });
-  if (!meta.guess && !meta.points) analyzeReview(review);
-  else if (!meta.guess) refineKeyMoves(review);
+  if (!meta.points) analyzeReview(review);
+  else refineKeyMoves(review);
   startLive();
 }
 
@@ -316,7 +315,6 @@ export function gotoNode(node) {
   r.autoJump = false;
   r.game.goto(node.id);
   r.variation = null;
-  if (r.guess) r.guess.last = null;
   update();
   startLive();
 }
@@ -351,13 +349,12 @@ export function branchPoints() {
 }
 
 /**
- * A move on the review board: in guess mode it is a guess; otherwise it
- * opens (or follows) a variation from the position on screen.
+ * A move on the review board opens (or follows) a variation from the
+ * position on screen.
  */
 export function reviewPlay(x, y) {
   const r = state.review;
   if (!r) return;
-  if (r.guess) return guessPlay(x, y);
   if (r.markTool) return toggleMark(r.markTool, x, y);
   const cur = r.game.current;
   const existing = cur.children.find((c) => c.move && !c.move.pass && c.move.x === x && c.move.y === y);
@@ -410,7 +407,7 @@ export function gameTrends(n = 10) {
 
 /* ------------------------------------------ v5: editing the record */
 
-/** Where edits are saved: "record" (library), "current" (the game in play) or null (kept in memory only: classics, openings). */
+/** Where edits are saved: "record" (library), "current" (the game in play) or null (kept in memory only: classics). */
 function editTarget(r) {
   if (r.source === "record" && r.meta.recordId) return "record";
   if (r.source === "current" && state.game?.game === r.game) return "current";
@@ -502,7 +499,7 @@ function realign(r, before) {
   stopReviewWork(r);
   r.ctl = new AbortController();
   r.refining = false;
-  if (r.analyzing || (hadAny && !r.guess && r.points.some((p) => !p))) analyzeReview(r, { existing: r.points.slice() });
+  if (r.analyzing || (hadAny && r.points.some((p) => !p))) analyzeReview(r, { existing: r.points.slice() });
   else if (wasRefining) refineKeyMoves(r);
 }
 
@@ -607,7 +604,7 @@ export function stopLive() {
 export function startLive() {
   stopLive();
   const r = state.review;
-  if (!r || r.guess || !state.settings.liveAnalysis || !state.engine.available) {
+  if (!r || !state.settings.liveAnalysis || !state.engine.available) {
     if (r) r.live = null;
     return;
   }
@@ -738,7 +735,7 @@ export function focusMistake(km) {
 export function practiceThis(km) {
   const r = state.review;
   if (!r || !km.best || km.best.pass) return;
-  const key = r.meta.recordId || r.meta.classicId || r.meta.openingId || "game-" + r.game.root.id;
+  const key = r.meta.recordId || r.meta.classicId || "game-" + r.game.root.id;
   const m = {
     gameKey: key,
     index: km.index,
@@ -750,81 +747,13 @@ export function practiceThis(km) {
     loss: km.loss,
     theme: km.theme,
     size: r.game.size,
-    // v8: a drill from a classic game or a pro opening is not the player's
-    // own mistake; the training plan leaves it out of the weak themes.
-    ...(r.meta.classicId || r.meta.openingId ? { own: false } : {}),
+    // v8: a drill from a classic game is not the player's own mistake;
+    // the training plan leaves it out of the weak themes.
+    ...(r.meta.classicId ? { own: false } : {}),
   };
   addMistake(state.progress, m);
   const id = `${key}-${km.index}`;
   openMistakeDrill(id);
-}
-
-/* -------------------------------------------------------- guessing */
-
-export function guessPlay(x, y) {
-  const r = state.review;
-  if (!r?.guess) return;
-  const line = r.game.mainLine();
-  const i = reviewIndex();
-  const next = line[i + 1];
-  if (!next?.move) return;
-  r.guess.tries++;
-  if (!next.move.pass && next.move.x === x && next.move.y === y) {
-    r.guess.right++;
-    r.guess.last = "right";
-    Audio.correct ? Audio.correct() : Audio.stone(false);
-    advanceGuess();
-  } else {
-    r.guess.last = "wrong";
-    r.guess.wrongAt = { x, y };
-    Audio.wrong?.();
-    update();
-  }
-}
-
-export function revealGuess() {
-  const r = state.review;
-  if (!r?.guess || r.guess.done) return;
-  r.guess.last = "revealed";
-  advanceGuess();
-}
-
-function advanceGuess() {
-  const r = state.review;
-  const line = r.game.mainLine();
-  let i = reviewIndex() + 1;
-  r.game.goto(line[i].id);
-  const color = r.guess.color;
-  while (color != null && i + 1 < line.length && line[i + 1].move?.color !== color) {
-    i++;
-    r.game.goto(line[i].id);
-  }
-  if (i >= line.length - 1) {
-    r.guess.done = true;
-    if (r.meta.openingId) markOpening(state.progress, r.meta.openingId);
-    if (r.meta.classicId) markClassic(state.progress, r.meta.classicId);
-    Audio.win();
-  }
-  update();
-}
-
-export function toggleGuess() {
-  const r = state.review;
-  if (!r) return;
-  r.guess = r.guess ? null : { color: null, right: 0, tries: 0, last: null };
-  if (r.guess) {
-    // v8: guessing needs a next move of the game: from a variation, the
-    // main-line move it left; from the last move, the start of the game.
-    const line = r.game.mainLine();
-    let n = r.game.current;
-    while (n.parent && !line.includes(n)) n = n.parent;
-    if (n === line[line.length - 1]) n = line[0];
-    r.game.goto(n.id);
-    r.variation = null;
-    stopLive();
-    r.live = null;
-  } else startLive();
-  update();
 }
 
 /* ---------------------------------------------------- play from here */
