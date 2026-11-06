@@ -11,7 +11,7 @@
  * moves, result, date, names, thumbnail) and how the game was played
  * (opponent, rank, impl, humanColor, rating …). `analysis` is the
  * whole-game analysis (one point per position) and `review` the post-game
- * review built from it (app/report-model.js), so both live with their game
+ * review built from it (play/review-model.js), so both live with their game
  * and go when it goes.
  *
  * Readers get a record: the file flattened, meta fields at the top, with

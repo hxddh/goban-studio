@@ -83,5 +83,5 @@ export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) 
 }
 
 export function isFocus() {
-  return !!state.settings.focus && state.space === "play" && state.play.view === "game" && !C.playReviewing() && !C.reportVisible();
+  return !!state.settings.focus && state.space === "play" && state.play.view === "game" && !C.playReviewing();
 }

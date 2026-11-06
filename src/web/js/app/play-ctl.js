@@ -1,12 +1,13 @@
 /**
  * Playing a game: the live board, the computer's replies and how they feel,
- * teaching aids, clocks, scoring, the end of the game and what follows it.
+ * teaching aids, clocks, scoring, and the end of the game: the same board
+ * turns into the post-game review (review-ctl.js), in place.
  */
 import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
-import { THEME_TOPIC, addMistake, estimate, focus, implOpponent, recordGame, suggestedGame, themeLosses } from "../model/player.js";
+import { addMistake, estimate, focus, implOpponent, recordGame, suggestedGame, themeLosses } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
@@ -15,9 +16,8 @@ import { moveText } from "../a11y.js";
 import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { analyzeLine, describeMistakes, openReview } from "./review-ctl.js";
+import { describeMistakes, dropReview, openReview } from "./review-ctl.js";
 import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
-import { notePoints, queueReport } from "./report-ctl.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
 /* ------------------------------------------------------------ state */
@@ -38,8 +38,8 @@ export function opponentOf(meta = {}) {
 
 export function freshGameState(game, meta = {}) {
   // v7: a new game ends whatever the last one still had queued (its
-  // pondering, its post-game summary); a rated game's report carries on in
-  // the background (report-ctl queueReport).
+  // pondering); the last game's analysis carries on in the background
+  // (play/analysis.js).
   if (state.game?.owner) Engine.sched.cancelOwner(state.game.owner);
   return {
     owner: Engine.sched.newOwner("game"),
@@ -68,7 +68,6 @@ export function freshGameState(game, meta = {}) {
     aiLow: 0,
     ghost: null, // two-click placement
     captureFx: null,
-    summary: null,
     analysis: null, // whole-game analysis, shared with review
     rated: !!meta.rated,
   };
@@ -210,15 +209,16 @@ export function newGame(opts = {}) {
   const tc = opts.timeControl ?? state.settings.timeControl;
   if (opts.timeControl) setSetting("timeControl", opts.timeControl);
   Engine.cancel();
-  if (state.game) state.game.gen++;
   remember();
+  // The last game's review: its analysis goes on in the background.
+  if (state.review) dropReview();
+  if (state.game) state.game.gen++;
   update((s) => {
     s.game = freshGameState(game, { opponent, humanColor, rank: opponentRank, clock: newClock(tc), rated: opponent === "ai" });
     s.space = "play";
     s.play = { ...s.play, view: "game", explorer: null };
     s.sheet = null;
     s.review = null;
-    s.report = null;
   });
   persistCurrent();
   announce(t("a11y.newGame", [size]));
@@ -670,7 +670,6 @@ function finishGame() {
   saveToLibrary({ quiet: true });
   // Rating: games against the computer with enough moves to mean something
   // (model/player.js recordGame rates a game once, by its measured opponent).
-  let rated = null;
   if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
     const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
     // Against the implementation that played, by its measured strength
@@ -689,18 +688,33 @@ function finishGame() {
       g.ratingDelta = rec.rating.delta;
       // The estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
       g.ratingChange = ratingChange(before, after);
-      rated = rec.rating;
     }
   }
   if (g.ratingChange && g.recordId) Games.patchGame(g.recordId, { rating: g.ratingChange });
   announce(resultText(result));
-  update();
-  // v7: a rated game gets its report in the background, so opening it is
-  // instant (report-ctl queueReport, after the summary's analysis).
-  const autoReport = !!rated && !!g.recordId;
-  // v6: the report waits for this analysis (report-ctl).
-  if (g.opponent === "ai") g.summaryJob = summarize(g, { autoReport });
-  else if (autoReport) queueReport(g.recordId);
+  // The same board turns into the post-game review, in place: its analysis
+  // is the game's one analysis (stored with it, play/analysis.js). Away
+  // from the board (the computer resigned meanwhile), when it is back.
+  showFinished();
+}
+
+/** The finished game on the board as its review: the result, the balance, the key moments. */
+export function openPostGame(g = state.game, { inPlace = true } = {}) {
+  if (!g || !g.game.current.result || g.game.mainLine().length < 2) return;
+  Engine.cancel();
+  g.gen++;
+  g.thinking = false;
+  openReview(g.game, { source: "current", humanColor: g.opponent === "ai" ? g.humanColor : null, points: g.analysis || null, inPlace, autoJump: true, space: "play" });
+}
+
+/**
+ * The board of Play shows the game in play; a finished one is its review.
+ * Called where Play's board comes back (history, the sidebar).
+ */
+export function showFinished() {
+  const g = state.game;
+  if (state.space !== "play" || state.play.view !== "game" || state.review || state.play.explorer) return;
+  if (g?.game.current.result && !g.scoring) openPostGame(g);
 }
 
 /** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */
@@ -709,90 +723,13 @@ export function ratingChange(before, after) {
   return { before: { r: before.r, rank: before.rank, pm: before.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } };
 }
 
-/** The opponent's rank as a title shows it ("≈ 12 kyu"). */
-function levelText(rank) {
-  const r = Engine.rankParts(rank);
-  return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
-}
-
 /**
- * After a game against the computer: analyse it in the background and say
- * three things — the biggest mistake, a good move, and what to practise.
- *
- * v7: a background job owned by the game (scheduler.js): a new game cancels
- * it, and its computer's move never waits behind it. The positions analysed
- * so far are handed to the report (report-ctl notePoints), which finishes
- * the analysis in the background when the game was rated.
- */
-async function summarize(g, { autoReport = false } = {}) {
-  const recordId = g.recordId;
-  try {
-    if (!state.engine.available || g.game.mainLine().length < 8) return;
-    await summarizeAnalysis(g, recordId);
-  } finally {
-    if (autoReport) queueReport(recordId);
-  }
-}
-
-async function summarizeAnalysis(g, recordId) {
-  g.summary = { status: "analyzing", progress: 0 };
-  update();
-  const partial = new Array(g.game.mainLine().length).fill(null);
-  if (recordId) notePoints(recordId, partial, g.game);
-  const job = Engine.sched.startJob({
-    kind: "summary",
-    owner: g.owner,
-    title: () => t("sched.job.game", [levelText(g.rank)]),
-    meta: { recordId },
-    run: (job) =>
-      analyzeLine(g.game, {
-        visits: g.game.size === 19 ? 32 : 48,
-        signal: job.signal,
-        onPoint: (i, p) => {
-          partial[i] = p;
-        },
-        onProgress: (k, n) => {
-          job.setProgress(k / n);
-          if (state.game !== g || !g.summary) return;
-          g.summary.progress = k / n;
-          update();
-        },
-      }),
-  });
-  const points = await job.promise;
-  if (!points) {
-    // Cancelled (a new game, or from Settings): no summary.
-    if (g.summary?.status === "analyzing") g.summary = null;
-    if (state.game === g) update();
-    return;
-  }
-  if (recordId) notePoints(recordId, points, g.game);
-  if (state.game !== g) return;
-  g.analysis = points;
-  const mistakes = describeMistakes(g.game, points, g.humanColor);
-  const losses = mistakes.all;
-  const big = mistakes.top[0] || null;
-  // A good move: the player's move with the best result where it mattered most.
-  let good = null;
-  for (const m of losses) {
-    if (m.move.color !== g.humanColor || m.move.pass) continue;
-    const a = points[m.index - 1];
-    const spread = a?.moves?.length > 1 ? Math.abs(a.moves[0].scoreLead - a.moves[1].scoreLead) : 0;
-    if (m.loss <= 0.5 && spread >= 2 && (!good || spread > good.spread)) good = { ...m, spread };
-  }
-  learnFromGame({ game: g.game, points, humanColor: g.humanColor, recordId: g.recordId, trendId: g.trendId, mistakes });
-  const theme = mistakes.top.find((m) => m.theme)?.theme || null;
-  g.summary = { status: "done", big, good, theme, topic: theme ? THEME_TOPIC[theme] || null : null };
-  update();
-}
-
-/**
- * What a rated game teaches, from its whole-game analysis: the game's
- * record in the player model (per-phase losses, themes and what each cost,
- * model/player.js recordGame), and the two costliest mistakes as drills
- * (ids `${gameId}-${index}`). The post-game summary does it; when a new
- * game cancelled the summary, the game's background report does
- * (report-ctl). Once per game: its file is marked `learned`. Returns false
+ * What a game against the computer teaches, from its whole-game analysis:
+ * the game's record in the player model (per-phase losses, themes and what
+ * each cost, model/player.js recordGame), and the two costliest mistakes
+ * as drills (ids `${gameId}-${index}`). The analysis does it when it is
+ * stored (play/analysis.js storeAnalysis), in the review or in the
+ * background. Once per game: its file is marked `learned`. Returns false
  * when it was already done.
  */
 export function learnFromGame({ game, points, humanColor, recordId = null, trendId = recordId, mistakes = null }) {
@@ -846,7 +783,7 @@ export function resultHeadline(g) {
   return won === null ? resultText(r) : won ? t("result.youWon") : t("result.youLost");
 }
 
-/** Open the review of the game just played, reusing the summary analysis. */
+/** Open the review of the game on the board ("Review so far", or the game that ended). */
 export function reviewCurrentGame() {
   const g = state.game;
   if (!g || g.game.mainLine().length < 2) return;
@@ -888,12 +825,13 @@ export async function saveText(filename, text, mime = "text/plain") {
 
 export function continueCurrent() {
   remember();
+  if (state.review) dropReview();
   update((s) => {
     s.space = "play";
     s.play = { ...s.play, view: "game", explorer: null };
     s.review = null;
-    s.report = null;
   });
+  showFinished();
   maybeComputerMove();
   ponder();
 }

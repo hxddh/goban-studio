@@ -20,13 +20,12 @@ import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, suggestedOpponent } from "./play-ctl.js";
+import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
 import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
-import { dropReport, restoreReport } from "./report-ctl.js";
-import { resumeBackground } from "./report-batch.js";
+import { resumeBackground } from "../play/analysis.js";
 import { closeExplorer } from "./explorer-ctl.js";
 
 export * from "./ctl-core.js";
@@ -35,8 +34,7 @@ export * from "./review-ctl.js";
 export * from "./practice-ctl.js";
 export * from "./update-ctl.js";
 export * from "./models-ctl.js";
-export * from "./report-ctl.js";
-export * from "./report-batch.js";
+export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
 export * from "./plan-ctl.js";
@@ -70,8 +68,10 @@ export async function boot() {
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
+  // Play opens on the board when a game is in progress, else on its home.
+  const g = state.game?.game;
   state.space = "play";
-  state.play = { ...state.play, view: "home" };
+  state.play = { ...state.play, view: g && g.moveNumber > 0 && !g.current.result ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
@@ -84,7 +84,7 @@ export async function boot() {
     update({ engine: info });
     maybeComputerMove();
     ponder();
-    // Background reports and "Analyse all" that quitting interrupted.
+    // The background analyses quitting interrupted (play/analysis.js).
     resumeBackground();
   });
   // Which optional networks are installed (a local status call).
@@ -102,10 +102,9 @@ export const SPACES = ["play", "learn"];
 
 /** Play's home: the game in progress or the suggested game, then the history. */
 export function playHome() {
-  if (state.space === "play" && state.play.view === "home" && !state.review && !state.report && !state.play.explorer) return;
+  if (state.space === "play" && state.play.view === "home" && !state.review && !state.play.explorer) return;
   remember();
   if (state.review) dropReview();
-  if (state.report) dropReport();
   update((s) => {
     s.space = "play";
     s.play = { ...s.play, view: "home", explorer: null };
@@ -116,15 +115,16 @@ export function playHome() {
 
 /** The board of the game on it (Play). */
 export function playBoard() {
-  if (state.space === "play" && state.play.view === "game" && !state.review && !state.report) return;
+  if (state.space === "play" && state.play.view === "game" && !state.review) return showFinished();
   remember();
   if (state.review && (state.review.meta.space || "play") === "play") dropReview();
-  if (state.report && state.report.space === "play") dropReport();
   update((s) => {
     s.space = "play";
     s.play = { ...s.play, view: "game", explorer: null };
     s.menu = null;
   });
+  // A finished game's board is its review.
+  showFinished();
   maybeComputerMove();
   ponder();
   syncMenus();
@@ -135,11 +135,6 @@ export function goSpace(space) {
   // The space you are in again: back to its top level.
   if (space === state.space) {
     if (space === "learn") {
-      if (state.report && state.report.space === "learn") {
-        remember();
-        dropReport();
-        return update();
-      }
       if (state.review && (state.review.meta.space || "play") === "learn") {
         remember();
         dropReview();
@@ -189,8 +184,8 @@ function restore(loc) {
     else if (rv.source === "classic" && rv.classicId) openClassic(rv.classicId);
     if (state.review && rv.index >= 0) reviewGoto(rv.index);
   }
-  // The report page, when the entry had one open.
-  restoreReport(loc);
+  // A finished game's board is its review.
+  showFinished();
   update();
 }
 
@@ -201,17 +196,12 @@ export function openRecord(id) {
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "play", back: "play", autoJump: true, points: analysisOf(rec, game) });
+    // The same review as after a game: its stored analysis opens at once.
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "play", back: "play", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
   }
-}
-
-/** The stored whole-game analysis of a record, when it is of these moves. */
-function analysisOf(rec, game) {
-  const a = rec.analysis;
-  return Array.isArray(a) && a.length === game.mainLine().length && a.every(Boolean) ? a : null;
 }
 
 export function openClassic(id) {

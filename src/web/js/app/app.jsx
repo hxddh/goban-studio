@@ -3,9 +3,9 @@
  * and Settings, the native menu bar, keyboard handling, and the space
  * itself. Each page starts with the shared toolbar (chrome.jsx).
  *
- * Play shows its home (play/home.jsx) or the board (play.jsx); Learn its
- * home (the path, learn/path.jsx, then the catalog) or one of its pages
- * (practice.jsx). The report page and the review layer open over either.
+ * Play shows its home (play/home.jsx) or the board (play.jsx), which a
+ * finished game turns into its review; Learn its home (the path,
+ * learn/path.jsx, then the catalog) or one of its pages (practice.jsx).
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
@@ -22,7 +22,6 @@ import { PracticeView } from "./practice.jsx";
 import { PlayHome } from "../play/home.jsx";
 import { Sheets } from "./sheets.jsx";
 import { ExplorerView } from "./explorer.jsx";
-import { ReportView } from "./report.jsx";
 import { useAnnouncements } from "./announcer.js";
 import { installKeys, textSizeKeys } from "./a11y-keys.js";
 
@@ -54,17 +53,16 @@ function App() {
   useAnnouncements(); // v6 a11y: review moves, problems, lessons
   if (!s.ready) return null;
   const focus = isFocus();
-  const reviewKey = s.review ? "review-" + s.review.source : "";
-  const report = C.reportVisible();
+  // The game that ends turns into its review on the same page (no new place).
+  const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
   const page = s.space === "learn" ? s.learn.view : s.play.explorer ? "explorer" : s.play.view;
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
-        <div class="place" key={s.space + reviewKey + (report ? "report" : "") + page}>
-          {report && <ReportView />}
-          {!report && s.space === "play" && <PlaySpace />}
-          {!report && s.space === "learn" && <PracticeView />}
+        <div class="place" key={s.space + reviewKey + page}>
+          {s.space === "play" && <PlaySpace />}
+          {s.space === "learn" && <PracticeView />}
         </div>
       </main>
       <Sheets />
@@ -89,9 +87,9 @@ function App() {
 
 /* ------------------------------------------------------------ commands */
 
-/** The game's board is what Play shows (not its home, a review or the report). */
+/** The game's board is what Play shows (not its home or a review). */
 function onBoard() {
-  return state.space === "play" && state.play.view === "game" && !state.play.explorer && !C.playReviewing() && !C.reportVisible();
+  return state.space === "play" && state.play.view === "game" && !state.play.explorer && !C.playReviewing();
 }
 
 /** One table of commands for keyboard, native menus and the page. */
@@ -196,12 +194,12 @@ function onKeyDown(e) {
     if (state.menu) return update({ menu: null });
     if (state.sheet) return C.closeSheet();
     if (state.game?.ghost) return C.clearGhost();
+    if (state.review?.trial) return C.closeTrial();
     if (state.review?.variation) {
       state.review.variation = null;
       return update();
     }
     if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
-    if (C.reportVisible()) return C.closeReport();
 
     // The explorer: Esc goes back to Play's home.
     if (state.space === "play" && state.play.explorer) return C.closeExplorer();

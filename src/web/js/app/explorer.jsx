@@ -198,30 +198,6 @@ function ExplorerPanel({ cands }) {
   );
 }
 
-/** The Library tab: two entries, one per tree. */
-export function ExplorerEntries() {
-  const b = X.theBook();
-  return (
-    <>
-      <p class="muted section-sub explorer-help">{t("explorer.help")}</p>
-      <ul class="group collection">
-        {X.EXPLORER_MODES.map((mode) => (
-          <li>
-            <button type="button" class="collection-row" data-explorer={mode} onClick={() => X.openExplorer(mode)}>
-              <span class="collection-main">
-                <strong>{t(mode === "corner" ? "explorer.corner" : "explorer.whole")}</strong>
-                <span class="muted">{t(mode === "corner" ? "explorer.cornerHelp" : "explorer.wholeHelp")}</span>
-              </span>
-              {b && <span class="fine">{t("explorer.positions", [b.trees[mode]?.nodes.length || 0])}</span>}
-              <Icon name="next" size={15} />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 /**
  * Review: where a 19×19 game left the opening book, as one quiet line with
  * a link to that move. Nothing for games the book does not cover.

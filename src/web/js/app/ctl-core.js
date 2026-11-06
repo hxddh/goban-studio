@@ -129,8 +129,6 @@ export function locationNow() {
       captureFrom: p.capture?.from || null, // v8
     },
     play: { ...state.play },
-    // v6
-    report: state.report ? { recordId: state.report.recordId, space: state.report.space } : null,
     review: r
       ? {
           source: r.source,

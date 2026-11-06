@@ -25,12 +25,12 @@ export const state = {
   toasts: [],
   announce: "",
   game: null, // the game on the board (app/play-ctl.js)
-  review: null,
-  report: null, // the report page (app/report-ctl.js), opened from a game
+  review: null, // the review over a game, and the post-game review (app/review-ctl.js)
   // Play: view "home" (the game in progress or the suggested game, the
-  // history, the classics, the explorer) or "game" (the board); tab, kind
-  // and query belong to the home's lists; explorer is the opening explorer.
-  play: { view: "home", tab: "mine", kind: "all", query: "" },
+  // history, the classics, the explorer) or "game" (the board, which a
+  // finished game turns into its review); kind and query filter the
+  // history; explorer is the opening explorer.
+  play: { view: "home", kind: "all", query: "" },
   // Learn: view "home" (the path, then the catalog) or one of its pages
   // (lesson, problem, topic, mistake, capture, dailyDone).
   learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },

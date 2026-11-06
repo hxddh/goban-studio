@@ -8,5 +8,4 @@ export const V7_FIXES = {
   // The report's phase table, named for screen readers: {0} is Black or White.
   "report.phasesOf": m("{0}的三个阶段", "The three phases for {0}", "{0}의 세 단계", "{0}の三つの局面"),
   // A game between two people: whose mistakes become drills.
-  "report.practiseSide": m("练习哪一方的失误", "Practise the mistakes of", "누구의 실수를 연습할까요", "どちらの悪手を練習するか"),
 };

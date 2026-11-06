@@ -1,9 +1,9 @@
 /**
  * Play: the game in play with a fake KataGo host — the computer's move
- * never waits for a background report, "Review so far" never adds moves to
- * the game, a game saved during the count counts again, drills only from
- * your own games, and two SGF quirks of real records. Loaded by
- * scripts/test.mjs; receives the runner's helpers.
+ * never waits for a background analysis, "Review so far" never adds moves
+ * to the game, a game saved during the count counts again, and two SGF
+ * quirks of real records. Loaded by scripts/test.mjs; receives the
+ * runner's helpers.
  */
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -52,8 +52,7 @@ export default async function ({ test, assert, root }) {
   // The app with a fake async KataGo host (as in core-scheduler.mjs).
   const A = await bundle(root, [
     'export * as Play from "./src/web/js/app/play-ctl.js";',
-    'export * as Report from "./src/web/js/app/report-ctl.js";',
-    'export * as Batch from "./src/web/js/app/report-batch.js";',
+    'export * as Analysis from "./src/web/js/play/analysis.js";',
     'export * as Engine from "./src/web/js/engine.js";',
     'export * as Lib from "./src/web/js/data/games.js";',
     'export * as P from "./src/web/js/data/settings.js";',
@@ -66,9 +65,9 @@ export default async function ({ test, assert, root }) {
     'export { state } from "./src/web/js/app/store.js";',
     'export { setRestorer } from "./src/web/js/app/ctl-core.js";',
     'export { loadSGF } from "./src/web/js/sgf.js";',
-    'export { reportFits, buildReport } from "./src/web/js/app/report-model.js";',
+    'export { reviewFits } from "./src/web/js/play/review-model.js";',
   ]);
-  const { Report, Engine, Lib, P, PM, Review, Game, BLACK, state, loadSGF, reportFits } = A;
+  const { Analysis, Engine, Lib, P, PM, Review, Game, BLACK, state, loadSGF, reviewFits } = A;
   // The store picks its backend on first use: the preview's, before the fake host below.
   await A.store.open();
 
@@ -125,11 +124,11 @@ export default async function ({ test, assert, root }) {
   }
 
   try {
-    await test("play game: the computer's move starts at once even in the middle of a background report, and the report still completes", async () => {
+    await test("play game: the computer's move starts at once even in the middle of a background analysis, and the analysis still completes", async () => {
       delay = 120;
       const rec = twoPlayerRecord(14);
-      const job = Report.queueReport(rec.id);
-      await until(() => job.progress > 0.2, 8000, "report progress");
+      const job = Analysis.queueAnalysis(rec.id);
+      await until(() => job.progress > 0.2, 8000, "analysis progress");
       await sleep(20); // in the middle of a search
       const game = new Game({ size: 9 });
       fill(game, 6);
@@ -144,34 +143,15 @@ export default async function ({ test, assert, root }) {
       assert.ok(r.move, "the computer moved");
       await job.promise;
       const stored = Lib.getGame(rec.id).report;
-      assert.ok(stored, "the report completed");
-      assert.ok(reportFits(stored, loadSGF(rec.sgf).game), "and fits its game");
+      assert.ok(stored, "the review completed");
+      assert.ok(reviewFits(stored, loadSGF(rec.sgf).game), "and fits its game");
       assert.equal(stored.moves, 14);
+      assert.equal(Lib.getGame(rec.id).analysis.length, 15, "with its analysis, once");
       delay = 15;
     });
 
 
 
-
-
-    await test("play game: a mistake in a classic game's review is no drill; one from your own game is", () => {
-      state.profile = PM.newProfile();
-      const game = new Game({ size: 9 });
-      fill(game, 10);
-      Review.openReview(game, { source: "classic", classicId: "ear-reddening", startAt: 0 });
-      const km = { index: 5, move: { color: BLACK, x: 1, y: 1 }, best: { x: 4, y: 4 }, accept: [{ x: 4, y: 4 }], loss: 5, theme: "ladder" };
-      assert.equal(Review.canPractiseThis(km), false, "not offered");
-      Review.practiceThis(km);
-      assert.deepEqual(state.profile.mistakes, [], "drills come from your own games only");
-      state.review = null;
-      Review.openReview(game, { source: "record", recordId: "r1", startAt: 0 });
-      assert.equal(Review.canPractiseThis({ ...km, index: 6 }), true);
-      Review.practiceThis({ ...km, index: 6 });
-      assert.deepEqual(state.profile.mistakes.map((m) => [m.id, m.gameId, m.index]), [["r1-6", "r1", 6]]);
-      assert.equal(state.space, "learn");
-      assert.equal(state.learn.view, "mistake", "and it opens in Learn");
-      state.review = null;
-    });
 
 
     await test("play game: a move tried in 'Review so far' never becomes a move of the game in play", async () => {

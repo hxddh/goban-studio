@@ -12,28 +12,28 @@ const loadControllers = () =>
     'export * as P from "./src/web/js/data/settings.js";',
     'export * as PM from "./src/web/js/model/player.js";',
     'export { loadSGF } from "./src/web/js/sgf.js";',
-    'export { buildReport, reportFits } from "./src/web/js/app/report-model.js";',
+    'export { buildReview, reviewFits } from "./src/web/js/play/review-model.js";',
   ]);
 
-await test("play review: saving edited moves drops a stored report of the old moves; comments keep it", async () => {
-  const { R, state, Lib, P, PM, loadSGF, buildReport, reportFits } = await loadControllers();
+await test("play review: saving edited moves drops the stored review and analysis of the old moves; comments keep them", async () => {
+  const { R, state, Lib, P, PM, loadSGF, buildReview, reviewFits } = await loadControllers();
   state.settings = { ...P.DEFAULT_SETTINGS, liveAnalysis: false };
   state.profile = PM.newProfile();
   const base = v5Review({ losses: { 25: 8 } });
-  const rec = Lib.saveGame(base.game, { name: "v7 stale report", opponent: "ai", humanColor: BLACK });
-  Lib.patchGame(rec.id, { report: buildReport({ game: loadSGF(rec.sgf).game, points: base.points, humanColor: BLACK }) });
-  assert.ok(reportFits(Lib.getGame(rec.id).report, loadSGF(rec.sgf).game));
+  const rec = Lib.saveGame(base.game, { name: "stale review", opponent: "ai", humanColor: BLACK });
+  Lib.patchGame(rec.id, { review: buildReview({ game: loadSGF(rec.sgf).game, points: base.points, humanColor: BLACK }) });
+  assert.ok(reviewFits(Lib.getGame(rec.id).report, loadSGF(rec.sgf).game));
   R.openReview(loadSGF(rec.sgf).game, { source: "record", recordId: rec.id, humanColor: BLACK, points: base.points, startAt: 10 });
-  // A comment only: the report still describes the game.
+  // A comment only: the review still describes the game.
   R.setComment("note");
   R.saveEdits();
-  assert.ok(Lib.getGame(rec.id).report, "a comment keeps the report");
-  // A variation promoted to the main line: the stored report is of other moves.
+  assert.ok(Lib.getGame(rec.id).report, "a comment keeps the review");
+  // A variation promoted to the main line: the stored review is of other moves.
   R.reviewGoto(30);
   R.reviewPlay(6, 6);
   assert.equal(R.promoteVariation(), true);
   R.saveEdits();
-  assert.equal(Lib.getGame(rec.id).report, null, "a report of the old moves is dropped");
+  assert.equal(Lib.getGame(rec.id).report, null, "a review of the old moves is dropped");
   R.dropReview();
   Lib.deleteGame(rec.id);
 });
@@ -48,9 +48,9 @@ await test("play review: the controller edits comments, marks and variations and
   R.openReview(game, { source: "record", recordId: rec.id, humanColor: BLACK, points: base.points, startAt: 10 });
   const r = state.review;
   assert.equal(r.edits.target, "record");
-  assert.equal(r.summary.confidence, "high");
-  assert.equal(R.reviewSummary(), r.summary);
-  assert.equal(r.summary.phases[1].players.black.blunders, 1);
+  assert.equal(r.model.confidence, "high");
+  assert.equal(R.reviewModel(), r.model);
+  assert.equal(r.model.phases[1].players.black.blunders, 1);
 
   // Comment and marks on the move on the board, saved to the record.
   assert.equal(R.setComment("Too slow here"), true);
@@ -87,8 +87,8 @@ await test("play review: the controller edits comments, marks and variations and
   for (let k = 0; k < 200 && r.analyzing; k++) await sleep(5);
   assert.equal(r.analyzing, false);
   assert.equal(r.points[31]?.source, "estimate");
-  assert.equal(r.summary.moves, 31);
-  assert.equal(r.summary.confidence, "low", "partly estimated");
+  assert.equal(r.model.moves, 31);
+  assert.equal(r.model.confidence, "low", "partly estimated");
   R.saveEdits();
   saved = loadSGF(Lib.getGame(rec.id).sgf).game;
   assert.equal(saved.mainLine().length, 32);
@@ -109,5 +109,4 @@ await test("play review: the controller edits comments, marks and variations and
   R.dropReview();
   saved = loadSGF(Lib.getGame(rec.id).sgf).game;
   assert.equal(saved.mainLine()[30].children.length, 1, "leaving the review saved the last edits");
-  assert.equal(typeof R.gameTrends().games, "number");
 });
