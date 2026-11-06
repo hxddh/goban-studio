@@ -1,23 +1,25 @@
 /**
- * Practice: the course, problem topics and today's five.
+ * Learn (docs/v9.md, "Two spaces"): the path chosen for you on top
+ * (learn/path.jsx), then the catalog: the course map, your mistakes,
+ * problem topics and shapes. And the pages they open: lessons, problems,
+ * topics, drills and the end of the day's problems.
  */
 import { useState } from "preact/hooks";
 import { BLACK } from "../rules.js";
 import * as S from "../solver.js";
 import { t } from "../i18n.js";
-import { todayKey } from "../persist.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
-import { DailyDots, FocusRow } from "./today.jsx";
+import { LearnPath } from "../learn/path.jsx";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
 
 export function PracticeView() {
-  const v = state.practice.view;
+  const v = state.learn.view;
   if (v === "lesson") return <LessonView />;
   if (v === "problem") return <ProblemView />;
   if (v === "topic") return <TopicPage />;
@@ -28,79 +30,19 @@ export function PracticeView() {
 }
 
 function PracticeHome() {
-  const p = state.progress;
-  const lessons = C.allLessons();
-  const doneLessons = lessons.filter(({ lesson }) => p.lessons[lesson.id]?.done).length;
+  const p = state.profile;
   const next = C.nextLesson();
-  const daily = C.todaysDaily();
-  const finished = daily && daily.index >= daily.items.length;
-  const pct = lessons.length ? (doneLessons / lessons.length) * 100 : 0;
   const plan = C.trainingFocus();
   const focusTopics = new Set(plan.items.map((f) => f.topic).filter(Boolean));
   return (
     <>
       <Toolbar />
-      <div class="page">
+      <div class="page learn-home">
         <header class="page-head">
-          <h1>{t("nav.practice")}</h1>
+          <h1>{t("nav.learn")}</h1>
         </header>
 
-        <section class="hero enter-up">
-          <div class="hero-text">
-            <span class="eyebrow">
-              {t("practice.course")}
-              {next ? ` · ${C.tx(next.unit.title)}` : ""}
-            </span>
-            <h2>{next ? C.tx(next.lesson.title) : t("practice.courseDone")}</h2>
-            <div class="hero-progress">
-              <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax={lessons.length} aria-valuenow={doneLessons}>
-                <i style={{ width: `${pct}%` }} />
-              </div>
-              <span class="fine">{t("practice.lessonsDone", [doneLessons, lessons.length])}</span>
-            </div>
-          </div>
-          {next && (
-            <Button kind="primary" size="lg" onClick={C.openNextLesson}>
-              {doneLessons ? t("practice.continue") : t("practice.start")}
-            </Button>
-          )}
-        </section>
-
-        <ul class="group enter-up">
-          <li class="group-row">
-            <span class="gr-icon">
-              <Icon name="target" size={18} />
-            </span>
-            <span class="gr-text">
-              <strong>{finished ? t("practice.dailyFinished") : t("practice.dailyTitle")}</strong>
-              <span>{finished ? t("practice.dailySolved", [daily.done.length, daily.items.length]) : plan.items.length ? t("plan.daily", [plan.items.map((f) => f.name).join(" · ")]) : t("practice.dailyHelp")}</span>
-            </span>
-            <DailyDots daily={daily} />
-            {!finished && (
-              <Button size="sm" onClick={C.startDaily}>
-                {daily && daily.index > 0 ? t("practice.continue") : t("practice.start")}
-              </Button>
-            )}
-          </li>
-          {plan.items.length === 1 && <FocusRow f={plan.items[0]} compact />}
-          {plan.items.length > 1 && (
-            <li class="group-row plan-row" data-focus={plan.items.map((f) => f.key).join(" ")}>
-              <span class="gr-icon">
-                <Icon name="target" size={18} />
-              </span>
-              <span class="gr-text">
-                <strong>{t("plan.title")}</strong>
-                <span class="plan-links">
-                  {plan.items.map((f) => (
-                    <button type="button" class="link" title={f.why} onClick={() => C.openFocusProblems(f)}>
-                      {f.name}
-                    </button>
-                  ))}
-                </span>
-              </span>
-            </li>
-          )}
-        </ul>
+        <LearnPath plan={plan} />
 
         <section class="section">
           <h2 class="section-title">{t("practice.course")}</h2>
@@ -167,7 +109,7 @@ function PracticeHome() {
  * you are in is open, the others open on click.
  */
 function CourseMap({ next }) {
-  const p = state.progress;
+  const p = state.profile;
   const [open, setOpen] = useState(null);
   const current = next ? C.COURSE.findIndex((u) => u.lessons.some((l) => l.id === next.lesson.id)) : -1;
   const shown = open ?? current;
@@ -222,7 +164,7 @@ function CourseMap({ next }) {
 }
 
 function MistakesSection() {
-  const list = state.progress.mistakes;
+  const list = state.profile.mistakes;
   if (!list.length) return null;
   return (
     <section class="section">
@@ -243,21 +185,21 @@ function MistakesSection() {
 }
 
 function TopicPage() {
-  const topic = state.practice.topic;
-  const theme = state.practice.theme;
-  const shape = state.practice.shape;
+  const topic = state.learn.topic;
+  const theme = state.learn.theme;
+  const shape = state.learn.shape;
   const all = shape ? C.problemsOfShape(shape) : C.problemsOfTopic(topic);
   const themes = [...new Set(all.map((x) => x.theme).filter(Boolean))];
   const list = theme ? all.filter((x) => x.theme === theme) : all;
-  const p = state.progress;
+  const p = state.profile;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
-  const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
+  const setTheme = (th) => update((s) => (s.learn = { ...s.learn, theme: th }));
   // Grades fold away: the first grade with unsolved problems starts open.
   const firstOpen = byGrade.find(({ items }) => items.some((x) => !p.problems[x.id]?.solved))?.g ?? byGrade[0]?.g;
   const [openGrades, setOpenGrades] = useState([firstOpen]);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
+    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
     <div class="page">
       <header class="page-head">
         <h1>{shape ? C.shapeName(shape) : t("topic." + topic)}</h1>
@@ -309,11 +251,11 @@ function TopicPage() {
 }
 
 function MistakeView() {
-  const D = state.practice.mistake;
+  const D = state.learn.mistake;
   const m = D.m;
   const game = D.game;
   const node = game.current;
-  const daily = state.practice.daily;
+  const daily = state.learn.daily;
   const marks = [];
   if (D.status === "wrong" || D.status === "same") marks.push({ ...D.last, type: "cross", tone: "bad" });
   if (D.status === "revealed" || D.status === "right") for (const a of m.accept || [m.best]) marks.push({ ...a, type: "circle", tone: "good" });
@@ -334,7 +276,7 @@ function MistakeView() {
     D.status === "right" ? t("mistakes.right") : D.status === "same" ? t("mistakes.same") : D.status === "wrong" ? t("mistakes.wrong") : D.status === "revealed" ? t("mistakes.revealed") : t("mistakes.prompt", [formatLoss(m.loss)]);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("mistakes.title")} sub={daily ? t("practice.dailyOf", [daily.index + 1, daily.items.length]) : ""} />
+    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("mistakes.title")} sub={daily ? t("practice.dailyOf", [daily.index + 1, daily.items.length]) : ""} />
     <div class="workspace">
       <section class="stage" aria-label={t("mistakes.title")}>
         <Board model={model} onPlay={C.practicePlay} />
@@ -493,8 +435,8 @@ function ProblemControls({ P, onNext, nextLabel }) {
 
 /** What this problem is: difficulty, theme, and your record with it. */
 function ProblemFacts({ def, grade }) {
-  const rec = state.progress.problems[def.id];
-  const record = !rec ? t("practice.recordNew") : rec.solved ? t("practice.recordSolved", [rec.attempts]) : t("practice.recordTried", [rec.attempts]);
+  const rec = state.profile.problems[def.id];
+  const record = !rec ? t("practice.recordNew") : rec.solved ? t("practice.recordSolved", [rec.tries]) : t("practice.recordTried", [rec.tries]);
   return (
     <dl class="facts">
       <dt>{t("practice.difficulty")}</dt>
@@ -518,14 +460,14 @@ function ProblemFacts({ def, grade }) {
 }
 
 function ProblemView() {
-  const pr = state.practice;
+  const pr = state.learn;
   const P = pr.problem;
   const def = P.def;
   const daily = pr.daily;
-  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
+  const list = state.learn.theme ? C.problemsOfTheme(state.learn.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
-  const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
+  const crumbs = [{ label: t("nav.learn"), onClick: C.learnHome }];
   if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
@@ -564,7 +506,7 @@ function ProblemView() {
 }
 
 function LessonView() {
-  const L = state.practice.lesson;
+  const L = state.learn.lesson;
   const steps = L.lesson.steps;
   // v8: lesson complete, with its bridge into a game (beginner.jsx).
   if (L.finished) return <LessonDone L={L} />;
@@ -605,7 +547,7 @@ function LessonView() {
   const last = L.index === steps.length - 1;
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} sub={C.tx(L.unit.title)} />
+    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} sub={C.tx(L.unit.title)} />
     <div class="workspace">
       <section class="stage" aria-label={C.tx(L.lesson.title)}>
         {model ? <Board model={model} onPlay={onPlay} /> : <div class="board-placeholder" />}
@@ -669,24 +611,18 @@ function LessonView() {
 }
 
 function DailyDone() {
-  const d = state.practice.daily || state.progress.daily;
+  const d = state.learn.daily || C.todaysDaily();
   const total = d?.items?.length || 5;
-  const streak = C.streakNow();
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.daily")} />
+    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("practice.daily")} />
     <div class="page center-page">
       <section class="card celebrate">
         <span class="eyebrow">{t("practice.daily")}</span>
         <h1>{t("practice.dailyFinished")}</h1>
         <p class="muted">{t("practice.dailySolved", [d?.done?.length || 0, total])}</p>
-        {streak > 0 && (
-          <p class="fine">
-            <Icon name="flame" size={13} /> {t("practice.streak", [streak])}
-          </p>
-        )}
         <div class="actions center">
-          <Button kind="primary" onClick={C.practiceHome}>
+          <Button kind="primary" onClick={C.learnHome}>
             {t("practice.backHome")}
           </Button>
         </div>

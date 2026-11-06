@@ -1,47 +1,32 @@
 /**
- * v7: the training plan in the app. Reads the player model (plan.js) for
- * "this week's focus" on Today and Practice, and lets the plan choose
- * today's five through practice-ctl's daily hook.
+ * The week's focus on screen. The focus itself is the player model's
+ * (model/player.js focus: the evidence as it stood when the week began,
+ * kept for the week once it is shown); this turns it into rows with names,
+ * the evidence as text, a lesson and the problems that train it.
  */
 import { t } from "../i18n.js";
 import { state } from "./store.js";
-import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, setDailyPlanner, themeName } from "./practice-ctl.js";
-import { evidenceOf, focusLesson, focusTopic, planDaily, weekToKeep, weeklyModel } from "./plan.js";
-import { saveProgress } from "../persist.js";
-import { weekStart } from "./week.js";
-import { CLASSICS } from "../content.js";
+import { changeProfile } from "./ctl-core.js";
+import { PROBLEMS, GRADES, allLessons, openLesson, openTopic, themeName } from "./practice-ctl.js";
+import { evidenceOf, focus, focusLesson, focusTopic, keepFocus } from "../model/player.js";
 
-// v8: drills of these games (by their gameKey) are not the player's own.
-let foreignKeys = null;
-const foreign = () => (foreignKeys ||= new Set(CLASSICS.map((g) => g.id)));
-
-/** The model behind this week's focus (see plan.weeklyModel). */
+/** The model behind this week's focus; the first focus shown in a week is kept for that week. */
 export function planModel(now = Date.now()) {
-  return weekly(state.progress, GRADES, now);
-}
-
-/** The week's model; the first focus shown in a week is kept for that week. */
-function weekly(progress, grades, now) {
-  const ws = weekStart(new Date(now));
-  const model = weeklyModel(progress, { problems: PROBLEMS, grades, now, weekStart: ws, foreign: foreign() });
-  const keep = weekToKeep(progress, model, ws);
-  if (keep && progress) {
-    progress.planWeek = keep;
-    saveProgress(progress);
-  }
-  return model;
+  const view = focus(state.profile, now, { problems: PROBLEMS, grades: GRADES });
+  if (view.keep) changeProfile((p) => keepFocus(p, view));
+  return view;
 }
 
 /**
  * This week's focus for the views:
- *   { status: "focus" | "notEnough" | "none", items: [{ key, name, why, topic, theme, lesson }] }
+ *   { status: "focus" | "notEnough" | "none", items: [{ key, name, why, topic, theme, lesson }], needed }
  * `why` is the evidence as translated text; `lesson` a lesson id or null.
  */
 export function trainingFocus(now = Date.now()) {
   const model = planModel(now);
   const lessons = new Set(allLessons().map(({ lesson }) => lesson.id));
-  const done = (id) => !!state.progress.lessons?.[id]?.done;
-  const items = model.focus.map((a) => {
+  const done = (id) => !!state.profile.lessons?.[id]?.done;
+  const items = (model.focus || []).map((a) => {
     const { topic, theme } = focusTopic(a.key, PROBLEMS);
     const lesson = focusLesson(a.key, done);
     return {
@@ -53,7 +38,7 @@ export function trainingFocus(now = Date.now()) {
       lesson: lesson && lessons.has(lesson) ? lesson : null,
     };
   });
-  return { status: model.status, items, needed: model.games.needed };
+  return { status: model.status, items, needed: model.games?.needed };
 }
 
 export function openFocusLesson(item) {
@@ -63,9 +48,3 @@ export function openFocusLesson(item) {
 export function openFocusProblems(item) {
   if (item?.topic) openTopic(item.topic, item.theme);
 }
-
-/** Today's five: the plan chooses when it has a focus (else practice-ctl's own choice). */
-setDailyPlanner(({ progress, pool, grades, now }) => {
-  const model = weekly(progress, grades, now);
-  return planDaily({ progress, model, pool, bank: PROBLEMS, grades, now });
-});

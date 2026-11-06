@@ -37,7 +37,7 @@ export function rankParts(rank) {
  */
 // v9: one source for the calibration (opponents.js): the measured levels,
 // the θ ↔ GoR scale and its anchor.
-import { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR } from "../opponents.js";
+import { ANCHOR_K, MEASURED, gorToTheta, implTheta, thetaToGoR } from "../opponents.js";
 export { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR };
 
 
@@ -134,4 +134,26 @@ export function ladder({ size = 19, modes = ["standard"] } = {}) {
     }
   }
   return out.sort((a, b) => a.theta - b.theta);
+}
+
+/**
+ * The strength of an implementation of the opponent ladder (opponents.js
+ * IMPLS, what a game stores as `impl`) on the board it was played on, in
+ * that board's θ, with `handicap` stones given to the player (negative: the
+ * player gave them), counted as levelTheta counts them. Null for an
+ * unknown implementation. This is the `opponent` a rated game is recorded
+ * against (player.js recordGame).
+ */
+export function implOpponent(impl, { size = 19, handicap = 0 } = {}) {
+  const sz = sizeOf(size);
+  let t19 = implTheta(impl, 19);
+  if (t19 == null) return null;
+  const tSmall = sz === 19 ? null : implTheta(impl, sz);
+  if (sz !== 19 && Math.abs(handicap) < 2) return tSmall;
+  if (sz !== 19) t19 = fromBoard(tSmall, sz);
+  if (Math.abs(handicap) >= 2) {
+    const g = thetaToGoR(t19) - Math.sign(handicap) * Math.abs(handicap) * RANKS_PER_STONE[sz] * 100;
+    t19 = gorToTheta(g);
+  }
+  return onBoard(t19, sz);
 }

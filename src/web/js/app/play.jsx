@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
-import { areaOf, rankParts } from "../engine.js";
+import { areaOf } from "../engine.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
@@ -12,22 +12,14 @@ import { ataris } from "./insight.js";
 import { storyText } from "./story.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
-import { ratingParts } from "./rating.js";
+import { rankText } from "./estimate-label.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { FirstCountNote } from "./beginner.jsx";
 
-/** A rank (rating.js encoding) as shown: "≈ 12 kyu", "≈ 4 dan". */
-export function rankLabel(rank) {
-  const r = rankParts(rank);
-  return t(r.unit === "kyu" ? "rank.kyu" : "rank.dan", [r.n]);
-}
-
-export function ratingLabel(r) {
-  const p = ratingParts(r);
-  return t(p.unit === "kyu" ? "rank.kyu" : "rank.dan", [p.n]);
-}
+/** A rank (kyu 30…1, 1 dan = 0 …) as shown: "≈ 12 kyu", "≈ 4 dan". */
+export const rankLabel = rankText;
 
 function moveNumbers(game) {
   if (!state.settings.numbers) return null;
@@ -180,8 +172,8 @@ function PlayerRow({ color }) {
     sub = rankLabel(g.rank);
   } else if (g.opponent === "ai") {
     name = t("play.you");
-    const r = state.progress.rating?.r;
-    if (r != null) sub = ratingLabel(r);
+    const e = C.playerEstimate({ size: game.size });
+    if (e.games > 0) sub = rankLabel(e.rank);
   } else name = colorName(color);
   const fx = g.captureFx && g.captureFx.color === color && performance.now() - g.captureFx.at < 1200 ? g.captureFx : null;
   const side = g.clock ? g.clock[color === BLACK ? "b" : "w"] : null;
@@ -480,7 +472,7 @@ function ResultCard() {
       {headline !== C.resultText(r) && <span class="muted">{C.resultText(r)}</span>}
       {g.ratingDelta != null && (
         <span class={`rating-delta ${g.ratingDelta >= 0 ? "up" : "down"}`}>
-          {t("summary.rating", [ratingLabel(state.progress.rating.r), (g.ratingDelta >= 0 ? "+" : "") + g.ratingDelta])}
+          {t("summary.rating", [rankLabel(C.playerEstimate({ size: g.game.size }).rank), (g.ratingDelta >= 0 ? "+" : "") + g.ratingDelta])}
         </span>
       )}
       {aids.length > 0 && <span class="fine">{aids.join(" · ")}</span>}
@@ -589,7 +581,7 @@ function reviewHeading(r) {
   const line = r.game.mainLine();
   const result = line[line.length - 1].result;
   const space = meta.space || "play";
-  const crumbs = [{ label: t(space === "library" ? "nav.library" : space === "practice" ? "nav.practice" : "nav.play"), onClick: C.closeReview }];
+  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");
   let sub = result ? C.resultText(result) : "";
   if (meta.classic) {
@@ -787,7 +779,7 @@ function KeyMove({ km }) {
                 {t("review.showPlayed")}
               </button>
             )}
-            {km.best && !km.best.pass && (
+            {C.canPractiseThis(km) && (
               <button type="button" onClick={() => C.practiceThis(km)}>
                 {t("review.practiceThis")}
               </button>

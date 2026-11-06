@@ -15,15 +15,14 @@ import { V8_BEGINNER } from "./messages/v8-beginner.js";
 import { V8_TEACHING } from "./messages/v8-teaching.js";
 import { V8_FEEL } from "./messages/v8-feel.js";
 import { V8_FIXES } from "./messages/v8-fixes.js";
-import { V8_SIMPLIFY } from "./messages/v8-simplify.js";
+import { SHELL } from "./messages/shell.js";
+import { PLAY } from "./messages/play.js";
+import { LEARN } from "./messages/learn.js";
 
 export const MESSAGES = {
   "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
 
   "nav.main": m("主导航", "Main navigation", "주 메뉴", "メインナビゲーション"),
-  "nav.play": m("下棋", "Play", "대국", "対局"),
-  "nav.practice": m("练习", "Practice", "연습", "練習"),
-  "nav.library": m("棋谱", "Library", "기보", "棋譜"),
   "nav.settings": m("设置", "Settings", "설정", "設定"),
 
   "common.newGame": m("新对局", "New game", "새 대국", "新しい対局"),
@@ -175,7 +174,6 @@ export const MESSAGES = {
   "practice.dailyFinished": m("今天的题做完了", "Done for today", "오늘 문제를 마쳤습니다", "今日の問題は終わりです"),
   "practice.dailySolved": m("解出 {0} / {1} 道", "{0} of {1} solved", "{1}문제 중 {0}문제 성공", "{1}問中{0}問正解"),
   "practice.dailyOf": m("今日第 {0} / {1} 题", "Daily {0} of {1}", "오늘의 문제 {0} / {1}", "今日の{1}問中{0}問目"),
-  "practice.streak": m("连续 {0} 天", "{0}-day streak", "{0}일 연속", "{0}日連続"),
   "practice.problems": m("死活与手筋", "Problems", "사활과 맥", "詰碁と手筋"),
   "practice.problemsCaption": m("{0} 道题，每一道都由求解器验证；难度按解题所需的步数和计算量测定。", "{0} problems, each verified by the solver; difficulty is measured from the length and size of the solution.", "{0}문제, 모두 솔버로 검증했습니다. 난이도는 정답 수순의 길이와 계산량으로 정했습니다.", "{0}問。すべてソルバーで検証済みで、難易度は正解手順の長さと読みの量から測っています。"),
   "practice.problem": m("题目", "Problem", "문제", "問題"),
@@ -290,7 +288,6 @@ export const MESSAGES = {
   "onboarding.play19": m("开始 19 路对局", "Start a 19×19 game", "19줄 대국 시작", "19路で対局開始"),
   "onboarding.offline": m("完全离线，不需要账号。", "Fully offline. No account needed.", "완전 오프라인, 계정이 필요 없습니다.", "完全オフライン。アカウント不要です。"),
 
-  "toast.saved": m("已保存到棋谱", "Saved to Library", "기보에 저장했습니다", "棋譜に保存しました"),
   "toast.exported": m("已导出 SGF", "SGF exported", "SGF를 내보냈습니다", "SGFを書き出しました"),
 
   "error.illegal": m("这里不能落子。", "You can't play there.", "그곳에는 둘 수 없습니다.", "そこには打てません。"),
@@ -308,7 +305,6 @@ export const MESSAGES = {
   "a11y.newGame": m("新对局，{0} 路", "New {0}×{0} game", "새 {0}줄 대국", "新しい{0}路の対局"),
 
   // v3
-  "nav.today": m("今天", "Today", "오늘", "今日"),
   "nav.back": m("后退", "Back", "뒤로", "戻る"),
   "nav.forward": m("前进", "Forward", "앞으로", "進む"),
   "menu.game": m("对局", "Game", "대국", "対局"),
@@ -316,26 +312,6 @@ export const MESSAGES = {
   "menu.go": m("前往", "Go", "이동", "移動"),
   "menu.help": m("帮助", "Help", "도움말", "ヘルプ"),
 
-  "today.morning": m("早上好", "Good morning", "좋은 아침입니다", "おはようございます"),
-  "today.afternoon": m("下午好", "Good afternoon", "안녕하세요", "こんにちは"),
-  "today.evening": m("晚上好", "Good evening", "좋은 저녁 되세요", "こんばんは"),
-  "today.night": m("夜深了", "Late night", "늦은 밤이네요", "夜更けですね"),
-  "today.suggestedGame": m("推荐一盘", "Suggested game", "추천 대국", "おすすめの対局"),
-  "today.suggestedTitle": m("{0} 路 · 对 {1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
-  "today.withHandicap": m("让 {0} 子", "{0} handicap stones", "{0}점 접바둑", "{0}子局"),
-  "today.even": m("分先", "Even game", "호선", "互先"),
-  "today.because": m("练练最近的弱点：{0}", "works on a recent weak spot: {0}", "최근 약점 연습: {0}", "最近の弱点の練習：{0}"),
-  "today.becauseLevel": m("按你现在的棋力", "matched to your current level", "현재 기력에 맞춤", "今の棋力に合わせて"),
-  "today.play": m("开始对局", "Play", "대국 시작", "対局を始める"),
-  "today.nextLesson": m("继续课程", "Continue the course", "과정 계속하기", "講座を続ける"),
-  "today.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
-  "today.levelGames": m("根据 {0} 盘对局估计", "Estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
-  "today.levelStart": m("和电脑下几盘，这里会显示你的棋力变化。", "Play a few games against the computer and your level will appear here.", "컴퓨터와 몇 판 두면 기력 변화가 여기에 나타납니다.", "コンピュータと何局か打つと、棋力の変化がここに表示されます。"),
-  "today.workOn": m("值得练的地方", "Worth practising", "보완할 점", "練習ポイント"),
-  "today.seenN": m("最近出现 {0} 次", "came up {0} times lately", "최근 {0}번 나옴", "最近{0}回"),
-  "today.noWeak": m("复盘几盘棋后，这里会列出你常犯的错误类型。", "After a few reviewed games, the kinds of mistakes you make most will show up here.", "몇 판을 복기하면 자주 하는 실수 유형이 여기에 표시됩니다.", "何局か検討すると、よくある間違いの種類がここに表示されます。"),
-  "today.recent": m("最近的对局", "Recent games", "최근 대국", "最近の対局"),
-  "today.dailyMistakes": m("包括你对局里的 {0} 个失误", "Includes {0} mistakes from your own games", "내 대국의 실수 {0}개 포함", "自分の対局の悪手 {0} 個を含みます"),
 
   "play.proposeCount": m("棋局看起来已经结束了。数目吗？", "The game looks finished. Count it?", "대국이 끝난 것 같습니다. 계가할까요?", "終局のようです。整地しますか？"),
   "play.countNow": m("数目", "Count", "계가", "整地する"),
@@ -445,7 +421,6 @@ export const MESSAGES = {
   "review.estimateAt": m("第 {0} 手的形势", "At move {0}", "{0}수째 형세", "{0}手目の形勢"),
   "practice.resetting": m("这步不对，看看对方怎么应。马上重来…", "Not this one — see the answer, then it resets…", "이 수는 아닙니다. 상대의 응수를 보세요. 곧 다시 시작합니다…", "この手ではありません。応手を見てください。すぐにやり直します…"),
   "practice.finishDaily": m("完成", "Finish", "완료", "完了"),
-  "today.quick9": m("来盘 9 路快棋", "Or a quick 9×9", "9줄 속기 한 판", "9路で早碁を一局"),
 
   // v4 review
   // Story steps: {0} is the colour (common.black / common.white); {1} a count or an area.* string.
@@ -694,13 +669,9 @@ export const MESSAGES = {
   "backup.title": m("备份", "Backup", "백업", "バックアップ"),
   "backup.export": m("导出备份…", "Export backup…", "백업 내보내기…", "バックアップを書き出す…"),
   "backup.import": m("从备份恢复…", "Restore from backup…", "백업에서 복원…", "バックアップから復元…"),
-  "backup.help": m("把设置、进度、棋力记录、错题和全部棋谱存成一个文件；换电脑时用它恢复。", "Saves your settings, progress, level, mistake drills and every game in one file. Use it to move to another computer.", "설정, 진도, 기력 기록, 오답 연습과 모든 기보를 파일 하나로 저장합니다. 다른 컴퓨터로 옮길 때 쓰세요.", "設定・進み具合・棋力の記録・間違えた問題・すべての棋譜を1つのファイルに保存します。別のコンピュータへ移るときに使います。"),
   "backup.confirmTitle": m("用这份备份替换现有数据？", "Replace your data with this backup?", "이 백업으로 현재 데이터를 바꿀까요?", "このバックアップで今のデータを置き換えますか？"),
-  "backup.confirmBody": m("备份里有 {0} 盘棋谱、{1} 节完成的课、{2} 道解出的题。现在的数据会被全部替换。", "The backup holds {0} games, {1} finished lessons and {2} solved problems. Everything you have now will be replaced.", "백업에는 기보 {0}개, 마친 강의 {1}개, 푼 문제 {2}개가 있습니다. 지금의 데이터는 모두 바뀝니다.", "バックアップには棋譜 {0} 局、終えた講座 {1}、解いた問題 {2} があります。今のデータはすべて置き換わります。"),
   "backup.restore": m("恢复", "Restore", "복원", "復元"),
   "backup.error.notBackup": m("这不是 Goban Studio 的备份文件。", "That isn't a Goban Studio backup.", "Goban Studio 백업 파일이 아닙니다.", "Goban Studio のバックアップではありません。"),
-  "backup.error.newerFormat": m("这份备份来自更新的版本，请先更新 Goban Studio。", "This backup is from a newer version. Update Goban Studio first.", "더 새 버전에서 만든 백업입니다. 먼저 Goban Studio를 업데이트하세요.", "新しいバージョンのバックアップです。先に Goban Studio を更新してください。"),
-  "backup.error.storage": m("无法写入数据，未作任何更改。请释放磁盘空间后重试。", "Couldn't save the data, so nothing was changed. Free some disk space and try again.", "데이터를 저장할 수 없어 아무것도 바꾸지 않았습니다. 디스크 공간을 확보한 뒤 다시 시도하세요.", "データを保存できなかったため、何も変更していません。ディスクの空きを増やしてもう一度お試しください。"),
   "backup.error.damaged": m("备份文件已损坏，无法恢复。", "The backup file is damaged and can't be restored.", "백업 파일이 손상되어 복원할 수 없습니다.", "バックアップが壊れているため復元できません。"),
   // v6 ui
   "review.tabs": m("复盘内容", "Review sections", "복기 항목", "検討の項目"),
@@ -1076,5 +1047,8 @@ export const MESSAGES = {
   ...V8_TEACHING,
   ...V8_FEEL,
   ...V8_FIXES,
-  ...V8_SIMPLIFY,
+  // v9: strings by area (src/web/js/messages/{shell,play,learn}.js).
+  ...SHELL,
+  ...PLAY,
+  ...LEARN,
 };

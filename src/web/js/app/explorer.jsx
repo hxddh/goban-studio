@@ -42,7 +42,7 @@ function lineName(mode, id) {
 export function ExplorerView() {
   const e = X.explorerState();
   // v8: the book is fetched on first use; a moment's empty page until then.
-  if (!e) return <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
+  if (!e) return <Toolbar crumbs={[{ label: t("nav.play"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
   const mode = e.mode;
   const node = e.game.current;
   const cands = X.explorerCandidates(e);
@@ -65,7 +65,7 @@ export function ExplorerView() {
   const title = t(mode === "corner" ? "explorer.corner" : "explorer.whole");
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
+      <Toolbar crumbs={[{ label: t("nav.play"), onClick: X.closeExplorer }]} title={t("explorer.title")} sub={title}>
         <div class="tool-group">
           {X.explorerZoomable(e) && (
             <IconButton

@@ -19,7 +19,7 @@ export function ReportView() {
   const r = state.report;
   const m = r.model;
   const busy = r.status === "analyzing" || r.status === "waiting";
-  const crumbs = r.space === "library" ? [{ label: t("nav.library"), onClick: C.closeReport }] : [];
+  const crumbs = [{ label: t(r.space === "learn" ? "nav.learn" : "nav.play"), onClick: C.closeReport }];
   return (
     <>
       <Toolbar crumbs={crumbs} title={t("report.title")}>

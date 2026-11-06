@@ -8,7 +8,7 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
-import { bridgeAfter } from "./beginner.js";
+import { bridgeAfter } from "../model/player.js";
 import { Board, Button, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 
@@ -20,7 +20,7 @@ import { Toolbar } from "./chrome.jsx";
  */
 export function LessonDone({ L }) {
   const next = C.nextLesson();
-  const bridge = bridgeAfter(L.lesson.id, { settings: state.settings, progress: state.progress });
+  const bridge = bridgeAfter(L.lesson.id, state.profile, { captureWins: state.settings.captureWins });
   const nextLesson = next && (
     <Button kind={bridge ? "secondary" : "primary"} onClick={() => C.openLesson(next.lesson.id)}>
       {t("practice.nextLesson")}
@@ -28,7 +28,7 @@ export function LessonDone({ L }) {
   );
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} />
+      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} />
       <div class="page center-page">
         <section class="card celebrate" data-bridge={bridge || undefined}>
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
@@ -47,7 +47,7 @@ export function LessonDone({ L }) {
               </Button>
             )}
             {nextLesson}
-            <Button kind="ghost" onClick={C.practiceHome}>
+            <Button kind="ghost" onClick={C.learnHome}>
               {t("practice.backHome")}
             </Button>
           </div>
@@ -60,7 +60,7 @@ export function LessonDone({ L }) {
 /* ----------------------------------------------------------- capture Go */
 
 export function CaptureView() {
-  const K = state.practice.capture;
+  const K = state.learn.capture;
   if (!K) return null;
   const game = K.game;
   const node = game.current;
@@ -92,7 +92,7 @@ export function CaptureView() {
   const title = t("capture.title");
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={title} sub={`${game.size} × ${game.size}`} />
+      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={title} sub={`${game.size} × ${game.size}`} />
       <div class={`workspace capture ${over ? "is-over" : ""}`}>
         <section class="stage" aria-label={title}>
           <Board model={model} onPlay={C.capturePlay} onHover={(v) => (v ? C.captureCanPlay(v.x, v.y) : true)} />

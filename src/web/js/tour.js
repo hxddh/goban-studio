@@ -29,8 +29,8 @@ const OPENING = [
 
 export const STEPS = [
   {
-    name: "today",
-    go: () => C.goSpace("today"),
+    name: "play",
+    go: () => C.playHome(),
   },
   {
     name: "game19",
@@ -47,8 +47,8 @@ export const STEPS = [
     go: () => C.reviewCurrentGame(),
   },
   {
-    name: "practice",
-    go: () => C.goSpace("practice"),
+    name: "learn",
+    go: () => C.goSpace("learn"),
   },
   {
     name: "settings",

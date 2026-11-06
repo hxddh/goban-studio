@@ -13,6 +13,7 @@
  *     problems: { [id]: { tries, solved, clean, last, due, streak } },
  *     mistakes: [{ id, gameId, index, theme, loss, due, ... }],  // own games only
  *     lessons: { [id]: { done, step, at } },
+ *     classics: { [id]: { done, at } },             // classic games played through
  *     week: { start, focus: [key], areas? } | null,   // this week's focus, kept
  *   }
  *
@@ -146,7 +147,7 @@ const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 export function newProfile({ rank = null, at = 0 } = {}) {
   const rating = {};
   for (const size of SIZES) rating[size] = priorRating(rank, at);
-  return { v: PROFILE_V, rating, history: [], games: [], problems: {}, mistakes: [], lessons: {}, week: null };
+  return { v: PROFILE_V, rating, history: [], games: [], problems: {}, mistakes: [], lessons: {}, classics: {}, week: null };
 }
 
 /**
@@ -268,6 +269,8 @@ export function normalizeProfile(raw) {
   for (const [id, e] of Object.entries(obj(raw.lessons) || {})) {
     if (obj(e)) lessons[id] = { done: e.done === true, step: Math.max(0, Math.floor(num(e.step, 0))), at: num(e.at, 0) };
   }
+  const classics = {};
+  for (const [id, e] of Object.entries(obj(raw.classics) || {})) if (obj(e) && e.done === true) classics[id] = { done: true, at: num(e.at, 0) };
   const w = obj(raw.week);
   let week = null;
   if (w && finite(w.start) && Array.isArray(w.focus) && w.focus.every((k) => typeof k === "string")) {
@@ -276,7 +279,7 @@ export function normalizeProfile(raw) {
     const areas = Array.isArray(w.areas) ? w.areas.filter((a) => obj(a) && week.focus.includes(a.key)) : [];
     if (areas.length) week.areas = JSON.parse(JSON.stringify(areas));
   }
-  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, week };
+  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week };
 }
 
 /* ============================================================= mutations */
@@ -352,6 +355,12 @@ export function recordLesson(profile, id, { step = null, done = false } = {}, no
   if (step != null && Number.isFinite(Number(step))) next.step = Math.max(prev.step || 0, Number(step));
   if (done) next.done = true;
   return { ...p, lessons: { ...p.lessons, [id]: next } };
+}
+
+/** A classic game opened and played through. */
+export function recordClassic(profile, id, now = 0) {
+  const p = normalizeProfile(profile);
+  return { ...p, classics: { ...p.classics, [id]: { done: true, at: now } } };
 }
 
 /**

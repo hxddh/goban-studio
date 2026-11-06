@@ -57,7 +57,7 @@ import { fileURLToPath } from "node:url";
 import { BLACK, WHITE, Game, coordLabel } from "../src/web/js/rules.js";
 import { STRENGTHS, humanMoveFromAnalysis, humanRequest, moveFromAnalysis } from "../src/web/js/engine.js";
 import { parseVertex, toAnalysis } from "../src/web/js/katago.js";
-import { MEASURED, thetaToGoR } from "../src/web/js/app/strength.js";
+import { MEASURED, thetaToGoR } from "../src/web/js/opponents.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -861,7 +861,7 @@ async function main() {
       games = games.filter((g) => keep.has(g.black) && keep.has(g.white));
     }
     // v6: --fixed holds the shipped ladder (L:) at its v4 measurement
-    // (strength.js MEASURED.standard, for --size 9 or 19) and places only
+    // (opponents.js MEASURED.standard, for --size 9 or 19) and places only
     // the other players; on 19×19 their GoR comes from the v4 anchor map.
     const anchors = a.anchor ? String(a.anchor).split(",") : null;
     const opt = { boot: Number(a.boot || 1000), anchors };
