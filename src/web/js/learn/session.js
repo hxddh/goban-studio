@@ -6,8 +6,9 @@
  * first 9×9 game while it applies), played in order. Finishing an item
  * moves to the next; after the last one, a quiet "done for today".
  *
- * The session is the path as it stood when it started, kept in memory for
- * the day, so solving a problem does not reshuffle what is left. Two
+ * The session is the path as it stood when it started, kept for the day
+ * (in the store, session.json, so a restart keeps what is done), so
+ * solving a problem does not reshuffle what is left. Two
  * things join it on the way: the bridge a finished lesson leads to
  * (capture Go, the first 9×9 game), and drills that fall due meanwhile
  * (a moment of a game tried again in Play).
@@ -20,6 +21,7 @@ import { state, update } from "../app/store.js";
 import { changeProfile, isRestoring, remember } from "../app/ctl-core.js";
 import { bridgeAfter, evidenceOf, focus, focusLesson, keepFocus, learnPath as pathOf } from "../model/player.js";
 import { COURSE, GRADES, PROBLEMS, withContent } from "../content.js";
+import { store } from "../data/store.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, themeName } from "../app/practice-ctl.js";
 import { startCapture, startFirstGame } from "../app/capture-ctl.js";
 
@@ -65,6 +67,22 @@ export function weekFocus(now = Date.now()) {
 /* -------------------------------------------------------- today's session */
 
 let session = null;
+const SESSION_KEY = "session.json";
+
+/** The session as stored (today's, or another day's to be ignored); read once. */
+function loaded() {
+  if (session) return session;
+  const v = store.get(SESSION_KEY);
+  if (v && typeof v.date === "string" && Array.isArray(v.items) && Array.isArray(v.done)) {
+    session = { date: v.date, items: v.items.filter((it) => it && it.kind), done: v.done.filter((k) => typeof k === "string"), current: typeof v.current === "string" ? v.current : null };
+  }
+  return session;
+}
+
+/** Keep the session across a restart. */
+function save(s = session) {
+  if (s) store.put(SESSION_KEY, { date: s.date, items: s.items, done: s.done, current: s.current ?? null });
+}
 
 const dayOf = (now) => {
   const d = new Date(now);
@@ -94,7 +112,7 @@ function insertAt(s) {
  * since it started join it, before the first game (which leaves Learn).
  */
 export function todaysSession(now = Date.now()) {
-  const s = session;
+  const s = loaded();
   if (!s || s.date !== dayOf(now)) return null;
   s.items = s.items.filter(known);
   s.done = s.done.filter((k) => s.items.some((it) => it.key === k));
@@ -105,6 +123,7 @@ export function todaysSession(now = Date.now()) {
     const game = s.items.findIndex((it) => it.kind === "game");
     if (game >= 0 && game < at && !isDone(s, s.items[game])) at = game;
     s.items.splice(at, 0, ...fresh);
+    save(s);
   }
   return s.items.length ? s : null;
 }
@@ -114,6 +133,7 @@ function begin(now = Date.now()) {
   const before = todaysSession(now);
   const items = learnPath(now);
   session = { date: dayOf(now), items, done: (before?.done || []).filter((k) => items.some((it) => it.key === k)), current: null };
+  save();
   return session;
 }
 
@@ -179,6 +199,7 @@ export function openPathItem(key) {
 
 function openItem(s, it) {
   s.current = it.key;
+  save(s);
   if (it.kind === "lesson") return openLesson(it.id, null, { daily: s });
   if (it.kind === "problem") return openProblem(it.id, { daily: s });
   if (it.kind === "mistake") return openMistakeDrill(it.id, { daily: s });
@@ -192,7 +213,10 @@ function openItem(s, it) {
 }
 
 function markDone(s, key) {
-  if (s && key && !s.done.includes(key)) s.done.push(key);
+  if (s && key && !s.done.includes(key)) {
+    s.done.push(key);
+    save(s);
+  }
 }
 
 /** The open session item is done (a problem solved, a drill found, a lesson finished, a capture game over). */
@@ -214,6 +238,7 @@ export function lessonFinished(lessonId) {
   const bridge = bridgeAfter(lessonId, state.profile, { captureWins: state.settings.captureWins });
   if (bridge === "capture" && !s.items.some((it) => it.kind === "capture")) s.items.splice(insertAt(s), 0, keyed({ kind: "capture", role: "bridge" }));
   if (bridge === "firstGame" && !s.items.some((it) => it.kind === "game")) s.items.push(keyed({ kind: "game", role: "bridge" }));
+  save(s);
 }
 
 /** "Continue": the open item is done; on to the next, or the quiet end of the day. */
@@ -228,13 +253,15 @@ export function continuePath() {
 
 function finish(s) {
   s.current = null;
+  save(s);
   update((st) => {
     st.space = "learn";
     st.learn = { ...st.learn, view: "dailyDone", lesson: null, problem: null, mistake: null, daily: null };
   });
 }
 
-/** For tests: forget today's session. */
-export function resetSession() {
+/** For tests: forget today's session (`keepStored`: as a restart would, memory only). */
+export function resetSession({ keepStored = false } = {}) {
   session = null;
+  if (!keepStored) store.remove(SESSION_KEY);
 }
