@@ -476,6 +476,8 @@ select, .text-input {
 button.group-row { cursor: pointer; }
 button.group-row:hover { background: var(--fill); }
 .gr-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--fill); color: var(--text-2); }
+.gr-icon.has-thumb { background: none; overflow: hidden; }
+.dthumb { display: block; width: 32px; height: 32px; border-radius: 6px; }
 .gr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gr-text strong { font: 500 13px/18px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-text span { font: var(--t-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

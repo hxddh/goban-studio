@@ -10,7 +10,7 @@ import { t } from "../i18n.js";
 import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { PROBLEMS } from "../content.js";
-import { Button, Icon, Stone } from "../app/parts.jsx";
+import { Button, DiagramThumb, Icon, Stone } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 
 /** Why an item is in the path, in a few words. */
@@ -40,8 +40,8 @@ export function pathRow(it) {
   }
   const def = PROBLEMS.find((x) => x.id === it.id);
   if (!def) return null;
-  // Many problems share a title; how hard it is tells them apart and says what to expect.
-  return { icon: "target", title: C.tx(def.title), why: whyText(it), more: t("grade." + C.gradeOf(def.id)) };
+  // Many problems share a title: the position tells them apart (v10), how hard it is says what to expect.
+  return { icon: "target", diagram: def.diagram, title: C.tx(def.title), why: whyText(it), more: t("grade." + C.gradeOf(def.id)) };
 }
 
 /** The week's focus and its reason, in one line; its lesson as a quiet link. */
@@ -95,7 +95,9 @@ export function LearnHome() {
                 return (
                   <li>
                     <button type="button" class={`group-row path-row ${done ? "done" : ""}`} data-kind={it.kind} data-role={it.role} onClick={() => C.openPathItem(it.key)}>
-                      <span class="gr-icon">{row.stone ? <Stone color={row.stone} size={14} /> : <Icon name={row.icon} size={18} />}</span>
+                      <span class={`gr-icon ${row.diagram ? "has-thumb" : ""}`}>
+                        {row.diagram ? <DiagramThumb diagram={row.diagram} /> : row.stone ? <Stone color={row.stone} size={14} /> : <Icon name={row.icon} size={18} />}
+                      </span>
                       <span class="gr-text">
                         <strong>{row.title}</strong>
                         <span>

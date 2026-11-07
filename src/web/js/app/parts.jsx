@@ -286,3 +286,63 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
   }, [value]);
   return <>{format(shown)}</>;
 }
+
+/**
+ * v10: a problem's position, small: its diagram (solver.js notation, one
+ * string per row) drawn as a square tile of 32 css px, so the rows of
+ * Learn's path that share a title look different. Nothing before the
+ * problem's part has arrived (content.js), the caller shows its icon.
+ */
+export function DiagramThumb({ diagram, label = "" }) {
+  const ref = useRef(null);
+  const key = Array.isArray(diagram) ? diagram.join("|") : "";
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || !key) return;
+    const rows = diagram.map((r) => r.replace(/\s+/g, "").split(""));
+    const h = rows.length;
+    const w = Math.max(...rows.map((r) => r.length));
+    const px = 32;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    c.width = px * dpr;
+    c.height = px * dpr;
+    const g = c.getContext("2d");
+    g.scale(dpr, dpr);
+    const css = getComputedStyle(c);
+    const n = Math.max(w, h);
+    const cell = px / n;
+    const ox = (px - w * cell) / 2;
+    const oy = (px - h * cell) / 2;
+    g.fillStyle = css.getPropertyValue("--thumb-board").trim() || "#e4cb9a";
+    g.fillRect(0, 0, px, px);
+    g.strokeStyle = css.getPropertyValue("--thumb-line").trim() || "rgba(60,40,20,0.35)";
+    g.lineWidth = 0.5;
+    g.beginPath();
+    for (let y = 0; y < h; y++) {
+      g.moveTo(ox + cell / 2, oy + cell * (y + 0.5));
+      g.lineTo(ox + cell * (w - 0.5), oy + cell * (y + 0.5));
+    }
+    for (let x = 0; x < w; x++) {
+      g.moveTo(ox + cell * (x + 0.5), oy + cell / 2);
+      g.lineTo(ox + cell * (x + 0.5), oy + cell * (h - 0.5));
+    }
+    g.stroke();
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const ch = rows[y][x];
+        const black = ch === "X" || ch === "x";
+        if (!black && ch !== "O" && ch !== "o") continue;
+        g.beginPath();
+        g.arc(ox + cell * (x + 0.5), oy + cell * (y + 0.5), cell * 0.46, 0, Math.PI * 2);
+        g.fillStyle = black ? "#1b1a17" : "#fbf8f1";
+        g.fill();
+        if (!black) {
+          g.lineWidth = Math.max(0.5, cell * 0.08);
+          g.strokeStyle = "rgba(27,26,23,0.45)";
+          g.stroke();
+        }
+      }
+    }
+  }, [key]);
+  return <canvas ref={ref} class="dthumb" width="32" height="32" role="img" aria-label={label} />;
+}

@@ -9,6 +9,8 @@ const A = await bundle([
   'export { state } from "./src/web/js/app/store.js";',
   'export { DEFAULT_SETTINGS } from "./src/web/js/data/settings.js";',
   'export * as PM from "./src/web/js/model/player.js";',
+  'export { classicYear, CLASSICS_SHOWN } from "./src/web/js/play/home.jsx";',
+  'export { CLASSICS } from "./src/web/js/content/classics.js";',
 ]);
 const { C, state, PM } = A;
 
@@ -31,4 +33,12 @@ await test("play suggest: a stronger player is offered the standard board, with 
   const r = C.recommendedGame();
   assert.equal(r.size, 19);
   assert.equal(r.quick.size, 9);
+});
+
+await test("play home: classics show the year only, and the first few until All classics", () => {
+  assert.equal(A.classicYear("1846-09-11,14,15"), "1846");
+  assert.equal(A.classicYear("1933-10-16..1934-01-29"), "1933");
+  assert.equal(A.classicYear(""), "");
+  for (const g of A.CLASSICS) assert.match(A.classicYear(g.date), /^\d{4}$/, g.id);
+  assert.ok(A.CLASSICS_SHOWN < A.CLASSICS.length && A.CLASSICS_SHOWN <= 4);
 });

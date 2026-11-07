@@ -715,6 +715,7 @@
 "play.suggest.other","Or a {0}×{0} game","或者下一盘 {0} 路","","또는 {0}줄 한 판","","または{0}路で一局",""
 "play.home.level","Your level","你的棋力","","나의 기력","","あなたの棋力",""
 "play.home.levelGames","estimated from {0} games","根据 {0} 盘对局估计","","대국 {0}판으로 추정","","{0}局の対局から推定",""
+"play.home.allClassics","All {0} classics","全部 {0} 局名局","","명국 {0}판 모두 보기","","名局 {0} 局をすべて表示",""
 "play.home.showAll","Show all {0}","显示全部 {0} 盘","","전체 {0}판 보기","","全{0}局を表示",""
 "play.home.explorer","Openings and joseki","布局与定式","","포석과 정석","","布石と定石",""
 "try.again","Try again","再下一次","","다시 두기","","打ち直す",""
