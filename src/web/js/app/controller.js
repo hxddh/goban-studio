@@ -151,16 +151,21 @@ export function goSpace(space) {
       return;
     }
     if (space === "today") return;
-    return state.game && !state.review ? playBoard() : playHome();
+    return state.game && !playReviewingNow() ? playBoard() : playHome();
   }
-  // Play is the board while a game is not over (v12, as before v9).
-  if (space === "play" && state.game && !state.game.game.current.result && !playReviewingNow()) return playBoard();
   remember();
+  // v12: a record or classic is read in the Library; leaving the Library
+  // closes it (its edits are kept), so no other space carries it along.
+  if (state.review?.meta.space === "library") dropReview();
+  // Play is the board while a game is not over (v12, as before v9).
+  const board = space === "play" && state.game && !state.game.game.current.result && !playReviewingNow();
   update((s) => {
     s.space = space;
     s.menu = null;
+    if (board) s.play = { ...s.play, view: "game", explorer: s.play.explorer };
   });
   if (space === "play") {
+    if (board) showFinished();
     maybeComputerMove();
     ponder();
   }

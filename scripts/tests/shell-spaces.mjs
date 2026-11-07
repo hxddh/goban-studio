@@ -137,6 +137,16 @@ try {
     assert.equal(state.review?.meta.space, "library");
     C.goSpace("play");
     assert.equal(state.space, "play");
+    assert.equal(state.review, null, "leaving the Library closes its review");
+    // Play again stays on the board (its clock, keys and report need the game view).
+    C.goSpace("play");
+    assert.equal(state.play.view, "game");
+    // Back from Practice returns to the board, not to the classic.
+    C.goSpace("learn");
+    assert.equal(C.back(), true);
+    assert.equal(state.space, "play");
+    assert.equal(state.review, null);
+    assert.equal(state.play.view, "game");
     const g = state.game.game;
     g.play(2, 2);
     g.play(6, 6);
