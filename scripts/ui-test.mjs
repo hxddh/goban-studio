@@ -425,6 +425,12 @@ await check("v6 explorer: opens from the Library, a book move shows candidates, 
 // pointer-only controls, unnamed images, landmarks, contrast.
 const AUDIT = fs.readFileSync(path.join(root, "scripts/a11y-audit.js"), "utf8");
 async function audit(page, where) {
+  // Colours are measured on the settled page: a place, a sheet or the theme
+  // can still be fading in (CSS animations and transitions), and a colour
+  // read halfway says nothing about what a reader sees.
+  await page
+    .waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getTiming?.().iterations ?? 1) === Infinity), null, { timeout: 2000, polling: 50 })
+    .catch(() => {});
   const found = await page.evaluate(`(${AUDIT})()`);
   assert(!found.length, `${where}: ${found.map((f) => `${f.kind} ${f.el}`).join("; ")}`);
 }
