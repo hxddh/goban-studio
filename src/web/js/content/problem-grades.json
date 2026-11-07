@@ -6308,6 +6308,160 @@
       }
     ]
   },
+  "life-capture-eye-24": {
+    "grade": 3,
+    "score": 8.3,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 17,
+        "y": 0
+      }
+    ]
+  },
+  "life-capture-eye-25": {
+    "grade": 3,
+    "score": 8.5,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 1
+      }
+    ]
+  },
+  "life-capture-eye-26": {
+    "grade": 2,
+    "score": 6.3,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 9,
+        "y": 0
+      }
+    ]
+  },
+  "life-vital-36": {
+    "grade": 3,
+    "score": 8.3,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 1
+      }
+    ]
+  },
+  "life-vital-37": {
+    "grade": 3,
+    "score": 8.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      }
+    ]
+  },
+  "life-vital-38": {
+    "grade": 3,
+    "score": 8.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 11,
+        "y": 18
+      }
+    ]
+  },
+  "life-vital-39": {
+    "grade": 3,
+    "score": 8.8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 8
+      }
+    ]
+  },
+  "life-vital-40": {
+    "grade": 3,
+    "score": 8.8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
+        "y": 0
+      }
+    ]
+  },
+  "life-vital-41": {
+    "grade": 2,
+    "score": 6.4,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 18,
+        "y": 6
+      }
+    ]
+  },
+  "life-vital-42": {
+    "grade": 3,
+    "score": 8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 9
+      }
+    ]
+  },
+  "life-vital-43": {
+    "grade": 3,
+    "score": 7.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 10
+      }
+    ]
+  },
+  "life-vital-44": {
+    "grade": 3,
+    "score": 8.7,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 18,
+        "y": 7
+      }
+    ]
+  },
+  "life-vital-45": {
+    "grade": 2,
+    "score": 7.5,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 10
+      }
+    ]
+  },
+  "life-vital-46": {
+    "grade": 2,
+    "score": 6.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 11,
+        "y": 1
+      }
+    ]
+  },
   "endgame-biggest-05": {
     "grade": 4,
     "score": 10.7,
