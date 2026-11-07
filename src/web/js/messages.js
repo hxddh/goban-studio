@@ -907,6 +907,28 @@ export const MESSAGES = {
     "각 수의 가치를 세어 보세요. 흑이 먼저 둘 때와 백이 먼저 둘 때의 차이입니다. 가장 큰 수부터 두세요.",
     "それぞれの手の価値を数えましょう。黒が先に打つ場合と白が先に打つ場合の差です。一番大きい手から打ちます。",
   ),
+  // v11 endgame: generic titles and hints for single-area problems
+  "problem.endgame.sente.title": m("先手官子", "A sente move", "선수 끝내기", "先手のヨセ"),
+  "problem.endgame.sente.hint": m(
+    "这里有一手是先手：白棋不应就会损失更多。找到它，白棋应了之后你仍然保有先手。",
+    "One move here is sente: if White does not answer it, White loses even more. Find it; after White answers, you still have sente.",
+    "여기에는 선수인 수가 있습니다. 백이 받지 않으면 더 크게 손해를 봅니다. 그 수를 찾으세요. 백이 받은 뒤에도 흑이 선수를 쥡니다.",
+    "ここには先手の手があります。白が受けないともっと損をします。その手を見つけましょう。白が受けた後も黒の先手です。",
+  ),
+  "problem.endgame.reverse.title": m("逆收", "Reverse sente", "역끝내기", "逆ヨセ"),
+  "problem.endgame.reverse.hint": m(
+    "白棋在这里下是先手。你抢先下掉：虽然是后手，却消除了白棋的先手官子。",
+    "A White move here would be sente for White. Play there first: your move is gote, but it takes White's sente move away.",
+    "여기서 백이 두면 백의 선수입니다. 먼저 두세요. 흑에게는 후수지만 백의 선수 끝내기를 없앱니다.",
+    "ここは白が打てば白の先手です。先に打ちましょう。黒にとっては後手ですが、白の先手ヨセを消せます。",
+  ),
+  "problem.endgame.gote.title": m("后手官子", "A gote move", "후수 끝내기", "後手のヨセ"),
+  "problem.endgame.gote.hint": m(
+    "这里谁下都是后手。找出收获最多的一手，然后把这里下到定形。",
+    "Here a move is gote for either side. Find the move that gains the most, then play the area out until it is settled.",
+    "여기서는 누가 두든 후수입니다. 가장 많이 얻는 수를 찾고, 이곳이 정리될 때까지 두어 보세요.",
+    "ここはどちらが打っても後手です。一番得をする手を見つけ、形が決まるまで打ちましょう。",
+  ),
   // end v6 endgame
 
 
