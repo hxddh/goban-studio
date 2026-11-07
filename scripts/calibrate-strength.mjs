@@ -775,8 +775,13 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
   const hs = Object.keys(fit.gamma).map(Number);
   const gammaSamples = Object.fromEntries(hs.map((h) => [h, []]));
   const sz = size ?? games[0]?.size;
-  const stone = hs.length && [9, 13, 19].includes(sz) ? stoneValue(games, fit.theta, sz) : null;
-  const stone1 = hs.includes(1) && [9, 13, 19].includes(sz) ? stoneValue(games, fit.theta, sz, { minStones: 1 }) : null;
+  // The value of a stone converts θ to ranks on the app's absolute scale, so
+  // it needs a fit in that frame: at least one player held at its app value
+  // (--fixed). An unanchored fit puts its first player at 0, an arbitrary origin.
+  const framed = !!fixed && players.some((p) => Number.isFinite(fixed[p]));
+  const rated = framed && [9, 13, 19].includes(sz);
+  const stone = hs.length && rated ? stoneValue(games, fit.theta, sz) : null;
+  const stone1 = hs.includes(1) && rated ? stoneValue(games, fit.theta, sz, { minStones: 1 }) : null;
   const stoneSamples = [];
   const stone1Samples = [];
   for (let b = 0; b < boot; b++) {
@@ -848,7 +853,7 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
     return { stones: h, gamma: fit.gamma[h], lo, hi, games: hpairs.reduce((sum, p) => sum + p.n, 0), blackWins: hpairs.reduce((sum, p) => sum + p.aw, 0) };
   });
   const withCI = (sv, xs) => (sv ? { ...sv, lo: ci(xs)[0], hi: ci(xs)[1] } : null);
-  return { players, rows, eta: fit.eta, pairs: sorted, anchors: am ? am.points : [], single, handicap, stoneValue: withCI(stone, stoneSamples), stoneValue1: withCI(stone1, stone1Samples), size: sz, theta: fit.theta };
+  return { players, rows, eta: fit.eta, pairs: sorted, anchors: am ? am.points : [], single, handicap, framed, stoneValue: withCI(stone, stoneSamples), stoneValue1: withCI(stone1, stone1Samples), size: sz, theta: fit.theta };
 }
 
 /** Wilson 95% interval for k wins in n games. */
@@ -890,7 +895,7 @@ function report(result, { markdown }) {
     for (const h of result.handicap) {
       const per = receivers.map((r) => {
         const ps = result.pairs.filter((p) => p.h === h.stones && p.a === r);
-        if (!ps.length) return "–";
+        if (!ps.length || !result.framed) return "–";
         const t = ps.reduce((sum, p) => sum + result.theta[p.b] * p.n, 0) / ps.reduce((sum, p) => sum + p.n, 0);
         return (natsToRanks(t, h.gamma, result.size) / h.stones).toFixed(1);
       });
@@ -900,6 +905,7 @@ function report(result, { markdown }) {
     lines.push("");
     sv(result.stoneValue, "Value of a stone as the app counts it (2+ stones, 19×19 ranks per stone)");
     sv(result.stoneValue1, "The same with one-stone games included");
+    if (!result.framed) lines.push("No value of a stone in ranks: the fit is not on the app's scale (hold the ladder with --fixed).");
   }
   if (result.anchors.length) {
     lines.push(`Anchors used: ${result.anchors.map((a) => `${a.player} (nominal ${goRLabel(a.nominal)}, fitted ${goRLabel(a.mapped)})`).join(", ")}.`);

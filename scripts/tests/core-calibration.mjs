@@ -135,6 +135,12 @@ export default async function ({ test, assert, root }) {
     assert.equal(r.handicap.length, 4);
     assert.ok(r.pairs.every((p) => p.h >= 1 && p.a === `L:${pairs.find(([a, b]) => p.a === `L:${a}` && p.b === `L:${b}`)[0]}`));
     assert.equal(stoneValue(games.map((g) => ({ ...g, handicap: 0 })), fixed, 13), null);
+    // Without the ladder held, θ has an arbitrary origin: no value in ranks.
+    const free = analyse(games, { boot: 10, size: 13 });
+    assert.equal(free.framed, false);
+    assert.equal(free.stoneValue, null);
+    assert.equal(free.stoneValue1, null);
+    assert.equal(free.handicap.length, 4);
   });
 
   test("core calibration: --fixed impls holds the whole current ladder (v11)", () => {
