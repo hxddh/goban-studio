@@ -43,7 +43,6 @@ export { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR };
 
 /** The level ids, weakest first (the keys of the standard ladder). */
 export const LEVELS = Object.keys(MEASURED.standard);
-export const MODES = Object.keys(MEASURED);
 export const SIZES = [9, 13, 19];
 
 export const isLevel = (id) => Object.prototype.hasOwnProperty.call(MEASURED.standard, id);

@@ -23,6 +23,11 @@ import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { FirstCountNote } from "./beginner.jsx";
 
+/** A classic's year: "1846-09-11,14,15" and "1933-10-16..1934-01-29" read as 1846 and 1933. */
+export function classicYear(date) {
+  return /^\d{4}/.exec(String(date || ""))?.[0] || "";
+}
+
 /** A rank (kyu 30…1, 1 dan = 0 …) as shown: "≈ 12 kyu", "≈ 4 dan". */
 export const rankLabel = rankText;
 
@@ -533,7 +538,7 @@ function reviewHeading(r) {
   let sub = "";
   if (meta.classic) {
     title = C.tx(meta.classic.title);
-    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
+    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${classicYear(meta.classic.date)}`;
   } else if (meta.name) title = meta.name;
   return { crumbs, title, sub };
 }
@@ -1087,6 +1092,14 @@ function GameSummary() {
                 </button>
               ) : (
                 storyText(tk)
+              )}
+              {tk.kind === "theme" && (tk.theme || tk.topic) && (
+                <>
+                  {" "}
+                  <button type="button" class="link take-practise" onClick={() => C.practiseTheme(tk.theme, tk.topic)}>
+                    {t("gameSummary.practise")}
+                  </button>
+                </>
               )}
             </li>
           ))}

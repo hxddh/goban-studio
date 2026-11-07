@@ -42,3 +42,23 @@ await test("play home: classics show the year only, and the first few until All 
   for (const g of A.CLASSICS) assert.match(A.classicYear(g.date), /^\d{4}$/, g.id);
   assert.ok(A.CLASSICS_SHOWN < A.CLASSICS.length && A.CLASSICS_SHOWN <= 4);
 });
+
+await test("play review to practice: a theme takeaway opens an unsolved problem of that theme near the level; Next stays in the theme", async () => {
+  player(12);
+  state.learn = { view: "home", topic: null, theme: null, lesson: null, problem: null, daily: null, placement: null };
+  await C.practiseTheme("cut", "connect");
+  assert.equal(state.learn.view, "problem");
+  const first = state.learn.problem.def;
+  assert.equal(first.theme, "cut");
+  assert.equal(state.learn.theme, "cut");
+  // Solved ones are passed over.
+  state.profile = { ...state.profile, problems: { ...state.profile.problems, [first.id]: { solved: true, tries: 1, last: 1 } } };
+  await C.practiseTheme("cut", "connect");
+  assert.notEqual(state.learn.problem.def.id, first.id);
+  C.nextProblem();
+  assert.equal(state.learn.problem.def.theme, "cut", "Next stays in the theme");
+  // A theme with too few problems falls back to its topic.
+  await C.practiseTheme("no-such-theme", "capture");
+  assert.equal(state.learn.problem.def.topic, "capture");
+  assert.equal(state.learn.theme, null);
+});

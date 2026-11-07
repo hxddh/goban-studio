@@ -7,12 +7,12 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem } from "../model/player.js";
+import { gradeForRank, nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
-import { changeProfile, isRestoring, playerEstimate, remember } from "./ctl-core.js";
+import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember } from "./ctl-core.js";
 import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
 import { continuePlacement, placementAnswer } from "../learn/placement.js";
 
@@ -251,6 +251,30 @@ export function problemsOfTopic(topic) {
 
 export function problemsOfTheme(theme) {
   return PROBLEMS.filter((p) => p.theme === theme).sort((a, b) => gradeOf(a.id) - gradeOf(b.id));
+}
+
+/**
+ * v11: from a game's review to practice. A takeaway that names a theme
+ * ("key mistakes that look like a cut") opens a problem of that theme (or,
+ * with fewer than three of them, of its topic): the first one not solved
+ * yet, nearest the player's level. The problem view's Next stays in that
+ * theme. Returns the problem's id, or null when there is none.
+ */
+export function practiseTheme(theme, topic = null) {
+  return withContent("problems", () => {
+    const byTheme = theme ? problemsOfTheme(theme) : [];
+    const useTheme = byTheme.length >= 3;
+    const list = useTheme ? byTheme : topic ? problemsOfTopic(topic) : [];
+    if (!list.length) return null;
+    const target = gradeForRank(playerRankNow()) ?? 1;
+    const solved = (id) => !!state.profile.problems?.[id]?.solved;
+    const open = list.filter((p) => !solved(p.id));
+    const pool = open.length ? open : list;
+    const pick = pool.slice().sort((a, b) => Math.abs(gradeOf(a.id) - target) - Math.abs(gradeOf(b.id) - target))[0];
+    update((s) => (s.learn = { ...s.learn, theme: useTheme ? theme : null }));
+    openProblem(pick.id);
+    return pick.id;
+  });
 }
 
 /** Problems built on one classic textbook shape (see SHAPES in problems.js). */

@@ -28,7 +28,6 @@ const DIAG = [
   [-1, -1],
 ];
 
-export const COLOR_KEY = { 1: "common.black", "-1": "common.white" };
 const colorRef = (c) => ({ key: c === 1 ? "common.black" : "common.white" });
 
 const inside = (size, x, y) => x >= 0 && y >= 0 && x < size && y < size;
@@ -398,11 +397,6 @@ export function narrate(facts, { max = 6, min = 3 } = {}) {
     if (out.length >= min && DECISIVE.has(d.key)) break;
   }
   return out;
-}
-
-/** Simulate and narrate in one go. */
-export function storyOf(signMap, firstColor, moves, opts = {}) {
-  return narrate(simulate(signMap, firstColor, (moves || []).slice(0, (opts.max || 6) + 4), opts), opts);
 }
 
 /**

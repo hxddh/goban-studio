@@ -28,7 +28,6 @@ import * as Engine from "../engine.js";
 import { state, update, toast } from "./store.js";
 import { confirmAction } from "./ctl-core.js";
 
-export const canDownloadModels = M.canDownload;
 
 let pollTimer = null;
 

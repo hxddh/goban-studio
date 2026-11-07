@@ -12,7 +12,7 @@
  * and properties the app does not interpret are kept on node.extra (root
  * and moves) so that toSGF() writes them back.
  */
-import { BLACK, WHITE, Game, EMPTY, defaultKomi, rulesFromSgf, starPoints } from "./rules.js";
+import { BLACK, WHITE, Game, EMPTY, defaultKomi, rulesFromSgf } from "./rules.js";
 
 let nodeSeq = 1;
 
@@ -371,12 +371,3 @@ export function loadSGF(text) {
   return { game, warnings };
 }
 
-/** A fresh game with handicap stones on the standard points. */
-export function handicapSetup(size, count) {
-  const game = new Game({ size, handicap: count });
-  game.setup(
-    starPoints(size).slice(0, count).map(([x, y]) => ({ x, y, color: BLACK })),
-    WHITE,
-  );
-  return game;
-}

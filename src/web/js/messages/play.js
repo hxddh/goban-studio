@@ -20,6 +20,7 @@ export const PLAY = {
   "play.suggest.other": m("或者下一盘 {0} 路", "Or a {0}×{0} game", "또는 {0}줄 한 판", "または{0}路で一局"),
   "play.home.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
   "play.home.levelGames": m("根据 {0} 盘对局估计", "estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
+  "gameSummary.practise": m("练这类题 →", "Practise these →", "이 유형 연습하기 →", "この形を練習 →"),
   "play.home.allClassics": m("全部 {0} 局名局", "All {0} classics", "명국 {0}판 모두 보기", "名局 {0} 局をすべて表示"),
   "play.home.showAll": m("显示全部 {0} 盘", "Show all {0}", "전체 {0}판 보기", "全{0}局を表示"),
   "play.home.explorer": m("布局与定式", "Openings and joseki", "포석과 정석", "布石と定石"),

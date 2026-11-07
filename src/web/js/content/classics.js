@@ -669,6 +669,3 @@ export const CLASSICS = [
   }
 ];
 
-export function classicById(id) {
-  return CLASSICS.find((game) => game.id === id) || null;
-}

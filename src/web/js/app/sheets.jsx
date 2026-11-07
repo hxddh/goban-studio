@@ -75,7 +75,8 @@ const PRESETS = [
 function NewGameSheet({ prefill }) {
   const s = state.settings;
   const rec = C.recommendedGame();
-  const [size, setSize] = useState(prefill?.size || s.boardSize || rec.size);
+  // The recommended board, as the strength (v11): the remembered one only with the suggestion off.
+  const [size, setSize] = useState(prefill?.size || (s.autoStrength ? rec.size : s.boardSize || rec.size));
   const [tc, setTc] = useState(s.timeControl || "none");
   const [opponent, setOpponent] = useState("ai");
   const [color, setColor] = useState(BLACK);
