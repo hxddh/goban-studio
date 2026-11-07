@@ -13,8 +13,9 @@ await test("shell strings: the area files (shell, play, learn) are merged into t
     assert.ok(Object.keys(table).length > 0, file);
     for (const [key, v] of Object.entries(table)) assert.deepEqual(MESSAGES[key], v, `${key} (${file}.js) is the table's`);
   }
-  // The removed places have no strings left.
-  for (const key of Object.keys(MESSAGES)) assert.ok(!/^(today\.|nav\.(today|practice|library)$)/.test(key), key);
+  // v12: the four spaces have their names (Practice keeps Learn's key).
+  for (const key of ["nav.today", "nav.play", "nav.learn", "nav.library"]) assert.ok(MESSAGES[key], key);
+  assert.ok(!MESSAGES["nav.practice"], "one key for Practice");
 });
 
 await test("every UI key exists in all four launch languages", () => {
@@ -27,12 +28,14 @@ await test("every UI key exists in all four launch languages", () => {
   setLang("ko");
   assert.equal(t("nav.play"), "대국");
   setLang("ja");
-  assert.equal(t("nav.learn"), "学ぶ");
+  assert.equal(t("nav.learn"), "練習");
   setLang("en");
-  assert.equal(t("nav.learn"), "Learn");
+  assert.equal(t("nav.learn"), "Practice");
   setLang("zh");
   assert.equal(t("nav.play"), "下棋");
-  assert.equal(t("nav.learn"), "学棋");
+  assert.equal(t("nav.learn"), "练习");
+  assert.equal(t("nav.today"), "今天");
+  assert.equal(t("nav.library"), "棋谱");
 });
 
 await test("every key the interface uses is in the string table", () => {

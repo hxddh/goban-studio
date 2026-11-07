@@ -643,7 +643,7 @@ function ShortcutsSheet() {
     [`${SHIFT}${MOD}H`, t("common.hint")],
     [`${MOD}.`, t("play.focus")],
     [`${MOD},`, t("nav.settings")],
-    [`${MOD}1 / 2`, `${t("nav.play")} / ${t("nav.learn")}`],
+    [`${MOD}1 – 4`, `${t("nav.today")} / ${t("nav.play")} / ${t("nav.learn")} / ${t("nav.library")}`],
     [`${MOD}[  ${MOD}]`, t("shortcuts.history")],
     ["← →", t("shortcuts.browse")],
     ["Enter", t("shortcuts.continue")],

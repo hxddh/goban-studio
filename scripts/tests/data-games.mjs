@@ -218,7 +218,7 @@ await test("data games: a backup holds every game file with its analysis, and re
 
 await test("data: nothing reads the old localStorage keys, and the old data modules are gone", () => {
   const js = path.join(root, "src/web/js");
-  for (const f of ["persist.js", "library.js", "app/strength.js", "app/rating.js", "app/plan.js", "app/week.js", "app/course-path.js", "app/beginner.js", "app/today.jsx", "app/library.jsx"]) assert.ok(!fs.existsSync(path.join(js, f)), `${f} is gone`);
+  for (const f of ["persist.js", "library.js", "app/strength.js", "app/rating.js", "app/plan.js", "app/week.js", "app/course-path.js", "app/beginner.js", "app/library.jsx"]) assert.ok(!fs.existsSync(path.join(js, f)), `${f} is gone`);
   // The sources (not the build output, not the content tables).
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === "content" ? [] : walk(path.join(dir, e.name))) : /\.jsx?$/.test(e.name) && e.name !== "bundle.js" ? [path.join(dir, e.name)] : []));
   for (const f of walk(js)) {

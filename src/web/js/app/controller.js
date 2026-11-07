@@ -21,7 +21,7 @@ import { CLASSICS, preload as preloadContent, withContent } from "../content.js"
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
 import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
-import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
+import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
@@ -72,7 +72,7 @@ export async function boot() {
   restoreCurrent();
   // Play opens on the board when a game is in progress, else on its home.
   const g = state.game?.game;
-  state.space = "play";
+  state.space = "today";
   state.play = { ...state.play, view: g && g.moveNumber > 0 && !g.current.result ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
@@ -99,8 +99,8 @@ export async function boot() {
 
 /* --------------------------------------------------------------- spaces */
 
-/** The two spaces (docs/v9.md, "Two spaces"), in sidebar order. */
-export const SPACES = ["play", "learn"];
+/** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
+export const SPACES = ["today", "play", "learn", "library"];
 
 /** Play's home: the game in progress or the suggested game, then the history. */
 export function playHome() {
@@ -145,8 +145,13 @@ export function goSpace(space) {
       if (state.learn.view !== "home") return learnHome();
       return;
     }
-    if (state.play.explorer && !state.review) return closeExplorer();
-    return playHome();
+    if (space === "library") {
+      if (state.review && state.review.meta.space === "library") return closeReview();
+      if (state.play.explorer) return closeExplorer();
+      return;
+    }
+    if (space === "today") return;
+    return state.game && !state.review ? playBoard() : playHome();
   }
   remember();
   update((s) => {
@@ -209,7 +214,7 @@ export function openRecord(id) {
   try {
     const { game } = loadSGF(rec.sgf);
     // The same review as after a game: its stored analysis opens at once.
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "play", back: "play", autoJump: true });
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
@@ -226,7 +231,7 @@ function showClassic(id) {
   try {
     const { game } = loadSGF(c.sgf);
     changeProfile((p) => recordClassic(p, c.id, Date.now()));
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: (c.moments?.find((m) => m.title) ?? c.moments?.[0])?.index, autoJump: !c.moments?.length, space: "play", back: "play" });
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: (c.moments?.find((m) => m.title) ?? c.moments?.[0])?.index, autoJump: !c.moments?.length, space: "library", back: "library" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }
@@ -268,7 +273,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
     setSetting("onboarded", true);
     update({ sheet: null });
   }
-  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "play", back: "play", autoJump: true });
+  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
   if (warnings.length) toast(warnings[0], "warn");
 }
 

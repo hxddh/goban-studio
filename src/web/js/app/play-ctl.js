@@ -592,7 +592,7 @@ export function clockTick() {
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
   // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
-  if (state.space !== "play" || state.play.view !== "game" || state.play.explorer || playReviewing() || document.hidden) return;
+  if (state.space !== "play" || state.play.view !== "game" || playReviewing() || document.hidden) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.
@@ -720,7 +720,7 @@ export function openPostGame(g = state.game, { inPlace = true } = {}) {
  */
 export function showFinished() {
   const g = state.game;
-  if (state.space !== "play" || state.play.view !== "game" || state.review || state.play.explorer) return;
+  if (state.space !== "play" || state.play.view !== "game" || state.review) return;
   if (g?.game.mainLine().at(-1).result && !g.scoring) openPostGame(g);
 }
 

@@ -1,5 +1,5 @@
 /**
- * The shell: the sidebar with the two spaces (Play and Learn, docs/v9.md)
+ * The shell: the sidebar with the four spaces (v12: Today, Play, Practice, Library)
  * and Settings, the native menu bar, keyboard handling, and the space
  * itself. Each page starts with the shared toolbar (chrome.jsx).
  *
@@ -19,7 +19,8 @@ import * as S from "../solver.js";
 import { SPACES, Sidebar, isFocus } from "./chrome.jsx";
 import { PlayView, ReviewView } from "./play.jsx";
 import { PracticeView } from "./practice.jsx";
-import { PlayHome } from "../play/home.jsx";
+import { LibraryHome, PlayStart, gameInProgress } from "../play/home.jsx";
+import { TodayView } from "./today.jsx";
 import { Sheets } from "./sheets.jsx";
 import { ExplorerView } from "./explorer.jsx";
 import { useAnnouncements } from "./announcer.js";
@@ -37,11 +38,17 @@ function Toasts() {
   );
 }
 
-/** What Play shows: a review, the explorer, the board, or its home. */
+/** What Play shows: a review, the board, or (no game on it) what to play. */
 function PlaySpace() {
   if (C.playReviewing()) return <ReviewView />;
+  return state.game && (state.play.view === "game" || gameInProgress()) ? <PlayView /> : <PlayStart />;
+}
+
+/** What the Library shows: a review of a record or classic, the explorer, or its list. */
+function LibrarySpace() {
+  if (state.review && state.review.meta.space === "library") return <ReviewView />;
   if (state.play.explorer) return <ExplorerView />;
-  return state.play.view === "game" ? <PlayView /> : <PlayHome />;
+  return <LibraryHome />;
 }
 
 function App() {
@@ -55,14 +62,16 @@ function App() {
   const focus = isFocus();
   // The game that ends turns into its review on the same page (no new place).
   const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
-  const page = s.space === "learn" ? s.learn.view : s.play.explorer ? "explorer" : s.play.view;
+  const page = s.space === "learn" ? s.learn.view : s.space === "library" ? (s.play.explorer ? "explorer" : "list") : s.space === "play" ? s.play.view : "today";
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
         <div class="place" key={s.space + reviewKey + page}>
+          {s.space === "today" && <TodayView />}
           {s.space === "play" && <PlaySpace />}
           {s.space === "learn" && <PracticeView />}
+          {s.space === "library" && <LibrarySpace />}
         </div>
       </main>
       <Sheets />
@@ -89,7 +98,7 @@ function App() {
 
 /** The game's board is what Play shows (not its home or a review). */
 function onBoard() {
-  return state.space === "play" && state.play.view === "game" && !state.play.explorer && !C.playReviewing();
+  return state.space === "play" && state.play.view === "game" && !C.playReviewing();
 }
 
 /** One table of commands for keyboard, native menus and the page. */
@@ -112,8 +121,10 @@ const COMMANDS = {
   "view.eval": () => C.setSetting("showEval", !state.settings.showEval),
   "view.live": () => C.toggleLive(),
   "view.largeText": () => C.setSetting("largeText", !state.settings.largeText),
+  "go.today": () => C.goSpace("today"),
   "go.play": () => C.goSpace("play"),
   "go.learn": () => C.goSpace("learn"),
+  "go.library": () => C.goSpace("library"),
   "go.back": () => C.back(),
   "go.forward": () => C.forward(),
 };
@@ -158,8 +169,10 @@ function menuSpec() {
     {
       title: t("menu.go"),
       items: [
-        { label: t("nav.play"), command: "go.play", key: "1" },
-        { label: t("nav.learn"), command: "go.learn", key: "2" },
+        { label: t("nav.today"), command: "go.today", key: "1" },
+        { label: t("nav.play"), command: "go.play", key: "2" },
+        { label: t("nav.learn"), command: "go.learn", key: "3" },
+        { label: t("nav.library"), command: "go.library", key: "4" },
         { separator: true },
         { label: t("nav.back"), command: "go.back", key: "[" },
         { label: t("nav.forward"), command: "go.forward", key: "]" },
@@ -201,8 +214,8 @@ function onKeyDown(e) {
     }
     if (state.review && (state.review.meta.space || "play") === state.space) return C.closeReview();
 
-    // The explorer: Esc goes back to Play's home.
-    if (state.space === "play" && state.play.explorer) return C.closeExplorer();
+    // The explorer: Esc goes back to the Library.
+    if (state.space === "library" && state.play.explorer) return C.closeExplorer();
     if (state.settings.focus) return C.toggleFocus();
     return;
   }
@@ -219,7 +232,7 @@ function onKeyDown(e) {
       e.preventDefault();
       return runCommand("view.focus");
     }
-    if (k === "1" || k === "2") {
+    if (k >= "1" && k <= "4" && k.length === 1) {
       e.preventDefault();
       return C.goSpace(SPACES[Number(k) - 1].id);
     }
@@ -273,7 +286,7 @@ function onKeyDown(e) {
     if (e.key === "End") return C.reviewGoto(Infinity);
   }
   // v6 explorer: ← / → step through the line, Home goes back to the start.
-  if (!reviewing && state.space === "play" && state.play.explorer) {
+  if (!reviewing && state.space === "library" && state.play.explorer) {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       return C.explorerStep(e.key === "ArrowLeft" ? -1 : 1);

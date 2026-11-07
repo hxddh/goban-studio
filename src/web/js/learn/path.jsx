@@ -13,6 +13,7 @@ import { PROBLEMS } from "../content.js";
 import { PLACEMENT } from "../model/player.js";
 import { Button, DiagramThumb, Icon, Stone } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
+import { CatalogSections } from "./catalog.jsx";
 
 /** Why an item is in the path, in a few words. */
 export function whyText(it) {
@@ -145,16 +146,7 @@ export function LearnHome() {
             </ol>
           </section>
         )}
-        <ul class="group catalog-link">
-          <li>
-            <button type="button" class="group-row" onClick={C.openCatalog}>
-              <span class="gr-text">
-                <strong>{t("learn.catalog")}</strong>
-              </span>
-              <Icon name="next" size={14} />
-            </button>
-          </li>
-        </ul>
+        <CatalogSections />
       </div>
     </>
   );

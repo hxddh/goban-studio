@@ -6,7 +6,19 @@ import { m } from "./m.js";
 
 export const SHELL = {
   "nav.play": m("下棋", "Play", "대국", "対局"),
-  "nav.learn": m("学棋", "Learn", "배우기", "学ぶ"),
+  "nav.learn": m("练习", "Practice", "연습", "練習"),
+  "nav.today": m("今天", "Today", "오늘", "今日"),
+  "nav.library": m("棋谱", "Library", "기보", "棋譜"),
+  "today.morning": m("早上好", "Good morning", "좋은 아침입니다", "おはようございます"),
+  "today.afternoon": m("下午好", "Good afternoon", "안녕하세요", "こんにちは"),
+  "today.evening": m("晚上好", "Good evening", "좋은 저녁 되세요", "こんばんは"),
+  "today.night": m("夜深了", "Late night", "늦은 밤이네요", "夜更けですね"),
+  "today.practice": m("今天的练习", "Today's practice", "오늘의 연습", "今日の練習"),
+  "today.next": m("下一项", "Next", "다음", "次"),
+  "today.week": m("本周", "This week", "이번 주", "今週"),
+  "today.weekLine": m("下了 {0} 盘棋，做对 {1} 道题。", "{0} games played, {1} problems solved.", "대국 {0}판, 문제 {1}개 해결.", "対局 {0} 局、正解 {1} 問。"),
+  "today.weekNone": m("这周还没有下棋或做题。", "No games or problems yet this week.", "이번 주에는 아직 대국이나 문제가 없습니다.", "今週はまだ対局も問題もありません。"),
+  "today.recent": m("最近的对局", "Recent games", "최근 대국", "最近の対局"),
 
   // The store (data/store.js): one toast however many writes failed.
   "store.writeFailed": m(

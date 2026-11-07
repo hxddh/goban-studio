@@ -182,8 +182,10 @@ function PlayerRow({ color }) {
     sub = rankLabel(g.rank);
   } else if (g.opponent === "ai") {
     name = t("play.you");
+    // v12: your level as before v9 — the estimate once a game is rated, else what you said you are.
     const e = C.playerEstimate({ size: game.size });
-    if (e.games > 0) sub = rankLabel(e.rank);
+    const rank = e.games > 0 ? e.rank : C.playerRankNow();
+    if (rank != null) sub = rankLabel(rank);
   } else name = colorName(color);
   const fx = g.captureFx && g.captureFx.color === color && performance.now() - g.captureFx.at < 1200 ? g.captureFx : null;
   const side = g.clock ? g.clock[color === BLACK ? "b" : "w"] : null;
@@ -532,7 +534,7 @@ function reviewHeading(r) {
   const line = r.game.mainLine();
   const result = line[line.length - 1].result;
   const space = meta.space || "play";
-  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : "nav.play"), onClick: C.closeReview }];
+  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");
   // A game with a result says it at the top of the panel (ResultLine).
   let sub = "";
@@ -861,13 +863,10 @@ function ResultLine() {
 }
 
 /**
- * v11: a classic's moments to study. A moment is either written for the
- * game (title and note) or one of the game's largest swings by KataGo's
- * count (docs/classics-katago.json: the move KataGo prefers and about how
- * much the move gave away), said in a fixed sentence. Each row goes to its
- * move; the note of the move on the board is shown.
+ * A classic's famous moves (v11; v12: written ones only — KataGo's swings
+ * read as noise, docs/classics-katago.json keeps them for writing more).
+ * Each row goes to its move; the note of the move on the board is shown.
  */
-const half = (v) => Math.round(v * 2) / 2;
 
 function ClassicMoments({ classic }) {
   const r = state.review;
@@ -887,12 +886,12 @@ function ClassicMoments({ classic }) {
             <li class={`key-move ${on ? "on" : ""}`}>
               <button type="button" class="key-head" aria-current={on ? "step" : undefined} onClick={() => C.reviewGoto(mo.index)}>
                 <Stone color={mv.color} size={12} />
-                <span>{mo.title ? C.tx(mo.title) : t("review.classicLoss", [formatPoints(half(mo.loss))])}</span>
+                <span>{C.tx(mo.title)}</span>
                 <em class="cm-at">
                   {mo.index} · {where}
                 </em>
               </button>
-              {on && <p>{mo.note ? C.tx(mo.note) : t("review.classicLossNote", [colorName(mv.color), mo.best, formatPoints(half(mo.loss))])}</p>}
+              {on && <p>{C.tx(mo.note)}</p>}
             </li>
           );
         })}
@@ -1039,15 +1038,15 @@ function ReviewPanel() {
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
               <>
-                {meta.classic && <ClassicMoments classic={meta.classic} />}
-                <Moments />
-                <Variations />
                 {meta.classic && (
                   <section class="quiet-note">
                     <p>{C.tx(meta.classic.note)}</p>
                     {meta.classic.event && <p class="fine">{meta.classic.event}</p>}
                   </section>
                 )}
+                {meta.classic && <ClassicMoments classic={meta.classic} />}
+                <Moments />
+                <Variations />
               </>
             )}
             {tab === "summary" && <GameSummary />}

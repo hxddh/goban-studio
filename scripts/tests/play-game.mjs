@@ -262,9 +262,12 @@ export default async function ({ test, assert, root }) {
         was = left();
         await run();
         assert.equal(left(), was, "Play's home: the clock waits");
-        state.play = { ...state.play, view: "game", explorer: { open: true } };
+        // v12: the explorer is in the Library; another space keeps the board off screen.
+        state.play = { ...state.play, view: "game", explorer: "whole" };
+        state.space = "library";
         await run();
-        assert.equal(left(), was, "the explorer: the clock waits");
+        assert.equal(left(), was, "the Library's explorer: the clock waits");
+        state.space = "play";
         state.play = { ...state.play, view: "game", explorer: null };
       } finally {
         if (!hadDoc) delete globalThis.document;
