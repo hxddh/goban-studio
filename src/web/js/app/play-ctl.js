@@ -89,7 +89,9 @@ export function restoreCurrent() {
   }
   // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
   // brand-new board takes the default ruleset and its komi.
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai" });
+  // v12: Play shows this board as the game to play, so it is one: against
+  // the chosen rank, rated like a game from New game.
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", rank: state.settings.opponentRank, rated: true });
 }
 
 export function persistCurrent() {

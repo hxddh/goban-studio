@@ -35,6 +35,10 @@ try {
     assert.equal(state.profile.v, 9, "an empty v9 profile");
     assert.equal(state.profile.games.length, 0);
     assert.ok(state.game && state.game.game.moveNumber === 0, "an empty board waits");
+    // v12: Play shows that board as the game to play, so it is rated like one from New game.
+    assert.equal(state.game.rated, true);
+    assert.equal(state.game.opponent, "ai");
+    assert.ok(Number.isFinite(state.game.rank), "against a rank of the ladder");
     assert.ok(!("progress" in state), "no old progress object");
     // The source: boot awaits store.open() before it reads anything, and start() awaits boot before the first render.
     const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
