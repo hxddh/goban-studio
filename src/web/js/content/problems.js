@@ -9865,12 +9865,15 @@ export const PROBLEMS = [
     at: [0, 0],
   },
   // ------------------------------------------------------------------ v11
-  // Added in v11 to fill thin grade x goal cells (see docs/problems-audit.md,
-  // "v11"). Endgame areas were enumerated from natural boundary shapes (each
-  // side's wall stopping on the first or second line, a gap of zero to two
-  // points, a hane or cut already played), proved alone with every ':' point
-  // made playable as well, and summed for the "biggest move" problems. Like
-  // every problem they are proved by scripts/check-problems.mjs.
+  // Added in v11 so that every grade holds at least 15 capture, save, live,
+  // kill and endgame problems (see docs/problems-audit.md, "v11"). Life
+  // problems come from the v5 sealed eye-space generator with tidier walls;
+  // save problems from small open positions re-proved on a diagram padded
+  // with four lines of open board; endgame areas were enumerated from natural
+  // boundary shapes (each wall stopping on the first or second line, a gap of
+  // zero to two points, a hane or cut already played), proved alone with
+  // every ':' point made playable as well, and summed for the "biggest move"
+  // problems. Like every problem they are proved by scripts/check-problems.mjs.
   {
     id: "life-capture-eye-24",
     topic: "life",
