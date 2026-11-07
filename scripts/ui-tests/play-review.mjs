@@ -276,6 +276,29 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
+  await check("play review: a classic opens at its first moment; the moments to study go to their moves and show their notes", async () => {
+    const page = await fresh();
+    await onboard(page, 1);
+    await page.keyboard.press("Control+1");
+    await page.click(".collection-row >> nth=0");
+    await page.waitForSelector(".classic-moments .key-move");
+    const first = await page.evaluate(() => {
+      const c = window.__state.review.meta.classic;
+      return { moments: c.moments.map((m) => m.index), rows: document.querySelectorAll(".classic-moments .key-move").length, on: document.querySelector(".classic-moments .key-move.on p")?.textContent || "" };
+    });
+    assert(first.rows === first.moments.length && first.rows >= 1, `rows ${first.rows} for ${first.moments}`);
+    assert((await page.evaluate(() => window.__state.review.game.mainLine().indexOf(window.__state.review.game.current))) === first.moments[0], "opens at the first moment");
+    assert(first.on.length > 20, "the first moment's note is shown");
+    const last = first.moments.length - 1;
+    await page.click(`.classic-moments .key-head >> nth=${last}`);
+    await page.waitForFunction((i) => window.__state.review.game.mainLine().indexOf(window.__state.review.game.current) === i, first.moments[last]);
+    const on = await page.locator(".classic-moments .key-move.on").count();
+    assert(on === 1, `${on} moments marked current`);
+    await audit(page, "a classic's moments");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   /** `n` finished two-player 19×19 games of `moves` moves, written straight into the preview's store (one file each). */
   async function seed(page, n, moves) {
     await page.evaluate(

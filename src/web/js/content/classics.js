@@ -43,7 +43,7 @@ export const CLASSICS = [
       }
     ],
     "note": {
-      "zh": "1846 年秀策对幻庵因硕。第 127 手的“耳赤之妙手”是围棋史上最著名的读秒名场面之一。",
+      "zh": "1846 年秀策对幻庵因硕。第 127 手的“耳赤之妙手”是围棋史上最著名的妙手之一。",
       "en": "Shusaku vs Gennan Inseki, 1846. The move now called the ear-reddening move is one of the most famous acts of reading in Go history.",
       "ko": "1846년 슈사쿠 대 겐난 인세키. 127수의 \"귀가 붉어진 묘수\"는 바둑사에서 가장 유명한 수읽기 장면 중 하나입니다.",
       "ja": "1846年、秀策対幻庵因碩。127手の「耳赤の妙手」は囲碁史上最も有名な読みの場面の一つです。"

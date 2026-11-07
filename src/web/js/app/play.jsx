@@ -878,12 +878,15 @@ function ClassicMoments({ classic }) {
         {moments.map((mo) => {
           const mv = line[mo.index].move;
           const on = at === mo.index;
+          const where = mv.pass ? t("common.pass") : coordLabel(mv.x, mv.y, r.game.size);
           return (
             <li class={`key-move ${on ? "on" : ""}`}>
               <button type="button" class="key-head" aria-current={on ? "step" : undefined} onClick={() => C.reviewGoto(mo.index)}>
                 <Stone color={mv.color} size={12} />
-                <span>{t("review.moveLabel", [mo.index, colorName(mv.color), mv.pass ? t("common.pass") : coordLabel(mv.x, mv.y, r.game.size)])}</span>
-                <em class="cm-title">{C.tx(mo.title)}</em>
+                <span>{C.tx(mo.title)}</span>
+                <em class="cm-at">
+                  {mo.index} · {where}
+                </em>
               </button>
               {on && <p>{C.tx(mo.note)}</p>}
             </li>
