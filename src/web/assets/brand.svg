@@ -1,5 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <title>Goban Studio</title>
-  <circle cx="20.4" cy="20.4" r="15.455" fill="#1b1a17"/>
-  <circle cx="43.6" cy="43.6" r="13.855" fill="#fbf8f1" stroke="#1b1a17" stroke-width="3.2"/>
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efd9ad"/><stop offset="1" stop-color="#ddba85"/>
+    </linearGradient>
+    <radialGradient id="bk" cx=".36" cy=".32" r=".78">
+      <stop offset="0" stop-color="#55565b"/><stop offset=".22" stop-color="#2c2d30"/><stop offset=".62" stop-color="#151517"/><stop offset="1" stop-color="#060607"/>
+    </radialGradient>
+    <radialGradient id="wh" cx=".36" cy=".32" r=".8">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#f7f5f0"/><stop offset=".85" stop-color="#e4dfd4"/><stop offset="1" stop-color="#cdc6b7"/>
+    </radialGradient>
+    <radialGradient id="rimDark" cx=".5" cy=".5" r=".5">
+      <stop offset=".78" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/>
+    </radialGradient>
+    <radialGradient id="rimWhite" cx=".5" cy=".5" r=".5">
+      <stop offset=".8" stop-color="#6b5a3a" stop-opacity="0"/><stop offset="1" stop-color="#6b5a3a" stop-opacity=".22"/>
+    </radialGradient>
+    <radialGradient id="spec" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bounce" x1="0" y1="0" x2="1" y2="1">
+      <stop offset=".55" stop-color="#d9a860" stop-opacity="0"/><stop offset="1" stop-color="#d9a860" stop-opacity=".18"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".05" stop-color="#fff" stop-opacity="0"/><stop offset=".95" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".14"/>
+    </linearGradient>
+    <clipPath id="body"><rect width="64" height="64" rx="14.45"/></clipPath>
+  </defs>
+  <g clip-path="url(#body)">
+    <rect width="64" height="64" fill="url(#board)"/>
+    <g stroke="#5b4220" stroke-opacity=".40" stroke-width="0.6"><path d="M20.35 0V64M0 20.35H64"/><path d="M43.65 0V64M0 43.65H64"/></g>
+    <circle cx="20.98" cy="21.4" r="10.49" fill="#3b2508" opacity=".28"/><circle cx="20.35" cy="20.35" r="10.49" fill="url(#bk)"/><circle cx="20.35" cy="20.35" r="10.49" fill="url(#rimDark)"/><circle cx="20.35" cy="20.35" r="10.49" fill="url(#bounce)"/>
+    <circle cx="44.28" cy="44.7" r="10.49" fill="#3b2508" opacity=".28"/><circle cx="43.65" cy="43.65" r="10.49" fill="url(#wh)"/><circle cx="43.65" cy="43.65" r="10.49" fill="url(#rimWhite)"/>
+  </g>
 </svg>

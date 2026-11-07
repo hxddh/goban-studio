@@ -2,10 +2,9 @@
  * Generate every visual and audio asset of Goban Studio from code.
  *
  *   node scripts/make-assets.mjs            # everything
- *   node scripts/make-assets.mjs surfaces   # one group: surfaces | stones | sounds | brand
+ *   node scripts/make-assets.mjs brand      # one group: stones | sounds | brand
  *
  * Output (src/web/assets):
- *   surfaces/kaya.webp                         2048² wood grain (for the app icon only)
  *   stones/{white-0..7,black-0..3}.png          256² sprites
  *   sounds/*.wav                                 16-bit mono 44.1 kHz
  *   brand.svg                                    the mark
@@ -13,8 +12,8 @@
  *
  * Every random choice comes from a fixed seed, so a re-run writes identical
  * files. Pixels, PNGs and WAVs are produced in plain Node; Chromium (via
- * Playwright, which must be installed) is used only to encode WebP and to
- * composite the raster app icon.
+ * Playwright, which must be installed) is used only to render the raster
+ * app icon from its SVG (scripts/assets/brand.mjs).
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -22,19 +21,14 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { contrast, encodePNG, encodeWAV, hex } from "./assets/lib.mjs";
-import * as Surf from "./assets/surfaces.mjs";
+import { encodePNG, encodeWAV } from "./assets/lib.mjs";
 import * as Stones from "./assets/stones.mjs";
 import * as Snd from "./assets/sounds.mjs";
 import { brandSVG, iconHTML, iconSVG } from "./assets/brand.mjs";
-import { THEME_COLORS } from "../src/web/js/materials.js";
 
-const SURFACES = Object.keys(THEME_COLORS);
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, "src/web/assets");
-const SIZE = 2048;
-const WEBP_QUALITY = 0.94;
 const only = new Set(process.argv.slice(2));
 const want = (g) => only.size === 0 || only.has(g);
 
@@ -70,89 +64,11 @@ async function page() {
   return p;
 }
 
-/** Encode RGB pixels as lossy WebP in Chromium. */
-async function webp(p, rgb, size, quality) {
-  const rgba = Buffer.alloc(size * size * 4);
-  for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
-    rgba[j] = rgb[i];
-    rgba[j + 1] = rgb[i + 1];
-    rgba[j + 2] = rgb[i + 2];
-    rgba[j + 3] = 255;
-  }
-  p.serve("/raw", rgba);
-  const b64 = await p.evaluate(
-    async ({ size, quality }) => {
-      const buf = await (await fetch("/raw")).arrayBuffer();
-      const c = document.createElement("canvas");
-      c.width = size;
-      c.height = size;
-      c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(buf), size, size), 0, 0);
-      const blob = await new Promise((ok) => c.toBlob(ok, "image/webp", quality));
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      let s = "";
-      for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-      return btoa(s);
-    },
-    { size, quality },
-  );
-  return Buffer.from(b64, "base64");
-}
-
-/** Worst-case contrast of a colour against the surface (1st/99th percentile luminance pixels). */
-function surfaceStats(rgb) {
-  const n = rgb.length / 3;
-  const lum = new Float32Array(n);
-  let m = [0, 0, 0];
-  for (let i = 0; i < n; i++) {
-    const r = rgb[i * 3];
-    const g = rgb[i * 3 + 1];
-    const b = rgb[i * 3 + 2];
-    m[0] += r;
-    m[1] += g;
-    m[2] += b;
-    lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  m = m.map((v) => Math.round(v / n));
-  const idx = Array.from({ length: 4096 }, (_, k) => Math.floor((k * n) / 4096));
-  idx.sort((a, b) => lum[a] - lum[b]);
-  const px = (i) => [rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]];
-  return { mean: m, dark: px(idx[Math.floor(idx.length * 0.01)]), light: px(idx[Math.floor(idx.length * 0.99)]) };
-}
-
-function checkTheme(name, stats) {
-  const t = THEME_COLORS[name];
-  const rows = [];
-  let ok = true;
-  for (const key of ["line", "edge", "star", "text"]) {
-    const col = hex(t[key]);
-    const worst = key === "text" ? contrast(col, stats.mean) : Math.min(contrast(col, stats.dark), contrast(col, stats.light));
-    if (worst < 3) ok = false;
-    rows.push(`${key} ${worst.toFixed(2)}:1`);
-  }
-  console.log(`  ${name.padEnd(8)} contrast  ${rows.join("  ")}${ok ? "" : "   << below 3:1"}`);
-  return ok;
-}
-
 const report = [];
 function note(rel, extra = "") {
   const size = fs.statSync(path.join(out, rel)).size;
   report.push([rel, size]);
   console.log(`  ${rel.padEnd(30)} ${(size / 1024).toFixed(1).padStart(8)} KB ${extra}`);
-}
-
-let contrastOk = true;
-
-if (want("surfaces")) {
-  console.log("surfaces");
-  const p = await page();
-  await p.goto("http://assets.invalid/");
-  for (const name of SURFACES) {
-    const rgb = Surf[name](SIZE);
-    write(`surfaces/${name}.webp`, await webp(p, rgb, SIZE, WEBP_QUALITY));
-    note(`surfaces/${name}.webp`);
-    contrastOk = checkTheme(name, surfaceStats(rgb)) && contrastOk;
-  }
-  await p.close();
 }
 
 if (want("stones")) {
@@ -190,15 +106,8 @@ if (want("brand")) {
   write("brand.svg", brandSVG());
   note("brand.svg");
   fs.writeFileSync(path.join(root, "assets/icon.svg"), iconSVG());
-  const kaya = path.join(out, "surfaces/kaya.webp");
-  const black = path.join(out, "stones/black-0.png");
-  const white = path.join(out, "stones/white-0.png");
-  if (![kaya, black, white].every((f) => fs.existsSync(f))) throw new Error("brand needs surfaces and stones generated first");
   const p = await page();
-  p.serve("/kaya.webp", fs.readFileSync(kaya), "image/webp");
-  p.serve("/black.png", fs.readFileSync(black), "image/png");
-  p.serve("/white.png", fs.readFileSync(white), "image/png");
-  p.__html = iconHTML({ kaya: "/kaya.webp", black: "/black.png", white: "/white.png" });
+  p.__html = iconHTML();
   await p.goto("http://assets.invalid/");
   const b64 = await p.evaluate(() => window.done);
   fs.writeFileSync(path.join(root, "assets/icon.png"), Buffer.from(b64, "base64"));
@@ -225,9 +134,5 @@ walk(out);
 console.log(`total src/web/assets: ${(total / 1024 / 1024).toFixed(2)} MB  (sha256 ${hashes.digest("hex").slice(0, 16)})`);
 if (total > 6 * 1024 * 1024) {
   console.error("asset budget exceeded (6 MB)");
-  process.exitCode = 1;
-}
-if (!contrastOk) {
-  console.error("a theme colour is below 3:1 against its surface");
   process.exitCode = 1;
 }

@@ -148,8 +148,7 @@ kbd { font: 500 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; backgr
 .sb-top { height: var(--tb); flex: none; display: flex; align-items: center; padding: 0 var(--s-4); }
 .sb-brand { display: flex; align-items: center; gap: var(--s-2); font: 600 13px/1 var(--font); color: var(--text); }
 :root[data-native-chrome="inset"] .sb-brand { display: none; }
-.sb-mark .mk-b { fill: var(--text); }
-.sb-mark .mk-w { fill: var(--surface); stroke: var(--text); stroke-width: 3.2; }
+.sb-mark { display: block; flex: none; }
 .sb-list { display: flex; flex-direction: column; gap: 2px; padding: var(--s-2) var(--s-2); }
 .sb-foot { margin-top: auto; padding: var(--s-2); }
 .sb-item {
@@ -584,8 +583,8 @@ button.group-row:hover { background: var(--fill); }
 .onboarding .drag { position: absolute; top: 0; left: 0; right: 0; height: var(--tb); }
 .ob-card { width: min(480px, 100%); display: flex; flex-direction: column; align-items: center; gap: var(--s-4); text-align: center; animation: sheet-in var(--dur-3) var(--ease-out); }
 .ob-card h1 { font: var(--t-display); }
-.ob-mark { display: flex; gap: 0; margin-bottom: var(--s-2); }
-.ob-mark .stone + .stone { margin-left: -6px; }
+/* The app icon carries its own 100/1024 margin and soft shadow. */
+.ob-mark { display: block; margin: -8px 0 var(--s-1); }
 .choice-list { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; }
 .choice { display: flex; flex-direction: column; gap: 2px; padding: var(--s-3) var(--s-4); border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--surface); cursor: pointer; text-align: left; transition: border-color var(--dur-1); }
 .choice:hover { border-color: var(--text); }
