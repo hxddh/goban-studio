@@ -20,7 +20,7 @@ import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
+import { boardShown, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
@@ -102,22 +102,31 @@ export async function boot() {
 /** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
 export const SPACES = ["today", "play", "learn", "library"];
 
-/** Play's home: the game in progress or the suggested game, then the history. */
+/**
+ * Play's top: the board while a game is not over (v12, as before v9), else
+ * what to play next. Any review open in Play closes.
+ */
 export function playHome() {
-  if (state.space === "play" && state.play.view === "home" && !state.review && !state.play.explorer) return;
+  const live = !!state.game && !state.game.game.current.result;
+  const view = live ? "game" : "home";
+  if (state.space === "play" && state.play.view === view && !state.review) return;
   remember();
   if (state.review) dropReview();
   update((s) => {
     s.space = "play";
-    s.play = { ...s.play, view: "home", explorer: null };
+    s.play = { ...s.play, view };
     s.menu = null;
   });
+  if (live) {
+    maybeComputerMove();
+    ponder();
+  }
   syncMenus();
 }
 
 /** The board of the game on it (Play). */
 export function playBoard() {
-  if (state.space === "play" && state.play.view === "game" && !state.review) return showFinished();
+  if (boardShown() && !state.review) return showFinished();
   remember();
   if (state.review && (state.review.meta.space || "play") === "play") dropReview();
   update((s) => {

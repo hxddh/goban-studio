@@ -99,7 +99,7 @@ function App() {
 
 /** The game's board is what Play shows (not its home or a review). */
 function onBoard() {
-  return state.space === "play" && state.play.view === "game" && !C.playReviewing();
+  return C.boardShown();
 }
 
 /** One table of commands for keyboard, native menus and the page. */

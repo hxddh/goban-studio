@@ -144,6 +144,15 @@ export function playReviewing() {
   return !!state.review && (state.review.meta.space || "play") === "play";
 }
 
+/**
+ * v12: the game's board is on screen — by the same rule Play draws it
+ * (app.jsx PlaySpace): in Play, no review, and the game view or a game that
+ * is not over. The clock, the report and the board's keys follow this.
+ */
+export function boardShown() {
+  return state.space === "play" && !playReviewing() && !!state.game && (state.play.view === "game" || !state.game.game.current.result);
+}
+
 export function isComputerTurn() {
   const g = state.game;
   return !!g && g.opponent === "ai" && g.game.phase === "playing" && !g.game.current.result && g.game.turn !== g.humanColor;
@@ -592,7 +601,7 @@ export function clockTick() {
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
   // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
-  if (state.space !== "play" || state.play.view !== "game" || playReviewing() || document.hidden) return;
+  if (!boardShown() || document.hidden) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.
@@ -722,7 +731,7 @@ export function showFinished() {
   const g = state.game;
   // v12: a review left open in another space (a record or classic in the
   // Library) does not hold back this game's report; it is closed first.
-  if (state.space !== "play" || state.play.view !== "game" || playReviewing()) return;
+  if (!boardShown()) return;
   if (g?.game.mainLine().at(-1).result && !g.scoring) {
     if (state.review) dropReview();
     openPostGame(g);

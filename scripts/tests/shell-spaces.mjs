@@ -147,6 +147,13 @@ try {
     assert.equal(state.space, "play");
     assert.equal(state.review, null);
     assert.equal(state.play.view, "game");
+    // "Review so far" during the game, then Play again: the board, its clock, keys and report.
+    state.game.game.play(3, 3);
+    C.reviewCurrentGame();
+    assert.equal(C.playReviewing(), true);
+    C.goSpace("play");
+    assert.equal(state.review, null);
+    assert.equal(C.boardShown(), true, "the board is on screen for the clock, keys and report");
     const g = state.game.game;
     g.play(2, 2);
     g.play(6, 6);
