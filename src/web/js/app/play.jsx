@@ -861,10 +861,14 @@ function ResultLine() {
 }
 
 /**
- * v11: a classic's moments to study, written for the game and checked
- * against KataGo (docs/classics-katago.json). Each row goes to its move;
- * the note of the move on the board is shown.
+ * v11: a classic's moments to study. A moment is either written for the
+ * game (title and note) or one of the game's largest swings by KataGo's
+ * count (docs/classics-katago.json: the move KataGo prefers and about how
+ * much the move gave away), said in a fixed sentence. Each row goes to its
+ * move; the note of the move on the board is shown.
  */
+const half = (v) => Math.round(v * 2) / 2;
+
 function ClassicMoments({ classic }) {
   const r = state.review;
   const line = r.game.mainLine();
@@ -883,12 +887,12 @@ function ClassicMoments({ classic }) {
             <li class={`key-move ${on ? "on" : ""}`}>
               <button type="button" class="key-head" aria-current={on ? "step" : undefined} onClick={() => C.reviewGoto(mo.index)}>
                 <Stone color={mv.color} size={12} />
-                <span>{C.tx(mo.title)}</span>
+                <span>{mo.title ? C.tx(mo.title) : t("review.classicLoss", [formatPoints(half(mo.loss))])}</span>
                 <em class="cm-at">
                   {mo.index} · {where}
                 </em>
               </button>
-              {on && <p>{C.tx(mo.note)}</p>}
+              {on && <p>{mo.note ? C.tx(mo.note) : t("review.classicLossNote", [colorName(mv.color), mo.best, formatPoints(half(mo.loss))])}</p>}
             </li>
           );
         })}

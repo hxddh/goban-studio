@@ -276,7 +276,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
-  await check("play review: a classic opens at its first moment; the moments to study go to their moves and show their notes", async () => {
+  await check("play review: a classic opens at its written moment (else its first); the moments to study go to their moves and show their notes", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await page.keyboard.press("Control+1");
@@ -284,10 +284,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.waitForSelector(".classic-moments .key-move");
     const first = await page.evaluate(() => {
       const c = window.__state.review.meta.classic;
-      return { moments: c.moments.map((m) => m.index), rows: document.querySelectorAll(".classic-moments .key-move").length, on: document.querySelector(".classic-moments .key-move.on p")?.textContent || "" };
+      return { moments: c.moments.map((m) => m.index), start: (c.moments.find((m) => m.title) ?? c.moments[0]).index, rows: document.querySelectorAll(".classic-moments .key-move").length, on: document.querySelector(".classic-moments .key-move.on p")?.textContent || "" };
     });
     assert(first.rows === first.moments.length && first.rows >= 1, `rows ${first.rows} for ${first.moments}`);
-    assert((await page.evaluate(() => window.__state.review.game.mainLine().indexOf(window.__state.review.game.current))) === first.moments[0], "opens at the first moment");
+    assert((await page.evaluate(() => window.__state.review.game.mainLine().indexOf(window.__state.review.game.current))) === first.start, "opens at the written moment");
     assert(first.on.length > 20, "the first moment's note is shown");
     const last = first.moments.length - 1;
     await page.click(`.classic-moments .key-head >> nth=${last}`);

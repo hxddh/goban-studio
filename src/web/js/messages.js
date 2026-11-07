@@ -103,6 +103,8 @@ export const MESSAGES = {
   "review.estimateNote": m("离线估算（浏览器预览没有 KataGo），只适合找转折点。", "Offline estimate (no KataGo in the browser preview); good for finding turning points only.", "오프라인 추정입니다(브라우저 미리보기에는 KataGo가 없음). 전환점을 찾는 정도로만 쓰세요.", "オフライン推定です（ブラウザ版にはKataGoがありません）。転換点を探す目安にしてください。"),
   "review.noKeyMoves": m("没有明显的大失误，下得不错。", "No big mistakes. Well played.", "큰 실수가 없습니다. 잘 두었습니다.", "大きな悪手はありません。よく打てています。"),
   "review.classicMoments": m("名局看点", "Moments to study", "명국의 장면", "見どころ"),
+  "review.classicLoss": m("约 {0} 目的损失", "About {0} points lost", "약 {0}집 손해", "約{0}目の損"),
+  "review.classicLossNote": m("KataGo 更喜欢 {1}。{0}这一手大约损失 {2} 目（每个局面搜索 400 次的估计）。", "KataGo prefers {1}. {0}'s move loses about {2} points (an estimate from 400 visits per position).", "KataGo는 {1}을 더 좋게 봅니다. {0}의 이 수는 약 {2}집 손해입니다(국면마다 400회 탐색한 추정).", "KataGo は {1} を選びます。{0}のこの手は約{2}目の損です（各局面400探索の推定）。"),
   "review.moveLabel": m("第 {0} 手 · {1} {2}", "Move {0} · {1} {2}", "{0}수 · {1} {2}", "{0}手目 · {1} {2}"),
   "review.lossN": m("约损 {0} 目", "−{0} pts", "약 {0}집 손해", "約{0}目損"),
   "review.sentence": m("更好的是{0}的 {1}。", "{1}, {0}, was better.", "{0} {1} 자리가 더 좋았습니다.", "{0}の{1}が良かったです。"),

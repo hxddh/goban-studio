@@ -55,11 +55,20 @@ await test("classics: 3 to 5 moments each, in order, on moves of the game, in fo
     ms.forEach((mo, i) => {
       assert.ok(Number.isInteger(mo.index) && mo.index >= 1 && mo.index <= n, `${c.id} ${mo.index}`);
       if (i) assert.ok(mo.index > ms[i - 1].index, `${c.id}: moments in game order`);
-      for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
-      // A moment that calls the move a mistake or the best move says what KataGo says.
       const g = byId[c.id];
       assert.ok(g, `${c.id} in docs/classics-katago.json`);
       const mv = g.moves[mo.index - 1];
+      if (mo.title || mo.note) {
+        // Written for the game: four languages, and no KataGo numbers of its own.
+        for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
+        assert.ok(mo.best == null && mo.loss == null, `${c.id} ${mo.index}: a written moment with KataGo numbers`);
+      } else {
+        // A swing: KataGo's preferred move and the loss, exactly as measured.
+        assert.equal(mo.best, mv.best, `${c.id} ${mo.index} best`);
+        assert.equal(mo.loss, mv.loss, `${c.id} ${mo.index} loss`);
+        assert.ok(mo.best !== mv.move && mo.loss >= 1, `${c.id} ${mo.index}: not a swing`);
+      }
+      // A moment that calls the move a mistake or the best move says what KataGo says.
       if (mo.claim === "mistake") assert.ok(mv.loss >= 3, `${c.id} ${mo.index}: a mistake loses ${mv.loss}`);
       if (mo.claim === "best") assert.ok(mv.move === mv.best || mv.loss <= 1, `${c.id} ${mo.index}: best move loses ${mv.loss}`);
       if (mo.claim) assert.ok(["mistake", "best"].includes(mo.claim), mo.claim);
