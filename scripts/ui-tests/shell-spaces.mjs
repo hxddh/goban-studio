@@ -1,46 +1,49 @@
 /**
- * Shell: the two spaces in the browser — the sidebar has exactly Play and
- * Learn (and Settings), Play is its home or the board, Learn's top is the
- * path, everything survives a reload through the store, and a write that
- * fails is said once. Loaded by scripts/ui-test.mjs before the visual
+ * Shell: the four spaces in the browser (v12) — Today, Play, Practice and
+ * Library (and Settings); Today leads with one hero, Play is the board,
+ * Practice has the path and the catalog, the Library the games;
+ * everything survives a reload through the store, and a write that fails
+ * is said once. Loaded by scripts/ui-test.mjs before the visual
  * baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser, audit).
  */
 export default async function ({ check, assert, fresh, onboard, clickPoint }) {
-  await check("shell spaces: two spaces in the sidebar; Play is its home or the board, with one primary action", async () => {
+  await check("shell spaces: four spaces in the sidebar; Today leads with one hero, Play is the board, Practice has the path and the catalog, the Library the games", async () => {
     const page = await fresh();
     await onboard(page, 1);
     const items = await page.locator(".sidebar .sb-list .sb-item").allInnerTexts();
-    assert(JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(["Play", "Learn"]), `sidebar: ${items.join(", ")}`);
+    assert(JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(["Today", "Play", "Practice", "Library"]), `sidebar: ${items.join(", ")}`);
     assert((await page.locator(".sidebar .sb-foot .sb-item").innerText()).trim() === "Settings", "Settings below");
-    // Onboarding ("I know the rules") opened the board; Play again goes to its home.
+    // Onboarding ("I know the rules") opened the board; Play again stays on it.
     assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "onboarding opens the board");
-    await page.click(".sidebar .sb-item >> nth=0");
-    await page.waitForSelector(".play-home");
-    assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Play's home");
-    assert((await page.textContent(".play-home .hero")).includes("Suggested game"), "the suggested game before any move");
-    // A move makes it a game in progress: the home offers to continue it.
-    await page.keyboard.press("Control+[");
+    await page.click(".sidebar .sb-item >> nth=1");
+    assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "Play again: the board");
+    // Today: the suggested game before any move, one primary.
+    await page.keyboard.press("Control+1");
+    await page.waitForSelector(".today .hero");
+    assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Today");
+    assert((await page.textContent(".today .hero")).includes("Suggested game"), "the suggested game before any move");
+    // A move makes it a game in progress: Today offers to continue it.
+    await page.keyboard.press("Control+2");
     await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.geom?.cell > 20);
     await clickPoint(page, 2, 2);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
     await page.keyboard.press("Control+1");
-    await page.waitForSelector(".play-home .hero");
-    assert((await page.textContent(".play-home .hero")).includes("Game in progress"), "the game in progress leads the home");
-    await page.click(".play-home .hero .btn.primary");
-    await page.waitForFunction(() => window.__state.play.view === "game");
-    // Learn: the path, one primary (start it), then one row to the catalog.
-    await page.keyboard.press("Control+2");
+    await page.waitForSelector(".today .hero");
+    assert((await page.textContent(".today .hero")).includes("Game in progress"), "the game in progress leads Today");
+    await page.click(".today .hero .btn.primary");
+    await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
+    // Practice: the path, one primary (start it), then the course and the problems on the same page.
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row");
-    assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Learn");
-    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".catalog-link")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
-    assert((await page.locator(".learn-home .units, .learn-home .topic-row").count()) === 0, "the catalog is one row away, not on the home");
-    // Cmd+3 and Cmd+4 go nowhere now.
-    for (const k of ["3", "4"]) {
-      await page.keyboard.press("Control+" + k);
-      await page.waitForTimeout(50);
-      assert((await page.evaluate(() => window.__state.space)) === "learn", `Cmd+${k} moved`);
-    }
+    assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Practice");
+    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".learn-home .catalog")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
+    assert((await page.locator(".learn-home .units").count()) === 1 && (await page.locator(".learn-home .topic-row").count()) === 8, "the course and the topics are on the page");
+    // The Library: your games, the classics, the explorer, Import SGF.
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".library-home .collection-row");
+    assert((await page.locator(".library-home [data-explorer]").count()) === 1, "the explorer row");
+    assert((await page.locator(".btn.primary:visible").count()) === 0, "no primary in the Library");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
@@ -50,7 +53,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await onboard(page, 1);
     await clickPoint(page, 4, 4);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.click(".learn-path .btn.primary");
     await page.waitForSelector(".steps");
     await page.waitForFunction(() => !!localStorage.getItem("goban9:current.json"), null, { timeout: 3000 });
@@ -58,13 +61,13 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     assert(keys.includes("goban9:settings.json") && keys.includes("goban9:current.json"), `stored: ${keys.join(", ")}`);
     assert(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("goban-studio.")))), "nothing under the old keys");
     await page.reload();
-    // A game in progress: Play opens on its board.
-    await page.waitForSelector("canvas.board");
+    // The app opens on Today, which offers the game in progress; Play is its board.
+    await page.waitForSelector(".today .hero");
     const s = await page.evaluate(() => ({ space: window.__state.space, view: window.__state.play.view, moves: window.__state.game.game.moveNumber, sheet: window.__state.sheet, onboarded: window.__state.settings.onboarded }));
-    assert(s.space === "play" && s.view === "game" && s.moves >= 1 && !s.sheet && s.onboarded, JSON.stringify(s));
-    await page.keyboard.press("Control+1");
-    await page.waitForSelector(".play-home .hero");
-    assert((await page.textContent(".play-home .hero")).includes("Game in progress"), "the game is offered again");
+    assert(s.space === "today" && s.view === "game" && s.moves >= 1 && !s.sheet && s.onboarded, JSON.stringify(s));
+    assert((await page.textContent(".today .hero")).includes("Game in progress"), "the game is offered again");
+    await page.keyboard.press("Control+2");
+    await page.waitForSelector("canvas.board");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

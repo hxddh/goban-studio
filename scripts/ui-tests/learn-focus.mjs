@@ -24,15 +24,14 @@ export default async function ({ check, assert, fresh, onboard }) {
   await check("learn focus: no focus line without evidence", async () => {
     const page = await fresh();
     await onboard(page, 1);
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path");
     assert((await page.locator(".path-focus").count()) === 0, "focus shown without games");
     assert(!(await page.locator(".learn-path").innerText()).includes("This week's focus"), "a focus row without games");
-    // Play (the board onboarding opened), and Play again: its home.
+    // Today's suggested game (v12).
     await page.keyboard.press("Control+1");
-    await page.keyboard.press("Control+1");
-    await page.waitForSelector(".play-home .hero");
-    assert(!(await page.textContent(".play-home .hero")).includes("focus"), "the suggestion names a focus without games");
+    await page.waitForSelector(".today .hero");
+    assert(!(await page.textContent(".today .hero")).includes("focus"), "the suggestion names a focus without games");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
@@ -41,7 +40,7 @@ export default async function ({ check, assert, fresh, onboard }) {
     const page = await fresh();
     await onboard(page, 1);
     await seedGames(page);
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-focus");
     const line = await page.textContent(".learn-path .path-focus");
     assert(line.includes("This week's focus: Cutting") && line.includes("Lost ≈20 points here in your last 4 games"), `the line: ${line}`);
@@ -58,13 +57,13 @@ export default async function ({ check, assert, fresh, onboard }) {
     await page.waitForFunction(() => window.__state.learn.view === "problem" && window.__state.learn.problem.def.theme === "cut" && !!window.__state.learn.daily);
     assert((await page.textContent(".panel .eyebrow")).includes("This week's focus: Cutting"), "the panel says why");
     // The lesson link opens the lesson on cutting.
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.click(".learn-path .path-focus .link");
     await page.waitForFunction(() => window.__state.learn.view === "lesson" && /cut/.test(window.__state.learn.lesson.lesson.id));
-    // Play's suggested game names it.
+    // Today's suggested game names it.
     await page.keyboard.press("Control+1");
-    await page.waitForSelector(".play-home .hero");
-    assert((await page.textContent(".play-home .hero")).includes("this week's focus: Cutting"), "the suggestion says why");
+    await page.waitForSelector(".today .hero");
+    assert((await page.textContent(".today .hero")).includes("this week's focus: Cutting"), "the suggestion says why");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

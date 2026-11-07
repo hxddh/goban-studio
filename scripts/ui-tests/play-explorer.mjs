@@ -31,7 +31,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     for (const size of [{ width: 1200, height: 800 }, { width: 1600, height: 1000 }]) {
       const page = await fresh("en-US", size);
       await onboard(page, 1);
-      await page.keyboard.press("Control+1");
+      await page.keyboard.press("Control+4");
       // Play's home has one explorer row (the whole board); the corner tree is one click inside.
       await page.click('.collection-row[data-explorer="whole"]');
       await page.waitForSelector(".explorer-panel");
@@ -71,7 +71,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
   await check("play explorer: About this book names the network, the visits and the size", async () => {
     const page = await fresh();
     await onboard(page, 1);
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     await page.click('.collection-row[data-explorer="whole"]');
     await page.waitForSelector(".explorer-panel");
     await page.click(".explorer-panel .segmented button >> nth=1");

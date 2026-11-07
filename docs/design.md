@@ -145,31 +145,38 @@ group per screen region.
   *New game* after a game you just played, *Play from here* otherwise. A
   record opens on its final position and moves to the first key moment
   when the analysis is there, unless the player has already moved. A
-  classic (v11) opens on its famous move, else its first moment to study,
-  and its Analysis tab starts with 3–5 *moments to study*: rows in the
-  key-moment style (stone, title, move number and point on the right),
-  the note shown only for the move on the board. A written moment has a
-  title and a note; the others are the game's largest swings by KataGo's
-  count of every move (docs/classics-katago.json), said in one fixed
-  sentence with KataGo's move and the loss, never more than it measured.
-* **Learn (v9).** One path chosen for you: a short ordered list of rows
+  classic opens on its famous move when it has one written for it; under
+  its note, those moves are rows in the key-moment style (stone, title,
+  move number and point on the right), the note shown only for the move on
+  the board. v12: written moves only — the v11 rows made from KataGo's
+  swings ("about 5 points lost") read as noise and were removed.
+* **Today (v12, as before v9).** The app opens here. A date and a
+  greeting; one hero — the game in progress or the suggested game — with
+  the page's one primary button; one row for today's practice (what is
+  next, done of total, *Start* / *Continue*; the placement quiz in its
+  place before the first path); your level; this week in one line; the
+  last three games. Nothing empty is shown as a card.
+* **Play (v12).** The board. With no game on it: the suggested game (the
+  one primary) and *New game* in the toolbar.
+* **Practice (v9 Learn; v12 name).** One path chosen for you: a short ordered list of rows
   (5–8: the next lesson, reviews due, the week's focus, one stretch
   problem, the beginner bridges), each saying why it is there in a few
   words; the week's focus and its reason in one line above it. One primary
   (*Start* / *Continue*) plays the rows as one session; at the end a quiet
-  "done for today". One row below opens the catalog: the course as one
-  group of unit rows, the problem topics as rows, the basic shapes as chips.
+  "done for today". Below it, on the same page (v12; v9–v11 hid it one
+  row away): the course as one group of unit rows, the problem topics as
+  rows, the basic shapes as chips.
   A problem row shows its position as a small tile (v10), so rows that
   share a title look different. Before the first path, someone who knows
   the rules is offered the placement quiz in its place (v10): one card with
   the one primary (*Start*) and a quiet *Not now*; six problems, the toolbar
   saying which one; the grade it ends on sets where the course starts.
-* **Play's home (v9).** Toolbar holds Import. One column, no tabs: the
-  game in progress or the suggested game (the one primary button, a quiet
-  9×9 link beside it), your level, then your games as compact rows with a
+* **Library (v12; v9–v11 Play's home).** Toolbar holds Import. One
+  column, no tabs, no primary: your games as compact rows with a
   thumbnail (filter and search only once the list is long; the first eight
-  until *Show all*), the classics, and one row that opens the opening
-  explorer. The player's games are analysed in the background by
+  until *Show all*), the classics (four, then all 20), and one row that
+  opens the opening explorer. A game or classic opens its review in the
+  Library; Esc or the Library again comes back to the list. The player's games are analysed in the background by
   themselves; a row says so only while it is being analysed.
 * **Settings.** A wide sheet with two panes: a source list on the left
   (General, Board, Playing, Data, About; the opponents' networks close the

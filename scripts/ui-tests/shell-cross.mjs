@@ -47,7 +47,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
   }
 
   for (const c of combos) {
-    await check(`shell cross: both spaces with audit, ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""}`, async () => {
+    await check(`shell cross: every space with audit, ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""}`, async () => {
       const page = await fresh(c.locale);
       await page.emulateMedia({ colorScheme: c.scheme });
       await onboard(page, 1);
@@ -55,21 +55,20 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
 
       await inspect(page, "the board");
       await page.keyboard.press("Control+1");
-      await inspect(page, "Play's home");
-      await page.keyboard.press("Control+2");
+      await page.waitForSelector(".today .hero");
+      await inspect(page, "Today");
+      await page.keyboard.press("Control+3");
       await page.waitForSelector(".learn-path");
-      await inspect(page, "Learn's home");
-      await page.click(".catalog-link .group-row");
       await page.waitForSelector(".catalog .topic-row");
-      await inspect(page, "Learn's catalog");
+      await inspect(page, "Practice");
       await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
       await page.waitForFunction(() => window.__state.learn.view === "problem");
       await inspect(page, "problem");
 
-      // Play's home, the explorer in both modes, a classic in review.
-      await page.keyboard.press("Control+1");
-      await inspect(page, "Play's home again");
+      // The Library, the explorer in both modes, a classic in review.
+      await page.keyboard.press("Control+4");
+      await inspect(page, "the Library");
       await page.waitForSelector(".collection-row[data-explorer]");
       await page.click('.collection-row[data-explorer="whole"]');
       await page.waitForSelector(".explorer-panel");
@@ -112,8 +111,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
         await inspect(page, `post-game review tab ${i + 1}`);
       }
       await page.keyboard.press("Escape");
-      await page.waitForSelector(".play-home .game-row");
-      await page.click(".play-home .menu-wrap > button >> nth=0");
+      await page.keyboard.press("Control+4");
+      await page.waitForSelector(".library-home .game-row");
+      await page.click(".library-home .menu-wrap > button >> nth=0");
       await inspect(page, "history row menu");
       await page.keyboard.press("Escape");
 

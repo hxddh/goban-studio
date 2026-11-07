@@ -32,7 +32,7 @@ export function CatalogSections() {
   const p = state.profile;
   const solvedOf = (list) => list.filter((x) => p.problems[x.id]?.solved).length;
   return (
-    <>
+    <div class="catalog">
       <section class="section first">
         <h2 class="section-title">{t("practice.course")}</h2>
         <CourseMap />
@@ -80,7 +80,7 @@ export function CatalogSections() {
           </div>
         </section>
       )}
-    </>
+    </div>
   );
 }
 

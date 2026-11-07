@@ -38,7 +38,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await page.emulateMedia({ colorScheme: scheme });
     await onboard(page, 0);
     await page.waitForFunction(() => window.__state.space === "learn" && window.__state.learn.view === "lesson");
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row");
     return page;
   }
@@ -51,21 +51,20 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     for (const r of rows.slice(1)) assert(r.kind === "problem" && r.text.includes("At your level"), JSON.stringify(r));
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
     assert((await page.textContent(".learn-path .btn.primary")).trim() === "Start", "Start");
-    // No Daily five, no focus card, no mistakes section, no course hero, no tiles on the home.
-    assert((await page.locator(".learn-home .hero, .learn-home .units, .learn-home .topic-row, .learn-home .problem-grid").count()) === 0, "the old sections");
+    // No Daily five, no focus card, no mistakes section, no course hero, no tiles on the page.
+    assert((await page.locator(".learn-home .hero, .learn-home .problem-grid").count()) === 0, "the old sections");
     assert(!(await page.textContent(".learn-home")).includes("Daily five"), "Daily five");
-    // The catalog: the course, the problem topics and the basic shapes.
-    await page.click(".catalog-link .group-row");
+    // v12: below the path, the course, the problem topics and the basic shapes, on the same page.
     await page.waitForSelector(".catalog .units");
     assert((await page.locator(".catalog .unit").count()) >= 10, "the course units");
     assert((await page.locator(".catalog .unit.open .lesson-row").count()) > 0, "the unit you are in is open");
     assert((await page.locator(".catalog .topic-row").count()) === 8, "the problem topics as rows");
     assert((await page.locator(".catalog .shape-chips .chip").count()) > 0, "the basic shapes");
-    assert((await page.locator(".btn.primary:visible").count()) === 0, "the catalog has no primary");
+    assert((await page.locator(".catalog .btn.primary:visible").count()) === 0, "the catalog has no primary");
     await page.click(".catalog .topic-row >> nth=0");
     await page.waitForSelector(".problem-card");
     const crumbs = await page.textContent(".toolbar");
-    assert(crumbs.includes("All lessons and problems"), "the topic is under the catalog");
+    assert(crumbs.includes("Practice"), "the topic is under Practice");
     await page.keyboard.press("Control+[");
     await page.waitForSelector(".catalog .topic-row");
     assert(page.errors.length === 0, page.errors.join("; "));
@@ -145,7 +144,6 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
       await page.click(".session-done .btn.primary");
       await page.waitForSelector(".learn-path .path-row.done");
       await inspect(page, "Learn's path, done");
-      await page.click(".catalog-link .group-row");
       await page.waitForSelector(".catalog .topic-row");
       await inspect(page, "the catalog");
       assert(page.errors.length === 0, page.errors.join("; "));
