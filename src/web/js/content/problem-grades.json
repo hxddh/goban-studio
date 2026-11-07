@@ -6627,6 +6627,127 @@
       }
     ]
   },
+  "escape-extend-23": {
+    "grade": 5,
+    "score": 11.2,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 6,
+        "y": 2
+      }
+    ]
+  },
+  "escape-extend-24": {
+    "grade": 5,
+    "score": 11.7,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 17,
+        "y": 2
+      }
+    ]
+  },
+  "escape-extend-25": {
+    "grade": 5,
+    "score": 11.4,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 6,
+        "y": 17
+      }
+    ]
+  },
+  "escape-extend-26": {
+    "grade": 5,
+    "score": 10.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 17,
+        "y": 1
+      }
+    ]
+  },
+  "escape-extend-27": {
+    "grade": 5,
+    "score": 12,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 17,
+        "y": 8
+      }
+    ]
+  },
+  "escape-extend-28": {
+    "grade": 5,
+    "score": 11.2,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 6,
+        "y": 1
+      }
+    ]
+  },
+  "escape-extend-29": {
+    "grade": 5,
+    "score": 11.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 16,
+        "y": 11
+      }
+    ]
+  },
+  "escape-extend-30": {
+    "grade": 5,
+    "score": 11.5,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 12,
+        "y": 17
+      }
+    ]
+  },
+  "escape-extend-31": {
+    "grade": 5,
+    "score": 12.6,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 1,
+        "y": 11
+      }
+    ]
+  },
+  "escape-extend-32": {
+    "grade": 5,
+    "score": 11.5,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 6,
+        "y": 2
+      }
+    ]
+  },
+  "escape-extend-33": {
+    "grade": 5,
+    "score": 12,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 15,
+        "y": 17
+      }
+    ]
+  },
   "endgame-biggest-05": {
     "grade": 4,
     "score": 10.7,
