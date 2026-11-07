@@ -219,7 +219,7 @@ export function localArea(pos, accept) {
 }
 
 export function vertex(x, y, size) {
-  return LETTERS[x] + (size - y);
+  return x < 0 ? "pass" : LETTERS[x] + (size - y);
 }
 function fromVertex(v, size) {
   if (!v || /^pass$/i.test(v)) return null;
@@ -275,7 +275,7 @@ export class Analysis {
     });
   }
   /** Search a position; `moves` are [color, x, y] played after the stones. */
-  query({ pos, toMove, moves = [], visits, allow = null, ownership = false }) {
+  query({ pos, toMove, moves = [], visits, allow = null, ownership = false, komi = KOMI }) {
     const id = `q${++this.next}`;
     const size = pos.size;
     const col = (c) => (c === 1 ? "B" : "W");
@@ -285,7 +285,7 @@ export class Analysis {
       initialPlayer: col(toMove),
       moves: moves.map(([c, x, y]) => [col(c), vertex(x, y, size)]),
       rules: "japanese",
-      komi: KOMI,
+      komi,
       boardXSize: size,
       boardYSize: size,
       maxVisits: visits,
