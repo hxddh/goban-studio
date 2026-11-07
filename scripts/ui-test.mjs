@@ -148,6 +148,10 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
 }
 
 async function snap(page, name, mask = []) {
+  // Canvases (thumbnails, the board) draw in an effect after the render, and
+  // content parts may still be arriving: let both settle before the picture.
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const buf = await page.screenshot({ mask: mask.map((s) => page.locator(s)), animations: "disabled" });
   const file = path.join(baseDir, name + ".png");
   if (UPDATE || !fs.existsSync(file)) {

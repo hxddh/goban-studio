@@ -235,15 +235,20 @@ function showLog(log) {
 /** Hold a file open without sharing, so the folder cannot be renamed (Windows). */
 // Resolves once the file is actually held: PowerShell can take seconds to
 // start on a busy runner, and a lock taken after the swap tests nothing.
-async function lockFile(file, ms) {
-  // The marker lives outside the folder being swapped.
-  const ready = path.join(tempDir("lock"), "locked");
-  fs.rmSync(ready, { force: true });
+/**
+ * Hold `file` open without sharing until `release()` is called (or 90 s
+ * pass). Returns { child, release }.
+ */
+async function lockFile(file) {
+  // The marker files live outside the folder being swapped.
+  const dir = tempDir("lock");
+  const ready = path.join(dir, "locked");
+  const stop = path.join(dir, "release");
   const q = (s) => s.replace(/'/g, "''");
-  const script = `$f = [System.IO.File]::Open('${q(file)}', 'Open', 'Read', 'None'); Set-Content -LiteralPath '${q(ready)}' -Value 1; Start-Sleep -Milliseconds ${ms}; $f.Close(); Remove-Item -LiteralPath '${q(ready)}' -ErrorAction SilentlyContinue`;
+  const script = `$f = [System.IO.File]::Open('${q(file)}', 'Open', 'Read', 'None'); Set-Content -LiteralPath '${q(ready)}' -Value 1; $n = 0; while (-not (Test-Path -LiteralPath '${q(stop)}') -and $n -lt 450) { Start-Sleep -Milliseconds 200; $n++ }; $f.Close(); Remove-Item -LiteralPath '${q(ready)}' -ErrorAction SilentlyContinue`;
   const child = spawn(powershell, ["-NoProfile", "-Command", script], { stdio: "ignore" });
   await waitFor(() => fs.existsSync(ready), 60000, "the file lock");
-  return child;
+  return { child, release: () => fs.writeFileSync(stop, "1"), kill: () => child.kill() };
 }
 
 /** Launch the real app with GOBAN_UPDATE_PROBE_OUT and read its report. */
@@ -294,10 +299,28 @@ if (!liveTag) {
     // Windows: something holds a file in the install folder for a while after
     // the app exits (WebView2, antivirus); the swap has to wait it out. The
     // lock is in place before the app starts, and outlasts it.
-    const locker = isWin ? await lockFile(path.join(target, "README-Windows.txt"), 7000) : null;
+    const locker = isWin ? await lockFile(path.join(target, "README-Windows.txt")) : null;
     const app = fakeApp(3000);
     try {
+      // The lock is let go only once the swap has run into it (its first
+      // failed attempt is in the log), so the retry is always exercised,
+      // however slow the runner.
+      let released = false;
+      const watch = locker
+        ? setInterval(() => {
+            if (released) return;
+            let text = "";
+            try {
+              text = fs.readFileSync(log, "utf8");
+            } catch {}
+            if (/failed \(attempt 1\)/.test(text)) {
+              released = true;
+              setTimeout(() => locker.release(), 1500);
+            }
+          }, 200)
+        : null;
       const code = await runHelper({ pid: app.pid, target, staged, ack, log, cleanup });
+      if (watch) clearInterval(watch);
       if (code !== 0) showLog(log);
       assert.equal(code, 0, "helper exit code");
       assert.ok(fs.existsSync(path.join(target, markerRel)), "the new version is in place under the installed name");
