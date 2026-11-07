@@ -6462,6 +6462,171 @@
       }
     ]
   },
+  "connect-18": {
+    "grade": 1,
+    "score": 3.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 13,
+        "y": 1
+      }
+    ]
+  },
+  "connect-19": {
+    "grade": 3,
+    "score": 7.8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 17
+      }
+    ]
+  },
+  "connect-20": {
+    "grade": 3,
+    "score": 7.8,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 17,
+        "y": 13
+      }
+    ]
+  },
+  "connect-21": {
+    "grade": 3,
+    "score": 8.6,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 5,
+        "y": 17
+      }
+    ]
+  },
+  "connect-22": {
+    "grade": 3,
+    "score": 8.4,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 2,
+        "y": 5
+      }
+    ]
+  },
+  "connect-23": {
+    "grade": 4,
+    "score": 9.8,
+    "moves": 3,
+    "correct": [
+      {
+        "x": 13,
+        "y": 1
+      }
+    ]
+  },
+  "connect-24": {
+    "grade": 4,
+    "score": 10.5,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 14,
+        "y": 2
+      }
+    ]
+  },
+  "escape-capture-18": {
+    "grade": 3,
+    "score": 8.2,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 0,
+        "y": 6
+      }
+    ]
+  },
+  "escape-capture-19": {
+    "grade": 3,
+    "score": 8.9,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 0,
+        "y": 3
+      }
+    ]
+  },
+  "escape-capture-20": {
+    "grade": 3,
+    "score": 8.8,
+    "moves": 4,
+    "correct": [
+      {
+        "x": 1,
+        "y": 8
+      }
+    ]
+  },
+  "escape-capture-21": {
+    "grade": 3,
+    "score": 7.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 3,
+        "y": 17
+      }
+    ]
+  },
+  "escape-capture-22": {
+    "grade": 3,
+    "score": 8.9,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 1,
+        "y": 4
+      }
+    ]
+  },
+  "escape-capture-23": {
+    "grade": 4,
+    "score": 9.8,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 5,
+        "y": 17
+      }
+    ]
+  },
+  "escape-capture-24": {
+    "grade": 4,
+    "score": 9.1,
+    "moves": 2,
+    "correct": [
+      {
+        "x": 7,
+        "y": 17
+      }
+    ]
+  },
+  "escape-extend-22": {
+    "grade": 1,
+    "score": 3.6,
+    "moves": 1,
+    "correct": [
+      {
+        "x": 4,
+        "y": 17
+      }
+    ]
+  },
   "endgame-biggest-05": {
     "grade": 4,
     "score": 10.7,
