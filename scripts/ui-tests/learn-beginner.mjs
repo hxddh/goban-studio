@@ -285,7 +285,14 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
         },
         n,
         { timeout: 15000, polling: 100 },
-      );
+      ).catch(async (e) => {
+        // Say where the game stood, so a stall names its cause.
+        const at = await page.evaluate(() => {
+          const s = window.__state.game;
+          return { moves: s.game.moveNumber, turn: s.game.turn, thinking: s.thinking, pending: !!s.pending, proposal: !!s.proposal, phase: s.game.phase, result: s.game.current.result || null, sheet: window.__state.sheet?.kind || null, toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent) };
+        });
+        throw new Error(`${e.message} — after clicking ${pt.x},${pt.y} at move ${n}: ${JSON.stringify(at)}`);
+      });
     }
     await page.click(".panel .menu-wrap > button");
     await page.click(".menu [role=menuitem]:has-text('Count')");
