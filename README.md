@@ -53,7 +53,7 @@ and a link to the rest. v10 reads everything v9 saved.
 
 A classic now opens with 3–5 moments to study: its famous moves, written
 for the game, and its largest swings by KataGo's count of every move. A
-takeaway from your review ("you lost most to cuts") has a *Practise these*
+takeaway from your review that names a kind of mistake has a *Practise these*
 link straight to problems of that kind. The problem bank grows to 624, with
 at least 15 capture, save, life, kill and endgame problems at every grade.
 v11 reads everything v10 saved.
