@@ -10,7 +10,8 @@ import { t } from "../i18n.js";
 import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { PROBLEMS } from "../content.js";
-import { Button, Icon, Stone } from "../app/parts.jsx";
+import { PLACEMENT } from "../model/player.js";
+import { Button, DiagramThumb, Icon, Stone } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 
 /** Why an item is in the path, in a few words. */
@@ -40,8 +41,8 @@ export function pathRow(it) {
   }
   const def = PROBLEMS.find((x) => x.id === it.id);
   if (!def) return null;
-  // Many problems share a title; how hard it is tells them apart and says what to expect.
-  return { icon: "target", title: C.tx(def.title), why: whyText(it), more: t("grade." + C.gradeOf(def.id)) };
+  // Many problems share a title: the position tells them apart (v10), how hard it is says what to expect.
+  return { icon: "target", diagram: def.diagram, title: C.tx(def.title), why: whyText(it), more: t("grade." + C.gradeOf(def.id)) };
 }
 
 /** The week's focus and its reason, in one line; its lesson as a quiet link. */
@@ -64,6 +65,31 @@ function FocusLine({ wf }) {
   );
 }
 
+/**
+ * v10: before the first path, someone who knows the rules is asked to place
+ * themselves with six problems (learn/placement.js). The page's one primary
+ * starts the quiz; "Not now" keeps what onboarding said.
+ */
+function PlacementOffer() {
+  return (
+    <section class="placement-offer hero enter-up" aria-labelledby="placement-title">
+      <div class="hero-text">
+        <span class="eyebrow">{t("placement.eyebrow")}</span>
+        <h2 id="placement-title">{t("placement.title")}</h2>
+        <p class="muted">{t("placement.lead", [PLACEMENT.LENGTH])}</p>
+      </div>
+      <div class="hero-actions">
+        <Button kind="primary" onClick={C.startPlacement}>
+          {t("placement.start")}
+        </Button>
+        <button type="button" class="link" onClick={C.skipPlacement}>
+          {t("placement.skip")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function LearnHome() {
   // The focus first: the first one shown in a week is kept, and the path reads it.
   const wf = C.weekFocus();
@@ -76,7 +102,9 @@ export function LearnHome() {
         <header class="page-head">
           <h1>{t("nav.learn")}</h1>
         </header>
-        {rows.length > 0 && (
+        {C.placementOffered() ? (
+          <PlacementOffer />
+        ) : rows.length > 0 && (
           <section class="learn-path enter-up" aria-labelledby="path-title">
             <div class="path-head">
               <h2 class="section-title" id="path-title">
@@ -95,7 +123,9 @@ export function LearnHome() {
                 return (
                   <li>
                     <button type="button" class={`group-row path-row ${done ? "done" : ""}`} data-kind={it.kind} data-role={it.role} onClick={() => C.openPathItem(it.key)}>
-                      <span class="gr-icon">{row.stone ? <Stone color={row.stone} size={14} /> : <Icon name={row.icon} size={18} />}</span>
+                      <span class={`gr-icon ${row.diagram ? "has-thumb" : ""}`}>
+                        {row.diagram ? <DiagramThumb diagram={row.diagram} /> : row.stone ? <Stone color={row.stone} size={14} /> : <Icon name={row.icon} size={18} />}
+                      </span>
                       <span class="gr-text">
                         <strong>{row.title}</strong>
                         <span>

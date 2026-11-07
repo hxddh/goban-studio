@@ -17,20 +17,9 @@
  *
  * Nothing here throws: a failed image resolves as null (or is left out of
  * the variant arrays), and callers keep their procedural fallback.
- *
- * The kaya surface (surfaces/kaya.webp) is generated for the app icon
- * only; the app does not ship or draw it.
  */
 
 export const STONE_COUNTS = { black: 4, white: 8 };
-
-/**
- * Grid colours for the kaya surface the app icon is drawn on
- * (make-assets checks their contrast).
- */
-export const THEME_COLORS = {
-  kaya: { line: "#3a2611", edge: "#2b1b0a", star: "#2b1b0a", text: "#5e4020", shadow: "rgba(48, 26, 6, 0.38)" },
-};
 
 let base = "assets/";
 

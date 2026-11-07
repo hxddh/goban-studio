@@ -5,13 +5,12 @@ and orders Learn's path around them. Since v9 it is part of the one player
 model, `src/web/js/model/player.js` (`evidence`, `focus`, `keepFocus`,
 `learnPath`; pure, tested in `scripts/tests/model-player.mjs` and
 `learn-path.mjs`). The app side is `src/web/js/learn/session.js`. The
-thresholds are `RULES` in player.js. Where this page says "today's five",
-v9 has Learn's path for today.
+thresholds are `RULES` in player.js.
 
 ## What counts as evidence
 
 **Your analysed games.** These are the per-game records in
-`progress.games`. Each rated game against the computer gets one, and the
+`profile.games`. Each rated game against the computer gets one, and the
 post-game analysis completes it. A record keeps the themes of up to ten
 explained mistakes (`describeMistakes`: ladder, snapback, double atari, cut,
 vital point, eye space, ko, races). From v7 it also keeps the points each
@@ -34,8 +33,8 @@ mistakes, so they agree with the record. Only records with an analysis count.
 - Before 3 analysed games the plan says "not enough games yet" and does not
   guess.
 
-**Problems and drills.** The plan reads the results in `progress.problems`
-and your mistake drills (`progress.mistakes`) from the last 60 days. Each
+**Problems and drills.** The plan reads the results in `profile.problems`
+and your mistake drills (`profile.mistakes`) from the last 60 days. Each
 result weighs `0.5^(days/21)`. A problem counts as *missed* when its last
 result was not a clean solve: a wrong move, a hint, the answer, or a solve
 after a miss. A theme needs **4 tried**, a weighted miss rate of **≥ 50 %**
@@ -50,7 +49,7 @@ the endgame problem themes count as *endgame*.
 **Stable for the week.** The focus is worked out from the evidence as it
 stood on Monday 00:00. If there was no focus on Monday, it uses what there
 is now. This week's games therefore change next week's focus, not today's. Once a focus has been shown in a week it is
-kept for the rest of that week (`progress.planWeek`): a problem record only
+kept for the rest of that week (`profile.week`): a problem record only
 keeps its latest attempt, so reviewing last week's misses would otherwise
 erase the evidence the focus came from.
 
@@ -61,9 +60,11 @@ The level is the highest grade (1–5) where at least 3 problems were tried and
 tried but no grade qualifies. Without enough results it falls back to the
 lowest grade with unseen problems, the same rule as before v7.
 
-## Today's five
+## Learn's path
 
-When there is a focus, the plan chooses the five, in this order:
+Learn's path for today (`learnPath`) is the next lesson, capture Go while
+it applies (beginners), then up to five problem items, then the first 9×9
+game while it applies. With a focus, the problem items come in this order:
 
 1. Due reviews: up to two mistake drills from your own games, then due
    problems. These follow the same spaced-repetition ladder as before (1, 3, 7
@@ -74,10 +75,35 @@ When there is a focus, the plan chooses the five, in this order:
    problems from the whole bank, never above the level.
 3. One stretch problem, two grades above the level, in a focus theme if one
    exists.
-4. Anything left is chosen as before (`persist.dailySet`).
+4. Anything left: new problems at the level (`dailySet`).
 
-The set is saved for the day, so it stays the same all day. With no focus
-(new players, too little evidence), today's five works exactly as in v6.
+The path is played as today's session and kept for the day in the store
+(`session.json`), so it stays the same all day and survives a restart.
+With no focus (new players, too little evidence), the problem items are
+due reviews and new problems at the level.
+
+## Placement (v10)
+
+Someone who said at onboarding that they know the rules (or play) is
+offered a placement quiz on Learn's home before the first path
+(`placementNext`, `placementGrade`; `learn/placement.js`):
+
+- Six problems (capturing, escaping, killing, living; no endgame or
+  opening points), starting at grade 2. A solve moves the next problem one
+  grade up, a miss one grade down. The first answer to each counts; a hint
+  or the answer counts as a miss.
+- The grade is the highest grade solved at least once and missed no more
+  often than solved there; grade 1 when nothing was solved.
+- It is kept in the profile (`profile.placement`). Until the player's own
+  results measure a solving level, it stands in for it, and it sets where
+  the course starts (grade 3 and up start at the intermediate units,
+  grade 5 at the advanced ones) and whether the beginner bridges apply
+  (not from grade 2).
+- The quiz's own answers are recorded like any problem, but they do not
+  outrank it: until some grade has enough results to measure a level
+  (`levelOnGrade`), the placement stands. The problems come from the whole
+  bank from grade 2, not only from the topics of finished beginner lessons.
+- Skipping is remembered; the path then starts from what onboarding said.
 
 ## What it cannot know
 

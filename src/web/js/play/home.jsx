@@ -216,13 +216,23 @@ function MyGames() {
   );
 }
 
+/** Classics shown before "All classics" (the best-known first, as in content/classics.js). */
+export const CLASSICS_SHOWN = 4;
+let allClassics = false;
+
+/** A classic's year: "1846-09-11,14,15" and "1933-10-16..1934-01-29" read as 1846 and 1933. */
+export function classicYear(date) {
+  return /^\d{4}/.exec(String(date || ""))?.[0] || "";
+}
+
 function Classics() {
   const done = state.profile.classics || {};
+  const list = allClassics ? C.CLASSICS : C.CLASSICS.slice(0, CLASSICS_SHOWN);
   return (
     <section class="home-section home-classics">
       <h2 class="section-title">{t("library.classics")}</h2>
       <ul class="group collection">
-        {C.CLASSICS.map((g) => (
+        {list.map((g) => (
           <li>
             <button type="button" class={`collection-row ${done[g.id]?.done ? "done" : ""}`} onClick={() => C.openClassic(g.id)}>
               <span class="collection-main">
@@ -232,13 +242,25 @@ function Classics() {
                 </span>
               </span>
               <span class="fine">
-                {String(g.date).split("..")[0]} · {C.resultText(g.result)}
+                {classicYear(g.date)} · {C.resultText(g.result)}
               </span>
               {done[g.id]?.done && <Icon name="check" size={15} />}
             </button>
           </li>
         ))}
       </ul>
+      {list.length < C.CLASSICS.length && (
+        <button
+          type="button"
+          class="link show-all"
+          onClick={() => {
+            allClassics = true;
+            update();
+          }}
+        >
+          {t("play.home.allClassics", [C.CLASSICS.length])}
+        </button>
+      )}
     </section>
   );
 }

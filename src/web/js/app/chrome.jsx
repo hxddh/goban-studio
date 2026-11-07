@@ -20,10 +20,7 @@ export function Sidebar() {
     <nav class="sidebar" aria-label={t("nav.main")}>
       <div class="sb-top" data-drag>
         <span class="sb-brand">
-          <svg class="sb-mark" viewBox="0 0 64 64" width="18" height="18" aria-hidden="true">
-            <circle cx="20.4" cy="20.4" r="15.5" class="mk-b" />
-            <circle cx="43.6" cy="43.6" r="13.9" class="mk-w" />
-          </svg>
+          <img class="sb-mark" src="assets/brand.svg" width="18" height="18" alt="" />
           <span>Goban Studio</span>
         </span>
       </div>

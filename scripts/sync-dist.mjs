@@ -38,13 +38,11 @@ if (fs.existsSync(path.join(root, "assets/icon.png"))) {
   fs.copyFileSync(path.join(root, "assets/icon.png"), path.join(dist, "icon.png"));
 }
 // Generated stone sprites, sounds and the brand mark
-// (scripts/make-assets.mjs). The preview page is a development aid only,
-// and the kaya surface is drawn into the app icon, never by the app (v9:
-// one plain board).
+// (scripts/make-assets.mjs). The preview page is a development aid only.
 if (fs.existsSync(path.join(src, "assets"))) {
   fs.cpSync(path.join(src, "assets"), path.join(dist, "assets"), {
     recursive: true,
-    filter: (from) => path.basename(from) !== "preview.html" && path.basename(from) !== "surfaces",
+    filter: (from) => path.basename(from) !== "preview.html",
   });
 }
 if (fs.existsSync(path.join(src, "moka"))) {

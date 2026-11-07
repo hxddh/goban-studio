@@ -319,7 +319,8 @@ function ProblemView() {
   const pr = state.learn;
   const P = pr.problem;
   const def = P.def;
-  const daily = pr.daily;
+  const placing = C.placementPlace();
+  const daily = pr.daily || placing;
   const list = state.learn.theme ? C.problemsOfTheme(state.learn.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
@@ -327,14 +328,14 @@ function ProblemView() {
   if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
-    <Toolbar crumbs={crumbs} title={C.tx(def.title)} sub={daily ? sessionSub() : t("practice.ofN", [n, list.length])} />
+    <Toolbar crumbs={crumbs} title={C.tx(def.title)} sub={placing ? t("placement.of", [placing.n, placing.total]) : daily ? sessionSub() : t("practice.ofN", [n, list.length])} />
     <div class="workspace">
       <section class="stage" aria-label={t("practice.problem")}>
         <Board model={puzzleModel(P)} onPlay={C.practicePlay} />
       </section>
       <aside class="panel">
         <div class="panel-title">
-          {daily && <SessionWhy />}
+          {pr.daily && <SessionWhy />}
           <h1>{C.tx(def.title)}</h1>
         </div>
         <p class="goal">

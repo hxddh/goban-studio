@@ -37,7 +37,7 @@ const grades = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/pr
 for (const p of PROBLEMS) assert.ok(grades[p.id]?.grade >= 1 && grades[p.id].grade <= 5, `${p.id} has a measured grade`);
 for (const p of PROBLEMS) assert.ok(THEMES.some((th) => th.id === p.theme), `${p.id} has a theme`);
 for (const th of THEMES) assertLocalized(th, ["name"], "theme " + th.id);
-for (const f of ["assets/surfaces/kaya.webp", "assets/brand.svg", "assets/sounds/place-wood-0.wav", "js/selftest.js"]) {
+for (const f of ["assets/brand.svg", "assets/sounds/place-wood-0.wav", "js/selftest.js"]) {
   assert.ok(fs.existsSync(path.join(root, "src/web", f)), f);
 }
 assert.ok(fs.existsSync(path.join(root, "scripts/patch-sdk.mjs")), "SDK menu patch present");

@@ -38,6 +38,7 @@ export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
 export * from "../learn/session.js"; // Learn's path, today's session
+export * from "../learn/placement.js"; // v10: the placement quiz
 import { itemKey, todaysSession } from "../learn/session.js";
 export * from "./capture-ctl.js"; // the beginner bridges (Learn)
 import { resumeCapture } from "./capture-ctl.js";

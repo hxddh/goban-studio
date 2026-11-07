@@ -147,7 +147,7 @@ const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 export function newProfile({ rank = null, at = 0 } = {}) {
   const rating = {};
   for (const size of SIZES) rating[size] = priorRating(rank, at);
-  return { v: PROFILE_V, rating, history: [], games: [], problems: {}, mistakes: [], lessons: {}, classics: {}, week: null };
+  return { v: PROFILE_V, rating, history: [], games: [], problems: {}, mistakes: [], lessons: {}, classics: {}, week: null, placement: null };
 }
 
 /**
@@ -279,7 +279,11 @@ export function normalizeProfile(raw) {
     const areas = Array.isArray(w.areas) ? w.areas.filter((a) => obj(a) && week.focus.includes(a.key)) : [];
     if (areas.length) week.areas = JSON.parse(JSON.stringify(areas));
   }
-  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week };
+  const pl = obj(raw.placement);
+  let placement = null;
+  if (pl && pl.skipped === true) placement = { skipped: true, at: num(pl.at, 0) };
+  else if (pl && finite(pl.grade) && pl.grade >= 1 && pl.grade <= 5) placement = { grade: Math.round(pl.grade), at: num(pl.at, 0) };
+  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week, placement };
 }
 
 /* ============================================================= mutations */
@@ -609,7 +613,7 @@ function area(map, key) {
  * now; grade 1 when none qualifies yet but enough were tried; null with
  * too few results to say.
  */
-export function solvingLevel(results) {
+export function solvingLevel(results, { fallback = true } = {}) {
   let level = null;
   let tried = 0;
   for (let g = 1; g <= 5; g++) {
@@ -617,7 +621,7 @@ export function solvingLevel(results) {
     tried += at.length;
     if (at.length >= RULES.LEVEL_MIN && at.filter((r) => !r.miss).length / at.length >= RULES.LEVEL_CLEAN) level = g;
   }
-  if (level == null && tried >= RULES.LEVEL_MIN) level = 1;
+  if (fallback && level == null && tried >= RULES.LEVEL_MIN) level = 1;
   return level;
 }
 
@@ -735,7 +739,7 @@ export function evidence(profile, { problems = [], grades = {}, now = 0 } = {}) 
   return {
     status: focusAreas.length ? "focus" : anything ? "notEnough" : "none",
     games: { analysed: recent.length, high: high.length, needed: Math.max(0, R.MIN_GAMES - recent.length) },
-    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY)) },
+    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY)), levelOnGrade: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY), { fallback: false }) != null },
     areas,
     focus: focusAreas,
   };
@@ -901,7 +905,9 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
 
   // 2. Focus problems around the level.
   const unseen = pool.filter((d) => !entry(d));
-  const measured = model?.problems?.level ?? null;
+  // A level measured on a grade outranks a prior; the "nothing qualified yet"
+  // fallback (grade 1) does not outrank a placement or a rank (v10).
+  const measured = model?.problems?.levelOnGrade || prior == null ? (model?.problems?.level ?? null) : null;
   const known = measured != null || prior != null;
   const level = measured ?? prior ?? (unseen.length ? Math.min(...unseen.map(gradeOf)) : 1);
   const rand = seeded(now, 7, 3);
@@ -1035,6 +1041,76 @@ export function gradeForRank(rank) {
   return rank >= 20 ? 1 : rank >= 12 ? 2 : rank >= 6 ? 3 : rank >= 1 ? 4 : 5;
 }
 
+/* ============================================================ placement */
+
+/**
+ * v10: the placement quiz. Someone who already knows the rules answers a
+ * few problems before Learn's first path, and the result sets where the
+ * course starts and which problems come first, until their own results
+ * measure a solving level. A staircase: the first problem is grade START,
+ * each solved one moves a grade up, each missed one a grade down.
+ */
+export const PLACEMENT = { LENGTH: 6, START: 2, GOALS: ["capture", "save", "kill", "live"] };
+
+/** The rank a placement grade stands for (the course start, the first problems). */
+export const PLACEMENT_RANK = { 1: 30, 2: 20, 3: 14, 4: 8, 5: 4 };
+
+const clampGrade = (g) => Math.max(1, Math.min(5, g));
+
+/** The grade the next placement problem should have, after `results` [{ grade, solved }]. */
+export function placementTarget(results) {
+  if (!results.length) return PLACEMENT.START;
+  const last = results[results.length - 1];
+  return clampGrade(last.grade + (last.solved ? 1 : -1));
+}
+
+/**
+ * The next placement problem's id, or null when the quiz is over. Only
+ * capturing, escaping, killing and living (no endgame or opening points),
+ * nearest the target grade, each problem once, in the bank's order.
+ */
+export function placementNext(results, problems = [], grades = {}) {
+  if (results.length >= PLACEMENT.LENGTH) return null;
+  const used = new Set(results.map((r) => r.id));
+  const target = placementTarget(results);
+  const gradeOf = (d) => grades[d.id]?.grade ?? null;
+  const pool = problems.filter((d) => PLACEMENT.GOALS.includes(d.goal) && gradeOf(d) != null && !used.has(d.id));
+  if (!pool.length) return null;
+  let best = null;
+  for (const d of pool) if (!best || Math.abs(gradeOf(d) - target) < Math.abs(gradeOf(best) - target)) best = d;
+  return best.id;
+}
+
+/**
+ * The placement's grade: the highest grade solved at least once and missed
+ * no more often than solved there; grade 1 when nothing was solved. Every
+ * answer right ends at 5, every answer wrong at 1, and someone who solves
+ * grade 3 but misses grade 4 is placed at 3.
+ */
+export function placementGrade(results) {
+  if (!results.length) return null;
+  let grade = 1;
+  for (let g = 1; g <= 5; g++) {
+    const at = results.filter((r) => r.grade === g);
+    const solved = at.filter((r) => r.solved).length;
+    if (solved > 0 && solved >= at.length - solved) grade = g;
+  }
+  return grade;
+}
+
+/** Store the placement's outcome: { grade } or { skipped: true }. */
+export function setPlacement(profile, outcome, now = 0) {
+  const p = normalizeProfile(profile);
+  const placement = outcome?.skipped ? { skipped: true, at: now } : { grade: clampGrade(Math.round(outcome.grade)), at: now };
+  return { ...p, placement };
+}
+
+/** The quiz is offered to someone who knows the rules and has not taken or skipped it. */
+export function placementOffered(profile, settings = {}) {
+  const p = normalizeProfile(profile);
+  return (settings.experience === "rules" || settings.experience === "player") && !p.placement;
+}
+
 /**
  * Learn's one ordered list, played as today's session (learn/session.js):
  *   1. the next lesson                         { kind: "lesson", id, unit, role: "next" }
@@ -1059,18 +1135,21 @@ export function learnPath(profile, content = {}, now = 0) {
 
   const all = lessonList(content);
   const est = estimate(p, { now });
-  const next = nextLesson(all, (id) => !!p.lessons[id]?.done, { experience: settings.experience, playerRank: settings.playerRank, rating: est.games > 0 ? est.r : null });
+  // A placement grade stands in for the rank given at onboarding when it says more.
+  const placed = p.placement?.grade ?? null;
+  const rankNow = placed != null ? Math.min(settings.playerRank ?? 30, PLACEMENT_RANK[placed]) : settings.playerRank;
+  const next = nextLesson(all, (id) => !!p.lessons[id]?.done, { experience: settings.experience, playerRank: rankNow, rating: est.games > 0 ? est.r : null });
   if (next) items.push({ kind: "lesson", id: next.lesson.id, unit: next.unit.id, role: "next" });
 
   // The bridges are for beginners: someone who already plays is not sent to capture Go.
-  const beginner = settings.experience === "new" || (settings.playerRank ?? 30) >= 25;
+  const beginner = settings.experience === "new" || (placed == null ? (settings.playerRank ?? 30) >= 25 : placed < 2);
   const done = (id) => !!p.lessons[id]?.done;
   if (beginner && CAPTURE_AFTER.some(done) && (content.captureWins || 0) < CAPTURE_WINS_ENOUGH) items.push({ kind: "capture", role: "bridge" });
 
   const model = focus(p, now, { problems, grades });
-  const pool = taughtPool(p, { ...content, problems });
+  const pool = taughtPool(p, { ...content, problems, settings: { ...settings, playerRank: rankNow } });
   // Someone who already plays starts near their rank until their solving level is measured.
-  const prior = beginner ? null : gradeForRank(est.games > 0 ? est.rank : settings.playerRank);
+  const prior = placed ?? (beginner ? null : gradeForRank(est.games > 0 ? est.rank : settings.playerRank));
   const picks = planProblems({ profile: p, model, pool, bank: problems, grades, now, limit, prior }) || due(p, now).mistakes.slice(0, 2).map((m) => ({ kind: "mistake", id: m.id, role: "review" }));
   items.push(...picks.slice(0, limit));
 

@@ -125,18 +125,33 @@ async function clickPoint(page, x, y) {
   await page.mouse.click(p.x, p.y);
 }
 
-async function onboard(page, choice = 1) {
+async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.goto(origin + "/");
   await page.waitForSelector(".ob-card");
   await page.click(".ob-card .btn.primary");
   await page.click(`.choice >> nth=${choice}`);
   await page.waitForSelector("canvas.board, .page");
+  // v10: someone who knows the rules is offered the placement quiz on Learn's
+  // home; checks that are not about it answer "Not now" first, then come back.
+  if (choice >= 1 && !placement) {
+    const space = await page.evaluate(() => window.__state.space);
+    await page.keyboard.press("Control+2");
+    await page.click(".placement-offer .link");
+    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:profile.json") || "{}").placement?.skipped === true, null, { timeout: 3000 });
+    await page.keyboard.press(space === "play" ? "Control+1" : "Control+2");
+    await page.waitForFunction((sp) => window.__state.space === sp, space);
+  }
   // The store writes a moment later (data/store.js): onboarding is on disk before a test reloads.
   // (With a fake native host the files go to the host instead.)
   await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:settings.json") || "{}").onboarded === true, null, { timeout: 3000 });
 }
 
 async function snap(page, name, mask = []) {
+  // Canvases (thumbnails, the board) draw in an effect after the render, and
+  // content parts may still be arriving: let both settle before the picture.
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const buf = await page.screenshot({ mask: mask.map((s) => page.locator(s)), animations: "disabled" });
   const file = path.join(baseDir, name + ".png");
   if (UPDATE || !fs.existsSync(file)) {

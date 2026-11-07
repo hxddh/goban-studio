@@ -12,7 +12,7 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel } from "./play.jsx";
 import { estimateLabel } from "./estimate-label.js";
-import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Stone, Switch } from "./parts.jsx";
+import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 
 export function Sheets() {
@@ -567,10 +567,7 @@ function Onboarding({ step = 0 }) {
     <div class="onboarding" role="dialog" aria-modal="true" aria-labelledby="ob-title">
       <div class="drag" data-drag />
       <div class="ob-card">
-        <div class="ob-mark" aria-hidden="true">
-          <Stone color={1} size={30} />
-          <Stone color={-1} size={30} />
-        </div>
+        <img class="ob-mark" src="icon.png" width="72" height="72" alt="" />
         {step === 0 && (
           <>
             <h1 id="ob-title">{t("onboarding.welcome")}</h1>
