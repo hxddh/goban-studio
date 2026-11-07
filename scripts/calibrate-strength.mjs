@@ -973,7 +973,9 @@ export function planMatrix(plan, { pending = null } = {}) {
     const shards = r.shards || 1;
     for (let i = 0; i < shards; i++) include.push({ run: r.id, shard: `${i}/${shards}` });
   }
-  if (!include.length) throw new Error("plan: no runs");
+  // A plan with no runs is a mistake; one whose runs are all complete has
+  // nothing left to play (an empty matrix: the workflow skips the play jobs).
+  if (!(plan.runs || []).length) throw new Error("plan: no runs");
   if (include.length > 256) throw new Error("plan: more than 256 jobs");
   return { include };
 }

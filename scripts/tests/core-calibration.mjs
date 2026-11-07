@@ -177,6 +177,9 @@ export default async function ({ test, assert, root }) {
     for (const r of plan.runs.filter((x) => x.id.startsWith("v8-"))) assert.equal(pendingGames(r, root), 0, r.id);
     const skip = planMatrix(plan, { pending: (r) => !r.id.startsWith("v8-") });
     assert.ok(skip.include.every((j) => !j.run.startsWith("v8-")));
+    // A plan that is all done is an empty matrix (the play jobs are skipped), not an error.
+    assert.deepEqual(planMatrix(plan, { pending: () => false }), { include: [] });
+    assert.ok(/needs\.plan\.outputs\.matrix != '\{"include":\[\]\}'/.test(fs.readFileSync(new URL("../../.github/workflows/calibrate.yml", import.meta.url), "utf8")), "the workflow skips an empty matrix");
   });
 
   test("core calibration: the workflow runs only on calibrate/** branches", () => {

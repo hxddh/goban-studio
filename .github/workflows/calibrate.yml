@@ -49,6 +49,8 @@ jobs:
 
   play:
     needs: plan
+    # A plan whose games are all committed has nothing to play.
+    if: needs.plan.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
