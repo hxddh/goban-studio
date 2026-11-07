@@ -17,6 +17,7 @@
  *            --human-model b18c384nbt-humanv0.bin.gz
  *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [more.jsonl …] [--size 19] [--anchor rank_10k] [--boot 1000]
  *            [--fixed]   (v6: hold the L: ladder at its measured θ; needs --size 9, 19 or, since v8, 13)
+ *            [--fixed impls]  (v11: hold every implementation of the current ladder, opponents.js IMPLS)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
  * Players:
@@ -45,6 +46,16 @@
  * levels apart), "anchors" (each H: profile in --anchors against the two
  * ladder levels nearest its nominal rank), or explicit "A-B" lists.
  *
+ * v11, handicap games: a spec ending in "@hN" (e.g. "L:10k-L:5k@h2", or
+ * "adjacent@h2") plays N handicap stones for A, the first player: A always
+ * takes Black, the stones stand on the app's handicap points (rules.js
+ * handicapPoints, reaching KataGo as `play B …` before White's first move,
+ * as the native host sends them) and komi is the app's handicap komi
+ * (0.5 under Japanese rules, also for one stone; play-ctl.js). `fit` then
+ * fits Black's advantage at each stone count (γ_N) and the value of a
+ * stone in 19×19 ranks as the app counts it (model/ladder.js levelTheta);
+ * see `stoneValue` and docs/strength.md, v11.
+ *
  * Games already in --out are skipped, so a run can be stopped and resumed.
  * Binaries and models are never part of the repository: pass their paths.
  */
@@ -54,10 +65,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BLACK, WHITE, Game, coordLabel } from "../src/web/js/rules.js";
+import { BLACK, WHITE, Game, coordLabel, defaultKomi } from "../src/web/js/rules.js";
 import { STRENGTHS, humanMoveFromAnalysis, humanRequest, moveFromAnalysis } from "../src/web/js/engine.js";
 import { parseVertex, toAnalysis } from "../src/web/js/katago.js";
-import { MEASURED, thetaToGoR } from "../src/web/js/opponents.js";
+import { IMPLS, MEASURED, gorToTheta, thetaToGoR } from "../src/web/js/opponents.js";
+import { fromBoard, onBoard } from "../src/web/js/model/ladder.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -262,12 +274,28 @@ function katagoArgv(opt, human, variant = "") {
 
 const MOVE_CAP = { 9: 150, 13: 260, 19: 420 };
 
-async function setup(proc, size, komi) {
+async function setup(proc, size, komi, stones = []) {
   await proc.send(`boardsize ${size}`);
   await proc.send("clear_board");
   await proc.send(`komi ${komi}`);
   await proc.send("kata-set-rules japanese");
+  // v11: handicap stones as the app sends root stones (katago.js setupStones).
+  for (const s of stones) await proc.send(`play ${s}`);
 }
+
+/**
+ * v11: the root stones of a game as GTP plays, in the order the app sends
+ * them (katago.js setupStones: row by row; a handicap root is black only).
+ */
+export function rootStones(game) {
+  const out = [];
+  const root = game.root.board.signMap;
+  for (let y = 0; y < game.size; y++) for (let x = 0; x < game.size; x++) if (root[y][x]) out.push(`${root[y][x] === BLACK ? "B" : "W"} ${coordLabel(x, y, game.size)}`);
+  return out;
+}
+
+/** v11: komi of a game with `handicap` stones, as play-ctl.js newGame sets it (Japanese rules). */
+export const handicapKomi = (handicap, komi = 6.5) => (handicap > 0 ? defaultKomi("japanese", Math.max(2, handicap)) : komi);
 
 /** One ladder move: the app's search, the app's picker. */
 async function ladderMove(proc, game, strength, rnd) {
@@ -329,13 +357,14 @@ function vertex(move, size) {
  * result is KataGo's score lead at the end (400 visits, Japanese rules).
  */
 async function playGame(task, procs, opt) {
-  const { size, komi } = task;
-  const game = new Game({ size, komi });
+  const { size, komi, handicap = 0 } = task;
+  const game = new Game({ size, komi, handicap });
   const rnd = mulberry32(hash(task.key));
   const players = { [BLACK]: task.black, [WHITE]: task.white };
   const procOf = { [BLACK]: procs.black, [WHITE]: procs.white };
-  await setup(procs.black, size, komi);
-  if (procs.white !== procs.black) await setup(procs.white, size, komi);
+  const stones = rootStones(game);
+  await setup(procs.black, size, komi, stones);
+  if (procs.white !== procs.black) await setup(procs.white, size, komi, stones);
   const evals = [];
   const slack = Math.max(...[task.black, task.white].map((p) => (p.strength ? p.strength.maxLoss : 20)));
   const threshold = 20 + 2 * slack;
@@ -393,10 +422,29 @@ async function playGame(task, procs, opt) {
 
 /* ------------------------------------------------------------ schedule */
 
+/** v11: "spec@hN" → [spec, N]; N is 0 without a suffix. */
+export function parseHandicap(part) {
+  const m = /^(.*)@h(\d+)$/.exec(part);
+  if (!m) return [part, 0];
+  const h = Number(m[2]);
+  if (!(h >= 1 && h <= 9)) throw new Error(`bad handicap in ${part} (want @h1 … @h9)`);
+  return [m[1], h];
+}
+
 function expandPairs(text, opt) {
-  const ids = STRENGTHS.map((s) => `L:${s.id}`);
   const out = [];
-  for (const part of text.split(",").map((s) => s.trim()).filter(Boolean)) {
+  for (const spec of text.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const [part, h] = parseHandicap(spec);
+    const from = out.length;
+    expandPart(part, opt, out);
+    for (let i = from; i < out.length; i++) out[i][2] = h;
+  }
+  return out;
+}
+
+function expandPart(part, opt, out) {
+  const ids = STRENGTHS.map((s) => `L:${s.id}`);
+  {
     if (part === "adjacent") for (let i = 0; i + 1 < ids.length; i++) out.push([ids[i], ids[i + 1]]);
     else if (/^gap\d$/.test(part)) {
       const g = Number(part.slice(3));
@@ -409,10 +457,10 @@ function expandPairs(text, opt) {
       }
     } else {
       const [a, b] = part.split(/-(?=(?:L|C|H|HL|LS|CH):)/);
+      if (!a || !b) throw new Error(`bad pair ${part}`);
       out.push([a, b]);
     }
   }
-  return out;
 }
 
 function doneKeys(file) {
@@ -446,15 +494,19 @@ export function planTasks(opt, candidates = {}, done = new Set()) {
   const tasks = [];
   let n = 0;
   for (let g = 0; g < opt.games; g++) {
-    for (const [a, b] of pairs) {
+    for (const [a, b, handicap] of pairs) {
       const i = n++;
       if (opt.shard && i % opt.shard.count !== opt.shard.index) continue;
-      const key = `${opt.size}|${opt.komi}|${a}|${b}|${g}${opt.tag ? "|" + opt.tag : ""}`;
+      // v11: a handicap game has the app's handicap komi and "|hN" in its key;
+      // the keys of even games are unchanged.
+      const komi = handicapKomi(handicap, opt.komi);
+      const key = `${opt.size}|${komi}|${a}|${b}|${g}${handicap ? "|h" + handicap : ""}${opt.tag ? "|" + opt.tag : ""}`;
       if (done.has(key)) continue;
       const pa = resolvePlayer(a, candidates);
       const pb = resolvePlayer(b, candidates);
-      const [black, white] = g % 2 === 0 ? [pa, pb] : [pb, pa];
-      tasks.push({ key, size: opt.size, komi: opt.komi, a, b, black, white });
+      // Even games alternate colours; in a handicap game A always takes Black.
+      const [black, white] = handicap || g % 2 === 0 ? [pa, pb] : [pb, pa];
+      tasks.push({ key, size: opt.size, komi, handicap, a, b, black, white });
     }
   }
   return tasks;
@@ -487,7 +539,7 @@ async function runPlay(opt) {
       const t0 = Date.now();
       try {
         const r = await playGame(task, { black, white }, opt);
-        const row = { key: task.key, size: task.size, komi: task.komi, black: task.black.spec, white: task.white.spec, ...r, ms: Date.now() - t0 };
+        const row = { key: task.key, size: task.size, komi: task.komi, ...(task.handicap ? { handicap: task.handicap } : {}), black: task.black.spec, white: task.white.spec, ...r, ms: Date.now() - t0 };
         fs.appendFileSync(opt.out, JSON.stringify(row) + "\n");
         finished++;
         const rate = (Date.now() - started) / finished;
@@ -533,35 +585,50 @@ function solve(A, b) {
  * v6: `fixed` (player → θ) holds some players at known strengths (the v4
  * ladder) and fits only the others, in that frame; the prior is then
  * centred on the fixed players' mean and no recentring is done.
+ *
+ * v11: a game with `handicap` N ≥ 1 (N stones for Black at the app's
+ * handicap komi) gets its own first-move term γ_N in place of η:
+ *   logit P(Black wins) = θ_B − θ_W + γ_N.
+ * γ_N is Black's whole advantage from the stones and komi, in nats of the
+ * board's θ (weak prior σ = `sigma` around 0); `gamma` maps N → γ_N.
  */
 export function fitBT(games, players, { ref = players[0], sigma = 6, fixed = null } = {}) {
   const idx = new Map(players.map((p, i) => [p, i]));
-  const n = players.length + 1; // + η
+  const hs = [...new Set(games.map((g) => g.handicap || 0).filter((h) => h > 0))].sort((a, b) => a - b);
+  const np = players.length;
+  const ETA = np; // index of η
+  const gIdx = new Map(hs.map((h, i) => [h, np + 1 + i]));
+  const n = np + 1 + hs.length;
   let x = new Array(n).fill(0);
   const held = fixed ? players.map((p, i) => [i, fixed[p]]).filter(([, v]) => Number.isFinite(v)) : [];
   const m0 = held.length ? held.reduce((s, [, v]) => s + v, 0) / held.length : 0;
-  if (held.length) for (let i = 0; i < n - 1; i++) x[i] = m0;
+  if (held.length) for (let i = 0; i < np; i++) x[i] = m0;
   for (const [i, v] of held) x[i] = v;
   for (let it = 0; it < 200; it++) {
     const g = new Array(n).fill(0);
     const H = Array.from({ length: n }, () => new Array(n).fill(0));
-    for (let i = 0; i < n - 1; i++) {
+    for (let i = 0; i < np; i++) {
       g[i] -= (x[i] - m0) / (sigma * sigma);
       H[i][i] -= 1 / (sigma * sigma);
     }
-    g[n - 1] -= x[n - 1] / 4;
-    H[n - 1][n - 1] -= 1 / 4;
+    g[ETA] -= x[ETA] / 4;
+    H[ETA][ETA] -= 1 / 4;
+    for (const i of gIdx.values()) {
+      g[i] -= x[i] / (sigma * sigma);
+      H[i][i] -= 1 / (sigma * sigma);
+    }
     for (const gm of games) {
       const b = idx.get(gm.black);
       const w = idx.get(gm.white);
+      const e = gm.handicap > 0 ? gIdx.get(gm.handicap) : ETA;
       const s = gm.winner === "B" ? 1 : gm.winner === "W" ? 0 : 0.5;
-      const p = 1 / (1 + Math.exp(-(x[b] - x[w] + x[n - 1])));
+      const p = 1 / (1 + Math.exp(-(x[b] - x[w] + x[e])));
       const d = s - p;
       const v = p * (1 - p);
       const coef = [
         [b, 1],
         [w, -1],
-        [n - 1, 1],
+        [e, 1],
       ];
       for (const [i, ci] of coef) {
         g[i] += ci * d;
@@ -583,8 +650,75 @@ export function fitBT(games, players, { ref = players[0], sigma = 6, fixed = nul
   }
   const r = held.length ? 0 : x[idx.get(ref)];
   const theta = Object.fromEntries(players.map((p, i) => [p, x[i] - r]));
-  return { theta, eta: x[n - 1] };
+  const gamma = Object.fromEntries(hs.map((h) => [h, x[gIdx.get(h)]]));
+  return { theta, eta: x[ETA], gamma };
 }
+
+/**
+ * v11: the strength of `t` (θ on a board of `size`) after giving `ranks`
+ * 19×19 ranks of handicap, exactly as the app discounts an opponent that
+ * gives stones (model/ladder.js levelTheta, implOpponent): carried to
+ * 19×19, lowered by 100 GoR a rank, carried back.
+ */
+export function discounted(t, ranks, size) {
+  return onBoard(gorToTheta(thetaToGoR(fromBoard(t, size)) - ranks * 100), size);
+}
+
+/** v11: the 19×19 ranks that a shift of `nats` (θ on `size`) below `t` is worth. */
+export function natsToRanks(t, nats, size) {
+  return (thetaToGoR(fromBoard(t, size)) - thetaToGoR(fromBoard(t - nats, size))) / 100;
+}
+
+/**
+ * v11: the value of one handicap stone in 19×19 ranks, as the app uses it
+ * (ladder.js RANKS_PER_STONE, engine.js suggestHandicap, player.js
+ * handicapFor), fitted by maximum likelihood to handicap games between
+ * players of known θ (`theta`, on the board's own scale):
+ *   logit P(Black wins) = θ_Black − discounted(θ_White, N·r)
+ * i.e. the giver plays N·r ranks weaker, which is how the app rates and
+ * suggests a handicap game. Games with fewer than `minStones` stones are
+ * left out (the app counts a handicap from two stones). One parameter r,
+ * found by golden-section search on [lo, hi]; null without games.
+ */
+export function stoneValue(games, theta, size, { minStones = 2, lo = -2, hi = 12 } = {}) {
+  const gs = games.filter((g) => g.handicap >= minStones && Number.isFinite(theta[g.black]) && Number.isFinite(theta[g.white]));
+  if (!gs.length) return null;
+  const ll = (r) => {
+    let sum = 0;
+    for (const g of gs) {
+      const z = theta[g.black] - discounted(theta[g.white], g.handicap * r, size);
+      const s = g.winner === "B" ? 1 : g.winner === "W" ? 0 : 0.5;
+      // s·log σ(z) + (1 − s)·log σ(−z), computed stably
+      sum -= s * softplus(-z) + (1 - s) * softplus(z);
+    }
+    return sum;
+  };
+  const phi = (Math.sqrt(5) - 1) / 2;
+  let a = lo;
+  let b = hi;
+  let c = b - phi * (b - a);
+  let d = a + phi * (b - a);
+  let fc = ll(c);
+  let fd = ll(d);
+  while (b - a > 1e-6) {
+    if (fc > fd) {
+      b = d;
+      d = c;
+      fd = fc;
+      c = b - phi * (b - a);
+      fc = ll(c);
+    } else {
+      a = c;
+      c = d;
+      fc = fd;
+      d = a + phi * (b - a);
+      fd = ll(d);
+    }
+  }
+  return { ranks: (a + b) / 2, games: gs.length };
+}
+
+const softplus = (z) => (z > 30 ? z : Math.log1p(Math.exp(z)));
 
 /**
  * Map Bradley–Terry strength (nats) to EGF ratings. Relative spacing comes
@@ -622,7 +756,7 @@ function playerOrder(players) {
   });
 }
 
-export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fixed = null, gorMap = null } = {}) {
+export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fixed = null, gorMap = null, size = null } = {}) {
   const players = playerOrder([...new Set(games.flatMap((g) => [g.black, g.white]))]);
   const ref = players[0];
   const anchors = players
@@ -637,12 +771,34 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
   const rnd = mulberry32(seed);
   const samples = Object.fromEntries(players.map((p) => [p, []]));
   const gorSamples = Object.fromEntries(players.map((p) => [p, []]));
+  // v11: handicap terms and the value of a stone (needs the board size).
+  const hs = Object.keys(fit.gamma).map(Number);
+  const gammaSamples = Object.fromEntries(hs.map((h) => [h, []]));
+  const sz = size ?? games[0]?.size;
+  // The value of a stone converts θ to ranks on the app's absolute scale, so
+  // it needs a fit in that frame: at least one player held at its app value
+  // (--fixed). An unanchored fit puts its first player at 0, an arbitrary origin.
+  const framed = !!fixed && players.some((p) => Number.isFinite(fixed[p]));
+  const rated = framed && [9, 13, 19].includes(sz);
+  const stone = hs.length && rated ? stoneValue(games, fit.theta, sz) : null;
+  const stone1 = hs.includes(1) && rated ? stoneValue(games, fit.theta, sz, { minStones: 1 }) : null;
+  const stoneSamples = [];
+  const stone1Samples = [];
   for (let b = 0; b < boot; b++) {
     const res = games.map(() => games[Math.floor(rnd() * games.length)]);
     const f = fitBT(res, players, { ref, fixed });
     for (const p of players) samples[p].push(f.theta[p]);
     const m = mapOf(f.theta);
     if (m) for (const p of players) gorSamples[p].push(m.map(f.theta[p]));
+    for (const h of hs) if (Number.isFinite(f.gamma[h])) gammaSamples[h].push(f.gamma[h]);
+    if (stone) {
+      const sv = stoneValue(res, f.theta, sz);
+      if (sv) stoneSamples.push(sv.ranks);
+    }
+    if (stone1) {
+      const sv = stoneValue(res, f.theta, sz, { minStones: 1 });
+      if (sv) stone1Samples.push(sv.ranks);
+    }
   }
   const rows = players.map((p) => {
     const ts = samples[p].sort((a, b) => a - b);
@@ -659,12 +815,14 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
       gorHi: gs.length ? quantile(gs, 0.975) : null,
     };
   });
-  // Pairwise results.
+  // Pairwise results (v11: a handicap pair is "receiver (Black) vs giver"
+  // and is kept apart from the even games of the same players).
   const pairs = new Map();
   for (const g of games) {
-    const [a, b] = players.indexOf(g.black) < players.indexOf(g.white) ? [g.black, g.white] : [g.white, g.black];
-    const k = `${a} vs ${b}`;
-    const e = pairs.get(k) || { a, b, aw: 0, bw: 0, aBlackWins: 0, aBlack: 0, plies: 0, adjudicated: 0, cap: 0, n: 0 };
+    const h = g.handicap || 0;
+    const [a, b] = h ? [g.black, g.white] : players.indexOf(g.black) < players.indexOf(g.white) ? [g.black, g.white] : [g.white, g.black];
+    const k = `${a} vs ${b}${h ? ` h${h}` : ""}`;
+    const e = pairs.get(k) || { a, b, h, aw: 0, bw: 0, aBlackWins: 0, aBlack: 0, plies: 0, adjudicated: 0, cap: 0, n: 0 };
     const aWon = (g.winner === "B" && g.black === a) || (g.winner === "W" && g.white === a);
     if (aWon) e.aw++;
     else e.bw++;
@@ -684,8 +842,18 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
       }),
   );
   const order = (p) => players.indexOf(p);
-  const sorted = [...pairs.values()].sort((x, y) => order(x.a) - order(y.a) || order(x.b) - order(y.b));
-  return { players, rows, eta: fit.eta, pairs: sorted, anchors: am ? am.points : [], single };
+  const sorted = [...pairs.values()].sort((x, y) => order(x.a) - order(y.a) || order(x.b) - order(y.b) || x.h - y.h);
+  const ci = (xs) => {
+    const v = [...xs].sort((p, q) => p - q);
+    return [quantile(v, 0.025), quantile(v, 0.975)];
+  };
+  const handicap = hs.map((h) => {
+    const [lo, hi] = ci(gammaSamples[h]);
+    const hpairs = sorted.filter((p) => p.h === h);
+    return { stones: h, gamma: fit.gamma[h], lo, hi, games: hpairs.reduce((sum, p) => sum + p.n, 0), blackWins: hpairs.reduce((sum, p) => sum + p.aw, 0) };
+  });
+  const withCI = (sv, xs) => (sv ? { ...sv, lo: ci(xs)[0], hi: ci(xs)[1] } : null);
+  return { players, rows, eta: fit.eta, pairs: sorted, anchors: am ? am.points : [], single, handicap, framed, stoneValue: withCI(stone, stoneSamples), stoneValue1: withCI(stone1, stone1Samples), size: sz, theta: fit.theta };
 }
 
 /** Wilson 95% interval for k wins in n games. */
@@ -707,7 +875,7 @@ function report(result, { markdown }) {
   if (markdown) row(["---", "---:", "---:", "---:", "---:", "---:", "---:"]);
   for (const p of result.pairs) {
     const [lo, hi] = wilson(p.bw, p.n);
-    row([`${p.a} vs ${p.b}`, p.n, `${p.aw}–${p.bw}`, `${f0((100 * p.bw) / p.n)} (${f0(100 * lo)}–${f0(100 * hi)})`, f0(p.plies / p.n), p.adjudicated, p.cap]);
+    row([`${p.a} vs ${p.b}${p.h ? ` (${p.h} stone${p.h > 1 ? "s" : ""} for A)` : ""}`, p.n, `${p.aw}–${p.bw}`, `${f0((100 * p.bw) / p.n)} (${f0(100 * lo)}–${f0(100 * hi)})`, f0(p.plies / p.n), p.adjudicated, p.cap]);
   }
   lines.push("");
   row(["Player", "BT θ (nats)", "95% CI", "Elo (400·log10)", "EGF GoR", "GoR 95% CI", "≈ rank"]);
@@ -717,6 +885,28 @@ function report(result, { markdown }) {
   }
   lines.push("");
   lines.push(`First-move term η = ${result.eta.toFixed(2)} nats (positive favours Black at this komi).`);
+  if (result.handicap?.length) {
+    // v11: Black's advantage at each stone count, and in 19×19 ranks at the
+    // receivers' strengths (the shift of the giver that is worth γ_N).
+    lines.push("");
+    const receivers = [...new Set(result.pairs.filter((p) => p.h).map((p) => p.a))];
+    row(["Stones", "Games", "Black wins", "γ (nats)", "95% CI", ...receivers.map((r) => `ranks/stone vs ${r}'s opponents`)]);
+    if (markdown) row(["---:", "---:", "---:", "---:", "---:", ...receivers.map(() => "---:")]);
+    for (const h of result.handicap) {
+      const per = receivers.map((r) => {
+        const ps = result.pairs.filter((p) => p.h === h.stones && p.a === r);
+        if (!ps.length || !result.framed) return "–";
+        const t = ps.reduce((sum, p) => sum + result.theta[p.b] * p.n, 0) / ps.reduce((sum, p) => sum + p.n, 0);
+        return (natsToRanks(t, h.gamma, result.size) / h.stones).toFixed(1);
+      });
+      row([h.stones, h.games, h.blackWins, h.gamma.toFixed(2), `${h.lo.toFixed(2)} … ${h.hi.toFixed(2)}`, ...per]);
+    }
+    const sv = (v, what) => v && lines.push(`${what}: ${v.ranks.toFixed(2)} ranks (95% CI ${v.lo.toFixed(2)} … ${v.hi.toFixed(2)}; ${v.games} games).`);
+    lines.push("");
+    sv(result.stoneValue, "Value of a stone as the app counts it (2+ stones, 19×19 ranks per stone)");
+    sv(result.stoneValue1, "The same with one-stone games included");
+    if (!result.framed) lines.push("No value of a stone in ranks: the fit is not on the app's scale (hold the ladder with --fixed).");
+  }
   if (result.anchors.length) {
     lines.push(`Anchors used: ${result.anchors.map((a) => `${a.player} (nominal ${goRLabel(a.nominal)}, fitted ${goRLabel(a.mapped)})`).join(", ")}.`);
   }
@@ -772,18 +962,39 @@ const readGames = (file) =>
  * games, pairs, shards, workers?, scoreVisits?, candidates? }] }. Returns
  * the GitHub Actions matrix, one entry per (run, shard).
  */
-export function planMatrix(plan) {
+export function planMatrix(plan, { pending = null } = {}) {
   const include = [];
   for (const r of plan.runs || []) {
     if (!/^[\w.-]+$/.test(r.id || "")) throw new Error(`plan: bad run id ${r.id}`);
     if (![9, 13, 19].includes(r.size)) throw new Error(`plan ${r.id}: size must be 9, 13 or 19`);
     if (!(r.games > 0) || !r.pairs) throw new Error(`plan ${r.id}: games and pairs are required`);
+    // v11: a run whose games are all in its results file gets no jobs.
+    if (pending && !pending(r)) continue;
     const shards = r.shards || 1;
     for (let i = 0; i < shards; i++) include.push({ run: r.id, shard: `${i}/${shards}` });
   }
-  if (!include.length) throw new Error("plan: no runs");
+  // A plan with no runs is a mistake; one whose runs are all complete has
+  // nothing left to play (an empty matrix: the workflow skips the play jobs).
+  if (!(plan.runs || []).length) throw new Error("plan: no runs");
   if (include.length > 256) throw new Error("plan: more than 256 jobs");
   return { include };
+}
+
+/** v11: player → measured θ on `size` for every implementation of the current ladder (opponents.js IMPLS). */
+export function fixedImpls(size) {
+  const out = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
+  for (const i of IMPLS) if (Number.isFinite(i.theta?.[size])) out[i.id] = i.theta[size];
+  return out;
+}
+
+/**
+ * v11: games of a plan run not yet in `docs/calibration/results/<id>.jsonl`
+ * (relative to `root`), as `play` would schedule them.
+ */
+export function pendingGames(run, root = ROOT) {
+  const candidates = run.candidates ? loadCandidates(path.join(root, run.candidates)) : {};
+  const done = doneKeys(path.join(root, "docs/calibration/results", `${run.id}.jsonl`));
+  return planTasks({ size: run.size, komi: 6.5, games: run.games, pairs: run.pairs, tag: run.tag || "", anchors: [] }, candidates, done).length;
 }
 
 /* ---------------------------------------------------------------- main */
@@ -826,7 +1037,8 @@ async function main() {
     fs.appendFileSync(out, add.map((g) => JSON.stringify(g) + "\n").join(""));
     console.error(`${add.length} new games → ${out} (${readGames(out).length} in all)`);
   } else if (cmd === "matrix") {
-    console.log(JSON.stringify(planMatrix(JSON.parse(fs.readFileSync(a._[1] || "docs/calibration/plan.json", "utf8")))));
+    // v11: runs already complete in docs/calibration/results/ get no jobs.
+    console.log(JSON.stringify(planMatrix(JSON.parse(fs.readFileSync(a._[1] || "docs/calibration/plan.json", "utf8")), { pending: (r) => pendingGames(r) > 0 })));
   } else if (cmd === "run-args") {
     // v7 CI: the play arguments of one plan run, one per line.
     const plan = JSON.parse(fs.readFileSync(a._[1], "utf8"));
@@ -864,12 +1076,16 @@ async function main() {
     // (opponents.js MEASURED.standard, for --size 9 or 19) and places only
     // the other players; on 19×19 their GoR comes from the v4 anchor map.
     const anchors = a.anchor ? String(a.anchor).split(",") : null;
-    const opt = { boot: Number(a.boot || 1000), anchors };
+    const opt = { boot: Number(a.boot || 1000), anchors, size: a.size ? Number(a.size) : null };
     if (a.fixed) {
       const size = Number(a.size);
       // v8: 13×13 too, once the standard ladder is measured there.
       if (![9, 13, 19].includes(size) || !STRENGTHS.every((s) => Number.isFinite(MEASURED.standard[s.id][size]))) throw new Error("--fixed needs --size 9, 13 or 19 (a board the standard ladder is measured on)");
       opt.fixed = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
+      // v11: "--fixed impls" holds every implementation of the current
+      // ladder (opponents.js IMPLS: the levels, the human-style levels and
+      // the v4/v7 bridges) at its measured θ on that board, where measured.
+      if (a.fixed === "impls") opt.fixed = fixedImpls(size);
       if (size === 19) opt.gorMap = thetaToGoR;
     }
     if (a.json) {

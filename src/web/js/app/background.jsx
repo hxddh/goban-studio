@@ -5,7 +5,6 @@
  */
 import { useEffect, useState } from "preact/hooks";
 import * as Engine from "../engine.js";
-import { t } from "../i18n.js";
 
 /** Re-render while mounted whenever a job starts, moves or ends. */
 export function useJobs() {
@@ -14,8 +13,3 @@ export function useJobs() {
   return Engine.sched.listJobs();
 }
 
-/** "Analysing your game against ≈ 12 kyu — 40%". */
-export function jobText(job) {
-  const title = typeof job.title === "function" ? job.title() : String(job.title || "");
-  return t("sched.progress", [title, Math.round((job.progress || 0) * 100)]);
-}

@@ -6,6 +6,17 @@
 import { test, BLACK, R, WHITE, assert, loadSGF, reportGame } from "./helpers.mjs";
 import { addMistake, newProfile, recordMistake, due, DAY } from "../../src/web/js/model/player.js";
 
+await test("play review model: a theme takeaway keeps its theme and topic (the review's Practise these link)", () => {
+  const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 30: 4, 79: 2.5 } });
+  const kms = R.keyMovesOf(game, points, BLACK).map((km) => ({ ...km, theme: "cut" }));
+  const m = R.buildReview({ game, points, humanColor: BLACK, keyMoves: kms, at: 1 });
+  const tk = m.takeaways.find((x) => x.kind === "theme");
+  assert.ok(tk, JSON.stringify(m.takeaways.map((x) => x.kind)));
+  assert.equal(tk.theme, "cut");
+  assert.ok(tk.topic, "the theme's topic");
+  assert.deepEqual(JSON.parse(JSON.stringify(m)), m);
+});
+
 await test("play review model: the result, the three phases and three key moments", () => {
   const { game, points } = reportGame({ losses: { 5: 3, 25: 8, 30: 4, 79: 2.5 } });
   const m = R.buildReview({ game, points, humanColor: BLACK, at: 1 });

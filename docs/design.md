@@ -144,8 +144,14 @@ group per screen region.
   Export SGF) are icon buttons in the toolbar; the one primary action is
   *New game* after a game you just played, *Play from here* otherwise. A
   record opens on its final position and moves to the first key moment
-  when the analysis is there, unless the player has already moved; a
-  classic with a famous move opens on it.
+  when the analysis is there, unless the player has already moved. A
+  classic (v11) opens on its famous move, else its first moment to study,
+  and its Analysis tab starts with 3–5 *moments to study*: rows in the
+  key-moment style (stone, title, move number and point on the right),
+  the note shown only for the move on the board. A written moment has a
+  title and a note; the others are the game's largest swings by KataGo's
+  count of every move (docs/classics-katago.json), said in one fixed
+  sentence with KataGo's move and the loss, never more than it measured.
 * **Learn (v9).** One path chosen for you: a short ordered list of rows
   (5–8: the next lesson, reviews due, the week's focus, one stretch
   problem, the beginner bridges), each saying why it is there in a few

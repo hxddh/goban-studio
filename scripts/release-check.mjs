@@ -46,7 +46,10 @@ assert.ok(fs.existsSync(path.join(root, "docs/usability.md")), "usability protoc
 const histogram = [1, 2, 3, 4, 5].map((g) => PROBLEMS.filter((p) => grades[p.id].grade === g).length);
 
 assert.equal(CLASSICS.length, 20, "20 classic games");
-for (const classic of CLASSICS) assertLocalized(classic, ["title", "note"], classic.id);
+for (const classic of CLASSICS) {
+  assertLocalized(classic, ["title", "note"], classic.id);
+  for (const mo of classic.moments || []) if (mo.title) assertLocalized(mo, ["title", "note"], `${classic.id} move ${mo.index}`);
+}
 
 for (const file of [
   "engine/model/model.txt.gz",

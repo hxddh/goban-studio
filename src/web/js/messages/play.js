@@ -20,6 +20,7 @@ export const PLAY = {
   "play.suggest.other": m("或者下一盘 {0} 路", "Or a {0}×{0} game", "또는 {0}줄 한 판", "または{0}路で一局"),
   "play.home.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
   "play.home.levelGames": m("根据 {0} 盘对局估计", "estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
+  "gameSummary.practise": m("练这类题 →", "Practise these →", "이 유형 연습하기 →", "この形を練習 →"),
   "play.home.allClassics": m("全部 {0} 局名局", "All {0} classics", "명국 {0}판 모두 보기", "名局 {0} 局をすべて表示"),
   "play.home.showAll": m("显示全部 {0} 盘", "Show all {0}", "전체 {0}판 보기", "全{0}局を表示"),
   "play.home.explorer": m("布局与定式", "Openings and joseki", "포석과 정석", "布石と定石"),
@@ -68,7 +69,6 @@ export const PLAY = {
   "report.phasesOf": m("{0}的三个阶段", "The three phases for {0}", "{0}의 세 단계", "{0}の三つの局面"),
   // A game between two people: whose mistakes become drills.
   // Background analyses (play/analysis.js), as a job names them.
-  "sched.progress": m("{0} — {1}%", "{0} — {1}%", "{0} — {1}%", "{0} — {1}%"),
   "sched.job.game": m("正在分析你与电脑（{0}）的对局", "Analysing your game against {0}", "컴퓨터({0})와 둔 대국을 분석하는 중", "コンピュータ（{0}）との対局を解析中"),
   "sched.job.report": m("正在分析一盘棋", "Analysing a game", "대국을 분석하는 중", "対局を解析中"),
   "sched.job.review": m("正在复盘这盘棋", "Reviewing the game", "대국을 복기하는 중", "対局を検討中"),

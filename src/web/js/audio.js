@@ -150,11 +150,6 @@ export function setVolume(v) {
   if (master) master.gain.value = volume;
 }
 
-/** Where the sounds folder lives relative to the page (default "assets/sounds/"). */
-export function setSoundBase(path) {
-  base = path.endsWith("/") ? path : path + "/";
-}
-
 // ------------------------------------------------- synthesised fallback ----
 
 function tone(freq, duration, gainValue, type = "sine", at = 0) {

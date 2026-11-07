@@ -18,7 +18,7 @@
  *     players: ["black"] | ["white"] | ["black", "white"],
  *     phases: [{ id, from, to, players: { black, white } }] | null,
  *     totals: { black, white } | null,     per player { loss, mistakes, blunders, accuracy, measured }
- *     takeaways: [{ kind, key, params, tone, index? }],
+ *     takeaways: [{ kind, key, params, tone, index?, theme?, topic? }],
  *     moments: [{ index, color, played, best, loss, theme, why, thumb, accept }] }
  *
  * Honesty rules (v6):
@@ -160,7 +160,7 @@ export function buildReview({ game, points, humanColor = null, refined = null, k
       ? summary.phases.filter((p) => p.from <= p.to).map((p) => ({ id: p.id, from: p.from, to: p.to, players: { black: pick(p.players.black), white: pick(p.players.white) } }))
       : null,
     totals: high ? { black: pick(summary.players.black), white: pick(summary.players.white) } : null,
-    takeaways: high ? summary.takeaways.filter((tk) => tk.kind !== "estimate").map(({ kind, key, params, tone, index }) => ({ kind, key, params, tone, ...(index != null ? { index } : {}) })) : [],
+    takeaways: high ? summary.takeaways.filter((tk) => tk.kind !== "estimate").map(({ kind, key, params, tone, index, theme, topic }) => ({ kind, key, params, tone, ...(index != null ? { index } : {}), ...(theme ? { theme } : {}), ...(topic ? { topic } : {}) })) : [],
     moments,
   };
 }

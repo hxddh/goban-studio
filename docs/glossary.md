@@ -133,8 +133,8 @@ in this table. Usage targets:
 | Chinese rules | 中国规则 | Chinese rules | 중국 규칙 | 中国ルール | v5 `rules.chinese` |
 | Korean rules | 韩国规则 | Korean rules | 한국 규칙 | 韓国ルール | v5 `rules.korean` |
 | rules (ruleset) | 规则 | rules | 규칙 | ルール | v5 `rules.title` |
-| territory scoring | 数目（数目法） | territory scoring | 계지 | 計地 | v5 `rules.territory`; Japanese and Korean rules. zh 数目 is also "counting" in general (`score.title`) |
-| area scoring | 数子（数子法） | area scoring | 계자 | 計子 | v5 `rules.area`; Chinese rules. See review list |
+| territory scoring | 数目（数目法） | territory scoring | 계지 | 計地 | v5; Japanese and Korean rules. zh 数目 is also "counting" in general (`score.title`) |
+| area scoring | 数子（数子法） | area scoring | 계자 | 計子 | v5; Chinese rules. See review list |
 | counting under area scoring | 数子 | counting | 계가 | 計算 | v5 `score.titleArea`; ja 整地 is the Japanese-rules procedure, so the area card says 計算 |
 | stones (in an area count) | 棋子 | stones | 돌 | 石 | v5 `score.detailArea*` |
 | handicap compensation (Chinese rules) | 让子补偿（还子） | handicap (points White receives) | 치석 보상 | 置き石の補正 | v5: White receives N points for N handicap stones (Black returns half a stone per handicap stone) |

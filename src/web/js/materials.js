@@ -23,12 +23,6 @@ export const STONE_COUNTS = { black: 4, white: 8 };
 
 let base = "assets/";
 
-/** Where the assets folder lives relative to the page (default "assets/"). */
-export function setAssetBase(path) {
-  base = path.endsWith("/") ? path : path + "/";
-  cache = null;
-}
-
 export function assetURL(rel) {
   return base + rel;
 }

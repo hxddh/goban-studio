@@ -49,6 +49,15 @@ players who already know the rules, which sets where the course starts;
 Learn's problem rows show their position; Play's home lists four classics
 and a link to the rest. v10 reads everything v9 saved.
 
+## v11: study and practice
+
+A classic now opens with 3–5 moments to study: its famous moves, written
+for the game, and its largest swings by KataGo's count of every move. A
+takeaway from your review that names a kind of mistake has a *Practise these*
+link straight to problems of that kind. The problem bank grows to 624, with
+at least 15 capture, save, life, kill and endgame problems at every grade.
+v11 reads everything v10 saved.
+
 ## Two spaces
 
 - **Play** (⌘1) — opens on the game in progress, or the suggested game with
@@ -70,7 +79,7 @@ and a link to the rest. v10 reads everything v9 saved.
   review, this week's focus (named, with its reason), one stretch problem,
   new problems at your level, and for beginners capture Go and a first 9×9
   game. A quiet catalog holds every lesson (18 units, 82 lessons) and the
-  543 solver-proved problems.
+  624 solver-proved problems.
 - **Settings** (⌘, / Ctrl+,) — language, appearance, larger text, board
   coordinates and move numbers, sound, teaching, rules, your level, the
   optional KataGo networks, backup, updates.
@@ -172,7 +181,7 @@ The course and the problems are verified, not counted:
   proof that no unsettled end changes the count. A "biggest move" answer
   and its margin, and a "how many points" value (the difference between
   Black and White playing first), are stored only as the solver proves them.
-- 543 problems: 34 endgame problems (first-line hane and connect, sente and
+- 624 problems: 75 endgame problems (first-line hane and connect, sente and
   reverse sente, double sente, the monkey jump, comparing moves, counting a
   move), 57 capturing races (16 big eye against small eye, eye
   against no eye, outside liberties), 23 seki problems (from grade 1 up),
@@ -180,9 +189,11 @@ The course and the problems are verified, not counted:
   textbook shapes (straight and bent three, pyramid four, bulky and crossed
   five, rabbity six, rectangular six, seven stones on the second line) and
   six kills at the 2-1 point of the corner, each in four languages and
-  graded by measurement into five grades of about 100 problems each. The
+  graded by measurement into five grades of about 120 problems each. The
   247 problems added in v5 came from shape generators and were proved,
-  filtered and reviewed the same way (`docs/problems-audit.md`, "v5").
+  filtered and reviewed the same way (`docs/problems-audit.md`, "v5"); the
+  81 added in v11 give every grade at least 15 capture, save, life, kill
+  and endgame problems (`docs/problems-audit.md`, "v11").
 
 v1 shipped 300 drills that were 25 one-move shapes repeated by symmetry,
 with cyclic difficulty labels. v2 removed them.

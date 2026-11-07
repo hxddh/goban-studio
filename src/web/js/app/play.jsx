@@ -23,6 +23,11 @@ import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { FirstCountNote } from "./beginner.jsx";
 
+/** A classic's year: "1846-09-11,14,15" and "1933-10-16..1934-01-29" read as 1846 and 1933. */
+export function classicYear(date) {
+  return /^\d{4}/.exec(String(date || ""))?.[0] || "";
+}
+
 /** A rank (kyu 30…1, 1 dan = 0 …) as shown: "≈ 12 kyu", "≈ 4 dan". */
 export const rankLabel = rankText;
 
@@ -533,7 +538,7 @@ function reviewHeading(r) {
   let sub = "";
   if (meta.classic) {
     title = C.tx(meta.classic.title);
-    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${meta.classic.date}`;
+    sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${classicYear(meta.classic.date)}`;
   } else if (meta.name) title = meta.name;
   return { crumbs, title, sub };
 }
@@ -855,6 +860,47 @@ function ResultLine() {
   );
 }
 
+/**
+ * v11: a classic's moments to study. A moment is either written for the
+ * game (title and note) or one of the game's largest swings by KataGo's
+ * count (docs/classics-katago.json: the move KataGo prefers and about how
+ * much the move gave away), said in a fixed sentence. Each row goes to its
+ * move; the note of the move on the board is shown.
+ */
+const half = (v) => Math.round(v * 2) / 2;
+
+function ClassicMoments({ classic }) {
+  const r = state.review;
+  const line = r.game.mainLine();
+  const at = C.reviewIndex();
+  const moments = (classic.moments || []).filter((mo) => line[mo.index]?.move);
+  if (!moments.length) return null;
+  return (
+    <section class="key-moves classic-moments">
+      <h2 class="slot-title">{t("review.classicMoments")}</h2>
+      <ol>
+        {moments.map((mo) => {
+          const mv = line[mo.index].move;
+          const on = at === mo.index;
+          const where = mv.pass ? t("common.pass") : coordLabel(mv.x, mv.y, r.game.size);
+          return (
+            <li class={`key-move ${on ? "on" : ""}`}>
+              <button type="button" class="key-head" aria-current={on ? "step" : undefined} onClick={() => C.reviewGoto(mo.index)}>
+                <Stone color={mv.color} size={12} />
+                <span>{mo.title ? C.tx(mo.title) : t("review.classicLoss", [formatPoints(half(mo.loss))])}</span>
+                <em class="cm-at">
+                  {mo.index} · {where}
+                </em>
+              </button>
+              {on && <p>{mo.note ? C.tx(mo.note) : t("review.classicLossNote", [colorName(mv.color), mo.best, formatPoints(half(mo.loss))])}</p>}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 /** The key moments: KataGo's key mistakes, or the offline estimate's turning points only. */
 function Moments() {
   const r = state.review;
@@ -993,6 +1039,7 @@ function ReviewPanel() {
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
               <>
+                {meta.classic && <ClassicMoments classic={meta.classic} />}
                 <Moments />
                 <Variations />
                 {meta.classic && (
@@ -1087,6 +1134,14 @@ function GameSummary() {
                 </button>
               ) : (
                 storyText(tk)
+              )}
+              {tk.kind === "theme" && (tk.theme || tk.topic) && (
+                <>
+                  {" "}
+                  <button type="button" class="link take-practise" onClick={() => C.practiseTheme(tk.theme, tk.topic)}>
+                    {t("gameSummary.practise")}
+                  </button>
+                </>
               )}
             </li>
           ))}

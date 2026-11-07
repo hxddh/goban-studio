@@ -9,7 +9,8 @@ name: calibrate
 # game into docs/calibration/results/<run>.jsonl and commits that back to
 # the branch (a push made with GITHUB_TOKEN does not start this workflow
 # again). Games already in that file are skipped, so pushing the same plan
-# with more games only plays the new ones.
+# with more games only plays the new ones; a run with every game already
+# there gets no jobs (v11).
 #
 # KataGo (official 1.18.1 Linux release, Eigen AVX2 CPU build) and the two
 # optional networks (the URLs pinned in src/models.zig) are downloaded and
@@ -48,6 +49,8 @@ jobs:
 
   play:
     needs: plan
+    # A plan whose games are all committed has nothing to play.
+    if: needs.plan.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:

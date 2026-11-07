@@ -1,5 +1,5 @@
 {
-  "note": "v8: the shipped ladder on 13x13, never measured before (docs/strength.md, v8). v8-13a: the standard levels, adjacent and two apart. v8-13b: every human-style level against the standard levels of the same ID and its neighbours, the stronger network, and a 400-visit bridge above the top. v8-13c: bridges for the two sweeps of v8-13a (docs/calibration/v8-candidates.json). The games are in results/v8-13*.jsonl, so pushing this plan unchanged plays nothing new. Push to a calibrate/** branch to run it (.github/workflows/calibrate.yml).",
+  "note": "v8: the shipped ladder on 13x13, never measured before (docs/strength.md, v8). v8-13a: the standard levels, adjacent and two apart. v8-13b: every human-style level against the standard levels of the same ID and its neighbours, the stronger network, and a 400-visit bridge above the top. v8-13c: bridges for the two sweeps of v8-13a (docs/calibration/v8-candidates.json). v11 (docs/strength.md, v11): v11-13h, 13x13 handicap games, 1 to 4 stones for the weaker standard level against the next level up and two up, at five ladder points, with the app's handicap points and komi; v11-19anchor, KataGo's human SL model as a 10-kyu player (H:rank_10k, the 19x19 anchor) against the current ladder around 10 kyu (the standard levels and the v4 bridges of docs/calibration/v11-candidates.json). A run whose games are all in results/<run>.jsonl gets no jobs, so pushing this plan unchanged plays nothing new. Push to a calibrate/** branch to run it (.github/workflows/calibrate.yml).",
   "runs": [
     {
       "id": "v8-13a",
@@ -32,6 +32,27 @@
       "scoreVisits": 400,
       "candidates": "docs/calibration/v8-candidates.json",
       "tag": "v8"
+    },
+    {
+      "id": "v11-13h",
+      "size": 13,
+      "games": 24,
+      "pairs": "L:20k-L:15k@h1,L:20k-L:15k@h2,L:20k-L:15k@h3,L:20k-L:15k@h4,L:15k-L:10k@h1,L:15k-L:10k@h2,L:15k-L:10k@h3,L:15k-L:10k@h4,L:10k-L:5k@h1,L:10k-L:5k@h2,L:10k-L:5k@h3,L:10k-L:5k@h4,L:5k-L:1k@h1,L:5k-L:1k@h2,L:5k-L:1k@h3,L:5k-L:1k@h4,L:1k-L:2d@h1,L:1k-L:2d@h2,L:1k-L:2d@h3,L:1k-L:2d@h4,L:20k-L:10k@h1,L:20k-L:10k@h2,L:20k-L:10k@h3,L:20k-L:10k@h4,L:15k-L:5k@h1,L:15k-L:5k@h2,L:15k-L:5k@h3,L:15k-L:5k@h4,L:10k-L:1k@h1,L:10k-L:1k@h2,L:10k-L:1k@h3,L:10k-L:1k@h4,L:5k-L:2d@h1,L:5k-L:2d@h2,L:5k-L:2d@h3,L:5k-L:2d@h4",
+      "shards": 8,
+      "workers": 4,
+      "scoreVisits": 400,
+      "tag": "v11"
+    },
+    {
+      "id": "v11-19anchor",
+      "size": 19,
+      "games": 32,
+      "pairs": "H:rank_10k-L:15k,H:rank_10k-C:b40,H:rank_10k-L:10k,H:rank_10k-C:b18,H:rank_10k-L:5k,H:rank_10k-C:b0",
+      "shards": 8,
+      "workers": 4,
+      "scoreVisits": 200,
+      "candidates": "docs/calibration/v11-candidates.json",
+      "tag": "v11"
     }
   ]
 }

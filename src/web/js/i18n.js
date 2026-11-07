@@ -33,10 +33,6 @@ export function setLang(id) {
   return current;
 }
 
-export function getLang() {
-  return current;
-}
-
 export function available() {
   return LANG_IDS.map((id) => ({ id, name: LANG_NAMES[id] }));
 }
@@ -70,8 +66,6 @@ export function t(key, params) {
   }
   return s;
 }
-
-export const tf = t;
 
 export function apply(root) {
   const scope = root || (typeof document !== "undefined" ? document : null);

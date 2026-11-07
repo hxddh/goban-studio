@@ -416,6 +416,8 @@ select, .text-input {
 .key-head { display: flex; align-items: center; gap: var(--s-2); width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font: 500 13px/18px var(--font); }
 .key-head em { margin-left: auto; font-style: normal; font: var(--t-small); color: var(--bad); font-variant-numeric: tabular-nums; }
 .key-move p { font: var(--t-small); color: var(--text-2); }
+.key-head em.cm-at { color: var(--text-3); white-space: nowrap; }
+.classic-moments .key-move p { font: var(--t-read); }
 .seg-mini { display: flex; flex-wrap: wrap; gap: 4px; }
 .seg-mini button { height: 24px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); color: var(--text-2); font: 500 11px/1 var(--font); cursor: pointer; }
 .seg-mini button:hover { color: var(--text); }

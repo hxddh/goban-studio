@@ -258,6 +258,3 @@ function pickWeighted(moves, level) {
   return { x: pick.x, y: pick.y };
 }
 
-export async function hintMove(game, level = 4) {
-  return chooseMove(game, { level: Math.max(3, level), color: game.turn });
-}

@@ -15,7 +15,7 @@ import * as Games from "../data/games.js";
 import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import * as C from "../app/controller.js";
-import { rankLabel } from "../app/play.jsx";
+import { classicYear, rankLabel } from "../app/play.jsx";
 import { estimateLabel } from "../app/estimate-label.js";
 import { Button, Icon, MoreMenu, Thumb } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
@@ -220,10 +220,7 @@ function MyGames() {
 export const CLASSICS_SHOWN = 4;
 let allClassics = false;
 
-/** A classic's year: "1846-09-11,14,15" and "1933-10-16..1934-01-29" read as 1846 and 1933. */
-export function classicYear(date) {
-  return /^\d{4}/.exec(String(date || ""))?.[0] || "";
-}
+export { classicYear };
 
 function Classics() {
   const done = state.profile.classics || {};
