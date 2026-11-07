@@ -1119,6 +1119,59 @@ fewer games than the shipped levels (`C:b18` 58 on 19×19, `CH:r20k` 42,
 measurement use a derived one; the 7-dan and 8-dan entries rest on one
 bridge player and the anchor's furthest extrapolation.
 
+## v11: 13×13 handicap stones and the anchor again
+
+Two runs on GitHub-hosted runners (run 42333747888, branch
+`calibrate/v11-handicap-anchor`, 16 jobs, about 90 minutes of wall time),
+with `scripts/calibrate-strength.mjs`, which now plays handicap games: a
+pair `A-B@hN` gives A N stones as Black on the app's handicap points
+(`rules.js handicapPoints`) at the app's handicap komi (0.5, Japanese
+rules), as the native host sends them.
+
+**13×13 handicap (`v11-13h`, 864 games).** The weaker standard level
+against the next level up and two up (20k/15k, 15k/10k, 10k/5k, 5k/1k,
+1k/2d, 20k/10k, 15k/5k, 10k/1k, 5k/2d), with 1, 2, 3 and 4 stones, 24
+games each. The levels are held at their v8 13×13 values (`--fixed`);
+each stone count gets its own Black-advantage term γ:
+
+| Stones | Games | Black wins | γ (nats) | 95% CI |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 216 | 7 | −0.40 | −1.48 … 0.20 |
+| 2 | 216 | 16 | 0.54 | −0.14 … 1.04 |
+| 3 | 216 | 35 | 1.60 | 1.15 … 2.01 |
+| 4 | 216 | 38 | 1.74 | 1.25 … 2.17 |
+
+As the app counts a stone (`ladder.js levelTheta`: each stone from two
+makes the level weaker by `RANKS_PER_STONE[13]` ranks of 100 GoR), the
+best single value is **0.90 ranks a stone (95% CI 0.76 … 1.02;** 0.89
+with one-stone games included). The app uses 2.5.
+
+**What changed in the app: nothing.** Between these players a 13×13
+stone is worth less than a 19×19 rank, which contradicts the usual
+experience of people (a stone on a smaller board is worth more, and the
+app's 19×19 value of one rank a stone is itself the conventional value,
+not a measured one). Bot-versus-bot games may not say how much a stone
+helps a person: a weak level makes its mistakes at the same rate with or
+without the stones. Until people are measured, `RANKS_PER_STONE[13]`,
+`suggestHandicap` and `handicapFor` keep 2.5; the number above is the
+measured bot value, recorded here.
+
+**The 10-kyu anchor again (`v11-19anchor`, 192 games).** `H:rank_10k`
+against `L:15k`, `C:b40`, `L:10k`, `C:b18`, `L:5k` and `C:b0` (32 games
+each), every implementation of the current ladder held at its measured
+θ (`--fixed impls`; the bridges are in
+`docs/calibration/v11-candidates.json`). θ of `H:rank_10k` = **11.60
+(95% CI 11.16 … 12.06)**, against 11.65 (10.35 … 14.69) in v4, with a
+much narrower interval. `ANCHOR_K` (`opponents.js`) is unchanged; every
+label stays where it was.
+
+To refit:
+
+```sh
+node scripts/calibrate-strength.mjs fit docs/calibration/results/v11-13h.jsonl --size 13 --fixed --markdown
+node scripts/calibrate-strength.mjs fit docs/calibration/results/v11-19anchor.jsonl --size 19 --fixed impls --markdown
+```
+
 ## v6: your strength — the estimate
 
 Until v5 the player's level was an Elo-style number that moved by a fixed
