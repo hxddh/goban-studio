@@ -99,6 +99,10 @@ offered a placement quiz on Learn's home before the first path
   the course starts (grade 3 and up start at the intermediate units,
   grade 5 at the advanced ones) and whether the beginner bridges apply
   (not from grade 2).
+- The quiz's own answers are recorded like any problem, but they do not
+  outrank it: until some grade has enough results to measure a level
+  (`levelOnGrade`), the placement stands. The problems come from the whole
+  bank from grade 2, not only from the topics of finished beginner lessons.
 - Skipping is remembered; the path then starts from what onboarding said.
 
 ## What it cannot know

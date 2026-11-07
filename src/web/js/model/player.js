@@ -613,7 +613,7 @@ function area(map, key) {
  * now; grade 1 when none qualifies yet but enough were tried; null with
  * too few results to say.
  */
-export function solvingLevel(results) {
+export function solvingLevel(results, { fallback = true } = {}) {
   let level = null;
   let tried = 0;
   for (let g = 1; g <= 5; g++) {
@@ -621,7 +621,7 @@ export function solvingLevel(results) {
     tried += at.length;
     if (at.length >= RULES.LEVEL_MIN && at.filter((r) => !r.miss).length / at.length >= RULES.LEVEL_CLEAN) level = g;
   }
-  if (level == null && tried >= RULES.LEVEL_MIN) level = 1;
+  if (fallback && level == null && tried >= RULES.LEVEL_MIN) level = 1;
   return level;
 }
 
@@ -739,7 +739,7 @@ export function evidence(profile, { problems = [], grades = {}, now = 0 } = {}) 
   return {
     status: focusAreas.length ? "focus" : anything ? "notEnough" : "none",
     games: { analysed: recent.length, high: high.length, needed: Math.max(0, R.MIN_GAMES - recent.length) },
-    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY)) },
+    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY)), levelOnGrade: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY), { fallback: false }) != null },
     areas,
     focus: focusAreas,
   };
@@ -905,7 +905,9 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
 
   // 2. Focus problems around the level.
   const unseen = pool.filter((d) => !entry(d));
-  const measured = model?.problems?.level ?? null;
+  // A level measured on a grade outranks a prior; the "nothing qualified yet"
+  // fallback (grade 1) does not outrank a placement or a rank (v10).
+  const measured = model?.problems?.levelOnGrade || prior == null ? (model?.problems?.level ?? null) : null;
   const known = measured != null || prior != null;
   const level = measured ?? prior ?? (unseen.length ? Math.min(...unseen.map(gradeOf)) : 1);
   const rand = seeded(now, 7, 3);
@@ -1145,7 +1147,7 @@ export function learnPath(profile, content = {}, now = 0) {
   if (beginner && CAPTURE_AFTER.some(done) && (content.captureWins || 0) < CAPTURE_WINS_ENOUGH) items.push({ kind: "capture", role: "bridge" });
 
   const model = focus(p, now, { problems, grades });
-  const pool = taughtPool(p, { ...content, problems });
+  const pool = taughtPool(p, { ...content, problems, settings: { ...settings, playerRank: rankNow } });
   // Someone who already plays starts near their rank until their solving level is measured.
   const prior = placed ?? (beginner ? null : gradeForRank(est.games > 0 ? est.rank : settings.playerRank));
   const picks = planProblems({ profile: p, model, pool, bank: problems, grades, now, limit, prior }) || due(p, now).mistakes.slice(0, 2).map((m) => ({ kind: "mistake", id: m.id, role: "review" }));

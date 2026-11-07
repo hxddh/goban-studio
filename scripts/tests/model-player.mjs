@@ -707,5 +707,25 @@ export default async function ({ test, assert, root }) {
     const probs = P.learnPath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
     assert.ok(probs.length > 0);
     for (const it of probs) assert.ok(GRADES[it.id].grade >= 3, `${it.id} grade ${GRADES[it.id].grade}`);
+
+    // The quiz's own answers are problem results too: solved through grade 4, missed grade 5
+    // (grades 2, 3, 4, 5, 4, 5). Six tries on no grade three times must not read as level 1
+    // and outrank the placement; and the problems come from the whole bank, not only capturing.
+    let quizzed = fresh;
+    const quiz = [];
+    for (;;) {
+      const id = P.placementNext(quiz, PROBLEMS, GRADES);
+      if (!id) break;
+      const solved = GRADES[id].grade <= 4;
+      quiz.push({ id, grade: GRADES[id].grade, solved });
+      quizzed = P.recordProblem(quizzed, id, { solved, clean: solved }, 500);
+    }
+    assert.equal(P.placementGrade(quiz), 4);
+    quizzed = P.setPlacement(quizzed, { grade: P.placementGrade(quiz) }, 600);
+    const after = P.learnPath(quizzed, content, 1000).filter((it) => it.kind === "problem" && it.role !== "review");
+    assert.ok(after.length > 0);
+    for (const it of after) assert.ok(GRADES[it.id].grade >= 3, `after the quiz: ${it.id} grade ${GRADES[it.id].grade}`);
+    const topics = new Set(after.map((it) => PROBLEMS.find((d) => d.id === it.id).topic));
+    assert.ok([...topics].some((t) => t !== "capture"), `only capturing: ${[...topics]}`);
   });
 }
