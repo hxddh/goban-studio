@@ -26,15 +26,19 @@ const { C, state, store } = A;
 
 try {
   await test("shell: boot opens the store first, then reads settings, the player model and the game from it", async () => {
-    // A first launch: nothing stored. The onboarding sheet, on Play's home.
+    // A first launch: nothing stored. The onboarding sheet, on Today (v12).
     await C.boot();
     assert.equal(state.ready, true);
-    assert.equal(state.space, "play");
-    assert.equal(state.play.view, "home");
+    assert.equal(state.space, "today");
+    assert.equal(state.play.view, "game", "v12: the empty board is Play's page");
     assert.equal(state.sheet?.kind, "onboarding");
     assert.equal(state.profile.v, 9, "an empty v9 profile");
     assert.equal(state.profile.games.length, 0);
     assert.ok(state.game && state.game.game.moveNumber === 0, "an empty board waits");
+    // v12: Play shows that board as the game to play, so it is rated like one from New game.
+    assert.equal(state.game.rated, true);
+    assert.equal(state.game.opponent, "ai");
+    assert.ok(Number.isFinite(state.game.rank), "against a rank of the ladder");
     assert.ok(!("progress" in state), "no old progress object");
     // The source: boot awaits store.open() before it reads anything, and start() awaits boot before the first render.
     const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
@@ -46,20 +50,18 @@ try {
     assert.ok(app.indexOf("await C.boot()") < app.indexOf("render(<App />"), "the first render waits for boot");
   });
 
-  await test("shell: exactly two spaces, Play and Learn, in the sidebar, the keyboard and the native menus", () => {
+  await test("shell: four spaces, Today, Play, Practice and Library, in the sidebar, the keyboard and the native menus (v12)", () => {
     A.setLang("en");
-    assert.deepEqual(A.SPACES.map((s) => s.id), ["play", "learn"]);
-    assert.deepEqual(C.SPACES, ["play", "learn"]);
+    assert.deepEqual(A.SPACES.map((s) => s.id), ["today", "play", "learn", "library"]);
+    assert.deepEqual(C.SPACES, ["today", "play", "learn", "library"]);
     const go = A.menuSpec().find((m) => m.title === "Go");
     const items = go.items.filter((i) => i.command?.startsWith("go.") && i.key && /^\d$/.test(i.key));
-    assert.deepEqual(items.map((i) => [i.label, i.command, i.key]), [["Play", "go.play", "1"], ["Learn", "go.learn", "2"]]);
-    for (const old of ["go.today", "go.practice", "go.library"]) assert.ok(!(old in A.COMMANDS), old);
+    assert.deepEqual(items.map((i) => [i.label, i.command, i.key]), [["Today", "go.today", "1"], ["Play", "go.play", "2"], ["Practice", "go.learn", "3"], ["Library", "go.library", "4"]]);
+    for (const c of ["go.today", "go.play", "go.learn", "go.library"]) assert.ok(c in A.COMMANDS, c);
     const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
-    assert.match(app, /if \(k === "1" \|\| k === "2"\)/, "Cmd+1 and Cmd+2 only");
-    assert.doesNotMatch(app, /"3", "4"/);
+    assert.match(app, /k >= "1" && k <= "4"/, "Cmd+1 to Cmd+4");
     const sheets = fs.readFileSync(path.join(root, "src/web/js/app/sheets.jsx"), "utf8");
-    assert.match(sheets, /\$\{MOD\}1 \/ 2`, `\$\{t\("nav\.play"\)\} \/ \$\{t\("nav\.learn"\)\}`/, "the shortcuts sheet says so");
-    for (const f of ["app/today.jsx", "app/library.jsx"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js", f)), `${f} is not a destination any more`);
+    assert.match(sheets, /\$\{MOD\}1 – 4`/, "the shortcuts sheet says so");
   });
 
   await test("shell: onboarding asks experience, then opens Learn for a new player and Play for everyone else", async () => {
@@ -92,14 +94,18 @@ try {
     assert.ok(store.get("current.json")?.sgf, "the game on the board is saved");
   });
 
-  await test("shell: Play is its home or the board; the space again goes back to its top; back and forward cross spaces", () => {
-    // On the board after onboarding; Play again: its home, the game still on the board.
+  await test("shell: Play is the board; the space again goes back to its top; back and forward cross spaces", () => {
+    // On the board after onboarding; Play again stays on the board (v12).
     assert.equal(state.play.view, "game");
     const game = state.game;
     C.goSpace("play");
-    assert.equal(state.play.view, "home");
+    assert.equal(state.play.view, "game");
     assert.equal(state.game, game);
-    C.continueCurrent();
+    // Today and back to the board.
+    C.goSpace("today");
+    assert.equal(state.space, "today");
+    C.goSpace("play");
+    assert.equal(state.space, "play");
     assert.equal(state.play.view, "game");
     // To Learn and back.
     C.goSpace("learn");
@@ -119,16 +125,46 @@ try {
     assert.equal(C.forward(), true);
     assert.equal(state.space, "learn");
     C.goSpace("nowhere");
-    assert.equal(state.space, "learn", "only the two spaces");
-    // Play's home again, and the history of games and the classics are part of it.
-    C.goSpace("play");
-    C.playHome();
-    assert.equal(state.play.view, "home");
+    assert.equal(state.space, "learn", "only the four spaces");
+    // The Library: a classic opens there, and the Library again closes it.
+    C.goSpace("library");
+    assert.equal(state.space, "library");
     C.openClassic(C.CLASSICS[0].id);
-    assert.equal(state.review?.meta.space, "play", "a classic opens in Play");
+    assert.equal(state.space, "library");
+    assert.equal(state.review?.meta.space, "library", "a classic opens in the Library");
     assert.equal(state.profile.classics[C.CLASSICS[0].id]?.done, true, "and is kept as seen");
-    C.playHome();
+    C.goSpace("library");
     assert.equal(state.review, null);
+    assert.equal(state.space, "library");
+    // A classic left open in the Library does not hold back the report of a game finished in Play.
+    C.openClassic(C.CLASSICS[0].id);
+    assert.equal(state.review?.meta.space, "library");
+    C.goSpace("play");
+    assert.equal(state.space, "play");
+    assert.equal(state.review, null, "leaving the Library closes its review");
+    // Play again stays on the board (its clock, keys and report need the game view).
+    C.goSpace("play");
+    assert.equal(state.play.view, "game");
+    // Back from Practice returns to the board, not to the classic.
+    C.goSpace("learn");
+    assert.equal(C.back(), true);
+    assert.equal(state.space, "play");
+    assert.equal(state.review, null);
+    assert.equal(state.play.view, "game");
+    // "Review so far" during the game, then Play again: the board, its clock, keys and report.
+    state.game.game.play(3, 3);
+    C.reviewCurrentGame();
+    assert.equal(C.playReviewing(), true);
+    C.goSpace("play");
+    assert.equal(state.review, null);
+    assert.equal(C.boardShown(), true, "the board is on screen for the clock, keys and report");
+    const g = state.game.game;
+    g.play(2, 2);
+    g.play(6, 6);
+    g.resign(g.turn);
+    C.showFinished();
+    assert.equal(state.review?.source, "current", "the finished game's report opens");
+    assert.equal(state.review.meta.space, "play");
   });
 
   await test("shell: Learn's top is the path, one ordered list, and its problems are one session", () => {

@@ -103,8 +103,6 @@ export const MESSAGES = {
   "review.estimateNote": m("离线估算（浏览器预览没有 KataGo），只适合找转折点。", "Offline estimate (no KataGo in the browser preview); good for finding turning points only.", "오프라인 추정입니다(브라우저 미리보기에는 KataGo가 없음). 전환점을 찾는 정도로만 쓰세요.", "オフライン推定です（ブラウザ版にはKataGoがありません）。転換点を探す目安にしてください。"),
   "review.noKeyMoves": m("没有明显的大失误，下得不错。", "No big mistakes. Well played.", "큰 실수가 없습니다. 잘 두었습니다.", "大きな悪手はありません。よく打てています。"),
   "review.classicMoments": m("名局看点", "Moments to study", "명국의 장면", "見どころ"),
-  "review.classicLoss": m("约 {0} 目的损失", "About {0} points lost", "약 {0}집 손해", "約{0}目の損"),
-  "review.classicLossNote": m("KataGo 更喜欢 {1}。{0}这一手大约损失 {2} 目（每个局面搜索 400 次的估计）。", "KataGo prefers {1}. {0}'s move loses about {2} points (an estimate from 400 visits per position).", "KataGo는 {1}을 더 좋게 봅니다. {0}의 이 수는 약 {2}집 손해입니다(국면마다 400회 탐색한 추정).", "KataGo は {1} を選びます。{0}のこの手は約{2}目の損です（各局面400探索の推定）。"),
   "review.moveLabel": m("第 {0} 手 · {1} {2}", "Move {0} · {1} {2}", "{0}수 · {1} {2}", "{0}手目 · {1} {2}"),
   "review.lossN": m("约损 {0} 目", "−{0} pts", "약 {0}집 손해", "約{0}目損"),
   "review.sentence": m("更好的是{0}的 {1}。", "{1}, {0}, was better.", "{0} {1} 자리가 더 좋았습니다.", "{0}の{1}が良かったです。"),
@@ -906,28 +904,6 @@ export const MESSAGES = {
     "Count what each move is worth: the difference between you and White playing there first. Play the biggest.",
     "각 수의 가치를 세어 보세요. 흑이 먼저 둘 때와 백이 먼저 둘 때의 차이입니다. 가장 큰 수부터 두세요.",
     "それぞれの手の価値を数えましょう。黒が先に打つ場合と白が先に打つ場合の差です。一番大きい手から打ちます。",
-  ),
-  // v11 endgame: generic titles and hints for single-area problems
-  "problem.endgame.sente.title": m("先手官子", "A sente move", "선수 끝내기", "先手のヨセ"),
-  "problem.endgame.sente.hint": m(
-    "这里有一手是先手：白棋不应就会损失更多。找到它，白棋应了之后你仍然保有先手。",
-    "One move here is sente: if White does not answer it, White loses even more. Find it; after White answers, you still have sente.",
-    "여기에는 선수인 수가 있습니다. 백이 받지 않으면 더 크게 손해를 봅니다. 그 수를 찾으세요. 백이 받은 뒤에도 흑이 선수를 쥡니다.",
-    "ここには先手の手があります。白が受けないともっと損をします。その手を見つけましょう。白が受けた後も黒の先手です。",
-  ),
-  "problem.endgame.reverse.title": m("逆收", "Reverse sente", "역끝내기", "逆ヨセ"),
-  "problem.endgame.reverse.hint": m(
-    "白棋在这里下是先手。你抢先下掉：虽然是后手，却消除了白棋的先手官子。",
-    "A White move here would be sente for White. Play there first: your move is gote, but it takes White's sente move away.",
-    "여기서 백이 두면 백의 선수입니다. 먼저 두세요. 흑에게는 후수지만 백의 선수 끝내기를 없앱니다.",
-    "ここは白が打てば白の先手です。先に打ちましょう。黒にとっては後手ですが、白の先手ヨセを消せます。",
-  ),
-  "problem.endgame.gote.title": m("后手官子", "A gote move", "후수 끝내기", "後手のヨセ"),
-  "problem.endgame.gote.hint": m(
-    "这里谁下都是后手。找出收获最多的一手，然后把这里下到定形。",
-    "Here a move is gote for either side. Find the move that gains the most, then play the area out until it is settled.",
-    "여기서는 누가 두든 후수입니다. 가장 많이 얻는 수를 찾고, 이곳이 정리될 때까지 두어 보세요.",
-    "ここはどちらが打っても後手です。一番得をする手を見つけ、形が決まるまで打ちましょう。",
   ),
   // end v6 endgame
 

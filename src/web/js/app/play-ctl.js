@@ -89,7 +89,9 @@ export function restoreCurrent() {
   }
   // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
   // brand-new board takes the default ruleset and its komi.
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai" });
+  // v12: Play shows this board as the game to play, so it is one: against
+  // the chosen rank, rated like a game from New game.
+  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", rank: state.settings.opponentRank, rated: true });
 }
 
 export function persistCurrent() {
@@ -142,6 +144,15 @@ export function saveToLibrary({ quiet = false } = {}) {
 /** Play shows a review instead of the live game. */
 export function playReviewing() {
   return !!state.review && (state.review.meta.space || "play") === "play";
+}
+
+/**
+ * v12: the game's board is on screen — by the same rule Play draws it
+ * (app.jsx PlaySpace): in Play, no review, and the game view or a game that
+ * is not over. The clock, the report and the board's keys follow this.
+ */
+export function boardShown() {
+  return state.space === "play" && !playReviewing() && !!state.game && (state.play.view === "game" || !state.game.game.current.result);
 }
 
 export function isComputerTurn() {
@@ -592,7 +603,7 @@ export function clockTick() {
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
   // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
-  if (state.space !== "play" || state.play.view !== "game" || state.play.explorer || playReviewing() || document.hidden) return;
+  if (!boardShown() || document.hidden) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.
@@ -720,8 +731,13 @@ export function openPostGame(g = state.game, { inPlace = true } = {}) {
  */
 export function showFinished() {
   const g = state.game;
-  if (state.space !== "play" || state.play.view !== "game" || state.review || state.play.explorer) return;
-  if (g?.game.mainLine().at(-1).result && !g.scoring) openPostGame(g);
+  // v12: a review left open in another space (a record or classic in the
+  // Library) does not hold back this game's report; it is closed first.
+  if (!boardShown()) return;
+  if (g?.game.mainLine().at(-1).result && !g.scoring) {
+    if (state.review) dropReview();
+    openPostGame(g);
+  }
 }
 
 /** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */

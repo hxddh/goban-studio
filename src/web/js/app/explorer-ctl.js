@@ -83,7 +83,7 @@ export function openExplorer(mode = "whole") {
   if (!EXPLORER_MODES.includes(mode)) mode = "whole";
   remember();
   update((s) => {
-    s.space = "play";
+    s.space = "library";
     s.play = { ...s.play, explorer: mode };
   });
   ensure(mode);

@@ -1,15 +1,16 @@
 /**
- * Play's home (docs/v9.md, "Two spaces"; docs/design.md §1): what to play,
- * and what you played. The game in progress or the suggested game comes
- * first, with the page's one primary button (a quieter 9×9 beside the
- * suggestion); then your games as a compact list, the classics, and one
- * row that opens the opening explorer. No tabs: one column, every element
- * about playing.
+ * v12: what was Play's home (v9–v11) is split in two, as before v9.
  *
- * A game in the list opens in the same review as after a game
- * (app/review-ctl.js), its stored analysis at once. The suggestion comes
- * from the player model (model/player.js suggestedGame, through
- * app/play-ctl.js recommendedGame).
+ * - Play (下棋) without a game on the board: the suggested game with the
+ *   page's one primary button, a quieter 9×9 beside it, and New game for
+ *   every other setting (PlayStart).
+ * - Library (棋谱): your games as a compact list, the classics and the
+ *   opening explorer, with Import SGF in the toolbar (LibraryHome).
+ *
+ * Today (app/today.jsx) shares the heroes. A game in the list opens in the
+ * same review as after a game (app/review-ctl.js), its stored analysis at
+ * once. The suggestion comes from the player model (model/player.js
+ * suggestedGame, through app/play-ctl.js recommendedGame).
  */
 import * as Games from "../data/games.js";
 import { t } from "../i18n.js";
@@ -29,12 +30,13 @@ export function gameInProgress(g = state.game) {
 /** With more games than this the list gets its filter and search, and shows this many at first. */
 export const LIST_COMPACT = 8;
 
-export function PlayHome() {
+/** Play with no game on the board: what to play next. */
+export function PlayStart() {
   return (
     <>
       <Toolbar>
-        <Button size="sm" icon="upload" onClick={C.pickImport}>
-          {t("library.import")}
+        <Button size="sm" icon="plus" onClick={() => C.openNewGame()}>
+          {t("common.newGame")}
         </Button>
       </Toolbar>
       <div class="page play-home">
@@ -43,6 +45,24 @@ export function PlayHome() {
         </header>
         {gameInProgress() ? <ContinueHero /> : <SuggestedHero />}
         <Level />
+      </div>
+    </>
+  );
+}
+
+/** Library: your games, the classics, the opening explorer. */
+export function LibraryHome() {
+  return (
+    <>
+      <Toolbar>
+        <Button size="sm" icon="upload" onClick={C.pickImport}>
+          {t("library.import")}
+        </Button>
+      </Toolbar>
+      <div class="page library-home">
+        <header class="page-head">
+          <h1>{t("nav.library")}</h1>
+        </header>
         <MyGames />
         <Classics />
         <Explorer />
@@ -51,7 +71,7 @@ export function PlayHome() {
   );
 }
 
-function ContinueHero() {
+export function ContinueHero() {
   const g = state.game;
   return (
     <section class="hero enter-up">
@@ -73,7 +93,7 @@ function playSuggested(rec, quick) {
   C.newGame({ size: g.size, opponentRank: g.opponentRank, handicap: g.handicap, opponent: "ai", color: 1 });
 }
 
-function SuggestedHero() {
+export function SuggestedHero() {
   const rec = C.recommendedGame();
   const why = `${rec.handicap ? t("play.suggest.handicap", [rec.handicap]) : t("play.suggest.even")} · ${rec.weak ? t("play.suggest.because", [rec.weak.theme === "endgame" ? t("topic.endgame") : C.themeName(rec.weak.theme)]) : t("play.suggest.level")}`;
   return (
@@ -97,7 +117,7 @@ function SuggestedHero() {
 }
 
 /** The estimate as one number with its ±, once a game is rated. */
-function Level() {
+export function Level() {
   const e = C.playerEstimate();
   if (!(e.games > 0)) return null;
   return (
@@ -129,7 +149,7 @@ export function recordTitle(g) {
   return g.opponent === "ai" ? t("library.vsEngine", [g.rank != null ? rankLabel(g.rank) : "KataGo"]) : t("library.twoPlayers");
 }
 
-function outcome(g) {
+export function outcome(g) {
   if (!g.result) return { label: t("library.unfinished"), cls: "" };
   if (g.source === "import" || g.opponent !== "ai") return { label: C.resultText(g.result), cls: "" };
   const won = g.result.startsWith("B") === (g.humanColor !== -1);

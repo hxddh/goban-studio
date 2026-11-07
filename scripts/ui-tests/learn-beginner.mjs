@@ -34,11 +34,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     );
     await page.reload();
     await page.waitForFunction(() => window.__state?.ready && document.querySelector(".page"));
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForFunction(() => window.__state.space === "learn" && window.__state.learn.view === "home" && document.querySelector(".learn-path .btn.primary"));
     if (session) await page.click(".learn-path .btn.primary");
     else {
-      await page.click(".catalog-link .group-row");
       await page.click(".catalog .lesson-row.next");
     }
     await page.waitForFunction((id) => window.__state.learn.lesson?.lesson.id === id, id);
@@ -138,7 +137,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await clickPoint(page, 0, 8);
     await page.waitForFunction(() => window.__state.learn.capture.game.moveNumber >= 2 && !window.__state.learn.capture.thinking, null, { timeout: 5000 });
     const moves = await page.evaluate(() => window.__state.learn.capture.game.moveNumber);
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+2");
     await page.waitForFunction(() => window.__state.space === "play");
     await page.keyboard.press("Control+[");
     await page.waitForFunction(() => window.__state.learn.view === "capture", null, { timeout: 3000 });
@@ -210,7 +209,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await lessonDone(page, "stones-capture", { captureWins: 2 });
     assert((await page.getAttribute(".celebrate", "data-bridge")) === null, "still offered after two wins");
     // Not in New game, Play or the sidebar.
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+2");
     await page.waitForTimeout(80);
     assert(!(await page.textContent("body")).includes("capture Go"), "Play offers capture Go");
     await page.keyboard.press("Control+n");
@@ -342,7 +341,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".result-card .btn.primary");
     await page.waitForFunction(() => ["problem", "mistake"].includes(window.__state.learn.view) && window.__state.learn.daily?.done.includes("capture"));
     // Learn's home: the first two rows are checked, the primary goes on.
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row.done");
     assert((await page.locator(".learn-path .path-row.done").count()) === 2, "two done");
     assert((await page.textContent(".learn-path .btn.primary")).trim() === "Continue", "the primary goes on with the session");

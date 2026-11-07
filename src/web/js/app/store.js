@@ -15,7 +15,7 @@ let scheduled = false;
 
 export const state = {
   ready: false,
-  space: "play", // play | learn (docs/v9.md, "Two spaces")
+  space: "today", // today | play | learn | library (v12)
   playMode: "game", // game | review
   settings: null, // data/settings.js
   profile: null, // the one player model (model/player.js), stored as profile.json

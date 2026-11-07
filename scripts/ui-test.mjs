@@ -135,11 +135,11 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   // home; checks that are not about it answer "Not now" first, then come back.
   if (choice >= 1 && !placement) {
     const space = await page.evaluate(() => window.__state.space);
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
     await page.waitForSelector(".learn-path .path-row");
     await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:profile.json") || "{}").placement?.skipped === true, null, { timeout: 3000 });
-    await page.keyboard.press(space === "play" ? "Control+1" : "Control+2");
+    await page.keyboard.press(space === "play" ? "Control+2" : space === "learn" ? "Control+3" : space === "library" ? "Control+4" : "Control+1");
     await page.waitForFunction((sp) => window.__state.space === sp, space);
   }
   // The store writes a moment later (data/store.js): onboarding is on disk before a test reloads.
@@ -281,7 +281,7 @@ await check("a classic opens in review within budget", async () => {
   const page = await fresh();
   await onboard(page, 1);
   // Play again: its home, with the history and the classics.
-  await page.keyboard.press("Control+1");
+  await page.keyboard.press("Control+4");
   const t0 = Date.now();
   await page.click(".collection-row >> nth=0");
   await page.waitForSelector(".review-layer .chart");
@@ -294,8 +294,7 @@ await check("a classic opens in review within budget", async () => {
 await check("a wrong answer shows the refutation, then resets for another try", async () => {
   const page = await fresh();
   await onboard(page, 1);
-  await page.keyboard.press("Control+2");
-  await page.click(".catalog-link .group-row");
+  await page.keyboard.press("Control+3");
   await page.click(".topic-row >> nth=0");
   await page.click(".problem-card >> nth=0");
   const wrong = await page.evaluate(() => {
@@ -322,8 +321,8 @@ await check("a wrong answer shows the refutation, then resets for another try", 
 await check("history: back and forward across the two spaces", async () => {
   const page = await fresh();
   await onboard(page, 1);
+  await page.keyboard.press("Control+3");
   await page.keyboard.press("Control+2");
-  await page.keyboard.press("Control+1");
   const t0 = Date.now();
   await page.keyboard.press("Control+[");
   await page.waitForFunction(() => window.__state.space === "learn");
@@ -338,8 +337,7 @@ await check("history: back and forward across the two spaces", async () => {
 await check("history: Back from a shape problem returns to its collection", async () => {
   const page = await fresh();
   await onboard(page, 1);
-  await page.keyboard.press("Control+2");
-  await page.click(".catalog-link .group-row");
+  await page.keyboard.press("Control+3");
   await page.click(".shape-chips .chip >> nth=0");
   await page.waitForSelector(".problem-card");
   const before = await page.locator(".problem-card").count();
@@ -357,8 +355,8 @@ await check("all four languages render every place without overflow or missing s
   for (const locale of ["zh-CN", "en-US", "ko-KR", "ja-JP"]) {
     const page = await fresh(locale);
     await onboard(page, 1);
-    // The board (onboarding opened it), Play's home, Learn's home.
-    for (const k of ["", "1", "2"]) {
+    // The board (onboarding opened it), then the four spaces.
+    for (const k of ["", "1", "2", "3", "4"]) {
       if (k) await page.keyboard.press("Control+" + k);
       await page.waitForTimeout(50);
       const bad = await page.evaluate(() => {
@@ -382,7 +380,7 @@ await check("all four languages render every place without overflow or missing s
 await check("v6 explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
   const page = await fresh();
   await onboard(page, 1);
-  await page.keyboard.press("Control+1");
+  await page.keyboard.press("Control+4");
   await page.click('.collection-row[data-explorer="whole"]');
   await page.waitForSelector(".explorer-panel");
   // v8: onboarding plays on 9×9 now; wait for the explorer's own 19×19 board.
@@ -427,6 +425,12 @@ await check("v6 explorer: opens from the Library, a book move shows candidates, 
 // pointer-only controls, unnamed images, landmarks, contrast.
 const AUDIT = fs.readFileSync(path.join(root, "scripts/a11y-audit.js"), "utf8");
 async function audit(page, where) {
+  // Colours are measured on the settled page: a place, a sheet or the theme
+  // can still be fading in (CSS animations and transitions), and a colour
+  // read halfway says nothing about what a reader sees.
+  await page
+    .waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || (a.effect?.getTiming?.().iterations ?? 1) === Infinity), null, { timeout: 2000, polling: 50 })
+    .catch(() => {});
   const found = await page.evaluate(`(${AUDIT})()`);
   assert(!found.length, `${where}: ${found.map((f) => `${f.kind} ${f.el}`).join("; ")}`);
 }
@@ -482,7 +486,7 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await page.click(".choice >> nth=1");
     await page.waitForSelector("canvas.board, .page");
     await audit(page, "the board");
-    for (const [k, name] of [["1", "Play's home"], ["2", "Learn's home"]]) {
+    for (const [k, name] of [["1", "Today"], ["2", "Play"], ["3", "Practice"], ["4", "Library"]]) {
       await page.keyboard.press("Control+" + k);
       await page.waitForTimeout(60);
       await audit(page, name);
@@ -498,22 +502,20 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await newTwoPlayer9(page);
     for (const [x, y] of [[2, 2], [6, 6]]) await clickPoint(page, x, y);
     await page.keyboard.press("Control+s");
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     await page.waitForSelector(".game-row");
-    await audit(page, "Play's home with a game in progress and in the history");
+    await audit(page, "the Library with a game in the history");
     await page.click(".game-item .icon-btn");
     await audit(page, "history row menu");
     await page.keyboard.press("Escape");
     await page.click(".collection-row >> nth=0");
     await page.waitForSelector(".review-layer .chart");
     await audit(page, "review");
-    await page.keyboard.press("Control+2");
-    await page.click(".catalog-link .group-row");
+    await page.keyboard.press("Control+3");
     await page.click(".lesson-row >> nth=0");
     await page.waitForSelector(".steps");
     await audit(page, "lesson");
-    await page.keyboard.press("Control+2");
-    await page.click(".catalog-link .group-row");
+    await page.keyboard.press("Control+3");
     await page.click(".topic-row >> nth=0");
     await audit(page, "topic");
     await page.click(".problem-card >> nth=0");
@@ -546,12 +548,12 @@ await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
     return seen.size;
   };
   let total = await stops("the board");
-  for (const k of ["1", "2"]) {
+  for (const k of ["1", "2", "3", "4"]) {
     await page.keyboard.press("Control+" + k);
     await page.waitForTimeout(60);
     total += await stops("space " + k);
   }
-  await page.keyboard.press("Control+1");
+  await page.keyboard.press("Control+4");
   await page.click(".collection-row >> nth=0");
   await page.waitForSelector(".review-layer .chart");
   total += await stops("review");
@@ -605,8 +607,7 @@ for (const locale of ["en-US", "zh-CN"]) {
 await check("v6 a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
   const page = await fresh();
   await onboard(page, 1);
-  await page.keyboard.press("Control+2");
-  await page.click(".catalog-link .group-row");
+  await page.keyboard.press("Control+3");
   await page.click(".topic-row >> nth=0");
   await page.click(".problem-card >> nth=0");
   const goal = await page.evaluate(() => document.querySelector(".goal").textContent.trim());
@@ -626,8 +627,7 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   const verdict = await page.evaluate(() => document.querySelector(".feedback")?.textContent.trim());
   assert(/^Black [A-T]\d+/.test(heard[0] || ""), `the move was not spoken: ${heard.join(" | ")}`);
   assert(heard.some((h) => h.includes(verdict)), `the verdict "${verdict}" was not spoken: ${heard.join(" | ")}`);
-  await page.keyboard.press("Control+2");
-  await page.click(".catalog-link .group-row");
+  await page.keyboard.press("Control+3");
   await page.click(".lesson-row >> nth=0");
   await page.waitForSelector(".steps");
   await hear(page, "app", (s) => s.includes("Step 1 of"), "the lesson step");
@@ -708,25 +708,25 @@ for (const vp of [
     }
     const out = [];
     out.push(await snap(page, `play-${vp.tag}`));
-    // Play's home: the game in progress, the history (empty: nothing saved), the classics, the explorer.
+    // Today: the game in progress, today's practice, this week (the date and greeting change with the day).
     await page.keyboard.press("Control+1");
-    await page.waitForSelector(".play-home");
-    out.push(await snap(page, `home-${vp.tag}`));
-    // Learn's home: the path (its problems change with the day), then the catalog one row away.
-    await page.keyboard.press("Control+2");
-    await page.waitForSelector(".learn-home");
+    await page.waitForSelector(".today .hero");
+    out.push(await snap(page, `today-${vp.tag}`, [".today .page-head", ".today-row .gr-text span"]));
+    // Practice: the path (its problems change with the day), then the course and the problems.
+    await page.keyboard.press("Control+3");
+    await page.waitForSelector(".learn-home .catalog .topic-row");
     out.push(await snap(page, `learn-${vp.tag}`, [".learn-path .path-list"]));
-    await page.click(".catalog-link .group-row");
-    await page.waitForSelector(".catalog .topic-row");
-    out.push(await snap(page, `learn-catalog-${vp.tag}`));
+    // The Library: your games (empty: nothing saved), the classics, the explorer.
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".library-home");
+    out.push(await snap(page, `library-${vp.tag}`));
     await page.keyboard.press("Control+,");
     out.push(await snap(page, `settings-${vp.tag}`, [".about"]));
     // The post-game review: the same game counted, its board turned into its
     // review (the offline estimate here: turning points, no phase numbers).
     await page.keyboard.press("Escape");
     await page.waitForSelector(".sheet", { state: "detached" });
-    await page.keyboard.press("Control+1");
-    await page.click(".play-home .hero .btn.primary");
+    await page.keyboard.press("Control+2");
     await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.model.size === 9);
     for (let i = 0; i < 2; i++) {
       await page.keyboard.press("Control+Shift+P");

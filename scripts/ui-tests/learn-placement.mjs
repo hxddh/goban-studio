@@ -35,7 +35,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     const page = await fresh(locale);
     await page.emulateMedia({ colorScheme: scheme });
     await onboard(page, 1, { placement: true });
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".placement-offer");
     return page;
   }
@@ -67,7 +67,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await page.waitForTimeout(500); // the store writes a moment later
     await page.reload();
     await page.waitForFunction(() => window.__state?.ready);
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row");
     assert((await page.locator(".placement-offer").count()) === 0, "not offered again");
     await page.close();

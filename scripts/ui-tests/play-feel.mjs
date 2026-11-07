@@ -115,14 +115,12 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.click(".choice >> nth=1");
     await page.waitForSelector("canvas.board");
     await page.keyboard.press("Control+1");
-    await page.waitForSelector(".page h1");
-    await page.keyboard.press("Control+2");
-    await page.waitForSelector(".catalog-link");
+    await page.waitForSelector(".today .page-head h1");
+    await page.keyboard.press("Control+3");
     // A topic lists its problems by title (the problems part): it opens once that part arrives.
-    await page.click(".catalog-link .group-row");
     await page.click(".topic-row >> nth=0");
     await page.waitForTimeout(150);
-    assert(await page.evaluate(() => window.__state.learn.view === "catalog"), "the topic opened without its problems");
+    assert(await page.evaluate(() => window.__state.learn.view === "home"), "the topic opened without its problems");
     const t0 = Date.now();
     hold = false;
     for (const r of held.splice(0)) await r.continue();
@@ -166,7 +164,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     const fetched = [];
     page.on("request", (r) => r.url().includes("book.json") && fetched.push(r.url()));
     await onboard(page, 1);
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     const t0 = Date.now();
     await page.click("[data-explorer=whole]");
     await page.waitForSelector(".explorer-panel .explorer-row");
@@ -201,7 +199,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
   }
   /** Open the game from Play's history: its review, with the analysis done. */
   async function openFromHistory(page) {
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     await page.waitForSelector(".game-row");
     const t0 = Date.now();
     await page.click(".game-row >> nth=0");

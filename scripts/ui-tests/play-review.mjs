@@ -162,10 +162,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".review-tabs button >> nth=1");
     assert((await page.locator(".game-summary .phase-table tbody tr").count()) >= 1, "phase rows");
     await page.click(".review-tabs button >> nth=0");
-    // Esc: Play's home; the history row opens the same review again.
+    // Esc, then the Library: the history row opens the same review again.
     await page.keyboard.press("Escape");
-    await page.waitForSelector(".play-home .game-row");
-    await page.click(".play-home .game-row");
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".library-home .game-row");
+    await page.click(".library-home .game-row");
     await page.waitForSelector(".review-layer .review-result");
     assert(await page.evaluate(() => window.__state.review.source === "record" && !window.__state.review.analyzing && window.__state.review.model.confidence === "high"), "the stored analysis, at once");
     assert(page.errors.length === 0, page.errors.join("; "));
@@ -223,15 +224,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await clickPoint(page, 8, 0);
     await verdict(page, "bad");
     // Today the miss put it on tomorrow's list (the game had made it a drill due at once).
-    await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row");
     assert((await page.locator(".learn-path .path-row[data-kind=mistake]").count()) === 0, "due before tomorrow");
     await page.evaluate(() => {
       const real = Date.now.bind(Date);
       Date.now = () => real() + 26 * 3600 * 1000;
     });
-    await page.keyboard.press("Control+1");
     await page.keyboard.press("Control+2");
+    await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-row");
     const rows = await page.locator(".learn-path .path-row[data-kind=mistake]").allInnerTexts();
     assert(rows.some((r) => r.includes("Due for review") && /\b5\b/.test(r)), `Learn's path: ${rows.join(" | ") || "no mistake row"}`);
@@ -279,7 +280,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
   await check("play review: a classic opens at its written moment (else its first); the moments to study go to their moves and show their notes", async () => {
     const page = await fresh();
     await onboard(page, 1);
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     await page.click(".collection-row >> nth=0");
     await page.waitForSelector(".classic-moments .key-move");
     const first = await page.evaluate(() => {
@@ -324,11 +325,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const page = await fresh();
     await onboard(page, 1);
     await seed(page, 14, 150);
-    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+4");
     await page.waitForSelector(".game-row");
     assert((await page.locator(".game-row").count()) === 8, "a compact list: the first eight");
-    assert((await page.locator(".play-home .filters").count()) === 1, "filters once the list is long");
-    await page.click(".play-home .show-all");
+    assert((await page.locator(".library-home .filters").count()) === 1, "filters once the list is long");
+    await page.click(".library-home .show-all");
     assert((await page.locator(".game-row").count()) === 14, "then all of them");
     await page.evaluate(() => window.__autoAnalyse());
     await page.waitForFunction(() => window.__state.batch && window.__state.batch.total === 14);
@@ -340,7 +341,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const p2 = await fresh();
     await onboard(p2, 1);
     await seed(p2, 3, 30);
-    await p2.keyboard.press("Control+1");
+    await p2.keyboard.press("Control+4");
     await p2.evaluate(() => window.__autoAnalyse());
     await p2.waitForFunction(
       () => window.__state.batch === null && Object.keys(localStorage).filter((k) => k.startsWith("goban9:games/")).every((k) => { const g = JSON.parse(localStorage.getItem(k)); return g.review && g.analysis?.length === 31; }),
@@ -394,7 +395,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
         assert(!bad.overflow, `${where}: the page scrolls sideways`);
       };
       await page.keyboard.press("Control+1");
-      await inspect("Play's home");
+      await inspect("Today");
       await playAndResign(page, 4);
       await analysed(page);
       for (let i = 0; i < 3; i++) {
@@ -412,8 +413,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.keyboard.press("Escape");
       await page.waitForSelector(".try-card", { state: "detached" });
       await page.keyboard.press("Escape");
-      await page.waitForSelector(".play-home .game-row");
-      await inspect("Play's home with a game in the history");
+      await page.keyboard.press("Control+4");
+      await page.waitForSelector(".library-home .game-row");
+      await inspect("the Library with a game in the history");
       assert(page.errors.length === 0, page.errors.join("; "));
       await page.close();
     });

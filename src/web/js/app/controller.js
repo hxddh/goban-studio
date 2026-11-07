@@ -20,8 +20,8 @@ import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
-import { dropReview, openReview, reviewGoto } from "./review-ctl.js";
+import { boardShown, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
+import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
@@ -72,8 +72,8 @@ export async function boot() {
   restoreCurrent();
   // Play opens on the board when a game is in progress, else on its home.
   const g = state.game?.game;
-  state.space = "play";
-  state.play = { ...state.play, view: g && g.moveNumber > 0 && !g.current.result ? "game" : "home" };
+  state.space = "today";
+  state.play = { ...state.play, view: g && !g.current.result ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
@@ -99,25 +99,34 @@ export async function boot() {
 
 /* --------------------------------------------------------------- spaces */
 
-/** The two spaces (docs/v9.md, "Two spaces"), in sidebar order. */
-export const SPACES = ["play", "learn"];
+/** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
+export const SPACES = ["today", "play", "learn", "library"];
 
-/** Play's home: the game in progress or the suggested game, then the history. */
+/**
+ * Play's top: the board while a game is not over (v12, as before v9), else
+ * what to play next. Any review open in Play closes.
+ */
 export function playHome() {
-  if (state.space === "play" && state.play.view === "home" && !state.review && !state.play.explorer) return;
+  const live = !!state.game && !state.game.game.current.result;
+  const view = live ? "game" : "home";
+  if (state.space === "play" && state.play.view === view && !state.review) return;
   remember();
   if (state.review) dropReview();
   update((s) => {
     s.space = "play";
-    s.play = { ...s.play, view: "home", explorer: null };
+    s.play = { ...s.play, view };
     s.menu = null;
   });
+  if (live) {
+    maybeComputerMove();
+    ponder();
+  }
   syncMenus();
 }
 
 /** The board of the game on it (Play). */
 export function playBoard() {
-  if (state.space === "play" && state.play.view === "game" && !state.review) return showFinished();
+  if (boardShown() && !state.review) return showFinished();
   remember();
   if (state.review && (state.review.meta.space || "play") === "play") dropReview();
   update((s) => {
@@ -145,19 +154,35 @@ export function goSpace(space) {
       if (state.learn.view !== "home") return learnHome();
       return;
     }
-    if (state.play.explorer && !state.review) return closeExplorer();
-    return playHome();
+    if (space === "library") {
+      if (state.review && state.review.meta.space === "library") return closeReview();
+      if (state.play.explorer) return closeExplorer();
+      return;
+    }
+    if (space === "today") return;
+    return state.game && !playReviewingNow() ? playBoard() : playHome();
   }
   remember();
+  // v12: a record or classic is read in the Library; leaving the Library
+  // closes it (its edits are kept), so no other space carries it along.
+  if (state.review?.meta.space === "library") dropReview();
+  // Play is the board while a game is not over (v12, as before v9).
+  const board = space === "play" && state.game && !state.game.game.current.result && !playReviewingNow();
   update((s) => {
     s.space = space;
     s.menu = null;
+    if (board) s.play = { ...s.play, view: "game", explorer: s.play.explorer };
   });
   if (space === "play") {
+    if (board) showFinished();
     maybeComputerMove();
     ponder();
   }
   syncMenus();
+}
+
+function playReviewingNow() {
+  return !!state.review && (state.review.meta.space || "play") === "play";
 }
 
 export function toggleFocus() {
@@ -209,7 +234,7 @@ export function openRecord(id) {
   try {
     const { game } = loadSGF(rec.sgf);
     // The same review as after a game: its stored analysis opens at once.
-    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "play", back: "play", autoJump: true });
+    openReview(game, { source: "record", recordId: rec.id, name: rec.name, humanColor: rec.opponent === "ai" ? rec.humanColor : null, space: "library", back: "library", autoJump: true });
   } catch (e) {
     console.error("SGF open failed", e);
     toast(t("library.importError"), "error");
@@ -226,7 +251,7 @@ function showClassic(id) {
   try {
     const { game } = loadSGF(c.sgf);
     changeProfile((p) => recordClassic(p, c.id, Date.now()));
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: (c.moments?.find((m) => m.title) ?? c.moments?.[0])?.index, autoJump: !c.moments?.length, space: "play", back: "play" });
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: (c.moments?.find((m) => m.title) ?? c.moments?.[0])?.index, autoJump: !c.moments?.length, space: "library", back: "library" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }
@@ -268,7 +293,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
     setSetting("onboarded", true);
     update({ sheet: null });
   }
-  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "play", back: "play", autoJump: true });
+  openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
   if (warnings.length) toast(warnings[0], "warn");
 }
 

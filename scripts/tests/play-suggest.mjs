@@ -11,6 +11,7 @@ const A = await bundle([
   'export * as PM from "./src/web/js/model/player.js";',
   'export { classicYear, CLASSICS_SHOWN } from "./src/web/js/play/home.jsx";',
   'export { CLASSICS } from "./src/web/js/content/classics.js";',
+  'export { weekCounts } from "./src/web/js/app/today.jsx";',
 ]);
 const { C, state, PM } = A;
 
@@ -35,6 +36,28 @@ await test("play suggest: a stronger player is offered the standard board, with 
   assert.equal(r.quick.size, 9);
 });
 
+await test("today: this week counts finished games of your own and problems solved in the last seven days", () => {
+  const now = Date.UTC(2026, 10, 7);
+  const day = 86400000;
+  const games = [
+    { source: "game", result: "B+R", finishedAt: now - day },
+    { source: "game", result: "W+3.5", finishedAt: now - 6 * day },
+    { source: "game", result: "W+R", finishedAt: now - 8 * day },
+    { source: "game", result: null, updatedAt: now },
+    { source: "import", result: "B+R", updatedAt: now },
+  ];
+  // c was solved nine days ago and missed again yesterday: an attempt, not a solve this week.
+  const problems = { a: { solved: true, last: now - day, solvedAt: now - day }, b: { solved: false, last: now }, c: { solved: true, last: now - day, solvedAt: now - 9 * day } };
+  assert.deepEqual(A.weekCounts(now, games, problems), { played: 2, solved: 1 });
+  // recordProblem keeps when it was solved apart from when it was last tried.
+  let p = A.PM.recordProblem(A.PM.newProfile(), "x", { solved: true }, now - 9 * day);
+  p = A.PM.recordProblem(p, "x", { solved: false }, now - day);
+  assert.equal(p.problems.x.solvedAt, now - 9 * day);
+  assert.equal(p.problems.x.last, now - day);
+  assert.deepEqual(A.weekCounts(now, [], p.problems), { played: 0, solved: 0 });
+  assert.deepEqual(A.weekCounts(now, [], {}), { played: 0, solved: 0 });
+});
+
 await test("play home: classics show the year only, and the first few until All classics", () => {
   assert.equal(A.classicYear("1846-09-11,14,15"), "1846");
   assert.equal(A.classicYear("1933-10-16..1934-01-29"), "1933");
@@ -43,37 +66,29 @@ await test("play home: classics show the year only, and the first few until All 
   assert.ok(A.CLASSICS_SHOWN < A.CLASSICS.length && A.CLASSICS_SHOWN <= 4);
 });
 
-await test("classics: 3 to 5 moments each, in order, on moves of the game, in four languages; claims agree with KataGo", async () => {
+await test("classics: the moments are the famous moves, written in four languages, on moves of the game; none claims more than KataGo found", async () => {
   const fs = await import("node:fs");
   const { mainLine } = await import("../check-classics-katago.mjs");
   const data = JSON.parse(fs.readFileSync(new URL("../../docs/classics-katago.json", import.meta.url), "utf8"));
   const byId = Object.fromEntries(data.games.map((g) => [g.id, g]));
+  let written = 0;
   for (const c of A.CLASSICS) {
     const ms = c.moments || [];
-    assert.ok(ms.length >= 3 && ms.length <= 5, `${c.id}: ${ms.length} moments`);
+    assert.ok(ms.length <= 5, `${c.id}: ${ms.length} moments`);
     const n = mainLine(c.sgf).moves.length;
     ms.forEach((mo, i) => {
+      written++;
       assert.ok(Number.isInteger(mo.index) && mo.index >= 1 && mo.index <= n, `${c.id} ${mo.index}`);
       if (i) assert.ok(mo.index > ms[i - 1].index, `${c.id}: moments in game order`);
-      const g = byId[c.id];
-      assert.ok(g, `${c.id} in docs/classics-katago.json`);
-      const mv = g.moves[mo.index - 1];
-      if (mo.title || mo.note) {
-        // Written for the game: four languages, and no KataGo numbers of its own.
-        for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
-        assert.ok(mo.best == null && mo.loss == null, `${c.id} ${mo.index}: a written moment with KataGo numbers`);
-      } else {
-        // A swing: KataGo's preferred move and the loss, exactly as measured.
-        assert.equal(mo.best, mv.best, `${c.id} ${mo.index} best`);
-        assert.equal(mo.loss, mv.loss, `${c.id} ${mo.index} loss`);
-        assert.ok(mo.best !== mv.move && mo.loss >= 1, `${c.id} ${mo.index}: not a swing`);
-      }
-      // A moment that calls the move a mistake or the best move says what KataGo says.
+      for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
+      // v12: written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
+      const mv = byId[c.id].moves[mo.index - 1];
       if (mo.claim === "mistake") assert.ok(mv.loss >= 3, `${c.id} ${mo.index}: a mistake loses ${mv.loss}`);
       if (mo.claim === "best") assert.ok(mv.move === mv.best || mv.loss <= 1, `${c.id} ${mo.index}: best move loses ${mv.loss}`);
-      if (mo.claim) assert.ok(["mistake", "best"].includes(mo.claim), mo.claim);
+      assert.ok(mo.best == null && mo.loss == null, `${c.id} ${mo.index}: no KataGo numbers in a moment`);
     });
   }
+  assert.ok(written >= 5, `${written} written moments`);
 });
 
 await test("play review to practice: a theme takeaway opens an unsolved problem of that theme near the level; Next stays in the theme", async () => {

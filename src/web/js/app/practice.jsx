@@ -55,7 +55,7 @@ function TopicPage() {
   const [openGrades, setOpenGrades] = useState([firstOpen]);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }, { label: t("learn.catalog"), onClick: C.openCatalog }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
+    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
     <div class="page">
       <header class="page-head">
         <h1>{shape ? C.shapeName(shape) : t("topic." + topic)}</h1>

@@ -10,7 +10,7 @@
  *     rating: { [size]: { mu, sigma, games, at } },  // Glicko, measured ladder
  *     history: [{ at, size, rank, pm }],             // after each rated game
  *     games: [{ id, at, size, result, won, ... }],    // own games, newest 30
- *     problems: { [id]: { tries, solved, clean, last, due, streak } },
+ *     problems: { [id]: { tries, solved, clean, last, due, streak, solvedAt? } },
  *     mistakes: [{ id, gameId, index, theme, loss, due, ... }],  // own games only
  *     lessons: { [id]: { done, step, at } },
  *     classics: { [id]: { done, at } },             // classic games played through
@@ -231,7 +231,7 @@ function normalizeRatingEntry(e) {
 
 function normalizeProblem(e) {
   if (!obj(e)) return null;
-  return { tries: Math.max(0, Math.floor(num(e.tries, 0))), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0), due: num(e.due, 0), streak: Math.max(0, Math.floor(num(e.streak, 0))) };
+  return { tries: Math.max(0, Math.floor(num(e.tries, 0))), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0), due: num(e.due, 0), streak: Math.max(0, Math.floor(num(e.streak, 0))), ...(Number.isFinite(e.solvedAt) ? { solvedAt: e.solvedAt } : {}) };
 }
 
 function normalizeMistake(m) {
@@ -336,11 +336,14 @@ export function recordGame(profile, game) {
 export function recordProblem(profile, id, { solved = false, clean = solved, late = false } = {}, now = 0) {
   const p = normalizeProfile(profile);
   const prev = p.problems[id];
-  if (late && prev) return { ...p, problems: { ...p.problems, [id]: { ...prev, solved: true, clean: false, last: now } } };
+  if (late && prev) return { ...p, problems: { ...p.problems, [id]: { ...prev, solved: true, clean: false, last: now, solvedAt: now } } };
   if (late) return recordProblem(p, id, { solved: true, clean: false }, now);
   const base = prev || { tries: 0, solved: false, clean: false, last: 0, due: 0, streak: 0 };
   const next = { ...base, tries: base.tries + 1, last: now, clean: !!(solved && clean) };
-  if (solved) next.solved = true;
+  if (solved) {
+    next.solved = true;
+    next.solvedAt = now; // v12: when it was last solved (Today's week counts solves, not attempts)
+  }
   if (solved && clean) {
     next.streak = (base.streak || 0) + 1;
     next.due = now + LADDER[Math.min(LADDER.length - 1, next.streak - 1)] * DAY;

@@ -14,8 +14,6 @@ import { Toolbar } from "../app/chrome.jsx";
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
 export function CatalogView() {
-  const p = state.profile;
-  const solvedOf = (list) => list.filter((x) => p.problems[x.id]?.solved).length;
   return (
     <>
       <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("learn.catalog")} />
@@ -23,56 +21,66 @@ export function CatalogView() {
         <header class="page-head">
           <h1>{t("learn.catalog")}</h1>
         </header>
-
-        <section class="section first">
-          <h2 class="section-title">{t("practice.course")}</h2>
-          <CourseMap />
-        </section>
-
-        <section class="section">
-          <h2 class="section-title">{t("practice.problems")}</h2>
-          <ul class="group topic-list">
-            {TOPICS.map((topic) => {
-              const list = C.problemsOfTopic(topic);
-              if (!list.length) return null;
-              return (
-                <li>
-                  <button type="button" class="group-row topic-row" data-topic={topic} onClick={() => C.openTopic(topic)}>
-                    <span class="gr-text">
-                      <strong>{t("topic." + topic)}</strong>
-                    </span>
-                    <span class="row-count">{t("practice.ofN", [solvedOf(list), list.length])}</span>
-                    <Icon name="next" size={14} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-
-        {C.SHAPES.length > 0 && (
-          <section class="section">
-            <h2 class="section-title">{t("practice.shapes")}</h2>
-            <div class="chips shape-chips">
-              {C.SHAPES.map((sh) => {
-                const id = typeof sh === "string" ? sh : sh.id;
-                const list = C.problemsOfShape(id);
-                if (!list.length) return null;
-                const solved = solvedOf(list);
-                return (
-                  <button type="button" class={`chip ${solved === list.length ? "done" : ""}`} onClick={() => C.openShape(id)}>
-                    {C.shapeName(id)}
-                    <span class="chip-count">
-                      {solved}/{list.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        <CatalogSections />
       </div>
     </>
+  );
+}
+
+/** v12: the course, the problems by topic and the shapes — on Practice's page itself. */
+export function CatalogSections({ first = true } = {}) {
+  const p = state.profile;
+  const solvedOf = (list) => list.filter((x) => p.problems[x.id]?.solved).length;
+  return (
+    <div class="catalog">
+      <section class={`section ${first ? "first" : ""}`}>
+        <h2 class="section-title">{t("practice.course")}</h2>
+        <CourseMap />
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">{t("practice.problems")}</h2>
+        <ul class="group topic-list">
+          {TOPICS.map((topic) => {
+            const list = C.problemsOfTopic(topic);
+            if (!list.length) return null;
+            return (
+              <li>
+                <button type="button" class="group-row topic-row" data-topic={topic} onClick={() => C.openTopic(topic)}>
+                  <span class="gr-text">
+                    <strong>{t("topic." + topic)}</strong>
+                  </span>
+                  <span class="row-count">{t("practice.ofN", [solvedOf(list), list.length])}</span>
+                  <Icon name="next" size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {C.SHAPES.length > 0 && (
+        <section class="section">
+          <h2 class="section-title">{t("practice.shapes")}</h2>
+          <div class="chips shape-chips">
+            {C.SHAPES.map((sh) => {
+              const id = typeof sh === "string" ? sh : sh.id;
+              const list = C.problemsOfShape(id);
+              if (!list.length) return null;
+              const solved = solvedOf(list);
+              return (
+                <button type="button" class={`chip ${solved === list.length ? "done" : ""}`} onClick={() => C.openShape(id)}>
+                  {C.shapeName(id)}
+                  <span class="chip-count">
+                    {solved}/{list.length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
