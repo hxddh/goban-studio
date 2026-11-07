@@ -312,7 +312,7 @@ export default async function ({ test, assert, root }) {
 
   await test("model profile: v9 starts empty; anything else is not read; bad parts are dropped", () => {
     const empty = P.newProfile();
-    assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "problems", "rating", "v", "week"]);
+    assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "placement", "problems", "rating", "v", "week"]);
     assert.equal(empty.v, 9);
     assert.deepEqual(Object.keys(empty.rating), ["9", "13", "19"]);
     // A v8 progress object, or junk, is not migrated.
@@ -661,5 +661,51 @@ export default async function ({ test, assert, root }) {
     assert.ok(P.implOpponent("L:10k", { handicap: 4 }) < P.implOpponent("L:10k"));
     assert.equal(P.implOpponent("L:10k", { size: 9 }), O.implTheta("L:10k", 9));
     assert.equal(P.implOpponent("nope"), null);
+  });
+
+  await test("model placement: a staircase of six problems, one grade up or down; its grade sets the course start and the first problems", () => {
+    const GRADES = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
+    const run = (answer) => {
+      const results = [];
+      for (;;) {
+        const id = P.placementNext(results, PROBLEMS, GRADES);
+        if (!id) break;
+        const grade = GRADES[id].grade;
+        const def = PROBLEMS.find((d) => d.id === id);
+        assert.ok(P.PLACEMENT.GOALS.includes(def.goal), `${id}: ${def.goal}`);
+        assert.ok(!results.some((r) => r.id === id), "each problem once");
+        assert.equal(grade, P.placementTarget(results), "at the staircase's grade");
+        results.push({ id, grade, solved: answer(grade) });
+      }
+      assert.equal(results.length, P.PLACEMENT.LENGTH);
+      assert.equal(results[0].grade, P.PLACEMENT.START);
+      return P.placementGrade(results);
+    };
+    assert.equal(run(() => true), 5, "every answer right");
+    assert.equal(run(() => false), 1, "every answer wrong");
+    assert.equal(run((g) => g <= 3), 3, "solves up to grade 3");
+    assert.equal(run((g) => g <= 2), 2);
+    assert.equal(P.placementGrade([]), null);
+
+    // Offered once to someone who knows the rules; taking or skipping it ends the offer.
+    const fresh = P.newProfile({ rank: 25 });
+    assert.equal(P.placementOffered(fresh, { experience: "new" }), false);
+    assert.equal(P.placementOffered(fresh, { experience: "rules" }), true);
+    assert.equal(P.placementOffered(P.setPlacement(fresh, { skipped: true }, 5), { experience: "rules" }), false);
+    const placed = P.normalizeProfile(JSON.parse(JSON.stringify(P.setPlacement(fresh, { grade: 4 }, 5))));
+    assert.deepEqual(placed.placement, { grade: 4, at: 5 }, "kept through the store");
+    assert.equal(P.normalizeProfile({ ...placed, placement: { grade: 9 } }).placement, null, "a bad grade is dropped");
+
+    // The grade moves the course start: grade 4 skips the beginner units, grade 1 does not.
+    const content = { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: "rules", playerRank: 25 } };
+    const first = (prof) => P.learnPath(prof, content, 1000).find((it) => it.kind === "lesson");
+    const beginnerUnit = COURSE.find((u) => !u.level).id;
+    assert.equal(first(P.setPlacement(fresh, { grade: 1 }, 1)).unit, beginnerUnit);
+    const mid = first(P.setPlacement(fresh, { grade: 4 }, 1));
+    assert.equal(COURSE.find((u) => u.id === mid.unit).level, "intermediate");
+    // And the first problems sit near the grade.
+    const probs = P.learnPath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
+    assert.ok(probs.length > 0);
+    for (const it of probs) assert.ok(GRADES[it.id].grade >= 3, `${it.id} grade ${GRADES[it.id].grade}`);
   });
 }

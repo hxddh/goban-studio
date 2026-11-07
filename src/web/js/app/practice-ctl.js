@@ -14,6 +14,7 @@ import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../conten
 import { state, update, toast, announce } from "./store.js";
 import { changeProfile, isRestoring, playerEstimate, remember } from "./ctl-core.js";
 import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
+import { continuePlacement, placementAnswer } from "../learn/placement.js";
 
 export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
@@ -205,7 +206,7 @@ export function learnHome() {
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "learn";
-    s.learn = { ...s.learn, view: "home", lesson: null, problem: null, daily: null, topic: null, mistake: null, theme: null, shape: null };
+    s.learn = { ...s.learn, view: "home", lesson: null, problem: null, daily: null, placement: null, topic: null, mistake: null, theme: null, shape: null };
   });
 }
 
@@ -269,19 +270,21 @@ export function themeName(id) {
   return t("theme." + id);
 }
 
-export function openProblem(id, { daily = null } = {}) {
-  return withContent("problems", () => showProblem(id, daily));
+export function openProblem(id, { daily = null, placement = false } = {}) {
+  return withContent("problems", () => showProblem(id, daily, placement));
 }
 
-function showProblem(id, daily) {
+function showProblem(id, daily, placement = false) {
   const p = PROBLEMS.find((x) => x.id === id);
   if (!p) return;
-  if (!isRestoring() && !daily) remember();
+  if (!isRestoring() && !daily && !placement) remember();
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
   update((s) => {
     s.space = "learn";
-    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, topic: daily ? s.learn.topic : p.topic };
+    // The placement quiz goes on only on its own problems (learn/placement.js).
+    const keep = placement && s.learn.placement ? s.learn.placement : null;
+    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, placement: keep, topic: daily ? s.learn.topic : p.topic };
   });
 }
 
@@ -499,6 +502,7 @@ function recordAttempt(P, solved) {
     if (first) changeProfile((p) => recordProblem(p, P.def.id, { solved, clean: solved && !P.used }, now));
     else changeProfile((p) => recordProblem(p, P.def.id, { late: true }, now));
     if (solved) itemDone("problem", P.def.id);
+    if (first) placementAnswer(P.def.id, solved && !P.used);
   }
 }
 
@@ -543,6 +547,7 @@ export function showAnswer() {
 }
 
 export function nextProblem() {
+  if (state.learn.placement) return continuePlacement();
   if (state.learn.daily) return continuePath();
   const P = state.learn.problem;
   const list = browseList(P.def);
@@ -553,7 +558,7 @@ export function nextProblem() {
 
 export function prevProblem() {
   const P = state.learn.problem;
-  if (!P || state.learn.daily) return;
+  if (!P || state.learn.daily || state.learn.placement) return;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i > 0) openProblem(list[i - 1].id);

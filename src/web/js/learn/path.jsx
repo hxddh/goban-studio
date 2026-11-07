@@ -10,6 +10,7 @@ import { t } from "../i18n.js";
 import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { PROBLEMS } from "../content.js";
+import { PLACEMENT } from "../model/player.js";
 import { Button, DiagramThumb, Icon, Stone } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 
@@ -64,6 +65,31 @@ function FocusLine({ wf }) {
   );
 }
 
+/**
+ * v10: before the first path, someone who knows the rules is asked to place
+ * themselves with six problems (learn/placement.js). The page's one primary
+ * starts the quiz; "Not now" keeps what onboarding said.
+ */
+function PlacementOffer() {
+  return (
+    <section class="placement-offer hero enter-up" aria-labelledby="placement-title">
+      <div class="hero-text">
+        <span class="eyebrow">{t("placement.eyebrow")}</span>
+        <h2 id="placement-title">{t("placement.title")}</h2>
+        <p class="muted">{t("placement.lead", [PLACEMENT.LENGTH])}</p>
+      </div>
+      <div class="hero-actions">
+        <Button kind="primary" onClick={C.startPlacement}>
+          {t("placement.start")}
+        </Button>
+        <button type="button" class="link" onClick={C.skipPlacement}>
+          {t("placement.skip")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function LearnHome() {
   // The focus first: the first one shown in a week is kept, and the path reads it.
   const wf = C.weekFocus();
@@ -76,7 +102,9 @@ export function LearnHome() {
         <header class="page-head">
           <h1>{t("nav.learn")}</h1>
         </header>
-        {rows.length > 0 && (
+        {C.placementOffered() ? (
+          <PlacementOffer />
+        ) : rows.length > 0 && (
           <section class="learn-path enter-up" aria-labelledby="path-title">
             <div class="path-head">
               <h2 class="section-title" id="path-title">

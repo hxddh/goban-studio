@@ -1,4 +1,4 @@
-# Goban Studio design specification (v8)
+# Goban Studio design specification (v10)
 
 This is the single source of truth for how Goban Studio looks and moves.
 Every screen is checked against it before release (see the acceptance
@@ -153,6 +153,11 @@ group per screen region.
   (*Start* / *Continue*) plays the rows as one session; at the end a quiet
   "done for today". One row below opens the catalog: the course as one
   group of unit rows, the problem topics as rows, the basic shapes as chips.
+  A problem row shows its position as a small tile (v10), so rows that
+  share a title look different. Before the first path, someone who knows
+  the rules is offered the placement quiz in its place (v10): one card with
+  the one primary (*Start*) and a quiet *Not now*; six problems, the toolbar
+  saying which one; the grade it ends on sets where the course starts.
 * **Play's home (v9).** Toolbar holds Import. One column, no tabs: the
   game in progress or the suggested game (the one primary button, a quiet
   9×9 link beside it), your level, then your games as compact rows with a
