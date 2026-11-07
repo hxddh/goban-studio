@@ -30,7 +30,18 @@ export const CLASSICS = [
     "event": "",
     "date": "1846-09-11,14,15",
     "result": "B+2",
-    "moment": 127,
+    "moments": [
+      {
+        "index": 127,
+        "title": { "zh": "耳赤之妙手", "en": "The ear-reddening move", "ko": "귀가 붉어진 묘수", "ja": "耳赤の妙手" },
+        "note": {
+          "zh": "这一手同时照应上边的厚味、右边的白棋和下边的攻防，一子多用。传说观战的医生看到幻庵的耳朵变红，便断定黑棋要赢。",
+          "en": "One stone works in every direction at once: it backs Black's strength at the top, presses White's group on the right and helps the fight below. A doctor watching is said to have seen Gennan's ears turn red and known Black would win.",
+          "ko": "한 수가 위쪽의 두터움, 오른쪽 백 돌, 아래쪽 싸움을 동시에 돌봅니다. 관전하던 의사가 겐난의 귀가 붉어지는 것을 보고 흑의 승리를 짐작했다고 전해집니다.",
+          "ja": "一手で上辺の厚み、右辺の白、下辺の攻防のすべてに働きます。観戦していた医師が幻庵の耳が赤くなるのを見て黒の勝ちを悟ったと伝えられます。"
+        }
+      }
+    ],
     "note": {
       "zh": "1846 年秀策对幻庵因硕。第 127 手的“耳赤之妙手”是围棋史上最著名的读秒名场面之一。",
       "en": "Shusaku vs Gennan Inseki, 1846. The move now called the ear-reddening move is one of the most famous acts of reading in Go history.",
@@ -361,7 +372,18 @@ export const CLASSICS = [
     "event": "Google DeepMind Challenge Match",
     "date": "2016-03-13",
     "result": "W+R",
-    "moment": 78,
+    "moments": [
+      {
+        "index": 78,
+        "title": { "zh": "神之一手", "en": "The wedge", "ko": "신의 한 수", "ja": "神の一手" },
+        "note": {
+          "zh": "李世石在中央挖入。AlphaGo 没有算到这一手，随后几手连续出错，这是它在五番棋中唯一输掉的一局。",
+          "en": "Lee Sedol wedges into the centre. AlphaGo had not foreseen it and went wrong over the next moves; this was the only game it lost in the match.",
+          "ko": "이세돌이 중앙에 끼워 넣습니다. 알파고는 이 수를 예상하지 못했고 이어지는 몇 수에서 연달아 실수했습니다. 다섯 판 중 알파고가 진 유일한 대국입니다.",
+          "ja": "李世乭が中央に割り込みます。AlphaGo はこの手を読めておらず、続く数手で崩れました。五番勝負で AlphaGo が負けた唯一の一局です。"
+        }
+      }
+    ],
     "note": {
       "zh": "2016 年人机大战第四局。李世石执白取胜，第 78 手被称为人类创造力的一手。",
       "en": "Game 4 of the 2016 DeepMind Challenge. Lee Sedol won with White; move 78 is celebrated as a creative human move.",

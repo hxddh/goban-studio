@@ -860,6 +860,40 @@ function ResultLine() {
   );
 }
 
+/**
+ * v11: a classic's moments to study, written for the game and checked
+ * against KataGo (docs/classics-katago.json). Each row goes to its move;
+ * the note of the move on the board is shown.
+ */
+function ClassicMoments({ classic }) {
+  const r = state.review;
+  const line = r.game.mainLine();
+  const at = C.reviewIndex();
+  const moments = (classic.moments || []).filter((mo) => line[mo.index]?.move);
+  if (!moments.length) return null;
+  return (
+    <section class="key-moves classic-moments">
+      <h2 class="slot-title">{t("review.classicMoments")}</h2>
+      <ol>
+        {moments.map((mo) => {
+          const mv = line[mo.index].move;
+          const on = at === mo.index;
+          return (
+            <li class={`key-move ${on ? "on" : ""}`}>
+              <button type="button" class="key-head" aria-current={on ? "step" : undefined} onClick={() => C.reviewGoto(mo.index)}>
+                <Stone color={mv.color} size={12} />
+                <span>{t("review.moveLabel", [mo.index, colorName(mv.color), mv.pass ? t("common.pass") : coordLabel(mv.x, mv.y, r.game.size)])}</span>
+                <em class="cm-title">{C.tx(mo.title)}</em>
+              </button>
+              {on && <p>{C.tx(mo.note)}</p>}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 /** The key moments: KataGo's key mistakes, or the offline estimate's turning points only. */
 function Moments() {
   const r = state.review;
@@ -998,6 +1032,7 @@ function ReviewPanel() {
           <div class="review-tab" role="tabpanel" aria-label={tabs.find((x) => x.value === tab).label}>
             {tab === "analysis" && (
               <>
+                {meta.classic && <ClassicMoments classic={meta.classic} />}
                 <Moments />
                 <Variations />
                 {meta.classic && (

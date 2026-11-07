@@ -226,7 +226,7 @@ function showClassic(id) {
   try {
     const { game } = loadSGF(c.sgf);
     changeProfile((p) => recordClassic(p, c.id, Date.now()));
-    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moment, autoJump: c.moment == null, space: "play", back: "play" });
+    openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: c.moments?.[0]?.index, autoJump: !c.moments?.length, space: "play", back: "play" });
   } catch (e) {
     toast(t("library.importError"), "error");
   }

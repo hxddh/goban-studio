@@ -11,7 +11,6 @@ import { PLAY } from "./messages/play.js";
 import { LEARN } from "./messages/learn.js";
 
 export const MESSAGES = {
-  "app.name": m("Goban Studio", "Goban Studio", "Goban Studio", "Goban Studio"),
 
   "nav.main": m("主导航", "Main navigation", "주 메뉴", "メインナビゲーション"),
   "nav.settings": m("设置", "Settings", "설정", "設定"),
@@ -103,6 +102,7 @@ export const MESSAGES = {
   "review.estimating": m("估算中 {0}%", "Estimating · {0}%", "추정 중 {0}%", "推定中 {0}%"),
   "review.estimateNote": m("离线估算（浏览器预览没有 KataGo），只适合找转折点。", "Offline estimate (no KataGo in the browser preview); good for finding turning points only.", "오프라인 추정입니다(브라우저 미리보기에는 KataGo가 없음). 전환점을 찾는 정도로만 쓰세요.", "オフライン推定です（ブラウザ版にはKataGoがありません）。転換点を探す目安にしてください。"),
   "review.noKeyMoves": m("没有明显的大失误，下得不错。", "No big mistakes. Well played.", "큰 실수가 없습니다. 잘 두었습니다.", "大きな悪手はありません。よく打てています。"),
+  "review.classicMoments": m("名局看点", "Moments to study", "명국의 장면", "見どころ"),
   "review.moveLabel": m("第 {0} 手 · {1} {2}", "Move {0} · {1} {2}", "{0}수 · {1} {2}", "{0}手目 · {1} {2}"),
   "review.lossN": m("约损 {0} 目", "−{0} pts", "약 {0}집 손해", "約{0}目損"),
   "review.sentence": m("更好的是{0}的 {1}。", "{1}, {0}, was better.", "{0} {1} 자리가 더 좋았습니다.", "{0}の{1}が良かったです。"),
@@ -140,8 +140,6 @@ export const MESSAGES = {
   "newGame.start": m("开始", "Start", "시작", "開始"),
 
   "practice.course": m("课程", "Course", "과정", "講座"),
-  "practice.start": m("开始", "Start", "시작", "始める"),
-  "practice.continue": m("继续", "Continue", "계속", "続ける"),
   "practice.ofN": m("{0} / {1}", "{0} / {1}", "{0} / {1}", "{0} / {1}"),
   "practice.stepOf": m("第 {0} / {1} 步", "Step {0} of {1}", "{0} / {1}단계", "ステップ {0} / {1}"),
   "practice.prevStep": m("上一步", "Previous step", "이전 단계", "前のステップ"),
@@ -267,10 +265,7 @@ export const MESSAGES = {
   "error.suicide": m("这一手没有气，是禁着点。", "That stone would have no liberties.", "그 돌은 활로가 없어 둘 수 없습니다.", "その石は呼吸点がなく、着手禁止です。"),
   "error.superko": m("这个局面已经出现过。", "This position has occurred before.", "이 국면은 이미 나왔습니다.", "この局面はすでに出ています。"),
 
-  "a11y.board": m("围棋棋盘", "Go board", "바둑판", "碁盤"),
-  "a11y.boardHelp": m("棋盘。用方向键移动，空格或回车落子。", "Go board. Use the arrow keys to move and Space or Enter to play.", "바둑판. 방향키로 움직이고 스페이스나 엔터로 둡니다.", "碁盤。矢印キーで移動し、スペースかEnterで打ちます。"),
   "a11y.move": m("{0} {1}", "{0} {1}", "{0} {1}", "{0} {1}"),
-  "a11y.captured": m("提 {0} 子", "{0} captured", "{0}점 따냄", "{0}子取り"),
   "a11y.newGame": m("新对局，{0} 路", "New {0}×{0} game", "새 {0}줄 대국", "新しい{0}路の対局"),
 
   // v3
@@ -477,28 +472,14 @@ export const MESSAGES = {
     "기본값은 꺼짐입니다. 켜면 Goban Studio가 일주일에 한 번 GitHub에 최신 버전을 묻습니다. 사용자나 기보에 관한 정보는 보내지 않습니다.",
     "初期設定はオフです。オンにすると、Goban Studio が週に一度 GitHub に最新版を問い合わせます。あなたや棋譜についての情報は送りません。",
   ),
-  "update.privacy": m(
-    "检查更新时只会访问 GitHub 一次，且只在你要求时发生。除此之外，Goban Studio 只在你选择可选下载时联网。",
-    "Checking contacts GitHub once, and only when you ask. Apart from this, Goban Studio connects only for the optional downloads you choose.",
-    "업데이트 확인은 요청할 때만 GitHub에 한 번 접속합니다. 그 밖에는 직접 고른 선택 다운로드를 받을 때만 연결합니다.",
-    "アップデートの確認では、求めたときだけ GitHub に一度接続します。それ以外は、あなたが選んだ追加ダウンロードのときだけ通信します。",
-  ),
   "update.checking": m("正在检查更新…", "Checking for updates…", "업데이트 확인 중…", "アップデートを確認しています…"),
   "update.available": m("Goban Studio {0} 已发布", "Goban Studio {0} is available", "Goban Studio {0}이(가) 나왔습니다", "Goban Studio {0} が公開されています"),
   "update.current": m("已是最新版本（{0}）", "You have the latest version ({0})", "최신 버전입니다 ({0})", "最新版です（{0}）"),
   "update.download": m("打开下载页面", "Open download page", "다운로드 페이지 열기", "ダウンロードページを開く"),
-  "update.notes": m("更新内容", "What's new", "새로운 점", "新機能"),
-  "update.lastChecked": m("上次检查：{0}", "Last checked {0}", "마지막 확인: {0}", "最終確認：{0}"),
   "update.unavailable": m("只有桌面版应用可以检查更新", "Update checks are available in the desktop app only", "업데이트 확인은 데스크톱 앱에서만 할 수 있습니다", "アップデートの確認はデスクトップアプリでのみ行えます"),
   "update.error": m("暂时无法检查更新，请稍后再试", "Couldn't check for updates. Try again later.", "지금은 업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.", "アップデートを確認できませんでした。あとでもう一度お試しください。"),
   // v5 updater
   "update.install": m("下载并安装", "Download and install", "다운로드 및 설치", "ダウンロードしてインストール"),
-  "update.installPrivacy": m(
-    "下载时会从 GitHub 获取新版本及其校验值，不发送任何关于你或你的棋局的信息。",
-    "Downloading fetches the new version and its checksums from GitHub. Nothing about you or your games is sent.",
-    "다운로드하면 GitHub에서 새 버전과 체크섬을 받아옵니다. 사용자나 기보에 관한 정보는 보내지 않습니다.",
-    "ダウンロードでは GitHub から新しいバージョンとチェックサムを取得します。あなたや棋譜についての情報は送りません。",
-  ),
   "update.downloading": m("正在下载 Goban Studio {0}…", "Downloading Goban Studio {0}…", "Goban Studio {0} 다운로드 중…", "Goban Studio {0} をダウンロードしています…"),
   "update.progress": m("{0} / {1}", "{0} of {1}", "{0} / {1}", "{0} / {1}"),
   "update.verifying": m("正在校验下载的文件…", "Checking the download…", "다운로드한 파일을 확인하는 중…", "ダウンロードしたファイルを確認しています…"),
@@ -607,7 +588,6 @@ export const MESSAGES = {
   "settings.pane.general": m("通用", "General", "일반", "一般"),
   "settings.pane.board": m("棋盘", "Board", "바둑판", "碁盤"),
   "settings.pane.playing": m("对局", "Playing", "대국", "対局"),
-  "settings.pane.engine": m("对手与分析", "Opponents & analysis", "상대와 분석", "相手と解析"),
   "settings.pane.data": m("数据", "Data", "데이터", "データ"),
   "settings.pane.about": m("关于", "About", "정보", "情報"),
   "settings.boardGroup": m("棋盘与棋子", "Board and stones", "바둑판과 돌", "碁盤と石"),
@@ -620,8 +600,6 @@ export const MESSAGES = {
   "rules.japaneseNote": m("数目：地加提子。贴 6.5 目，让子棋贴 0.5 目。", "Territory scoring: territory plus prisoners. Komi 6.5; 0.5 in handicap games.", "계지: 집과 사석을 셉니다. 덤 6.5, 접바둑은 덤 0.5입니다.", "計地：地とアゲハマを数えます。コミ6.5目、置き碁はコミ0.5目です。"),
   "rules.chineseNote": m("数子：盘上活子加围住的空点，提子不计。贴 7.5 目（3¾ 子）。让子棋贴 0.5 目，白方另得让子数的目数。", "Area scoring: your stones on the board plus the points they surround; prisoners don't count. Komi 7.5. In handicap games komi is 0.5 and White gets 1 point per handicap stone.", "계자: 판 위의 살아 있는 돌과 둘러싼 빈 점을 셉니다. 따낸 돌은 세지 않습니다. 덤 7.5. 접바둑은 덤 0.5에 치석 한 점마다 백이 1집을 더 받습니다.", "計子：盤上の生き石と囲んだ空点を数えます。アゲハマは数えません。コミ7.5目。置き碁はコミ0.5目で、置き石1子につき白に1目を加えます。"),
   "rules.koreanNote": m("数目，算法与日本规则相同。贴 6.5 目，让子棋贴 0.5 目。", "Territory scoring, counted as under Japanese rules. Komi 6.5; 0.5 in handicap games.", "계지: 일본 규칙과 같은 방식으로 셉니다. 덤 6.5, 접바둑은 덤 0.5입니다.", "計地：日本ルールと同じ方法で数えます。コミ6.5目、置き碁はコミ0.5目です。"),
-  "rules.territory": m("数目法", "Territory scoring", "계지", "計地"),
-  "rules.area": m("数子法", "Area scoring", "계자", "計子"),
   "rules.unsupported": m("这个 SGF 使用的是 {0} 规则，Goban Studio 无法按这个规则正确数棋，因此没有导入。支持的规则：日本、中国、韩国。", "This SGF uses {0} rules, which Goban Studio cannot score correctly, so it was not imported. Supported: Japanese, Chinese and Korean rules.", "이 SGF는 {0} 규칙을 사용합니다. Goban Studio는 이 규칙으로 정확히 계가할 수 없어 가져오지 않았습니다. 지원 규칙: 일본, 중국, 한국 규칙.", "このSGFは{0}ルールを使用しています。Goban Studioではこのルールで正しく計算できないため、読み込みませんでした。対応ルール：日本・中国・韓国ルール。"),
   "score.titleArea": m("数子", "Counting", "계가", "計算"),
   "score.detailArea": m("棋子 {0} · 地 {1}", "Stones {0} · territory {1}", "돌 {0} · 집 {1}", "石 {0} · 地 {1}"),

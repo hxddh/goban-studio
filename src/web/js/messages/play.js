@@ -69,7 +69,6 @@ export const PLAY = {
   "report.phasesOf": m("{0}的三个阶段", "The three phases for {0}", "{0}의 세 단계", "{0}の三つの局面"),
   // A game between two people: whose mistakes become drills.
   // Background analyses (play/analysis.js), as a job names them.
-  "sched.progress": m("{0} — {1}%", "{0} — {1}%", "{0} — {1}%", "{0} — {1}%"),
   "sched.job.game": m("正在分析你与电脑（{0}）的对局", "Analysing your game against {0}", "컴퓨터({0})와 둔 대국을 분석하는 중", "コンピュータ（{0}）との対局を解析中"),
   "sched.job.report": m("正在分析一盘棋", "Analysing a game", "대국을 분석하는 중", "対局を解析中"),
   "sched.job.review": m("正在复盘这盘棋", "Reviewing the game", "대국을 복기하는 중", "対局を検討中"),
