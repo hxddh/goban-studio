@@ -49,6 +49,15 @@ players who already know the rules, which sets where the course starts;
 Learn's problem rows show their position; Play's home lists four classics
 and a link to the rest. v10 reads everything v9 saved.
 
+## v11: study and practice
+
+A classic now opens with 3–5 moments to study: its famous moves, written
+for the game, and its largest swings by KataGo's count of every move. A
+takeaway from your review ("you lost most to cuts") has a *Practise these*
+link straight to problems of that kind. The problem bank grows to 624, with
+at least 15 capture, save, life, kill and endgame problems at every grade.
+v11 reads everything v10 saved.
+
 ## Two spaces
 
 - **Play** (⌘1) — opens on the game in progress, or the suggested game with
