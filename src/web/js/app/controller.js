@@ -73,7 +73,7 @@ export async function boot() {
   // Play opens on the board when a game is in progress, else on its home.
   const g = state.game?.game;
   state.space = "today";
-  state.play = { ...state.play, view: g && g.moveNumber > 0 && !g.current.result ? "game" : "home" };
+  state.play = { ...state.play, view: g && !g.current.result ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
@@ -153,6 +153,8 @@ export function goSpace(space) {
     if (space === "today") return;
     return state.game && !state.review ? playBoard() : playHome();
   }
+  // Play is the board while a game is not over (v12, as before v9).
+  if (space === "play" && state.game && !state.game.game.current.result && !playReviewingNow()) return playBoard();
   remember();
   update((s) => {
     s.space = space;
@@ -163,6 +165,10 @@ export function goSpace(space) {
     ponder();
   }
   syncMenus();
+}
+
+function playReviewingNow() {
+  return !!state.review && (state.review.meta.space || "play") === "play";
 }
 
 export function toggleFocus() {

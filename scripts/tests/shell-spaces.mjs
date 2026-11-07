@@ -30,7 +30,7 @@ try {
     await C.boot();
     assert.equal(state.ready, true);
     assert.equal(state.space, "today");
-    assert.equal(state.play.view, "home");
+    assert.equal(state.play.view, "game", "v12: the empty board is Play's page");
     assert.equal(state.sheet?.kind, "onboarding");
     assert.equal(state.profile.v, 9, "an empty v9 profile");
     assert.equal(state.profile.games.length, 0);

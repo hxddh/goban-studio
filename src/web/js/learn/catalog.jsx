@@ -28,12 +28,12 @@ export function CatalogView() {
 }
 
 /** v12: the course, the problems by topic and the shapes — on Practice's page itself. */
-export function CatalogSections() {
+export function CatalogSections({ first = true } = {}) {
   const p = state.profile;
   const solvedOf = (list) => list.filter((x) => p.problems[x.id]?.solved).length;
   return (
     <div class="catalog">
-      <section class="section first">
+      <section class={`section ${first ? "first" : ""}`}>
         <h2 class="section-title">{t("practice.course")}</h2>
         <CourseMap />
       </section>

@@ -41,7 +41,8 @@ function Toasts() {
 /** What Play shows: a review, the board, or (no game on it) what to play. */
 function PlaySpace() {
   if (C.playReviewing()) return <ReviewView />;
-  return state.game && (state.play.view === "game" || gameInProgress()) ? <PlayView /> : <PlayStart />;
+  // As before v9: a game that is not over (an empty board too) is on screen.
+  return state.game && (state.play.view === "game" || !state.game.game.current.result) ? <PlayView /> : <PlayStart />;
 }
 
 /** What the Library shows: a review of a record or classic, the explorer, or its list. */

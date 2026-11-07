@@ -146,7 +146,7 @@ export function LearnHome() {
             </ol>
           </section>
         )}
-        <CatalogSections />
+        <CatalogSections first={false} />
       </div>
     </>
   );
