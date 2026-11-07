@@ -720,8 +720,13 @@ export function openPostGame(g = state.game, { inPlace = true } = {}) {
  */
 export function showFinished() {
   const g = state.game;
-  if (state.space !== "play" || state.play.view !== "game" || state.review) return;
-  if (g?.game.mainLine().at(-1).result && !g.scoring) openPostGame(g);
+  // v12: a review left open in another space (a record or classic in the
+  // Library) does not hold back this game's report; it is closed first.
+  if (state.space !== "play" || state.play.view !== "game" || playReviewing()) return;
+  if (g?.game.mainLine().at(-1).result && !g.scoring) {
+    if (state.review) dropReview();
+    openPostGame(g);
+  }
 }
 
 /** The estimate (model/player.js estimate) before and after a rated game, as the report shows it. */

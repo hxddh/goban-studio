@@ -132,6 +132,18 @@ try {
     C.goSpace("library");
     assert.equal(state.review, null);
     assert.equal(state.space, "library");
+    // A classic left open in the Library does not hold back the report of a game finished in Play.
+    C.openClassic(C.CLASSICS[0].id);
+    assert.equal(state.review?.meta.space, "library");
+    C.goSpace("play");
+    assert.equal(state.space, "play");
+    const g = state.game.game;
+    g.play(2, 2);
+    g.play(6, 6);
+    g.resign(g.turn);
+    C.showFinished();
+    assert.equal(state.review?.source, "current", "the finished game's report opens");
+    assert.equal(state.review.meta.space, "play");
   });
 
   await test("shell: Learn's top is the path, one ordered list, and its problems are one session", () => {
