@@ -4,4 +4,4 @@
  * Keep this in sync with package.json, app.zon and the version label in
  * index.html; `npm run release-check` rejects a mismatch.
  */
-export const APP_VERSION = "9.0.0";
+export const APP_VERSION = "10.0.0";

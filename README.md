@@ -41,11 +41,19 @@ v9 is rebuilt around one loop: **play a game → see what mattered, on the
 board → try that moment again → play the next game**. It starts empty: no
 data from earlier versions is read (see the v9 release notes).
 
+## v10: the first ten minutes
+
+A new mark (two stones in kosumi on a plain board, the same in the icon,
+the sidebar and the welcome screen); a six-problem placement quiz for
+players who already know the rules, which sets where the course starts;
+Learn's problem rows show their position; Play's home lists four classics
+and a link to the rest. v10 reads everything v9 saved.
+
 ## Two spaces
 
 - **Play** (⌘1) — opens on the game in progress, or the suggested game with
   one button (9×9 for a beginner, 19×19 from about 20 kyu). Below it: your
-  level ("≈ 12 kyu (±1)"), your games, the 20 classics and the opening
+  level ("≈ 12 kyu (±1)"), your games, the classics (four, then all 20) and the opening
   explorer. The opponent is one choice: a measured rank, 30 kyu to 7 dan;
   the app picks the KataGo setting that measured closest. Teaching mode
   warns before a costly move and says why; a hint gives its reason too.
