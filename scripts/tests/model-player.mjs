@@ -259,7 +259,7 @@ export default async function ({ test, assert, root }) {
     const other = PROBLEMS[0].id;
     let q = P.recordProblem(P.newProfile(), other, { solved: false }, NOW);
     q = P.recordProblem(q, other, { solved: true, late: true }, NOW + 1000);
-    assert.deepEqual(q.problems[other], { tries: 1, solved: true, clean: false, last: NOW + 1000, due: NOW + DAY, streak: 0 });
+    assert.deepEqual(q.problems[other], { tries: 1, solved: true, clean: false, last: NOW + 1000, due: NOW + DAY, streak: 0, solvedAt: NOW + 1000 });
     // A late solve without a counted miss counts as a solve with help.
     const r = P.recordProblem(P.newProfile(), other, { late: true }, NOW);
     assert.deepEqual([r.problems[other].tries, r.problems[other].solved, r.problems[other].streak], [1, true, 0]);

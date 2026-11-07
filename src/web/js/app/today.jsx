@@ -25,7 +25,8 @@ function greeting(h = new Date().getHours()) {
 export function weekCounts(now = Date.now(), games = Games.listGames(), problems = state.profile?.problems || {}) {
   const since = now - 7 * DAY;
   const played = games.filter((g) => g.source !== "import" && g.result && (g.finishedAt || g.updatedAt || 0) >= since).length;
-  const solved = Object.values(problems).filter((p) => p.solved && (p.last || 0) >= since).length;
+  // A solve, not an attempt: a failed retry of an old problem updates `last` but not `solvedAt`.
+  const solved = Object.values(problems).filter((p) => (p.solvedAt || 0) >= since).length;
   return { played, solved };
 }
 

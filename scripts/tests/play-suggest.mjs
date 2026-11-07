@@ -46,8 +46,15 @@ await test("today: this week counts finished games of your own and problems solv
     { source: "game", result: null, updatedAt: now },
     { source: "import", result: "B+R", updatedAt: now },
   ];
-  const problems = { a: { solved: true, last: now - day }, b: { solved: false, last: now }, c: { solved: true, last: now - 9 * day } };
+  // c was solved nine days ago and missed again yesterday: an attempt, not a solve this week.
+  const problems = { a: { solved: true, last: now - day, solvedAt: now - day }, b: { solved: false, last: now }, c: { solved: true, last: now - day, solvedAt: now - 9 * day } };
   assert.deepEqual(A.weekCounts(now, games, problems), { played: 2, solved: 1 });
+  // recordProblem keeps when it was solved apart from when it was last tried.
+  let p = A.PM.recordProblem(A.PM.newProfile(), "x", { solved: true }, now - 9 * day);
+  p = A.PM.recordProblem(p, "x", { solved: false }, now - day);
+  assert.equal(p.problems.x.solvedAt, now - 9 * day);
+  assert.equal(p.problems.x.last, now - day);
+  assert.deepEqual(A.weekCounts(now, [], p.problems), { played: 0, solved: 0 });
   assert.deepEqual(A.weekCounts(now, [], {}), { played: 0, solved: 0 });
 });
 
