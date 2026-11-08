@@ -6,9 +6,11 @@
  *
  * Flows exercise what a person does (first run, a game to the count, a
  * review variation, a wrong answer that resets, history back/forward, the
- * keyboard-only board). Budgets fail the run when the page gets slow.
+ * keyboard-only board). Budgets fail the run when the page gets slow; each
+ * is judged on the median of three runs (`medianOf`).
  * Visual checks compare key screens with tests/visual/*.png (masked where
  * the content is time-dependent) and write diffs to tests/visual/diff/.
+ * A missing baseline is written locally, but fails the run when CI is set.
  */
 import fs from "node:fs";
 import http from "node:http";
@@ -23,12 +25,36 @@ const dist = path.join(root, "frontend/dist");
 const baseDir = path.join(root, "tests/visual");
 const diffDir = path.join(baseDir, "diff");
 const UPDATE = process.argv.includes("--update");
+// GitHub Actions (and most CI) sets CI=true.
+const CI = !!process.env.CI && process.env.CI !== "false" && process.env.CI !== "0";
 const BUDGET = {
   firstRender: 1500, // ms from navigation to the app shell
   boardInput: 60, // ms from a click to the painted stone
   reviewOpen: 600, // ms to open a 300-move classic in review
   placeSwitch: 250, // ms to switch places
 };
+// Each budget is judged on the median of this many runs, so one stall on a
+// shared runner neither fails a check nor hides a real slowdown.
+const BUDGET_RUNS = 3;
+
+/**
+ * Run `once` (which returns one timing in ms) BUDGET_RUNS times. Returns
+ * the median and a line naming every run, for the check's report. Area
+ * checks (scripts/ui-tests) receive it as `medianOf`.
+ */
+async function medianOf(label, once) {
+  const runs = [];
+  for (let i = 0; i < BUDGET_RUNS; i++) runs.push(await once(i));
+  const median = [...runs].sort((a, b) => a - b)[Math.floor(runs.length / 2)];
+  const fmt = (ms) => (Number.isInteger(ms) ? String(ms) : ms.toFixed(1));
+  return { median, runs, text: `${label} median ${fmt(median)} ms of ${runs.map(fmt).join(" / ")}` };
+}
+/** medianOf, checked against BUDGET[key]. */
+async function withinBudget(key, label, once) {
+  const { median, text } = await medianOf(label, once);
+  assert(median < BUDGET[key], `${text} > ${BUDGET[key]}`);
+  return text;
+}
 
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".json": "application/json", ".woff2": "font/woff2", ".bin": "application/octet-stream", ".webp": "image/webp", ".wav": "audio/wav", ".ogg": "audio/ogg", ".svg": "image/svg+xml", ".gz": "application/gzip", ".txt": "text/plain", ".cfg": "text/plain" };
 const server = http.createServer((req, res) => {
@@ -154,6 +180,11 @@ async function snap(page, name, mask = []) {
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const buf = await page.screenshot({ mask: mask.map((s) => page.locator(s)), animations: "disabled" });
   const file = path.join(baseDir, name + ".png");
+  // In CI a missing baseline is a failure: writing one there would pass the
+  // check against itself, and the picture would be lost with the runner.
+  if (!UPDATE && !fs.existsSync(file) && CI) {
+    throw new Error(`${name}: no baseline tests/visual/${name}.png (run \`npm run ui-update\` locally, look at it, and commit it)`);
+  }
   if (UPDATE || !fs.existsSync(file)) {
     fs.mkdirSync(baseDir, { recursive: true });
     fs.writeFileSync(file, buf);
@@ -177,19 +208,23 @@ async function snap(page, name, mask = []) {
 /* ------------------------------------------------------------- flows */
 
 await check("first run → lesson one for a new player, no errors", async () => {
-  const page = await fresh();
-  const t0 = Date.now();
-  await page.goto(origin + "/");
-  await page.waitForSelector(".ob-card");
-  const first = Date.now() - t0;
-  assert(first < BUDGET.firstRender, `first render ${first} ms > ${BUDGET.firstRender}`);
+  // Each run is a new browser context (cold cache); the last page goes on.
+  let page;
+  const timing = await withinBudget("firstRender", "first render", async () => {
+    if (page) await page.close();
+    page = await fresh();
+    const t0 = Date.now();
+    await page.goto(origin + "/");
+    await page.waitForSelector(".ob-card");
+    return Date.now() - t0;
+  });
   await page.click(".ob-card .btn.primary");
   await page.click(".choice >> nth=0");
   await page.waitForSelector(".steps");
   assert((await page.textContent(".panel")).includes("Step 1"), "lesson one did not open");
   assert(page.errors.length === 0, page.errors.join("; "));
   await page.close();
-  return `first render ${first} ms`;
+  return timing;
 });
 
 await check("two-player 9×9 game to the count, with the board played by keyboard", async () => {
@@ -232,28 +267,32 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
 });
 
 await check("a board click paints within budget", async () => {
-  const page = await fresh();
-  await onboard(page, 1);
-  await page.keyboard.press("Control+n");
-  await page.click(".preset >> nth=0");
-  await page.click(".sheet .segmented button >> nth=1");
-  await page.click(".sheet-foot .btn.primary");
-  const p = await pointOf(page, 3, 3);
-  const ms = await page.evaluate(
-    ([x, y]) =>
-      new Promise((resolve) => {
-        const c = document.querySelector("canvas.board");
-        const t0 = performance.now();
-        c.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }));
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - t0)));
-      }),
-    [p.x, p.y],
-  );
-  const placed = await page.evaluate(() => window.__state.game.game.moveNumber);
-  assert(placed === 1, "the stone was not placed");
-  assert(ms < BUDGET.boardInput, `input→paint ${ms.toFixed(1)} ms > ${BUDGET.boardInput}`);
-  await page.close();
-  return `${ms.toFixed(1)} ms`;
+  // Each run starts from a new profile and its first game, so every click
+  // lands on an empty board with nothing to replace.
+  const timing = await withinBudget("boardInput", "input→paint", async () => {
+    const page = await fresh();
+    await onboard(page, 1);
+    await page.keyboard.press("Control+n");
+    await page.click(".preset >> nth=0");
+    await page.click(".sheet .segmented button >> nth=1");
+    await page.click(".sheet-foot .btn.primary");
+    const p = await pointOf(page, 3, 3);
+    const ms = await page.evaluate(
+      ([x, y]) =>
+        new Promise((resolve) => {
+          const c = document.querySelector("canvas.board");
+          const t0 = performance.now();
+          c.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }));
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - t0)));
+        }),
+      [p.x, p.y],
+    );
+    const placed = await page.evaluate(() => window.__state.game.game.moveNumber);
+    assert(placed === 1, "the stone was not placed");
+    await page.close();
+    return ms;
+  });
+  return timing;
 });
 
 await check("review: a variation, back to the game, Esc closes the layer", async () => {
@@ -278,17 +317,18 @@ await check("review: a variation, back to the game, Esc closes the layer", async
 });
 
 await check("a classic opens in review within budget", async () => {
-  const page = await fresh();
-  await onboard(page, 1);
-  // Play again: its home, with the history and the classics.
-  await page.keyboard.press("Control+4");
-  const t0 = Date.now();
-  await page.click(".collection-row >> nth=0");
-  await page.waitForSelector(".review-layer .chart");
-  const ms = Date.now() - t0;
-  assert(ms < BUDGET.reviewOpen, `review open ${ms} ms > ${BUDGET.reviewOpen}`);
-  await page.close();
-  return `${ms} ms`;
+  return withinBudget("reviewOpen", "review open", async () => {
+    const page = await fresh();
+    await onboard(page, 1);
+    // Play again: its home, with the history and the classics.
+    await page.keyboard.press("Control+4");
+    const t0 = Date.now();
+    await page.click(".collection-row >> nth=0");
+    await page.waitForSelector(".review-layer .chart");
+    const ms = Date.now() - t0;
+    await page.close();
+    return ms;
+  });
 });
 
 await check("a wrong answer shows the refutation, then resets for another try", async () => {
@@ -321,17 +361,21 @@ await check("a wrong answer shows the refutation, then resets for another try", 
 await check("history: back and forward across the two spaces", async () => {
   const page = await fresh();
   await onboard(page, 1);
-  await page.keyboard.press("Control+3");
-  await page.keyboard.press("Control+2");
-  const t0 = Date.now();
-  await page.keyboard.press("Control+[");
-  await page.waitForFunction(() => window.__state.space === "learn");
-  const ms = Date.now() - t0;
-  await page.keyboard.press("Control+]");
-  await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
-  assert(ms < BUDGET.placeSwitch, `place switch ${ms} ms > ${BUDGET.placeSwitch}`);
+  // Back and forward are checked every run; the timing is of Back.
+  const timing = await withinBudget("placeSwitch", "place switch", async () => {
+    await page.keyboard.press("Control+3");
+    await page.keyboard.press("Control+2");
+    await page.waitForFunction(() => window.__state.space === "play");
+    const t0 = Date.now();
+    await page.keyboard.press("Control+[");
+    await page.waitForFunction(() => window.__state.space === "learn");
+    const ms = Date.now() - t0;
+    await page.keyboard.press("Control+]");
+    await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
+    return ms;
+  });
   await page.close();
-  return `${ms} ms`;
+  return timing;
 });
 
 await check("history: Back from a shape problem returns to its collection", async () => {
@@ -679,7 +723,7 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
 // Each area keeps its browser checks in scripts/ui-tests/*.mjs (by area: shell-*, play-*, learn-*).
 for (const f of fs.readdirSync(path.join(root, "scripts/ui-tests")).filter((n) => n.endsWith(".mjs")).sort()) {
   const mod = await import("./ui-tests/" + f);
-  await mod.default({ check, assert, fresh, onboard, clickPoint, pointOf, origin, browser, audit });
+  await mod.default({ check, assert, fresh, onboard, clickPoint, pointOf, origin, browser, audit, medianOf });
 }
 
 /* ------------------------------------------------------------ visuals */
