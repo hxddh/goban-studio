@@ -83,6 +83,7 @@ const Job = struct {
     cancelled: bool = false,
     /// The KataGo process that serves it (echoed as `engine`).
     slot: engine_mod.Slot = .standard,
+    kind: engine_mod.Kind = .analyze,
     /// Backstop (v13): past this the page is answered `Timeout` whatever
     /// the worker is doing, so no request can hang. The worker's own
     /// watchdog (engine.zig) normally fires long before.
@@ -349,6 +350,7 @@ const sync_commands = [_]SyncCommand{
 
 const async_commands = [_]AsyncCommand{
     .{ .name = "studio.katagoAnalyzeAsync", .invoke = katagoAnalyzeAsync },
+    .{ .name = "studio.katagoHumanPolicy", .invoke = katagoHumanPolicy },
     .{ .name = "studio.checkUpdate", .invoke = checkUpdate },
     .{ .name = "studio.updateDownload", .invoke = updateDownload },
     .{ .name = "studio.updateApply", .invoke = updateApply },
@@ -690,7 +692,9 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     if (!jsonAppend(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
     if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
     if (!jsonAppendString(output, &n, self.katago_version)) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    // v13: `studio.katagoHumanPolicy` needs the human SL model.
+    const human = self.katago_available and self.models.isReady(.human);
+    if (!jsonAppend(output, &n, if (human) ",\"humanPolicy\":true}" else ",\"humanPolicy\":false}")) return error.HandlerFailed;
     return output[0..n];
 }
 
@@ -806,6 +810,9 @@ fn stopDrainTimer(self: *App) void {
 fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, result: ?*const engine_mod.Result) void {
     const info: []const u8 = if (result) |r| (r.info orelse "") else "";
     const cap = info.len * 2 + 512;
+    if (outcome == .ok and job.kind == .human_policy) {
+        if (result) |r| if (r.policy) |rows| return respondPolicy(job, rows);
+    }
     const buf = engine_mod.result_allocator.alloc(u8, cap) catch {
         job.responder.success(job.bridge_id[0..job.bridge_id_len], "{\"ok\":false,\"error\":\"OutOfMemory\"}") catch {};
         job.active = false;
@@ -905,12 +912,20 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
 
     const req = self.request_scratch;
     req.seq = 0;
+    req.kind = .analyze;
     req.position.setup_len = 0;
     req.position.moves_len = 0;
     parseAnalyzeRequest(self, invocation.request.payload, req, &job) catch {
         respondJob(&job, .failed, "InvalidRequest", null);
         return;
     };
+    submitJob(self, &job, req, engine_mod.deadlineMs(req.max_time, true) + engine_mod.warm_grace_ms);
+}
+
+/// Queue a parsed request for the worker and keep its job. Answers at once
+/// when it cannot run. `budget_ms` is the job's backstop.
+fn submitJob(self: *App, job_in: *Job, req: *engine_mod.Request, budget_ms: i64) void {
+    var job = job_in.*;
     if (!self.katago_available) {
         respondJob(&job, .failed, "EngineMissing", null);
         return;
@@ -942,9 +957,14 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     self.next_seq += 1;
     req.seq = self.next_seq;
     job.seq = req.seq;
+    if (job.id_len == 0) {
+        // A request without its own id (human policy) is named by its seq.
+        const named = std.fmt.bufPrint(&job.id, "p{d}", .{req.seq}) catch "";
+        job.id_len = named.len;
+    }
     // The worker's watchdog budget for a cold start, plus time to wait
     // behind the request it supersedes (which is being cancelled).
-    job.deadline_ms = nowMs(self) + engine_mod.deadlineMs(req.max_time, true) + engine_mod.warm_grace_ms;
+    job.deadline_ms = nowMs(self) + budget_ms;
     installWake(self);
     const submitted = self.katago.submit(req) catch |err| {
         respondJob(&job, .failed, @errorName(err), null);
@@ -954,6 +974,143 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     if (findJob(self, submitted.dropped_seq)) |dropped| respondJob(dropped, .cancelled, "", null);
     if (findJob(self, submitted.superseded_seq)) |superseded| superseded.cancelled = true;
     startDrainTimer(self);
+}
+
+// ------------------------------------------------------------ human policy
+//
+// v13 (docs/strength.md "your moves"): how likely a player of each rank
+// would have been to play the moves the player actually played, from the
+// human SL model's raw policy. One async request per finished game.
+
+const PolicyPayload = struct {
+    /// Optional: the page's id, for `studio.katagoCancel`.
+    id: []const u8 = "",
+    size: u32 = 19,
+    komi: f64 = 6.5,
+    rules: []const u8 = "japanese",
+    setup: []const u8 = "",
+    /// The whole main line ("B D4 W Q16 …").
+    moves: []const u8 = "",
+    /// The player's colour: the moves of this colour are scored.
+    color: []const u8 = "B",
+    profiles: []const []const u8 = &.{},
+    /// First move index to score (earlier moves are skipped).
+    from: u32 = 0,
+};
+
+/// Validate a `studio.katagoHumanPolicy` payload into `req` (and the job's
+/// id). Bounds the work: at most `max_policy_profiles` profiles, and as
+/// many positions as fit `max_policy_evals` evaluations (the reply then
+/// says `truncated`).
+fn parsePolicyRequest(allocator: std.mem.Allocator, payload: []const u8, req: *engine_mod.Request, job: *Job) !void {
+    const parsed = std.json.parseFromSlice(PolicyPayload, allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const p = parsed.value;
+    job.id_len = 0;
+    if (p.id.len > 0) {
+        if (!validRequestId(p.id)) return error.InvalidRequest;
+        @memcpy(job.id[0..p.id.len], p.id);
+        job.id_len = p.id.len;
+    }
+    if (p.size < 2 or p.size > 19) return error.InvalidRequest;
+    if (!std.math.isFinite(p.komi) or @abs(p.komi) > 150 or @floor(p.komi * 2) != p.komi * 2) return error.InvalidRequest;
+    if (p.color.len != 1 or (p.color[0] != 'B' and p.color[0] != 'W')) return error.InvalidRequest;
+    if (p.profiles.len == 0 or p.profiles.len > engine_mod.max_policy_profiles) return error.InvalidRequest;
+    const size: u8 = @intCast(p.size);
+    req.* = .{ .kind = .human_policy, .slot = .human, .visits = 1, .max_time = 1, .color = p.color[0] };
+    req.position.size = size;
+    req.position.komi = p.komi;
+    req.position.rules = engine_mod.Rules.parse(p.rules) orelse return error.InvalidRequest;
+    req.position.setup_len = try engine_mod.parseMoves(p.setup, size, false, &req.position.setup);
+    req.position.moves_len = try engine_mod.parseMoves(p.moves, size, true, &req.position.moves);
+    for (p.profiles, 0..) |profile, k| {
+        if (!engine_mod.validProfile(profile)) return error.InvalidRequest;
+        @memcpy(req.policy_profiles[k][0..profile.len], profile);
+        req.policy_profile_lens[k] = @intCast(profile.len);
+    }
+    req.policy_profiles_len = p.profiles.len;
+    req.policy_from = p.from;
+    req.policy_max_positions = @min(engine_mod.max_policy_positions, engine_mod.max_policy_evals / p.profiles.len);
+    job.slot = .human;
+    job.kind = .human_policy;
+    job.stream = false;
+}
+
+/// How many positions a parsed policy request will score.
+fn policyPositions(req: *const engine_mod.Request) usize {
+    var n: usize = 0;
+    var i: usize = req.policy_from;
+    while (i < req.position.moves_len) : (i += 1) {
+        if (req.position.moves[i].color == req.color) n += 1;
+    }
+    return @min(n, req.policy_max_positions);
+}
+
+/// `studio.katagoHumanPolicy {id?, size, komi, rules, setup, moves, color,
+/// profiles, from?}` (async): for every move of `color` in `moves` (from
+/// index `from`), the human SL policy's probability of that move in the
+/// position before it, under each profile. Replies `{ok:true, id, engine:
+/// "human", moves:[{index, p:{profile: probability}}], truncated}` or
+/// `{ok:false, id, error | cancelled}` (InvalidRequest, EngineMissing,
+/// ModelMissing, Busy, Timeout, …). Cancellable with `studio.katagoCancel`
+/// and watched like a search (each evaluation extends the deadline).
+fn katagoHumanPolicy(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
+    const self: *App = @ptrCast(@alignCast(context));
+    var job = Job{ .active = true, .responder = responder, .window_id = invocation.source.window_id, .kind = .human_policy, .slot = .human };
+    if (!keepBridgeId(invocation.request.id, &job.bridge_id, &job.bridge_id_len, responder)) return;
+    const req = self.request_scratch;
+    parsePolicyRequest(self.allocator, invocation.request.payload, req, &job) catch {
+        respondJob(&job, .failed, "InvalidRequest", null);
+        return;
+    };
+    const positions = policyPositions(req);
+    if (positions == 0) {
+        // Nothing to score: no need to start (or wait for) KataGo.
+        const rows = engine_mod.result_allocator.create(engine_mod.PolicyRows) catch {
+            respondJob(&job, .failed, "OutOfMemory", null);
+            return;
+        };
+        defer engine_mod.result_allocator.destroy(rows);
+        rows.* = .{ .profiles = req.policy_profiles_len };
+        respondPolicy(&job, rows);
+        return;
+    }
+    const evals: i64 = @intCast(positions * req.policy_profiles_len);
+    submitJob(self, &job, req, engine_mod.cold_grace_ms + engine_mod.warm_grace_ms + evals * 5_000);
+}
+
+/// `{ok:true, id, engine:"human", moves:[{index, p:{…}}], truncated}`.
+fn policyReply(buf: []u8, id: []const u8, rows: *const engine_mod.PolicyRows) ?[]const u8 {
+    var n: usize = 0;
+    if (!(jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and jsonAppendString(buf, &n, id) and jsonAppend(buf, &n, ",\"engine\":\"human\",\"moves\":["))) return null;
+    for (0..rows.count) |r| {
+        if (r > 0 and !jsonAppend(buf, &n, ",")) return null;
+        const head = std.fmt.bufPrint(buf[n..], "{{\"index\":{d},\"p\":{{", .{rows.index[r]}) catch return null;
+        n += head.len;
+        for (0..rows.profiles) |k| {
+            if (k > 0 and !jsonAppend(buf, &n, ",")) return null;
+            if (!jsonAppendString(buf, &n, rows.name(k))) return null;
+            const v = std.fmt.bufPrint(buf[n..], ":{d:.6}", .{rows.prob(r, k)}) catch return null;
+            n += v.len;
+        }
+        if (!jsonAppend(buf, &n, "}}")) return null;
+    }
+    if (!jsonAppend(buf, &n, if (rows.truncated) "],\"truncated\":true}" else "],\"truncated\":false}")) return null;
+    return buf[0..n];
+}
+
+fn respondPolicy(job: *Job, rows: *const engine_mod.PolicyRows) void {
+    const cap = 256 + rows.count * (32 + rows.profiles * 40);
+    const id = job.bridge_id[0..job.bridge_id_len];
+    const buf = engine_mod.result_allocator.alloc(u8, cap) catch {
+        job.responder.success(id, "{\"ok\":false,\"error\":\"OutOfMemory\"}") catch {};
+        job.active = false;
+        return;
+    };
+    defer engine_mod.result_allocator.free(buf);
+    const body = policyReply(buf, job.idText(), rows) orelse "{\"ok\":false,\"error\":\"ResponseTooLarge\"}";
+    job.responder.success(id, body) catch {};
+    job.active = false;
 }
 
 const CancelPayload = struct {
@@ -1011,6 +1168,7 @@ fn drainKatago(self: *App) void {
     const n = self.katago.takeResults(&results);
     for (results[0..n]) |*result| {
         defer if (result.info) |info| engine_mod.result_allocator.free(info);
+        defer if (result.policy) |rows| engine_mod.result_allocator.destroy(rows);
         const job = findJob(self, result.seq) orelse continue;
         const outcome: engine_mod.Outcome = if (job.cancelled) .cancelled else result.outcome;
         respondJob(job, outcome, result.error_name, result);
@@ -2072,4 +2230,60 @@ test "every bridge command is registered once, with the same origins" {
     var has_dev = false;
     for (allowed_origins) |o| has_dev = has_dev or std.mem.eql(u8, o, dev_server_origin);
     try std.testing.expectEqual(app_options.dev_origin, has_dev);
+}
+
+test "human policy requests are validated and bounded" {
+    const a = std.testing.allocator;
+    const req = try a.create(engine_mod.Request);
+    defer a.destroy(req);
+    var job = Job{};
+    try parsePolicyRequest(a, "{\"size\":9,\"komi\":6.5,\"rules\":\"chinese\",\"moves\":\"B E5 W C3 B G7 W pass B D4\",\"color\":\"B\",\"profiles\":[\"rank_20k\",\"rank_3d\"]}", req, &job);
+    try std.testing.expectEqual(engine_mod.Kind.human_policy, req.kind);
+    try std.testing.expectEqual(engine_mod.Slot.human, req.slot);
+    try std.testing.expectEqual(@as(usize, 2), req.policy_profiles_len);
+    try std.testing.expectEqualStrings("rank_3d", req.policyProfile(1));
+    try std.testing.expectEqual(@as(usize, 3), policyPositions(req));
+    try std.testing.expectEqual(@as(usize, 0), job.id_len); // no id: named by seq later
+    try parsePolicyRequest(a, "{\"id\":\"h1\",\"size\":9,\"moves\":\"B E5 W C3 B G7\",\"color\":\"W\",\"profiles\":[\"rank_1k\"],\"from\":2}", req, &job);
+    try std.testing.expectEqualStrings("h1", job.idText());
+    try std.testing.expectEqual(@as(usize, 0), policyPositions(req));
+    // Seven profiles: as many positions as fit the evaluation budget.
+    try parsePolicyRequest(a, "{\"size\":9,\"color\":\"B\",\"profiles\":[\"rank_20k\",\"rank_15k\",\"rank_10k\",\"rank_5k\",\"rank_1k\",\"rank_1d\",\"rank_3d\"]}", req, &job);
+    try std.testing.expectEqual(@min(engine_mod.max_policy_positions, engine_mod.max_policy_evals / 7), req.policy_max_positions);
+    const bad = [_][]const u8{
+        "{\"size\":9,\"color\":\"B\",\"profiles\":[]}",
+        "{\"size\":9,\"color\":\"B\",\"profiles\":[\"rank_5k maxVisits 1\"]}",
+        "{\"size\":9,\"color\":\"B\",\"profiles\":[\"proyear_2020\"]}",
+        "{\"size\":9,\"color\":\"X\",\"profiles\":[\"rank_5k\"]}",
+        "{\"size\":25,\"color\":\"B\",\"profiles\":[\"rank_5k\"]}",
+        "{\"size\":9,\"moves\":\"B Z9\",\"color\":\"B\",\"profiles\":[\"rank_5k\"]}",
+        "{\"size\":9,\"rules\":\"aga\",\"color\":\"B\",\"profiles\":[\"rank_5k\"]}",
+        "{\"id\":\"bad id\",\"size\":9,\"color\":\"B\",\"profiles\":[\"rank_5k\"]}",
+        "{\"size\":9,\"color\":\"B\",\"profiles\":[\"rank_1k\",\"rank_2k\",\"rank_3k\",\"rank_4k\",\"rank_5k\",\"rank_6k\",\"rank_7k\",\"rank_8k\",\"rank_9k\"]}",
+        "not json",
+    };
+    for (bad) |payload| try std.testing.expectError(error.InvalidRequest, parsePolicyRequest(a, payload, req, &job));
+}
+
+test "human policy replies are JSON the page reads" {
+    const rows = try std.testing.allocator.create(engine_mod.PolicyRows);
+    defer std.testing.allocator.destroy(rows);
+    rows.* = .{ .profiles = 2, .count = 2 };
+    @memcpy(rows.names[0][0..8], "rank_20k");
+    rows.name_lens[0] = 8;
+    @memcpy(rows.names[1][0..7], "rank_3d");
+    rows.name_lens[1] = 7;
+    rows.index[0] = 10;
+    rows.index[1] = 12;
+    rows.p[0] = 0.25;
+    rows.p[1] = 0.5;
+    rows.p[engine_mod.max_policy_profiles] = 0;
+    rows.p[engine_mod.max_policy_profiles + 1] = 1;
+    var buf: [512]u8 = undefined;
+    const got = policyReply(&buf, "p7", rows).?;
+    try std.testing.expectEqualStrings("{\"ok\":true,\"id\":\"p7\",\"engine\":\"human\",\"moves\":[{\"index\":10,\"p\":{\"rank_20k\":0.250000,\"rank_3d\":0.500000}},{\"index\":12,\"p\":{\"rank_20k\":0.000000,\"rank_3d\":1.000000}}],\"truncated\":false}", got);
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, got, .{});
+    parsed.deinit();
+    var small: [40]u8 = undefined;
+    try std.testing.expect(policyReply(&small, "p7", rows) == null);
 }

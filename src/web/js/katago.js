@@ -338,13 +338,20 @@ export async function humanMoveProbabilities(game, color, profiles, { signal = n
   const st = await status();
   if (!st?.available || !st.humanPolicy || signal?.aborted) return null;
   const base = positionPayload(game, game.mainLine ? game.mainLine().at(-1) : game.current, 1);
+  // The host scores every move of `color` and may take a while; an abort
+  // cancels it there too (`studio.katagoCancel` with this id).
+  const id = `h${++nextId}`;
+  const onAbort = () => nativeInvoke("studio.katagoCancel", { id }).catch(() => {});
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const reply = await nativeInvoke("studio.katagoHumanPolicy", { size: base.size, komi: base.komi, rules: base.rules, setup: base.setup, moves: base.moves, color: color === BLACK ? "B" : "W", profiles: profiles.slice() });
+    const reply = await nativeInvoke("studio.katagoHumanPolicy", { id, size: base.size, komi: base.komi, rules: base.rules, setup: base.setup, moves: base.moves, color: color === BLACK ? "B" : "W", profiles: profiles.slice() });
     if (signal?.aborted || !reply || reply.ok !== true || !Array.isArray(reply.moves)) return null;
     return reply.moves.filter((m) => m && Number.isFinite(m.index) && m.p && typeof m.p === "object");
   } catch (error) {
     console.warn("KataGo human policy request failed", error);
     return null;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 

@@ -405,6 +405,37 @@ pub const Engine = struct {
         return error.EngineProtocol;
     }
 
+    /// A multi-line GTP response (`=` then lines, closed by an empty
+    /// line), joined with '\n' into `out`. Too long for `out` is a
+    /// protocol error (the caller then discards the process).
+    fn readBlock(self: *@This(), out: []u8) ![]const u8 {
+        if (!self.reader_ready) return error.EngineMissing;
+        var n: usize = 0;
+        var started = false;
+        var lines: usize = 0;
+        while (lines < 10_000) : (lines += 1) {
+            const raw = self.reader.interface.takeDelimiterInclusive('\n') catch |err| switch (err) {
+                error.EndOfStream => return error.EngineExited,
+                else => return err,
+            };
+            var line = std.mem.trim(u8, raw, " \t\r\n");
+            if (!started) {
+                if (line.len == 0) continue;
+                if (line[0] == '?') return error.EngineRejected;
+                if (line[0] != '=') continue;
+                started = true;
+                line = std.mem.trim(u8, line[1..], " \t");
+            } else if (line.len == 0) {
+                return out[0..n];
+            }
+            if (n + line.len + 1 > out.len) return error.EngineProtocol;
+            @memcpy(out[n..][0..line.len], line);
+            out[n + line.len] = '\n';
+            n += line.len + 1;
+        }
+        return error.EngineProtocol;
+    }
+
     fn command(self: *@This(), text: []const u8) ![]const u8 {
         try self.writeLine(text);
         return self.readReply();
@@ -573,8 +604,21 @@ pub const Position = struct {
     }
 };
 
+/// What a request asks of KataGo.
+pub const Kind = enum { analyze, human_policy };
+
+/// Human-policy requests (v13, docs/strength.md "your moves"): at most this
+/// many positions and profiles, and this many network evaluations, per call.
+pub const max_policy_positions = 200;
+pub const max_policy_profiles = 8;
+pub const max_policy_evals = 1600;
+/// The watchdog's allowance for one evaluation (each one pushes the
+/// deadline on; a stuck evaluation is caught, a long game is not).
+pub const policy_eval_grace_ms: i64 = 20_000;
+
 pub const Request = struct {
     seq: u64 = 0,
+    kind: Kind = .analyze,
     position: Position = .{},
     color: u8 = 'B',
     visits: u32 = 64,
@@ -585,11 +629,78 @@ pub const Request = struct {
     profile: [max_profile]u8 = undefined,
     profile_len: usize = 0,
     style: HumanStyle = .raw,
+    /// Human policy only: the profiles to read (each a `validProfile`), the
+    /// first move index to score, and the positions to score at most.
+    policy_profiles: [max_policy_profiles][max_profile]u8 = undefined,
+    policy_profile_lens: [max_policy_profiles]u8 = @splat(0),
+    policy_profiles_len: usize = 0,
+    policy_from: usize = 0,
+    policy_max_positions: usize = max_policy_positions,
 
     pub fn profileText(self: *const Request) []const u8 {
         return self.profile[0..self.profile_len];
     }
+
+    pub fn policyProfile(self: *const Request, i: usize) []const u8 {
+        return self.policy_profiles[i][0..self.policy_profile_lens[i]];
+    }
 };
+
+/// The probabilities a human-policy request found: for each scored move
+/// (its index in the move list), the human SL policy's probability of the
+/// move actually played, under each profile. Owned by `result_allocator`.
+pub const PolicyRows = struct {
+    count: usize = 0,
+    profiles: usize = 0,
+    /// More positions qualified than the request's bound allowed.
+    truncated: bool = false,
+    names: [max_policy_profiles][max_profile]u8 = undefined,
+    name_lens: [max_policy_profiles]u8 = @splat(0),
+    index: [max_policy_positions]u16 = undefined,
+    p: [max_policy_positions * max_policy_profiles]f32 = undefined,
+
+    pub fn name(self: *const PolicyRows, k: usize) []const u8 {
+        return self.names[k][0..self.name_lens[k]];
+    }
+
+    pub fn prob(self: *const PolicyRows, row: usize, k: usize) f32 {
+        return self.p[row * max_policy_profiles + k];
+    }
+};
+
+/// The policy probability of `move` in a `kata-raw-human-nn` report
+/// (KataGo 1.18.1 `rawNN`): `policy` is followed by size×size numbers,
+/// row by row from the top (GTP row `size`), `NAN` for illegal points;
+/// `policyPass` by one number. Null when the report does not have them.
+pub fn policyAt(report: []const u8, size: u8, move: Move) ?f32 {
+    var it = std.mem.tokenizeAny(u8, report, " \t\r\n");
+    const pass = std.mem.eql(u8, move.text(), "pass");
+    var target: usize = 0;
+    if (!pass) {
+        const v = move.text();
+        if (v.len < 2) return null;
+        const col = std.mem.indexOfScalar(u8, columns, v[0]) orelse return null;
+        const row = std.fmt.parseInt(u8, v[1..], 10) catch return null;
+        if (col >= size or row < 1 or row > size) return null;
+        target = @as(usize, size - row) * size + col;
+    }
+    while (it.next()) |tok| {
+        if (pass and std.mem.eql(u8, tok, "policyPass")) return parseProb(it.next() orelse return null);
+        if (!pass and std.mem.eql(u8, tok, "policy")) {
+            var i: usize = 0;
+            while (i < target) : (i += 1) _ = it.next() orelse return null;
+            return parseProb(it.next() orelse return null);
+        }
+    }
+    return null;
+}
+
+fn parseProb(tok: []const u8) ?f32 {
+    if (std.ascii.eqlIgnoreCase(tok, "nan")) return 0;
+    const v = std.fmt.parseFloat(f32, tok) catch return null;
+    if (!std.math.isFinite(v) or v < 0) return null;
+    return @min(v, 1);
+}
 
 /// How the worker brought KataGo to the requested position.
 pub const SyncStats = struct {
@@ -607,6 +718,9 @@ pub const Result = struct {
     play_len: usize = 0,
     /// Final `info` line, owned by `result_allocator`; the collector frees it.
     info: ?[]u8 = null,
+    /// Human policy requests: the rows, owned by `result_allocator`; the
+    /// collector frees them.
+    policy: ?*PolicyRows = null,
     sync: SyncStats = .{},
     error_name: []const u8 = "",
 
@@ -765,6 +879,10 @@ pub const Worker = struct {
     last_stream_ms: i64 = 0,
     /// The current request got as far as talking to KataGo.
     touched: bool = false,
+    /// Human policy: the position being stepped through, and one
+    /// `kata-raw-human-nn` report.
+    policy_target: Position = .{},
+    block_buf: [64 * 1024]u8 = undefined,
 
     /// `strong_model` / `human_model`: absolute paths of the optional
     /// networks (they need not exist yet; empty disables the slot).
@@ -1002,6 +1120,7 @@ pub const Worker = struct {
             if (self.quit) {
                 self.lock.unlock(self.io);
                 if (result.info) |info| result_allocator.free(info);
+                if (result.policy) |rows| result_allocator.destroy(rows);
                 return;
             }
             self.lock.unlock(self.io);
@@ -1030,6 +1149,8 @@ pub const Worker = struct {
             result.error_name = if (self.timedOut(req.seq)) "Timeout" else @errorName(err);
             if (result.info) |info| result_allocator.free(info);
             result.info = null;
+            if (result.policy) |rows| result_allocator.destroy(rows);
+            result.policy = null;
             if (err == error.Cancelled and !self.timedOut(req.seq)) {
                 result.outcome = .cancelled;
                 return;
@@ -1044,9 +1165,73 @@ pub const Worker = struct {
         };
     }
 
+    /// Push the running request's deadline on (a long human-policy request
+    /// that keeps making progress).
+    fn extendDeadline(self: *Worker, ms: i64) void {
+        const now = std.Io.Timestamp.now(self.io, .awake).toMilliseconds();
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        if (self.running_deadline_ms != 0) self.running_deadline_ms = @max(self.running_deadline_ms, now + ms);
+    }
+
+    /// Human policy (v13): for each move of `req.color` from `policy_from`
+    /// on, bring the human slot's board to the position before it and read
+    /// the raw human SL policy under each profile: `kata-set-param
+    /// humanSLProfile <p>` then `kata-raw-human-nn <color> 0` (one
+    /// symmetry: these are statistics, not a move choice).
+    fn processPolicy(self: *Worker, req: *const Request, result: *Result) !void {
+        if (req.slot != .human or req.policy_profiles_len == 0 or req.policy_profiles_len > max_policy_profiles) return error.InvalidRequest;
+        for (0..req.policy_profiles_len) |k| {
+            if (!validProfile(req.policyProfile(k))) return error.InvalidRequest;
+        }
+        const rows = try result_allocator.create(PolicyRows);
+        rows.* = .{ .profiles = req.policy_profiles_len };
+        for (0..req.policy_profiles_len) |k| {
+            const p = req.policyProfile(k);
+            @memcpy(rows.names[k][0..p.len], p);
+            rows.name_lens[k] = @intCast(p.len);
+        }
+        result.policy = rows;
+        self.touched = true;
+        const engine = &self.engines[@intFromEnum(Slot.human)];
+        const state = &self.states[@intFromEnum(Slot.human)];
+        try engine.start();
+        // The profile changes below: the next human-style search sets its own.
+        state.human_valid = false;
+        const target = &self.policy_target;
+        target.* = req.position;
+        const color: []const u8 = if (req.color == 'W') "W" else "B";
+        const limit = @min(req.policy_max_positions, max_policy_positions);
+        var i: usize = req.policy_from;
+        while (i < req.position.moves_len) : (i += 1) {
+            const move = req.position.moves[i];
+            if (move.color != req.color) continue;
+            if (rows.count >= limit) {
+                rows.truncated = true;
+                break;
+            }
+            if (self.isCancelled(req.seq)) return error.Cancelled;
+            target.moves_len = i;
+            _ = try syncPosition(engine, state, target);
+            for (0..req.policy_profiles_len) |k| {
+                if (self.isCancelled(req.seq)) return error.Cancelled;
+                var buf: [96]u8 = undefined;
+                _ = try engine.command(std.fmt.bufPrint(&buf, "kata-set-param humanSLProfile {s}", .{req.policyProfile(k)}) catch return error.InvalidRequest);
+                try engine.writeLine(std.fmt.bufPrint(&buf, "kata-raw-human-nn {s} 0", .{color}) catch return error.InvalidRequest);
+                const report = try engine.readBlock(&self.block_buf);
+                rows.p[rows.count * max_policy_profiles + k] = policyAt(report, req.position.size, move) orelse return error.EngineProtocol;
+                self.extendDeadline(policy_eval_grace_ms);
+            }
+            rows.index[rows.count] = @intCast(i);
+            rows.count += 1;
+        }
+        result.outcome = .ok;
+    }
+
     fn processInner(self: *Worker, req: *const Request, result: *Result) !void {
         self.touched = false;
         if (self.isCancelled(req.seq)) return error.Cancelled;
+        if (req.kind == .human_policy) return self.processPolicy(req, result);
         if (req.slot == .human and !validProfile(req.profileText())) return error.InvalidRequest;
         self.touched = true;
         const engine = &self.engines[@intFromEnum(req.slot)];
@@ -1337,4 +1522,37 @@ test "the watchdog kills a process that stops answering" {
     _ = &child;
     try std.testing.expect(engine.child == null);
     try std.testing.expect(engine.kill_id == null);
+}
+
+test "the played move's probability is read from a kata-raw-human-nn report" {
+    // A 3x3 report as KataGo 1.18.1 prints it (rows from the top).
+    const report =
+        \\symmetry 0
+        \\whiteWin 0.400000
+        \\whiteLoss 0.600000
+        \\noResult 0.000000
+        \\whiteScore -1.500
+        \\whiteScoreSq 9.000
+        \\shorttermWinlossError 0.300
+        \\shorttermScoreError 2.000
+        \\policy
+        \\0.010000 0.020000 0.030000
+        \\0.040000 0.500000     NAN
+        \\0.070000 0.080000 0.090000
+        \\policyPass 0.150000
+        \\whiteOwnership
+        \\0.1 0.2 0.3
+        \\0.4 0.5 0.6
+        \\0.7 0.8 0.9
+    ;
+    var mv: [4]Move = undefined;
+    _ = try parseMoves("B A3 W B2 B C2 W pass", 3, true, &mv);
+    try std.testing.expectEqual(@as(f32, 0.01), policyAt(report, 3, mv[0]).?);
+    try std.testing.expectEqual(@as(f32, 0.5), policyAt(report, 3, mv[1]).?);
+    try std.testing.expectEqual(@as(f32, 0), policyAt(report, 3, mv[2]).?); // NAN (illegal) counts as 0
+    try std.testing.expectEqual(@as(f32, 0.15), policyAt(report, 3, mv[3]).?);
+    // A truncated or foreign report is not a probability.
+    try std.testing.expect(policyAt("symmetry 0\npolicy\n0.1 0.2", 3, mv[1]) == null);
+    try std.testing.expect(policyAt("whiteWin 0.5", 3, mv[0]) == null);
+    try std.testing.expect(policyAt("policy -1 0 0 0 0 0 0 0 0", 3, mv[0]) == null);
 }
