@@ -111,14 +111,12 @@ export const canSwap = (def) => def?.goal !== "endgame";
 /*
  * Problems the solver does not treat alike in every orientation, found by
  * `node scripts/check-transforms.mjs --all-syms` (every symmetry of every
- * problem): only the symmetries listed are used. In life-vital-20 the
- * solver proves a second correct first move in every orientation but the
- * written one (a search-order effect of the solver, to be fixed there);
- * capture-ladder-01 exceeds the first-move search's node budget in two
- * orientations. Colour swap is safe for both.
+ * problem): only the symmetries listed are used. capture-ladder-01
+ * exceeds the first-move search's node budget in two orientations; colour
+ * swap is safe. (life-vital-20 was listed until v13 fixed the solver's
+ * transposition table, which had proved it differently by orientation.)
  */
 const ONLY_SYMS = {
-  "life-vital-20": [0],
   "capture-ladder-01": [0, 1, 2, 3, 4, 6],
 };
 

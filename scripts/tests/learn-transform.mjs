@@ -120,8 +120,8 @@ await test("learn transform: a review's transform is reproducible, never the wri
     seen.add(`${t.sym}${t.swap}`);
   }
   assert.ok(seen.size >= 8, "varied from one review to the next");
-  const fixed = PROBLEMS.find((p) => p.id === "life-vital-20");
-  if (fixed) for (let tries = 1; tries < 10; tries++) assert.deepEqual(T.reviewTransform(fixed, tries), { sym: 0, swap: true });
+  const limited = PROBLEMS.find((p) => p.id === "capture-ladder-01");
+  if (limited) for (let tries = 1; tries < 40; tries++) assert.ok(T.allowedSyms(limited).includes(T.reviewTransform(limited, tries).sym));
   const eg = PROBLEMS.find((p) => p.goal === "endgame");
   for (let tries = 1; tries < 10; tries++) assert.equal(T.reviewTransform(eg, tries).swap, false);
 });

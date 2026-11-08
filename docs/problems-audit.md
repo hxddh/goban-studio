@@ -692,14 +692,15 @@ transform each (543 problems in about 22 s, locally): the solver's
 mapped, ko and seki results are kept, and a recoloured problem is played by
 the other colour. The unit tests run a sample of 60. `--all-syms` checks all
 eight symmetries of every problem (about 3 minutes); it found two problems
-the solver does not treat alike in every orientation, which are shown only
-in the symmetries that pass:
+the solver did not treat alike in every orientation:
 
 - `life-vital-20`: in every orientation but the written one the solver
-  proves a second correct first move, (1,1) besides (0,1), with exact
-  searches. Fresh searches of that one move disagree by orientation, so
-  the result depends on move order: a solver issue (the review notes
-  path-dependent results in the transposition table), not a property of
-  the position. Shown as written, recoloured only.
+  proved a second correct first move, (1,1) besides (0,1). The cause was the
+  transposition table storing results that rested on a repetition found at
+  the storing ply; with the table off, every orientation proves both moves.
+  v13 stores only repetition-free results, and a search started on a real
+  line (a solution line, a learner's attempt) now counts that line's earlier
+  positions for superko (which also fixed seki-01's answer line). The
+  problem now has two correct first moves, in every orientation.
 - `capture-ladder-01`: in two orientations the first-move search exceeds
   its node budget (inexact). Those two are not used.

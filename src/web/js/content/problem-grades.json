@@ -1904,10 +1904,10 @@
   },
   "kill-ko-01": {
     "grade": 5,
-    "score": 5.41,
-    "reading": 1.6,
+    "score": 4.76,
+    "reading": 0.95,
     "wrong": 5,
-    "moves": 3,
+    "moves": 6,
     "correct": [
       {
         "x": 2,
@@ -2503,7 +2503,7 @@
   },
   "kill-vital-03": {
     "grade": 4,
-    "score": 3.65,
+    "score": 3.66,
     "reading": 0.35,
     "wrong": 5,
     "moves": 1,
@@ -2627,9 +2627,9 @@
     ]
   },
   "kill-placement-10": {
-    "grade": 4,
-    "score": 4.19,
-    "reading": 0.7,
+    "grade": 5,
+    "score": 4.34,
+    "reading": 0.85,
     "wrong": 7,
     "moves": 2,
     "correct": [
@@ -2790,7 +2790,7 @@
   },
   "kill-reduce-07": {
     "grade": 4,
-    "score": 3.3,
+    "score": 3.31,
     "reading": 0.85,
     "wrong": 4,
     "moves": 2,
@@ -2837,7 +2837,7 @@
   },
   "life-vital-02": {
     "grade": 5,
-    "score": 5.4,
+    "score": 5.41,
     "reading": 1.85,
     "wrong": 7,
     "moves": 4,
@@ -3092,10 +3092,10 @@
   },
   "seki-01": {
     "grade": 5,
-    "score": 6.36,
-    "reading": 1.75,
+    "score": 6.26,
+    "reading": 1.65,
     "wrong": 6,
-    "moves": 4,
+    "moves": 3,
     "correct": [
       {
         "x": 1,
@@ -3118,7 +3118,7 @@
   },
   "seki-03": {
     "grade": 5,
-    "score": 5.77,
+    "score": 5.78,
     "reading": 1.1,
     "wrong": 6,
     "moves": 2,
@@ -3669,7 +3669,7 @@
   },
   "shape-second-line-seven-01": {
     "grade": 4,
-    "score": 3.34,
+    "score": 3.35,
     "reading": 0.55,
     "wrong": 6,
     "moves": 1,
@@ -5150,7 +5150,7 @@
   },
   "seki-16": {
     "grade": 5,
-    "score": 4.4,
+    "score": 4.41,
     "reading": 0.1,
     "wrong": 4,
     "moves": 1,
@@ -5449,11 +5449,15 @@
   },
   "life-vital-20": {
     "grade": 5,
-    "score": 5.84,
+    "score": 5.42,
     "reading": 2.1,
-    "wrong": 8,
+    "wrong": 7,
     "moves": 4,
     "correct": [
+      {
+        "x": 1,
+        "y": 1
+      },
       {
         "x": 0,
         "y": 1

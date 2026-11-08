@@ -434,7 +434,8 @@ export function initialState(pz) {
     h1 ^= a;
     h2 ^= b;
   }
-  return { board, toMove: pz.toMove, ko: -1, passes: 0, h1: h1 >>> 0, h2: h2 >>> 0 };
+  // hist: the start is the first position of the real line (withHistory).
+  return { board, toMove: pz.toMove, ko: -1, passes: 0, h1: h1 >>> 0, h2: h2 >>> 0, hist: [] };
 }
 
 /**
@@ -476,6 +477,26 @@ export function play(pz, st, i, ignoreKo = false) {
 /** A board-only position key (positional superko). */
 function posKey(st) {
   return (st.h1 & 0x1fffff) * 4294967296 + st.h2;
+}
+
+/**
+ * v13: the positions already played on a real line (a solution line, a
+ * learner's attempt) before `st`, as posKeys. A search started from a
+ * position on such a line treats them as part of its path, so positional
+ * superko forbids recreating them exactly as it would in the game; without
+ * them a fresh search could answer with a recapture the line has already
+ * made illegal (seki-01). Only line-level states carry it; the search's
+ * own states do not (the search keeps its own path).
+ */
+function withHistory(prev, next) {
+  if (!next || next === prev) return next;
+  next.hist = (prev.hist || []).concat(posKey(prev));
+  return next;
+}
+
+/** True when `next` recreates a position already played on its line. */
+function repeatsLine(next) {
+  return !!(next && next.hist && next.hist.includes(posKey(next)));
 }
 
 /* -------------------------------------------------------------- analysis */
@@ -750,6 +771,10 @@ function candidates(pz, st, keyIdx, master = 0, pushes = 0) {
       retake = !!next;
     }
     if (!next) continue;
+    if (st.hist) {
+      withHistory(st, next);
+      if (i !== PASS && !retake && repeatsLine(next)) continue;
+    }
     moves.push({ i, next, retake, score: moveScore(pz, next, i, attacking, keyIdx) });
   }
   moves.sort((a, b) => b.score - a.score);
@@ -906,7 +931,14 @@ class Search {
     // is returned (marked inexact) but never stored, or a later search with
     // budget left would read it back as a depth-limited result. Inexact
     // results stored before the budget ran out are depth-limited only.
-    if (dep >= ply && (exact || !this.exhausted)) this.tt.set(k, { win: result, exact, depth, pushes });
+    //
+    // v13: only a result that rests on no repetition at all is stored
+    // (dep === Infinity). Storing results whose repetition was found at
+    // this very ply (dep === ply) let a position's value depend on the
+    // order the search reached it: life-vital-20 proved one correct move as
+    // written and two in every other orientation; without the table, and
+    // with this rule, every orientation proves both.
+    if (dep === Infinity && (exact || !this.exhausted)) this.tt.set(k, { win: result, exact, depth, pushes });
     return out;
   }
 }
@@ -918,6 +950,9 @@ class Search {
  */
 export function attackerWins(pz, st, budget, master = -pz.userColor, strict = false) {
   const s = new Search(pz, master, budget, strict);
+  // The real line's earlier positions are on the path at ply -1: a result
+  // that rests on them is never stored (see run()).
+  if (st.hist) for (const k of st.hist) if (!s.path.has(k)) s.path.set(k, -1);
   // Iterative deepening: short wins (most of them) are found before the
   // search wanders down a long line; shallow results stay in the table.
   let r;
@@ -1093,7 +1128,7 @@ export function solutionLine(pz, limit = 24) {
     } else {
       const r = reply(pz, st);
       if (!r || r.pass) break;
-      const next = play(pz, st, indexOf(pz, r.x, r.y));
+      const next = withHistory(st, play(pz, st, indexOf(pz, r.x, r.y)));
       if (!next) break;
       line.push({ x: r.x, y: r.y, c: st.toMove });
       st = next;
@@ -2048,7 +2083,8 @@ export function countLine(pz, toMove = BLACK, limit = 30) {
  */
 export function playMove(pz, st, i) {
   if (!pz.counting) {
-    const next = play(pz, st, i);
+    const next = withHistory(st, play(pz, st, i));
+    if (i !== PASS && repeatsLine(next)) return null;
     return next ? { next } : null;
   }
   if (i === PASS) return { next: countPass(pz, st) };
