@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "esbuild": "0.28.2",
-    "pixelmatch": "^7.1.0",
+    "pixelmatch": "^8.0.0",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0"
   },
