@@ -49,15 +49,15 @@ the built commit and to `package.json`'s version, hash-pinned downloads.
 
 ## Content gate (`npm run release-check`)
 
-Fails the build unless: the course has at least 13 units, 60 lessons and
-240 steps (5+ intermediate units); at least 500 problems, each with a
+Fails the build unless: the course has at least 20 units, 90 lessons and
+310 steps (7+ intermediate units, 8+ advanced units with 27+ lessons); at least 500 problems, each with a
 theme and a measured grade 1–5; 20 classics; every title, hint and note in
 zh/en/ko/ja; the licences, engine config and SDK patch are present; the
 committed KataGo network `engine/model/model.txt.gz` has its pinned SHA-256
 (source: `engine/model/README.md`); `package.json`, `app.zon`,
 `build.zig.zon`, the web `APP_VERSION` and `index.html` agree on the
 version; release notes exist for it; and `.nvmrc` is the lowest Node that
-`engines` allows. Currently: 18 units · 82 lessons · 294 steps · 543
+`engines` allows. Currently: 23 units · 104 lessons · 369 steps · 543
 problems in 30 themes · 20 classics.
 
 ## Interface tests (`npm run ui-test`, 74 checks)

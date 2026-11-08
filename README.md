@@ -49,6 +49,16 @@ players who already know the rules, which sets where the course starts;
 Learn's problem rows show their position; Play's home lists four classics
 and a link to the rest. v10 reads everything v9 saved.
 
+## v13: trustworthy
+
+v13 keeps the four spaces and makes the app something you can rely on:
+correct counting and SGF reading, no lost games or overwritten data, a
+narrower native bridge and safer updates, problem grades and placement
+that fit people, review that varies the problem and spaces it by memory,
+and new units on ko, judging the position, area scoring, the endgame,
+openings, joseki and handicap Go. v13 reads everything v9–v12 saved. See
+[`.github/release-notes/v13.0.0.md`](.github/release-notes/v13.0.0.md).
+
 ## v12: four spaces again
 
 v9 folded the app into two spaces; that made every day's start harder to
@@ -79,7 +89,7 @@ saved.
 - **Practice** (⌘3) — one short path for today, chosen for you and played
   as one session (the next lesson, your own mistakes and problems due for
   review, this week's focus, one stretch problem, new problems at your
-  level), and on the same page every lesson (18 units, 82 lessons) and
+  level), and on the same page every lesson (23 units, 104 lessons) and
   the 543 solver-proved problems by topic.
 - **Library** (⌘4) — your games, the 20 classics and the opening
   explorer; Import SGF.
@@ -91,9 +101,11 @@ saved.
   keys and Space, and with a screen reader (⌘/ lists every key; Ctrl on
   Windows).
 - **Your data** — files in the app's data folder (`data/settings.json`,
-  `profile.json`, `current.json`, `games/<id>.json`), written atomically by
-  the desktop shell, with no size limit; *Export backup* writes them all as
-  one file.
+  `profile.json`, `current.json`, `games-index.json`, `games/<id>.json`),
+  written atomically by the desktop shell, versioned and migrated forward
+  on read (`docs/storage.md`); a file the app cannot read is copied aside
+  and never written over. *Export backup* writes them all as one file;
+  a restore keeps a snapshot you can undo.
 - **Offline by design** — no account, no telemetry, and no network request
   unless you ask for one: **Check for updates…** makes a single request to
   GitHub for the latest release, and the weekly automatic check is off
@@ -281,7 +293,7 @@ On a machine with Node.js 24+, Zig 0.16.0 and Native SDK 0.11.0:
 ```bash
 npm run build
 npm run sync
-zig build -Doptimize=ReleaseFast
+zig build -Doptimize=ReleaseSafe
 native package --target macos --signing adhoc --assets frontend/dist \
   --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
 node scripts/install-engine.mjs dist/GobanStudio.app macos
