@@ -19,14 +19,16 @@ on:
   push:
     branches: ["calibrate/**"]
 
+# Read-only by default; only the job that commits the results writes.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: calibrate-${{ github.ref }}
   cancel-in-progress: false
 
 env:
+  NPM_CONFIG_ENGINE_STRICT: "true"
   KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
   KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
 
@@ -36,10 +38,10 @@ jobs:
     outputs:
       matrix: ${{ steps.m.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       - run: npm ci --ignore-scripts
       - id: m
         run: |
@@ -57,10 +59,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       - run: npm ci --ignore-scripts
       - name: KataGo and networks (SHA-256 checked)
         run: |
@@ -96,7 +98,7 @@ jobs:
           if [ -f "docs/calibration/results/$RUN.jsonl" ]; then cp "docs/calibration/results/$RUN.jsonl" "$OUT"; fi
           node scripts/calibrate-strength.mjs play "${ARGS[@]}" --shard "$SHARD" --deadline 320 --out "$OUT"
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: games-${{ matrix.run }}-${{ strategy.job-index }}
           path: out/*.jsonl
@@ -106,13 +108,15 @@ jobs:
   collect:
     needs: play
     if: always() && needs.play.result != 'skipped'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
-      - uses: actions/download-artifact@v8
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: games-*
           path: in

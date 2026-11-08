@@ -7,34 +7,62 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, e.g. v1.0.0; notes file must exist"
+        description: "Release tag, e.g. v1.0.0; must be v + package.json version; notes file must exist"
         required: true
       sdk_version:
         description: "@native-sdk/cli version used by both platform builds"
         required: false
         default: "0.11.0"
       rehearse:
-        description: "Run every gate and both builds, publish nothing"
+        description: "Run every gate and both builds, publish nothing (allowed from any branch)"
         type: boolean
         required: false
         default: false
 
+# Read-only by default; only the jobs that write a release get more.
 permissions:
-  contents: write
-  actions: read
+  contents: read
+
+env:
+  NPM_CONFIG_ENGINE_STRICT: "true"
 
 jobs:
   preflight:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - name: notes exist and tag is not already published
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: branch, version, notes, and the tag is not already published
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
           REHEARSE: ${{ inputs.rehearse }}
+          # Only whether the secret exists reaches this step, never its value.
+          HAS_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY != '' }}
+          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
         run: |
           set -euo pipefail
+          # The tag is created at the commit that was built ($GITHUB_SHA), so
+          # a release is only ever cut from main.
+          if [ "$REHEARSE" != "true" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error title=release::run the release from main (this run is on $GITHUB_REF); rehearse=true runs anywhere"
+            exit 1
+          fi
+          version="$(node -p 'require("./package.json").version')"
+          if [ "$TAG" != "v${version}" ]; then
+            if [ "$REHEARSE" = "true" ]; then
+              echo "::warning title=release::tag $TAG does not match package.json version v${version}; a real release would stop here"
+            else
+              echo "::error title=release::tag $TAG does not match package.json version v${version}"
+              exit 1
+            fi
+          fi
+          # An app built with the update public key refuses an unsigned
+          # SHA256SUMS, so such a release must ship SHA256SUMS.sig. Checked
+          # here so a missing key fails in seconds, not after the builds.
+          if [ -n "$UPDATE_PUBKEY" ] && [ "$HAS_UPDATE_SIGNING_KEY" != "true" ]; then
+            echo "::error title=update signing::vars.UPDATE_PUBKEY is set but the UPDATE_SIGNING_KEY secret is not (docs/signing.md)"
+            exit 1
+          fi
           if [ "$REHEARSE" = "true" ]; then echo "rehearsal: nothing will be tagged"; exit 0; fi
           test -f ".github/release-notes/${TAG}.md" || { echo "missing .github/release-notes/${TAG}.md"; exit 1; }
           published=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
@@ -43,13 +71,19 @@ jobs:
 
   macos:
     needs: preflight
+    # The build job itself runs read-only (its own permissions in the called
+    # workflow); only that workflow's optional upload-to-release job, which
+    # a release never triggers, could use more.
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-macos.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
       runner: macos-15
       arch: arm64
     # Signing secrets are optional (docs/signing.md); without them the
-    # build is ad-hoc signed and the notes say so.
+    # build is ad-hoc signed and the notes say so. In the called workflow
+    # they reach only the steps that sign.
     secrets: inherit
 
   # v5: a native Intel build (KataGo built for x86_64 on the Intel runner),
@@ -59,6 +93,8 @@ jobs:
   # size of a universal app with two KataGo and two app binaries.
   macos-intel:
     needs: preflight
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-macos.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
@@ -68,6 +104,8 @@ jobs:
 
   windows:
     needs: preflight
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-windows.yml
     with:
       sdk_version: ${{ inputs.sdk_version }}
@@ -77,35 +115,37 @@ jobs:
     needs: [preflight, macos, macos-intel, windows]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.macos.result == 'success' && needs.macos-intel.result == 'success' && needs.windows.result == 'success' }}
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: GobanStudio-macOS-arm64
           path: dist-macos
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: GobanStudio-macOS-x64
           path: dist-macos
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: GobanStudio-Windows-x64
           path: dist-windows
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signing-status-macos
           path: signing
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signing-status-macos-x64
           path: signing
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signing-status-windows
           path: signing
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       - name: release notes with the real signing status
         env:
           TAG: ${{ inputs.tag }}
@@ -130,7 +170,7 @@ jobs:
             echo
             cat release-notes.md
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
           path: release-notes.md
@@ -152,6 +192,26 @@ jobs:
           (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip) >> SHA256SUMS
           cat SHA256SUMS
           test "$(wc -l < SHA256SUMS)" -eq 5
+      - name: sign SHA256SUMS
+        # SHA256SUMS.sig is what an app built with vars.UPDATE_PUBKEY trusts
+        # (docs/signing.md, "Update signing in CI"). The private key reaches
+        # this step only.
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            if [ -n "$UPDATE_PUBKEY" ]; then
+              echo "::error title=update signing::the apps enforce signed updates (vars.UPDATE_PUBKEY) but UPDATE_SIGNING_KEY is not set"
+              exit 1
+            fi
+            echo "::notice title=update signing::UPDATE_SIGNING_KEY not set; SHA256SUMS ships unsigned (docs/signing.md)"
+            exit 0
+          fi
+          node scripts/sign-sums.mjs
+          test -s SHA256SUMS.sig
+          echo "SHA256SUMS.sig written"
       - name: publish
         if: ${{ inputs.rehearse != true }}
         env:
@@ -159,16 +219,28 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
+          # A tag that already exists keeps its commit (gh ignores --target
+          # then): refuse one that points anywhere but the commit built here.
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" > /dev/null 2>&1; then
+            commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
+            [ "$commit" = "$GITHUB_SHA" ] || { echo "::error::tag ${TAG} exists at ${commit}, not at the built commit ${GITHUB_SHA}"; exit 1; }
+          fi
+          assets=(
+            dist-macos/GobanStudio-macOS-arm64.zip
+            dist-macos/GobanStudio-macOS-arm64.dmg
+            dist-macos/GobanStudio-macOS-x64.zip
+            dist-macos/GobanStudio-macOS-x64.dmg
+            dist-windows/GobanStudio-Windows-x64.zip
+            SHA256SUMS
+          )
+          if [ -f SHA256SUMS.sig ]; then assets+=(SHA256SUMS.sig); fi
+          # --target: the tag is created at the commit every package was
+          # built from, not wherever main points when the builds finish.
           gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --draft \
             --title "Goban Studio $TAG" \
             --notes-file release-notes.md
-          gh release upload "$TAG" \
-            dist-macos/GobanStudio-macOS-arm64.zip \
-            dist-macos/GobanStudio-macOS-arm64.dmg \
-            dist-macos/GobanStudio-macOS-x64.zip \
-            dist-macos/GobanStudio-macOS-x64.dmg \
-            dist-windows/GobanStudio-Windows-x64.zip \
-            SHA256SUMS
+          gh release upload "$TAG" "${assets[@]}"
           gh release edit "$TAG" --draft=false
           gh release view "$TAG" --json url,isDraft,assets

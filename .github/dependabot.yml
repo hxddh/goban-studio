@@ -1,0 +1,20 @@
+# Weekly update pull requests for the pinned actions (their commit SHAs and
+# version comments move together) and the npm lockfile. Each one runs the
+# checks workflow like any other pull request.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development

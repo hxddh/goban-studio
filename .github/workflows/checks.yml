@@ -8,6 +8,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request makes the older run pointless.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # package.json's "engines" is enforced here (not in local dev, where an
+  # older Node may still be installed): npm ci fails on a Node it excludes.
+  NPM_CONFIG_ENGINE_STRICT: "true"
+
 jobs:
   web:
     runs-on: ubuntu-latest
@@ -15,35 +25,74 @@ jobs:
       matrix:
         node: [24, 26]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
+      # No dependency needs its install script (esbuild finds its platform
+      # binary through its optional dependency).
+      - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run release-check
       - run: npm run build
       - run: npm run sync
       - run: test -s frontend/dist/js/bundle.js && test -s frontend/dist/index.html
 
+  # The Zig shell's unit tests (updater URL allow-list, SHA-256 parsing, zip
+  # entry checks, …) and a compile of the app, on Linux with the SDK's null
+  # platform: no window system is needed, so every pull request runs them.
+  # The macOS and Windows hosts themselves are compiled and tested by the
+  # platform builds (build-macos.yml, build-windows.yml).
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SDK_VERSION: "0.11.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # setup-zig verifies the download against Zig's signing key and caches
+      # the global Zig cache between runs.
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+      - name: install Native SDK sources
+        # --ignore-scripts: the postinstall downloads the `native` CLI binary,
+        # which the null-platform build and tests do not use.
+        run: |
+          npm install -g --ignore-scripts "@native-sdk/cli@${SDK_VERSION}"
+          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
+      - name: patch Native SDK
+        run: |
+          node scripts/patch-sdk.mjs "$SDK_PATH"
+          node scripts/patch-sdk.mjs --check "$SDK_PATH"
+      - name: zig build test
+        run: zig build test -Dnative-sdk-path="$SDK_PATH" -Dplatform=null --summary all
+      - name: zig build
+        run: zig build -Dnative-sdk-path="$SDK_PATH" -Dplatform=null --summary all
+
   ui:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
+          node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run sync
-      # Interaction flows, performance budgets, four-language rendering and
-      # visual regression against tests/visual (diffs uploaded on failure).
+      # Interaction flows, performance budgets (median of three runs), four-
+      # language rendering and visual regression against tests/visual (diffs
+      # uploaded on failure). With CI set, a missing baseline fails the run
+      # instead of being written.
       - run: node scripts/ui-test.mjs
       - if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ui-diffs
           path: tests/visual/diff
