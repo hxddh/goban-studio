@@ -1081,11 +1081,23 @@ function ReviewPanel() {
 }
 
 /** The game in three phases (KataGo only), per player, and three things to remember. */
+/** v13: "Your moves look like ≈ 12 kyu (8 kyu to 15 kyu)", from the human-style model, when there is a reading. */
+function MoveRankLine() {
+  const mr = C.moveRankOf(state.review);
+  if (!mr) return null;
+  return (
+    <p class="fine move-rank" title={t("review.moveRankHelp")}>
+      {t("review.moveRank", [rankText(mr.rank), rankText(mr.lo), rankText(mr.hi)])}
+    </p>
+  );
+}
+
 function GameSummary() {
   const m = state.review.model;
   if (!m?.phases?.length) return null;
   return (
     <section class="game-summary">
+      <MoveRankLine />
       {m.players.map((who) => (
         <table class="phase-table">
           <caption class="sr-only">{t("report.phasesOf", [t("common." + who)])}</caption>

@@ -1258,6 +1258,56 @@ the band of its game count. `progress.rating.r` (the GoR of μ) and
 data alike. Rank labels round to the nearest rank
 since v6 (v5 rounded a rating towards the weaker rank).
 
+## v13: your moves, a second channel
+
+Results against the measured levels remain the evidence for the estimate.
+v13 adds a second, separate reading from the player's own moves
+(`src/web/js/model/move-rank.js`), the approach KaTrain and AI Sensei use:
+KataGo's human SL model gives, for a position and a rank profile, the
+probability that a player of that rank plays each point. After a finished
+game's analysis, for every move of the player from move 10 on, the app
+asks for the probability of the move actually played under the profiles
+`rank_20k`, `rank_15k`, `rank_10k`, `rank_5k`, `rank_1k`, `rank_1d` and
+`rank_3d`. A uniform prior over the profiles and the summed log
+probabilities give a posterior; each move counts as a quarter of an
+independent observation (neighbouring moves are correlated, and the model
+imitates style rather than strength), no probability counts below 0.001,
+and a game needs 30 scored moves. The review summary then shows "Your moves
+look like ≈ 12 kyu (8 kyu to 15 kyu)": the posterior mean and mean ± one
+standard deviation, at least ± 2 ranks, never outside the 20 kyu – 3 dan
+range of the profiles. It is stored with the game (`moveRank`) and in the
+game's player-model record.
+
+**Only a weak prior.** `applyMoveRank` uses a game's reading once, and only
+while that board's estimate rests on fewer than 5 rated games, as a
+Gaussian measurement of at least 4 nats (about six ranks around 15 kyu).
+Against the prior's 2.5 nats it moves a fresh estimate about 28 % of the
+way towards the reading and narrows the band from 2.5 to about 2.1 nats; it
+is not a game, so it never counts towards the games that make the band
+narrow. Results soon outweigh it, as they should: the profiles were
+inconsistent with each other against the ladder (Limitations below:
+`rank_20k` measured about 17 kyu, no raw profile stronger than about 10
+kyu), so the reading's absolute ranks are the model's labels, not this
+ladder's.
+
+**What the host must offer.** The reading needs the human-style model and
+a host call that returns the human policy of positions. The current
+search requests cannot provide it: their report lists only the moves the
+search visited, with the main network's prior, so the move played is often
+missing. The JavaScript side (`katago.js humanMoveProbabilities`) asks only
+a host whose `studio.katagoStatus` reports `humanPolicy: true`, through
+`studio.katagoHumanPolicy` (position fields as `katagoAnalyzeAsync`, the
+whole main line, the player's colour and the profiles), and expects
+`{ ok, moves: [{ index, p: { profile: probability } }] }`. On the native
+side this is one new request kind on the human slot: bring KataGo to each
+position before a move of that colour (the existing incremental sync), and
+for each profile send `kata-set-param humanSLProfile <profile>` (already
+validated by `validProfile`) and `kata-raw-human-nn 0`, reading the
+probability of the played point from the policy grid (the `play`
+vocabulary and the profile check already exist; the command allowlist and
+a reply parser are new). Until a host offers it, nothing is shown and the
+estimate is unchanged.
+
 ## Limitations
 
 - **The anchor is a model, not people.** No human played these games. The

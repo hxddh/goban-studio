@@ -752,10 +752,14 @@ export default async function ({ test, assert, root }) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       const imports = [...src.matchAll(/^import[^;]*from "([^"]+)"/gm)].map((m) => m[1]);
       // opponents.js is the calibration's one source: tables and pure functions, no imports of its own.
-      for (const i of imports) assert.ok(i === "./ladder.js" || i === "../opponents.js", `${f} imports ${i}`);
+      for (const i of imports) assert.ok(i === "./ladder.js" || i === "../opponents.js" || i === "./move-rank.js", `${f} imports ${i}`);
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
     assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");
+    // v13: the reading from your moves is pure too, with no imports.
+    const mr = fs.readFileSync(path.join(root, "src/web/js/model/move-rank.js"), "utf8");
+    assert.equal([...mr.matchAll(/^import /gm)].length, 0, "move-rank.js imports nothing");
+    assert.doesNotMatch(mr, /localStorage|document\.|window\.|Date\.now\(\)/);
     for (const f of ["app/strength.js", "app/plan.js", "persist.js", "app/beginner.js", "app/course-path.js", "app/rating.js", "app/week.js"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js", f)), f);
     // The rating of a game against the opponent ladder: what played, on its board, with its handicap.
     assert.ok(P.implOpponent("L:10k", { handicap: 4 }) < P.implOpponent("L:10k"));

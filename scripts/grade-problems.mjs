@@ -67,7 +67,7 @@ export const THEME_BASE = {
   "race-big-eye": 2.6,
   ko: 2.7,
   seki: 2.8,
-  "hane-connect": 1.0,
+  "hane-connect": 0.5,
   "sente-gote": 1.6,
   "double-sente": 1.9,
   "monkey-jump": 2.0,

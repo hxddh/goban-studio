@@ -37,6 +37,7 @@
  *   - game records: persist.normalizeGameRecord, with themes and themeLoss.
  */
 import { LEVELS, SIZES, fromBoard, gorToTheta, isLevel, levelTheta, measuredRank, onBoard, rankToRating, ratingToRank, sizeOf, thetaToGoR } from "./ladder.js";
+import { normalizeMoveRank } from "./move-rank.js";
 
 export * from "./ladder.js";
 
@@ -173,6 +174,7 @@ export function setPriorRank(profile, rank, at = 0) {
  *     moves, confidence: "high" | "low" | null,
  *     phases: { opening|middle|endgame: { loss, mistakes, blunders, moves, accuracy } } | null,
  *     themes: { theme: count }, themeLoss?: { theme: points },
+ *     moveRank?: { rank, lo, hi, n }, moveRankUsed?,  // v13: model/move-rank.js
  *     rating: { before, after, delta } | null }   // GoR around this game's rating step
  */
 export function normalizeGame(r) {
@@ -196,6 +198,7 @@ export function normalizeGame(r) {
     for (const [k, v] of Object.entries(r.themeLoss)) if (num(v, -1) >= 0) themeLoss[k] = num(v);
   }
   const rt = obj(r.rating) && num(r.rating.after) != null ? { before: num(r.rating.before), after: num(r.rating.after), delta: num(r.rating.delta, 0) } : null;
+  const moveRank = normalizeMoveRank(r.moveRank);
   return {
     id: String(r.id ?? at),
     at,
@@ -212,8 +215,32 @@ export function normalizeGame(r) {
     phases,
     themes,
     ...(themeLoss ? { themeLoss } : {}),
+    ...(moveRank ? { moveRank } : {}),
+    ...(r.moveRankUsed === true ? { moveRankUsed: true } : {}),
     rating: rt,
   };
+}
+
+/**
+ * v13: the reading from the player's own moves (model/move-rank.js) as a
+ * weak prior. Only while a board's estimate rests on fewer than
+ * MOVE_RANK.MAX_GAMES rated games, and as a measurement of at least
+ * MOVE_RANK.SIGMA nats (about six ranks around 15 kyu): it moves a fresh
+ * estimate part of the way and narrows it a little; results against the
+ * measured levels soon outweigh it (docs/strength.md, "v13: your moves").
+ */
+export const MOVE_RANK = { SIGMA: 4, MAX_GAMES: 5 };
+
+export function applyMoveRank(entry, moveRank) {
+  const mr = normalizeMoveRank(moveRank);
+  if (!entry || !mr || !finite(entry.mu) || (entry.games || 0) >= MOVE_RANK.MAX_GAMES) return entry;
+  const at = (rank) => gorToTheta(rankToRating(rank));
+  const m = at(mr.rank);
+  const sm = Math.max(MOVE_RANK.SIGMA, Math.abs(at(mr.hi) - at(mr.lo)) / 2);
+  const s2 = entry.sigma * entry.sigma;
+  const v = 1 / (1 / s2 + 1 / (sm * sm));
+  const mu = v * (entry.mu / s2 + m / (sm * sm));
+  return { ...entry, mu: round(Math.min(MU_MAX, Math.max(MU_MIN, mu))), sigma: round(Math.sqrt(v)) };
 }
 
 /** Records as stored → a clean list, newest first, at most MAX_GAMES. */
@@ -486,6 +513,13 @@ export function recordGame(profile, game) {
     const b = Math.round(thetaToGoR(before.mu));
     merged.rated = true;
     merged.rating = { before: b, after: read.r, delta: read.r - b };
+  }
+  // v13: a reading from the player's moves, once per game, as a weak prior.
+  if (merged.moveRank && !merged.moveRankUsed && !existing?.moveRankUsed) {
+    const before = rating[merged.size];
+    const after = applyMoveRank(before, merged.moveRank);
+    if (after !== before) rating = { ...rating, [merged.size]: after };
+    merged.moveRankUsed = true;
   }
   const games = normalizeGames([merged, ...p.games.filter((g) => g.id !== merged.id)]);
   return { ...p, rating, history, games };
