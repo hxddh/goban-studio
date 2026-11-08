@@ -3,7 +3,7 @@
  * board sizes, invalid points, HA without AB, CA charsets, and records too long or deep for recursion.
  */
 import GoBoard from "@sabaki/go-board";
-import { test, BLACK, Game, MESSAGES, WHITE, assert, loadSGF, positionPayload, setLang } from "./helpers.mjs";
+import { test, BLACK, Game, MESSAGES, WHITE, assert, loadSGF, positionPayload, setLang, treeLayout } from "./helpers.mjs";
 import { decodeSgfBytes, sgfCharset } from "../../src/web/js/sgf.js";
 
 setLang("en");
@@ -262,6 +262,8 @@ await test("v13 SGF: 5,000 nested variations load and export without recursion",
   assert.equal(depth, N);
   const outB = b.toSGF();
   assert.equal(loadSGF(outB).game.toSGF(), outB);
+  // The variation map lays it out without recursion too.
+  assert.equal(treeLayout(b).nodes.length, 1 + 2 * N);
 });
 
 await test("v13 SGF: comments and marks of move-less variation nodes survive export", () => {

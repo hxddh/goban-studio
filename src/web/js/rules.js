@@ -1106,7 +1106,9 @@ export function treeLayout(game) {
     return k;
   };
 
-  // Iterative over the first-child chain, recursive only per variation.
+  // Places the first-child chain from `start` and returns a frame for its
+  // variations (v13: an explicit stack of frames, so a record nested
+  // thousands of variations deep cannot overflow the call stack).
   const placeChain = (start, x0, row, main) => {
     const chain = [];
     let x = x0;
@@ -1132,29 +1134,42 @@ export function treeLayout(game) {
       width = Math.max(width, x + 1);
       height = Math.max(height, row + 1);
     }
-    for (let i = chain.length - 1; i >= 0; i--) {
-      const px = x0 + i;
-      for (const child of chain[i].children.slice(1)) {
-        const len = chainLength(child);
-        let r = row + 1;
-        for (;;) {
-          let ok = true;
-          for (let k = 0; k <= len + 1 && ok; k++) if (!isFree(r, px + k)) ok = false;
-          for (let q = row + 1; q < r && ok; q++) if (!isFree(q, px) && ownerAt(q, px) !== chain[i]) ok = false;
-          if (ok) break;
-          r++;
-        }
-        for (let q = row + 1; q < r; q++) take(q, px, chain[i]); // the edge's vertical run
-        const points = [[px, row]];
-        if (r > row + 1) points.push([px, r - 1]);
-        points.push([px + 1, r]);
-        edges.push({ from: { x: px, y: row }, to: { x: px + 1, y: r }, points, isMain: false });
-        placeChain(child, px + 1, r, false);
-      }
-    }
+    // i: the chain index whose variations come next (last first), j: the next one of them.
+    return { chain, x0, row, i: chain.length - 1, j: 1 };
   };
 
-  placeChain(root, 0, 0, true);
+  const frames = [placeChain(root, 0, 0, true)];
+  while (frames.length) {
+    const f = frames[frames.length - 1];
+    if (f.i < 0) {
+      frames.pop();
+      continue;
+    }
+    const parent = f.chain[f.i];
+    if (f.j >= parent.children.length) {
+      f.i--;
+      f.j = 1;
+      continue;
+    }
+    const child = parent.children[f.j++];
+    const { row } = f;
+    const px = f.x0 + f.i;
+    const len = chainLength(child);
+    let r = row + 1;
+    for (;;) {
+      let ok = true;
+      for (let k = 0; k <= len + 1 && ok; k++) if (!isFree(r, px + k)) ok = false;
+      for (let q = row + 1; q < r && ok; q++) if (!isFree(q, px) && ownerAt(q, px) !== parent) ok = false;
+      if (ok) break;
+      r++;
+    }
+    for (let q = row + 1; q < r; q++) take(q, px, parent); // the edge's vertical run
+    const points = [[px, row]];
+    if (r > row + 1) points.push([px, r - 1]);
+    points.push([px + 1, r]);
+    edges.push({ from: { x: px, y: row }, to: { x: px + 1, y: r }, points, isMain: false });
+    frames.push(placeChain(child, px + 1, r, false));
+  }
   const cur = pos.get(game.current);
   return { nodes, edges, width, height, current: cur ? { x: cur.x, y: cur.y } : null };
 }
