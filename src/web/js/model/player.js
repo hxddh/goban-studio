@@ -559,13 +559,13 @@ export const FOCUS_LESSONS = {
   "eye-space": ["life-space", "life-corner"],
   "capture-eye": ["life-eye"],
   "false-eye": ["life-false-eye"],
-  ko: ["stones-ko", "adv-life-ko"],
+  ko: ["stones-ko", "ko-threat", "ko-count", "ko-resolve", "adv-life-ko"],
   seki: ["adv-life-seki"],
   race: ["race-count", "race-read", "race-practice"],
   "race-outside": ["race-outside"],
   "race-eye": ["race-read"],
   "race-big-eye": ["race-read"],
-  endgame: ["endgame-sente-gote", "endgame-first-line", "endgame-double-sente", "endgame-reverse-sente", "endgame-order"],
+  endgame: ["endgame-sente-gote", "endgame-first-line", "endgame-reverse-sente", "endgame-double-sente", "endgame-counting", "endgame-big", "endgame-japanese-counting", "endgame-order"],
 };
 
 /** The lesson to offer for a focus: the first not done, else the first. */

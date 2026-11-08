@@ -1,5 +1,6 @@
 /**
- * The intermediate course (v5): units 9–13, appended to the beginner course
+ * The intermediate course (v5): units 9–15 (v13 adds ko fighting and judging
+ * the position), appended to the beginner course
  * in ./course.js. Same step schema (read / place / problem; see course.js).
  * v6 adds two lessons to the fighting unit: the leaning attack and sabaki.
  *
@@ -7,9 +8,9 @@
  * diagram shows the whole board, a smaller diagram in a corner shows a
  * window around it (the app frames the diagram's '.' points, its stones,
  * its marks and every accept point). Joseki diagrams number the moves of
- * the sequence with label marks. Endgame boards are 9×9 positions whose
- * values were counted by hand and checked with a small territory counter;
- * the claims in the text are only the ones those counts support.
+ * the sequence with label marks. v13: endgame steps are endgame problems
+ * on sealed sides of a 19×19 board, counted exactly by the solver; the ko
+ * and judgement units (14–15) play on closed 9×9 games.
  *
  * Every unit here carries `level: "intermediate"`, so the beginner logic
  * (today's five problems for a learner still in the course) looks only at
@@ -125,49 +126,274 @@ const J33_MIRROR = win(9, 9, [[3, 3], [2, 3], [4, 2], [5, 1]], [[2, 2], [3, 2], 
 
 /* --------------------------------------------------------- endgame boards */
 
-// Black's wall on column 3, White's on column 4; the gaps are the endgame.
-const WALL = ". . . X O . . . .";
-const wall = (rows) => {
-  const out = {};
-  for (let y = 0; y < 9; y++) out[y] = rows[y] ?? WALL;
-  return out;
-};
-// Bottom: Black's wall reaches the first line, White's stops on the second.
-// Black's push on the first line is sente (1 point).
-const EG_PUSH = b9(wall({ 8: ". . . X . . . . ." }));
-// Both walls stop on the second line: a first-line hane and connection (gote, 2 points).
-const EG_HANE = b9(wall({ 8: E9 }));
-// The same, after White's first-line hane.
-const EG_WHITE_HANE = b9(wall({ 8: ". . . O . . . . ." }));
-// White's push on the first line (the mirror of EG_PUSH), already played.
-const EG_WHITE_PUSH = b9(wall({ 8: ". . . O O . . . ." }));
-// A gote hane at the top and a sente push at the bottom.
-const EG_TWO = b9(wall({ 0: E9, 8: ". . . X . . . . ." }));
-// White's sente push at the top, Black's at the bottom.
-const EG_REVERSE = b9(wall({ 0: ". . . . O . . . .", 8: ". . . X . . . . ." }));
-// Double sente at (4, 5): White's (4, 4) and Black's (4, 6) each have two liberties and share (4, 5).
-const DS_ROWS = {
-  2: ". . . X O O . . .",
-  3: ". . . X X O . . .",
+/*
+ * v13: the endgame unit is rebuilt on closed positions. Every interactive
+ * step is an endgame problem (goal "endgame"): a stretch of the lower side
+ * where the walls are settled and only the boundary is open, counted
+ * exactly by the solver's counting mode (Japanese counting, see solver.js),
+ * so the best move, its margin and every value in the text are proved by
+ * scripts/check-course.mjs. ':' points are territory that is counted but
+ * never played. The v5 boards were a few stones on an open 9×9, where
+ * KataGo's best move was an invasion the lesson was not about
+ * (docs/lesson-audit.md).
+ */
+
+// Black's wall reaches the first line, White's stops on the second: Black's sente push (1 point).
+const EG_PUSH = [
+  ", , , , , , , , , , ,",
+  "X X X X X O O O O O O",
+  "X : : : X O : : : : O",
+  "X : : : X . . : : : O",
+];
+// White has pushed along the first line into Black's area: Black must block (gote, 7 points).
+const EG_BLOCK = [
+  ", , , , , , , , , , , ,",
+  "X X X X X X O O O O O O",
+  "X : : : : X O : : : : O",
+  "X : : . . O O : : : : O",
+];
+// Black's sente push on the left, a gote hane on the right.
+const EG_PUSH_HANE_R = [
+  ", , , , , , , , , , , , ,",
+  "O O O O X X X X X O O O O",
+  "O : : O X : : : X O : : O",
+  "O : . . X : : . . . . : O",
+];
+// Both walls stop on the second line: the first-line hane and connection (gote, 2 points).
+const EG_HANE = [
+  ", , , , , , , , , , ,",
+  "X X X X X O O O O O O",
+  "X : : : X O : : : : O",
+  "X : : . . . . : : : O",
+];
+// White has played the first-line hane: Black blocks (8 points).
+const EG_WHITE_HANE = [
+  ", , , , , , , , , , , ,",
+  "X X X X X X O O O O O O",
+  "X : : : : X O : : : : O",
+  "X : : : . O . . : : : O",
+];
+// White's wall reaches the first line: White's sente push; Black's block first is reverse sente.
+const EG_WHITE_PUSH = [
+  ", , , , , , , , , , ,",
+  "O O O O O X X X X X X",
+  "O : : : O X : : : : X",
+  "O : : : O . . : : : X",
+];
+// White's sente push (left), Black's sente push (middle), a gote hane (right).
+const EG_TWO_PUSHES = [
+  ", , , , , , , , , , , , , , , , , ,",
+  "O O O O X X X X X O O O O O X X X X",
+  "O : : O X : : : X O : : : O X : : X",
+  "O : : O . . : : X . . : . . . . : X",
+];
+// Double sente at (6, 3): either side's move there is atari.
+const EG_DOUBLE = [
+  ", , , , , , , , , , , , ,",
+  "X X X X X X X O O O O O O",
+  "X : : : X X O . O : : : O",
+  "X : : : X X . O O : : : O",
+  "X : : : X . X O O : : : O",
+];
+// Double sente (left) and a gote hane (right).
+const EG_DOUBLE_HANE = [
+  ", , , , , , , , , , , , , , ,",
+  "X X X X X X O O O O O X X X X",
+  "X : : X X O . O : : O X : : X",
+  "X : : X X . O O : : O X : : X",
+  "X : : X . X O O : . . . . : X",
+];
+// Both walls stop on the third line: the second-line hane (gote, 6 points).
+const EG_HANE_2 = [
+  ", , , , , , , , , ,",
+  "X X X X X O O O O O",
+  "X : : : X O : : : O",
+  "X : : . . . . : : O",
+  "X : : . . . . : : O",
+];
+// A small double sente (left) and two black stones cut off at White's wall (right).
+const EG_DOUBLE_CUT = [
+  ", , , , , , , , , , , , , , , , ,",
+  "X X X X X X O O O O O O O X X X X",
+  "X : : X X O . O : : O O O X : : X",
+  "X : : X X . O O : : O X . . : : X",
+  "X : : X . X O O : : O X . . : : X",
+];
+// A small sente push (left) and the same two cut-off stones (right).
+const EG_PUSH_CUT = [
+  ", , , , , , , , , , , , , ,",
+  "X X X X O O O O O O X X X X",
+  "X : : X O : : O O O X : : X",
+  "X : : X O : : O X . . : : X",
+  "X : : X . . : O X . . : : X",
+];
+// White's one-point push (left) and two neutral points.
+const EG_ONE_POINT = [
+  ", , , , , , , , , , , , , ,",
+  "X X X X O O O O O O O X X X",
+  "X : : X . O : : : O . X : X",
+  "X : . . O O : : : O O X : X",
+];
+// Two neutral points: filling (4, 2) puts White's (4, 3) in atari, so White must add a stone inside.
+const EG_DEFENCE = [
+  ", , , , , , , , , , , , , ,",
+  "X X X X O O O O O O X X X X",
+  "X : : X . O : : : O . X : X",
+  "X : : X O . : : : O X : : X",
+];
+// Cut-off stones (left), a first-line push (middle), a hane (right).
+const EG_THREE = [
+  ", , , , , , , , , , , , , , , ,",
+  "O O O O O X X X X O O O O X X X",
+  "O : O O O X : : X O : : O X : X",
+  "O : O X . . : : X O : : O X : X",
+  "O : O X . . : : X . . . . . : X",
+];
+// A second-line hane (left) and a first-line push (right).
+const EG_HANE2_PUSH = [
+  ", , , , , , , , , , , , ,",
+  "X X X X O O O O O X X X X",
+  "X : : X O : : : O X : : X",
+  "X : . . . . : : O X : : X",
+  "X : . . . . : : O . . : X",
+];
+// A sente push (left) and a gote hane (right).
+const EG_PUSH_HANE = [
+  ", , , , , , , , , , , , , , , ,",
+  "X X X X X O O O O O O X X X X X",
+  "X : : : X O : : : : O X : : : X",
+  "X : : : X . . : : . . . . : : X",
+];
+
+/** An endgame problem on the lower side: the best move (`answer`) and how many points it gains over any other (`margin`). */
+const egMove = (diagram, answer, margin) => ({ goal: "endgame", ask: "move", corner: "bl", diagram, answer: pts(...answer), margin });
+/** A "how many points is this move worth" question (deiri count). */
+const egValue = (diagram, value, choices) => ({ goal: "endgame", ask: "value", corner: "bl", diagram, value, choices });
+/** The same position as an illustration (':' is just an empty point there); `stones` adds [x, y, colour]. */
+function egBoard(diagram, marks = [], stones = []) {
+  const g = diagram.map((r) => r.replace(/:/g, ".").split(" "));
+  for (const [x, y, c] of stones) g[y][x] = c === BLACK ? "X" : "O";
+  return { size: 19, corner: "bl", diagram: g.map((r) => r.join(" ")), marks };
+}
+
+/* ------------------------------------------------------ ko and judgement boards */
+
+/*
+ * v13: the ko and judgement units are played on finished-looking 9×9 games
+ * (the walls of unit 8's game, every area closed), so a place step's answer
+ * is the move that matters on the whole board, not a local idea on an empty
+ * board. The problem steps are proved by the solver on the whole 9×9.
+ */
+
+// White has just taken the ko at (4, 4); Black may retake at (5, 4) after a
+// threat. Black's threat is the cut at (5, 2): White's (5, 0)–(5, 1) then
+// have two liberties and Black's (6, 1) would capture them.
+const KO_ROWS = {
+  0: ". . . . X O . . .",
+  1: ". . . . X O . . .",
+  2: ". . . X X . O . .",
+  3: ". . . X X O O . .",
   4: ". . . X O . O . .",
-  5: ". . . X . O . . .",
-  6: ". . . . X O . . .",
+  5: ". . . X X O . . .",
+  6: ". . . X X O . . .",
+  7: ". . . . X O . . .",
+  8: ". . . . X O . . .",
+};
+// The same shape before anyone has taken: Black's capture at (5, 4) starts the ko.
+const KO_FRESH_ROWS = KO_ROWS;
+// Black has cut, White has connected at (6, 1): Black may retake.
+const KO_ANSWERED_ROWS = { ...KO_ROWS, 1: ". . . . X O O . .", 2: ". . . X X X O . ." };
+// A dead white stone inside Black's area: attacking it is no threat.
+const KO_DEAD_STONE_ROWS = { ...KO_ROWS, 6: ". O . X X O . . ." };
+// Black has retaken (White's (4, 4) is gone) and White has played elsewhere: Black connects at (4, 4).
+const KO_CONNECT = [
+  ". . . . X O . . .",
+  ". . . . X O O . .",
+  ". . . X X X O . .",
+  ". . . X X O O . .",
+  ". . . X . x O . .",
+  ". . . X X O . . .",
+  ". . . X X O . . .",
+  ". . . . X O . . .",
+  ". . . . X O . . .",
+];
+// Black's retake at (5, 4) left White's (5, 5) in atari: capturing it at (6, 5) ends the ko.
+const KO_CAPTURE = [
+  ". . . . X O . . .",
+  ". . . . X O O . .",
+  ". . . X X X O . .",
+  ". . . X X O O . .",
+  ". . . X . X O . .",
+  ". . . X X o . . .",
+  ". . . X X X O . .",
+  ". . . . X O O . .",
+  ". . . . X O . . .",
+];
+// White has taken and Black has played elsewhere: White connects at (5, 4).
+const KO_WHITE_CONNECT = [
+  ". . . . X O . . .",
+  ". . . . X O . . .",
+  ". . . X X . O . .",
+  ". . . X X O O . .",
+  ". . . X o . O . .",
+  ". . . X X O . . .",
+  ". . . X X O . . .",
+  ". . . . X O . . .",
+  ". . . . X O . . .",
+];
+
+// Every area closed but the first-line hane at the bottom. Black 30, White 24
+// (+ 6.5): Black's hane at (4, 8) wins by 0.5, White's at (3, 8) by 1.5.
+const JUDGE_ROWS = {
+  0: ". . . . . X O . .",
+  1: ". . . . . X O . .",
+  2: ". . . X X X O . .",
+  3: ". . . X O O O . .",
+  4: ". . . X O . . . .",
+  5: ". . . X O O . . .",
+  6: ". . . X X O . . .",
   7: ". . . X O O . . .",
+  8: ". . . . . . . . .",
 };
-const EG_DOUBLE = b9(wall(DS_ROWS));
-// Practice: a gote hane at the top, the double sente point, a sente push at the bottom.
-const EG_PRACTICE_ROWS = wall({ ...DS_ROWS, 0: E9, 1: WALL, 8: ". . . X . . . . ." });
-// Japanese counting: two neutral points. (4, 1) is harmless; if White fills
-// (4, 4), Black's stone at (4, 5) is in atari and Black must connect at (3, 5).
-const JP_ROWS = {
-  0: ". . . X O O . . .",
-  1: ". . . X . O . . .",
-  2: ". . . X O O . . .",
-  3: ". . . X O . . . .",
-  4: ". . . X . O . . .",
-  5: ". . . . X O . . .",
-};
-const EG_COUNT = b9(wall(JP_ROWS));
+// Black 32, White 24 once (3, 7) is filled; White's cut there captures Black's two stones.
+const JUDGE_SAFE = [
+  ". . . . . X O . .",
+  ". . . . . X O . .",
+  ". . . X X X O . .",
+  ". . . X O O O . .",
+  ". . . X O . . . .",
+  ". . . X O O . . .",
+  ". . . X O O . . .",
+  ". . . . x O . . .",
+  ". . . . x O . . .",
+];
+// Black 34, White 22 once the two black stones at the top are connected.
+const JUDGE_SAFE_TOP = [
+  ". . . x O . . . .",
+  ". . . x O . . . .",
+  ". . X O O O O . .",
+  ". . X X X X O . .",
+  ". . . . . X O . .",
+  ". . . . . X O . .",
+  ". . . . . X O . .",
+  ". . . . . X O . .",
+  ". . . . . X O . .",
+];
+// If White connects its two stones at the top, Black 29, White 24 (+ 6.5):
+// White wins by 1.5. Black's (6, 1) captures them.
+const JUDGE_BEHIND = [
+  ". . . . X o . . .",
+  ". . . . X o . . .",
+  ". . . X X X O . .",
+  ". . . X O O O . .",
+  ". . . X O . O . .",
+  ". . . X O O . . .",
+  ". . . X X O . . .",
+  ". . . X O O . . .",
+  ". . . X O O . . .",
+];
+// The same idea at the bottom (the board turned upside down).
+const JUDGE_CUT = JUDGE_BEHIND.slice().reverse();
 
 /* ------------------------------------------------------------------ units */
 
@@ -1029,7 +1255,7 @@ export const INTERMEDIATE = [
               "흑 두 점이 대각선으로 놓였고, 백이 잇는 점 하나를 차지해 끊으려 합니다. 이으세요. 꺾인 모양이 되지만 모서리에 백돌이 있으니 빈삼각이 아닙니다.",
               "黒二子が斜めに並び、白がつなぎの点の一つを占めて切ろうとしています。継ぎましょう。曲がった形になりますが、角に白石があるので空き三角ではありません。",
             ),
-            board: b9({ 3: ". . . X O . . . .", 4: ". . . . X . . . .", 6: ". . . . . . O . ." }),
+            board: b9({ 3: ". . . X O O . . .", 4: ". . . . X . . . .", 6: ". . . . . . O . ." }),
             toMove: BLACK,
             accept: pts([3, 4]),
             success: L("连好了，而且没有浪费。", "Connected, and nothing wasted.", "이었고, 낭비도 없습니다.", "つながり、無駄もありません。"),
@@ -1048,7 +1274,7 @@ export const INTERMEDIATE = [
               "백입니다. 같은 상황입니다. 백 두 점이 대각선으로 놓였고 흑이 잇는 점 하나를 차지했습니다. 이으세요.",
               "白番で、同じ状況です。白二子が斜めに並び、黒がつなぎの点の一つを占めました。継ぎましょう。",
             ),
-            board: b9({ 4: ". . . . . O . . .", 5: ". . . . O X . . .", 2: ". . X . . . . . ." }),
+            board: b9({ 4: ". . . . . O . . .", 5: ". . . . O X X . .", 2: ". . X . . . . . ." }),
             toMove: WHITE,
             accept: pts([4, 4]),
             success: L("对方的子填在角上，这个弯就是好形。", "With the opponent's stone in the corner of the bend, the shape is good.", "모서리에 상대 돌이 있으니 이 꺾임은 좋은 모양입니다.", "曲がりの角に相手の石があるので、これは好形です。"),
@@ -1339,10 +1565,10 @@ export const INTERMEDIATE = [
     level: "intermediate",
     title: L("官子", "The endgame", "끝내기", "ヨセ"),
     summary: L(
-      "先手和后手，一路扳粘，双先，逆收，以及日本规则终局时的单官和补棋。",
-      "Sente and gote, the first-line hane and connection, double sente, reverse sente, and filling neutral points at the end under Japanese rules.",
-      "선수와 후수, 1선 젖혀 잇기, 양선수, 역끝내기, 그리고 일본 규칙의 공배 메우기와 손질.",
-      "先手と後手、一線のハネツギ、両先手、逆ヨセ、そして日本ルールの終局でのダメ詰めと手入れ。",
+      "先手与后手，一路扳粘，逆收，双先，出入计算，大中小官子的比较，单官与补棋，以及官子的顺序。每道题都由解题程序精确数目证明。",
+      "Sente and gote, the first-line hane and connection, reverse sente, double sente, counting a move, comparing big, middle and small endgame moves, neutral points, and the order of play. Every problem is proved by an exact count.",
+      "선수와 후수, 1선 젖혀 잇기, 역끝내기, 양선수, 출입 계산, 큰 끝내기와 작은 끝내기의 비교, 공배와 손질, 그리고 끝내기 순서. 모든 문제는 정확한 계산으로 증명되어 있습니다.",
+      "先手と後手、一線のハネツギ、逆ヨセ、両先手、出入り計算、大ヨセと小ヨセの比較、ダメと手入れ、そしてヨセの順番。どの問題も正確な計算で証明されています。",
     ),
     lessons: [
       {
@@ -1352,69 +1578,45 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "对方必须应的一手叫先手：他应了之后，又轮到你下。下完后对方可以去别处下的叫后手。官子的基本顺序：先下先手，再下后手。图中上边的扳最后要自己粘，是后手；下边沿一路往里冲，白棋要挡，是黑棋的先手。",
-              "A move the opponent has to answer is sente: after the answer it is your turn again. A move after which the opponent can play elsewhere is gote. The basic order in the endgame: sente moves first, gote moves after. Here the hane at the top ends with your own connection, so it is gote; the push along the first line at the bottom must be blocked by White, so it is Black's sente.",
-              "상대가 받아야 하는 수가 선수입니다. 상대가 받으면 다시 내 차례가 됩니다. 두고 나서 상대가 다른 곳에 둘 수 있으면 후수입니다. 끝내기의 기본 순서는 선수 먼저, 후수는 나중입니다. 그림에서 위쪽 젖힘은 마지막에 내가 이어야 하니 후수, 아래쪽에서 1선으로 밀고 들어가는 수는 백이 막아야 하니 흑의 선수입니다.",
-              "相手が受けなければならない手が先手で、受けた後また自分の番になります。打った後で相手が他に打てる手は後手です。ヨセの基本は、先手を先に、後手は後で。図の上のハネは最後に自分で継ぐので後手、下の一線を押し込む手は白が止めなければならないので黒の先手です。",
+              "对方必须应的一手叫先手：他应完，又轮到你。下完后对方可以脱先的一手叫后手。同样大小时，先下先手，再下后手。图中左边黑棋沿一路往白地里冲（三角），白棋要挡，是黑棋的先手；右边的一路扳（圆圈）最后要自己粘，是后手。",
+              "A move the opponent has to answer is sente: after the answer it is your turn again. A move after which the opponent can play elsewhere is gote. Between moves of the same size, play sente first and gote after. On the left, Black's push along the first line into White's area (triangle) must be blocked, so it is Black's sente; on the right, the first-line hane (circle) ends with Black's own connection, so it is gote.",
+              "상대가 받아야 하는 수가 선수입니다. 상대가 받으면 다시 내 차례가 됩니다. 두고 나서 상대가 다른 곳에 둘 수 있으면 후수입니다. 크기가 같으면 선수를 먼저, 후수는 나중에 둡니다. 왼쪽에서 흑이 1선으로 백집에 밀고 들어가는 수(세모)는 백이 막아야 하니 흑의 선수, 오른쪽 1선 젖힘(동그라미)은 마지막에 흑이 이어야 하니 후수입니다.",
+              "相手が受けなければならない手が先手で、受けた後また自分の番になります。打った後で相手が他に打てる手は後手です。同じ大きさなら、先手を先に、後手は後で打ちます。左の、一線を白地に押し込む手（三角）は白が止めなければならないので黒の先手、右の一線のハネ（丸）は最後に黒が継ぐので後手です。",
             ),
-            board: { ...EG_TWO, marks: [{ x: 4, y: 0, type: "circle" }, { x: 4, y: 8, type: "triangle" }] },
+            board: egBoard(EG_PUSH_HANE_R, [{ x: 3, y: 3, type: "triangle" }, { x: 9, y: 3, type: "circle" }]),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "白棋沿一路往你的地里冲，下一手还要再冲。挡住它。",
-              "White has pushed along the first line into your area and threatens to push again. Block it.",
-              "백이 1선에서 흑집으로 밀고 들어왔고, 다음에 더 밀려고 합니다. 막으세요.",
-              "白が一線から黒地に押し込んできて、さらに押そうとしています。止めましょう。",
+              "黑先。你的墙伸到了一路，白棋的墙只到二路。沿一路冲进去：白棋必须挡，你的子已经连着，不用再补。",
+              "Black to play. Your wall reaches the first line, White's stops on the second. Push along the first line: White has to block, and your stone is already connected, so you need nothing more.",
+              "흑선. 흑 벽은 1선까지, 백 벽은 2선까지입니다. 1선을 따라 밀고 들어가세요. 백은 막아야 하고, 흑돌은 이미 이어져 있어 더 둘 필요가 없습니다.",
+              "黒先。黒の壁は一線まで、白の壁は二線までです。一線を押し込みましょう。白は止めなければならず、黒石はもうつながっているので手入れは要りません。",
             ),
-            board: EG_WHITE_PUSH,
-            toMove: BLACK,
-            accept: pts([2, 8]),
-            success: L("挡住了。白棋得了先手，这就是先手官子。", "Blocked. White keeps sente: that was a sente endgame move.", "막았습니다. 백은 선수를 잡았습니다. 이것이 선수 끝내기입니다.", "止めました。白は先手を取りました。これが先手のヨセです。"),
-            wrong: L(
-              "下在白子前面的一路上，紧挨着它。",
-              "Play on the first line right in front of the white stone.",
-              "1선에서 백돌 바로 앞에 두세요.",
-              "一線で、白石のすぐ前に打ちましょう。",
-            ),
+            problem: egMove(EG_PUSH, [[5, 3]], 1),
+            success: L("白棋挡住后又轮到你：先手得了一目。", "After White blocks it is your turn again: a point gained in sente.", "백이 막으면 다시 흑 차례입니다. 선수로 한 집을 벌었습니다.", "白が止めると、また黒番です。先手で一目得しました。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "你的墙伸到了一路，白棋的墙只到二路。沿一路往里冲：白棋必须挡，你的子已经连着，不用再补。",
-              "Your wall reaches the first line, White's stops on the second. Push along the first line: White has to block, and your stone is already connected, so you need nothing more.",
-              "흑 벽은 1선까지, 백 벽은 2선까지입니다. 1선을 따라 밀고 들어가세요. 백은 막아야 하고, 흑돌은 이미 이어져 있어 더 둘 필요가 없습니다.",
-              "黒の壁は一線まで、白の壁は二線までです。一線を押し込みましょう。白は止めなければならず、黒石はもうつながっているので手入れは要りません。",
+              "黑先。白棋沿一路冲进了你的地，下一手还要再冲。挡住它：这一手是后手，但不挡要亏7目。",
+              "Black to play. White has pushed along the first line into your area and threatens to push again. Block it: the block is gote, but leaving it costs 7 points.",
+              "흑선. 백이 1선으로 흑집에 밀고 들어왔고, 다음에 더 밀려고 합니다. 막으세요. 후수지만 막지 않으면 7집을 손해 봅니다.",
+              "黒先。白が一線から黒地に押し込んできて、さらに押そうとしています。止めましょう。後手ですが、止めないと7目損します。",
             ),
-            board: EG_PUSH,
-            toMove: BLACK,
-            accept: pts([4, 8]),
-            success: L("白棋挡住后，又轮到你。先手便宜了一目。", "After White blocks it is your turn again: a point gained in sente.", "백이 막으면 다시 흑 차례입니다. 선수로 한 집을 벌었습니다.", "白が止めると、また黒番です。先手で一目得しました。"),
-            wrong: L(
-              "从你一路上的那颗子往右，紧挨着推进一步。",
-              "From your stone on the first line, take one step to the right.",
-              "1선의 흑돌에서 오른쪽으로 한 칸 밀고 나가세요.",
-              "一線の黒石から右へ一歩押しましょう。",
-            ),
+            problem: egMove(EG_BLOCK, [[4, 3]], 7),
+            success: L("挡住了。对方的先手，你要应。", "Blocked. The opponent's sente is yours to answer.", "막았습니다. 상대의 선수에는 받아야 합니다.", "止めました。相手の先手には受けるものです。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "两个官子：上边的扳是后手，下边的冲是先手。先下先手。",
-              "Two endgame moves: the hane at the top is gote, the push at the bottom is sente. Play the sente move first.",
-              "끝내기가 두 곳입니다. 위쪽 젖힘은 후수, 아래쪽 밀기는 선수입니다. 선수부터 두세요.",
-              "ヨセが二か所あります。上のハネは後手、下の押しは先手です。先手から打ちましょう。",
+              "黑先。左边有你的一路冲（先手），右边有一路扳粘（后手），两处都很小。先下先手：白棋挡了以后，你再去扳。",
+              "Black to play. On the left you have a first-line push (sente), on the right a first-line hane and connection (gote); both are small. Play the sente move first: after White blocks, you take the hane as well.",
+              "흑선. 왼쪽에는 1선 밀기(선수), 오른쪽에는 1선 젖혀 잇기(후수)가 있고, 둘 다 작습니다. 선수부터 두세요. 백이 막으면 오른쪽 젖힘까지 흑이 둡니다.",
+              "黒先。左には一線の押し（先手）、右には一線のハネツギ（後手）があり、どちらも小さい所です。先手から打ちましょう。白が止めたら、右のハネも黒が打てます。",
             ),
-            board: EG_TWO,
-            toMove: BLACK,
-            accept: pts([4, 8]),
-            success: L("白棋要挡，你再回头扳上边：两处都归你。", "White must block, and then you take the hane at the top as well: both are yours.", "백이 막으면 위쪽 젖힘까지 흑이 둡니다. 두 곳 모두 흑의 몫입니다.", "白が止めたら上のハネも黒が打てます。両方とも黒のものです。"),
-            wrong: L(
-              "先下扳，白棋就会先去下边挡住你的冲。先下下边那手先手。",
-              "If you hane first, White will take away your push at the bottom. Start with the sente push at the bottom.",
-              "젖힘을 먼저 두면 백이 아래쪽 밀기를 먼저 막아 버립니다. 아래쪽 선수부터 두세요.",
-              "ハネを先に打つと、白に下の押しを先に止められてしまいます。下の先手から打ちましょう。",
-            ),
+            problem: egMove(EG_PUSH_HANE_R, [[3, 3]], 1),
+            success: L("先手先下，两处都归你。", "Sente first, and both places are yours.", "선수를 먼저 두어 두 곳 모두 흑의 몫입니다.", "先手を先に打って、両方とも黒のものです。"),
           },
         ],
       },
@@ -1425,142 +1627,34 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "双方的墙都停在二路时，一路上常有扳粘：黑1扳，白2挡，黑1只剩一口气，黑3粘。最后轮到白棋，所以是后手。和白棋从另一边扳粘相比，双方的差别是2目。",
-              "When both walls stop on the second line, there is a hane and connection on the first line: Black 1 hanes, White 2 blocks, Black 1 is in atari, and Black 3 connects. Then it is White's turn, so it is gote. Compared with White doing the same from the other side, the difference is 2 points.",
-              "두 벽이 모두 2선에서 멈추면 1선에서 젖혀 잇기가 생깁니다. 흑 1로 젖히고 백 2로 막으면 흑 1이 단수가 되어 흑 3으로 잇습니다. 마지막에 백 차례이니 후수입니다. 백이 반대쪽에서 젖혀 잇는 것과 비교하면 차이는 2집입니다.",
-              "両方の壁が二線で止まっているときは、一線のハネツギがあります。黒1とハネ、白2とオサエると黒1がアタリなので黒3と継ぎます。最後は白番なので後手です。白が反対側からハネツいだ場合との差は2目です。",
+              "双方的墙都停在二路时，一路上有扳粘：黑1扳，白2挡，黑1被打吃，黑3粘。之后轮到白棋，所以是后手。黑棋先扳粘和白棋先扳粘相比，相差2目：这一手值2目，后手。",
+              "When both walls stop on the second line, there is a hane and connection on the first line: Black 1 hanes, White 2 blocks, Black 1 is in atari and Black 3 connects. Then it is White's turn, so it is gote. Compared with White doing the same first, the difference is 2 points: the move is worth 2 points, in gote.",
+              "두 벽이 모두 2선에서 멈추면 1선에서 젖혀 잇기가 생깁니다. 흑 1로 젖히고 백 2로 막으면 흑 1이 단수가 되어 흑 3으로 잇습니다. 그다음은 백 차례이니 후수입니다. 백이 먼저 젖혀 잇는 것과 비교하면 2집 차이, 곧 후수 2집입니다.",
+              "両方の壁が二線で止まっているときは、一線のハネツギがあります。黒1とハネ、白2とオサエると黒1がアタリなので黒3と継ぎます。次は白番なので後手です。白が先にハネツいだ場合との差は2目、つまり後手2目の手です。",
             ),
-            board: b9(wall({ 8: ". . . X X O . . ." }), { marks: labels([4, 8, "1"], [5, 8, "2"], [3, 8, "3"]) }),
+            board: egBoard(EG_HANE, labels([5, 3, "1"], [6, 3, "2"], [4, 3, "3"]), [[5, 3, BLACK], [6, 3, WHITE], [4, 3, BLACK]]),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "两边的墙都停在二路。在一路上扳。",
-              "Both walls stop on the second line. Hane on the first line.",
-              "두 벽 모두 2선에서 멈췄습니다. 1선에서 젖히세요.",
-              "両方の壁が二線で止まっています。一線でハネましょう。",
+              "黑先。两边的墙都停在二路。在一路扳，再把扳的子粘回来。",
+              "Black to play. Both walls stop on the second line. Hane on the first line, then connect the hane stone.",
+              "흑선. 두 벽 모두 2선에서 멈췄습니다. 1선에서 젖히고, 젖힌 돌을 이으세요.",
+              "黒先。両方の壁が二線で止まっています。一線でハネて、ハネた石を継ぎましょう。",
             ),
-            board: EG_HANE,
-            toMove: BLACK,
-            accept: pts([4, 8]),
-            success: L("扳了。看白棋怎么应。", "The hane. Now see how White answers.", "젖혔습니다. 백의 응수를 봅시다.", "ハネました。白の応手を見ましょう。"),
-            wrong: L(
-              "一路上、斜挨着你二路的子、紧贴白子的那个点。",
-              "The first-line point diagonally below your second-line stone and touching White's stone.",
-              "흑의 2선 돌과 대각선이면서 백돌에 붙은 1선의 점입니다.",
-              "黒の二線の石と斜めで、白石に接する一線の点です。",
-            ),
+            problem: egMove(EG_HANE, [[5, 3]], 1),
+            success: L("扳粘完成，后手2目。", "Hane and connection done: 2 points, in gote.", "젖혀 잇기를 마쳤습니다. 후수 2집입니다.", "ハネツギの完成、後手2目です。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "白棋挡住了，你扳的子只剩一口气。粘上。",
-              "White has blocked and your hane stone is in atari. Connect it.",
-              "백이 막아서 젖힌 흑돌이 단수입니다. 이으세요.",
-              "白がオサエて、ハネた黒石がアタリです。継ぎましょう。",
+              "黑先。这次白棋先在一路扳了。挡住它：白棋要自己粘，是白棋的后手。不挡的话白棋还会再冲。",
+              "Black to play. This time White has played the first-line hane first. Block it: White must connect, in gote. If you do not block, White pushes further.",
+              "흑선. 이번에는 백이 먼저 1선에서 젖혔습니다. 막으세요. 백이 이어야 하니 백의 후수입니다. 막지 않으면 백이 더 밀고 들어옵니다.",
+              "黒先。今度は白が先に一線でハネました。オサエましょう。白は継がなければならず、白の後手です。オサエないと白はさらに押し込んできます。",
             ),
-            board: b9(wall({ 8: ". . . . X O . . ." })),
-            toMove: BLACK,
-            accept: pts([3, 8]),
-            success: L("扳粘完成，后手。", "Hane and connection done, in gote.", "젖혀 잇기를 마쳤습니다. 후수입니다.", "ハネツギの完成、後手です。"),
-            wrong: L(
-              "下在扳的子剩下的那口气上。",
-              "Play on your hane stone's last liberty.",
-              "젖힌 돌의 마지막 활로에 두세요.",
-              "ハネた石の最後の呼吸点に打ちましょう。",
-            ),
-          },
-          {
-            kind: "place",
-            text: L(
-              "这次白棋在一路扳了。挡住它。",
-              "This time White has played the first-line hane. Block it.",
-              "이번에는 백이 1선에서 젖혔습니다. 막으세요.",
-              "今度は白が一線でハネました。オサエましょう。",
-            ),
-            board: EG_WHITE_HANE,
-            toMove: BLACK,
-            accept: pts([2, 8]),
-            success: L("挡住后白子被打吃，白棋要自己粘：白棋后手。", "Now White's hane stone is in atari and White must connect: gote for White.", "막으니 백의 젖힌 돌이 단수가 되어 백이 이어야 합니다. 백의 후수입니다.", "オサエると白のハネた石がアタリになり、白は継がなければなりません。白の後手です。"),
-            wrong: L(
-              "下在白子前面的一路上，紧挨着它。",
-              "Play on the first line right in front of the white stone.",
-              "1선에서 백돌 바로 앞에 두세요.",
-              "一線で、白石のすぐ前に打ちましょう。",
-            ),
-          },
-        ],
-      },
-      {
-        id: "endgame-double-sente",
-        title: L("双先", "Double sente", "양선수", "両先手"),
-        steps: [
-          {
-            kind: "read",
-            text: L(
-              "三角标记的点很特别：黑棋下在这里，就打吃白子，白棋必须粘；白棋下在这里，就打吃黑子，黑棋必须粘。对双方都是先手，叫双先。双先要最先下。",
-              "The marked point is special. If Black plays there, a white stone is in atari and White must connect; if White plays there, a black stone is in atari and Black must connect. It is sente for both sides: double sente. Double sente comes before everything else.",
-              "세모 표시한 점은 특별합니다. 흑이 두면 백 한 점이 단수가 되어 백이 이어야 하고, 백이 두면 흑 한 점이 단수가 되어 흑이 이어야 합니다. 양쪽 모두에게 선수, 곧 양선수입니다. 양선수는 가장 먼저 둡니다.",
-              "三角印の点は特別です。黒が打てば白一子がアタリで白は継がなければならず、白が打てば黒一子がアタリで黒が継がなければなりません。双方にとって先手、つまり両先手です。両先手は何よりも先に打ちます。",
-            ),
-            board: { ...EG_DOUBLE, marks: [{ x: 4, y: 5, type: "triangle" }] },
-          },
-          {
-            kind: "place",
-            text: L(
-              "抢占双先：下在黑白两颗突出的子共同的那口气上。",
-              "Take the double sente point: the liberty shared by the two stones sticking out, one black and one white.",
-              "양선수 자리를 차지하세요. 튀어나온 흑돌과 백돌이 함께 쓰는 활로입니다.",
-              "両先手を打ちましょう。突き出た黒石と白石の共通の呼吸点です。",
-            ),
-            board: EG_DOUBLE,
-            toMove: BLACK,
-            accept: pts([4, 5]),
-            success: L("白子被打吃，白棋必须应，你还保有先手。", "White's stone is in atari, White must answer, and you keep sente.", "백돌이 단수라 백은 받아야 하고, 흑은 선수를 유지합니다.", "白石がアタリなので白は受けるしかなく、黒は先手を保ちます。"),
-            wrong: L(
-              "找同时挨着突出的黑子和白子的空点。",
-              "Find the empty point that touches both the jutting black stone and the jutting white stone.",
-              "튀어나온 흑돌과 백돌에 함께 닿는 빈 점을 찾으세요.",
-              "突き出た黒石と白石の両方に接する空点を探しましょう。",
-            ),
-          },
-          {
-            kind: "place",
-            text: L(
-              "你执白，黑棋刚抢了双先，你的子被打吃。粘上救它。",
-              "You are White. Black has just taken the double sente point and your stone is in atari. Connect to save it.",
-              "백입니다. 흑이 방금 양선수를 두어 백돌이 단수입니다. 이어서 살리세요.",
-              "白番です。黒が両先手を打ち、白石がアタリです。継いで助けましょう。",
-            ),
-            board: b9(wall({ ...DS_ROWS, 5: ". . . X X O . . ." })),
-            toMove: WHITE,
-            accept: pts([5, 4]),
-            success: L("救回来了，但这一手是在自己地里补的，少了一目。", "Saved, but the connection is inside your own territory and costs a point.", "살렸지만 자기 집 안에 둔 수라 한 집이 줄었습니다.", "助かりましたが、自分の地の中に打ったので一目減りました。"),
-            wrong: L(
-              "下在被打吃的白子剩下的那口气上。",
-              "Play on the last liberty of your stone in atari.",
-              "단수당한 백돌의 마지막 활로에 두세요.",
-              "アタリの白石の最後の呼吸点に打ちましょう。",
-            ),
-          },
-          {
-            kind: "place",
-            text: L(
-              "这次是白棋先抢了双先，你的子被打吃。粘上。",
-              "This time White took the double sente point first and your stone is in atari. Connect.",
-              "이번에는 백이 먼저 양선수를 두어 흑돌이 단수입니다. 이으세요.",
-              "今度は白が先に両先手を打ち、黒石がアタリです。継ぎましょう。",
-            ),
-            board: b9(wall({ ...DS_ROWS, 5: ". . . X O O . . ." })),
-            toMove: BLACK,
-            accept: pts([3, 6]),
-            success: L("双先谁先下谁便宜，这里相差2目。", "Whoever plays double sente first gains: here the difference is 2 points.", "양선수는 먼저 두는 쪽이 이득입니다. 여기서는 2집 차이입니다.", "両先手は先に打った方の得で、ここでは2目の差です。"),
-            wrong: L(
-              "下在被打吃的黑子剩下的那口气上。",
-              "Play on the last liberty of your stone in atari.",
-              "단수당한 흑돌의 마지막 활로에 두세요.",
-              "アタリの黒石の最後の呼吸点に打ちましょう。",
-            ),
+            problem: egMove(EG_WHITE_HANE, [[4, 3]], 8),
+            success: L("挡住后白子被打吃，白棋要自己粘。", "Now White's hane stone is in atari and White must connect.", "막으니 백의 젖힌 돌이 단수가 되어 백이 이어야 합니다.", "オサエると白のハネた石がアタリになり、白は継がなければなりません。"),
           },
         ],
       },
@@ -1571,104 +1665,197 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "下边黑棋沿一路冲是黑棋的先手。白棋如果先下在那里，自己是后手，但从此不用再应黑棋的先手，这叫逆收。逆收常常比看起来大。",
-              "At the bottom, Black's push along the first line is Black's sente. If White plays there first, it is gote for White, but White will never have to answer that push. Taking away the opponent's sente move like this is called reverse sente, and it is often bigger than it looks.",
-              "아래쪽에서 1선을 밀고 들어가는 것은 흑의 선수입니다. 백이 먼저 그곳에 두면 백은 후수지만, 앞으로 흑의 선수에 응할 필요가 없습니다. 이렇게 상대의 선수를 없애는 수를 역끝내기라고 하며, 보기보다 큰 경우가 많습니다.",
-              "下の一線を押し込む手は黒の先手です。白が先にそこに打てば白の後手ですが、もう黒の先手に受ける必要がなくなります。このように相手の先手を消す手を逆ヨセと言い、見た目より大きいことがよくあります。",
+              "白棋的墙伸到了一路，沿一路冲（三角）是白棋的先手。黑棋先挡在这里，自己是后手，但白棋从此少了一个先手，这叫逆收。逆收一目，大约顶得上后手两目，常常比看起来大。",
+              "White's wall reaches the first line, so the push along the first line (triangle) is White's sente. If Black blocks there first, it is gote for Black, but White has lost a sente move for good: this is reverse sente. A reverse sente of one point is worth about as much as a gote move of two, so it is often bigger than it looks.",
+              "백 벽이 1선까지 내려와 있어서 1선 밀기(세모)는 백의 선수입니다. 흑이 먼저 막으면 흑은 후수지만, 백은 선수 하나를 영영 잃습니다. 이것이 역끝내기입니다. 역끝내기 1집은 후수 2집쯤의 가치가 있어서 보기보다 큰 경우가 많습니다.",
+              "白の壁が一線まで来ているので、一線の押し（三角）は白の先手です。黒が先に止めれば黒の後手ですが、白は先手を一つ失います。これが逆ヨセです。逆ヨセ1目は後手2目くらいの価値があり、見た目より大きいことがよくあります。",
             ),
-            board: { ...EG_PUSH, marks: [{ x: 4, y: 8, type: "triangle" }] },
+            board: egBoard(EG_WHITE_PUSH, [{ x: 5, y: 3, type: "triangle" }]),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "你执白。抢先下在黑棋要冲的地方，消掉黑棋的先手。",
-              "You are White. Play first where Black wants to push and take away Black's sente move.",
-              "백입니다. 흑이 밀고 들어오려는 곳에 먼저 두어 흑의 선수를 없애세요.",
-              "白番です。黒が押し込みたい所に先に打って、黒の先手を消しましょう。",
+              "黑先。抢先挡在白棋要冲的地方，消掉白棋的先手。",
+              "Black to play. Block first where White wants to push, and take away White's sente move.",
+              "흑선. 백이 밀고 들어오려는 곳을 먼저 막아 백의 선수를 없애세요.",
+              "黒先。白が押し込みたい所を先に止めて、白の先手を消しましょう。",
             ),
-            board: EG_PUSH,
-            toMove: WHITE,
-            accept: pts([4, 8]),
-            success: L("逆收：后手，但白地保住了一目。", "Reverse sente: gote, but White's point is safe.", "역끝내기입니다. 후수지만 백집 한 집을 지켰습니다.", "逆ヨセです。後手ですが白地の一目を守りました。"),
-            wrong: L(
-              "下在一路上、你墙的正下方，挨着黑子。",
-              "Play on the first line directly below your wall, next to the black stone.",
-              "1선에서 백 벽 바로 아래, 흑돌 옆에 두세요.",
-              "一線で、白の壁のすぐ下、黒石の隣に打ちましょう。",
-            ),
+            problem: egMove(EG_WHITE_PUSH, [[5, 3]], 1),
+            success: L("逆收：后手，但白棋少了一个先手。", "Reverse sente: gote, but White has one sente move fewer.", "역끝내기입니다. 후수지만 백의 선수가 하나 줄었습니다.", "逆ヨセです。後手ですが、白の先手が一つ減りました。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "上边白棋有一个一路冲的先手，下边你有一个同样大的先手。先下自己的先手，白棋挡了以后，再回头逆收上边。",
-              "At the top White has a sente push along the first line; at the bottom you have a sente push of the same size. Play your sente first; after White blocks, come back and take the reverse sente at the top.",
-              "위쪽에는 백의 1선 밀기 선수가, 아래쪽에는 같은 크기의 흑 선수가 있습니다. 흑의 선수를 먼저 두고, 백이 막으면 위쪽을 역끝내기로 막으세요.",
-              "上には白の一線の押しの先手、下には同じ大きさの黒の先手があります。黒の先手を先に打ち、白が止めたら上を逆ヨセで止めましょう。",
+              "黑先。左边白棋有一路冲的先手，中间你有一个同样大的先手，右边还有一个后手扳。先下自己的先手。",
+              "Black to play. On the left White has a sente push along the first line, in the middle you have a sente push of the same size, and on the right there is a gote hane. Play your own sente first.",
+              "흑선. 왼쪽에는 백의 1선 밀기 선수, 가운데에는 같은 크기의 흑 선수, 오른쪽에는 후수 젖힘이 있습니다. 흑의 선수부터 두세요.",
+              "黒先。左には白の一線の押しの先手、真ん中には同じ大きさの黒の先手、右には後手のハネがあります。黒の先手から打ちましょう。",
             ),
-            board: EG_REVERSE,
-            toMove: BLACK,
-            accept: pts([4, 8]),
-            success: L("先手、再逆收，两处的便宜都归你。", "Sente first, reverse sente after: you gain in both places.", "선수 먼저, 그다음 역끝내기. 두 곳 모두 흑의 이득입니다.", "先手を打ってから逆ヨセ。両方とも黒の得です。"),
-            wrong: L(
-              "先在下边沿一路冲：那是你的先手。",
-              "Start with your sente push along the first line at the bottom.",
-              "먼저 아래쪽에서 1선을 밀고 들어가세요. 그것이 흑의 선수입니다.",
-              "まず下で一線を押し込みましょう。それが黒の先手です。",
+            problem: egMove(EG_TWO_PUSHES, [[9, 3]], 1),
+            success: L("先手不花代价，先下掉。", "Sente costs you nothing, so take it first.", "선수는 대가가 없으니 먼저 둡니다.", "先手は損がないので、先に打っておきます。"),
+          },
+        ],
+      },
+      {
+        id: "endgame-double-sente",
+        title: L("双先", "Double sente", "양선수", "両先手"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "三角标记的点：黑棋下在这里打吃白子，白棋必须粘；白棋下在这里打吃黑子，黑棋必须粘。对双方都是先手，叫双先。双先不花代价就能得利，通常要早下。但先手之所以是先手，是因为对方不应就亏得更多；别处有更大的后手时，对方会不应而去下大的。后面“官子的大小”一课会比较。",
+              "The marked point: if Black plays there, a white stone is in atari and White must connect; if White plays there, a black stone is in atari and Black must connect. It is sente for both sides: double sente. Double sente gains points and costs nothing, so it is usually played early. But a move is sente only because ignoring it costs more; when a bigger gote move is left elsewhere, the opponent will ignore it and take the big move. The lesson on the size of endgame moves compares them.",
+              "세모 표시한 점은 흑이 두면 백 한 점이 단수가 되어 백이 이어야 하고, 백이 두면 흑 한 점이 단수가 되어 흑이 이어야 합니다. 양쪽 모두에게 선수, 곧 양선수입니다. 양선수는 대가 없이 이득을 보므로 보통 일찍 둡니다. 하지만 선수가 선수인 것은 받지 않으면 더 손해이기 때문입니다. 다른 곳에 더 큰 후수가 남아 있으면 상대는 받지 않고 큰 곳을 둡니다. '끝내기의 크기' 강의에서 비교합니다.",
+              "三角印の点は、黒が打てば白一子がアタリで白が継がなければならず、白が打てば黒一子がアタリで黒が継がなければなりません。双方にとって先手、つまり両先手です。両先手は損なく得をするので、ふつう早めに打ちます。ただし先手が先手なのは、受けないともっと損をするからです。他にもっと大きい後手が残っていれば、相手は受けずに大きい所に回ります。「ヨセの大きさ」の課で比べます。",
             ),
+            board: egBoard(EG_DOUBLE, [{ x: 6, y: 3, type: "triangle" }]),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。抢占双先：下在黑白两颗突出的子共同的那口气上。",
+              "Black to play. Take the double sente point: the liberty shared by the two jutting stones, one black and one white.",
+              "흑선. 양선수 자리를 차지하세요. 튀어나온 흑돌과 백돌이 함께 쓰는 활로입니다.",
+              "黒先。両先手を打ちましょう。突き出た黒石と白石の共通の呼吸点です。",
+            ),
+            problem: egMove(EG_DOUBLE, [[6, 3]], 2),
+            success: L("白子被打吃，白棋必须粘，你还保有先手。", "White's stone is in atari, White must connect, and you keep sente.", "백돌이 단수라 백은 이어야 하고, 흑은 선수를 유지합니다.", "白石がアタリなので白は継ぐしかなく、黒は先手を保ちます。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。左边有双先，右边有一路扳粘（后手2目）。先下双先，再回头扳。",
+              "Black to play. There is double sente on the left and a first-line hane and connection (2 points in gote) on the right. Take the double sente, then come back for the hane.",
+              "흑선. 왼쪽에 양선수, 오른쪽에 1선 젖혀 잇기(후수 2집)가 있습니다. 양선수를 두고 나서 젖힘으로 돌아오세요.",
+              "黒先。左に両先手、右に一線のハネツギ（後手2目）があります。両先手を打ってから、ハネに回りましょう。",
+            ),
+            problem: egMove(EG_DOUBLE_HANE, [[5, 3]], 2),
+            success: L("双先在先，扳粘在后。", "Double sente first, the hane after.", "양선수가 먼저, 젖혀 잇기는 나중입니다.", "両先手が先、ハネツギは後です。"),
+          },
+        ],
+      },
+      {
+        id: "endgame-counting",
+        title: L("这一手值几目", "How much is a move worth?", "몇 집짜리일까", "何目の手か"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "算一手棋的大小（出入计算）：先让黑棋在这里先下，双方都走最好的应法，数出结果；再让白棋先下，再数一次。两次的差就是这一手值的目数。图中的一路扳粘，黑先比白先多2目，所以值2目，后手。有的书把后手官子除以二（见合计算，这里是1目），先手官子不除；两种算法比较大小的结论一样。本应用一律用出入，所以记住：目数相同，先手大约顶得上两倍的后手。",
+              "To count a move (deiri counting), let Black play here first, with the best answers on both sides, and count; then let White play first and count again. The difference is what the move is worth. The first-line hane and connection here gives Black 2 points more when Black plays first, so it is worth 2 points, in gote. Some books halve gote moves (miai counting: 1 point here) and leave sente moves whole; both ways compare moves the same. This app always uses the full difference, so remember: for the same count, a sente move is worth about twice a gote move.",
+              "한 수의 크기를 세는 법(출입 계산): 흑이 먼저 여기에 두고 양쪽이 최선으로 받은 결과를 세고, 다음에 백이 먼저 둔 결과를 셉니다. 두 결과의 차이가 그 수의 크기입니다. 그림의 1선 젖혀 잇기는 흑이 먼저 두면 2집이 많으니 후수 2집입니다. 어떤 책은 후수 끝내기를 반으로 나누고(미아이 계산, 여기서는 1집) 선수 끝내기는 그대로 둡니다. 어느 쪽으로 세어도 크기 비교의 결론은 같습니다. 이 앱은 언제나 출입 차이를 쓰므로, 같은 집수라면 선수가 후수의 두 배쯤 된다고 기억하세요.",
+              "一手の大きさの数え方（出入り計算）：黒が先にここに打ち、双方最善に応じた結果を数え、次に白が先に打った結果を数えます。その差が手の大きさです。図の一線のハネツギは黒が先に打つと2目多いので、後手2目です。後手のヨセを半分にし（見合い計算、ここでは1目）、先手のヨセはそのままにする本もありますが、大きさを比べた結論は同じです。このアプリはいつも出入りの差を使うので、同じ目数なら先手は後手の倍くらいの価値があると覚えておきましょう。",
+            ),
+            board: egBoard(EG_HANE, [{ x: 5, y: 3, type: "triangle" }]),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "这个一路扳粘值几目？",
+              "How many points is this first-line hane and connection worth?",
+              "이 1선 젖혀 잇기는 몇 집짜리일까요?",
+              "この一線のハネツギは何目の手でしょう？",
+            ),
+            problem: egValue(EG_HANE, 2, [1, 2, 3, 4]),
+            success: L("2目，后手。", "2 points, in gote.", "후수 2집입니다.", "後手2目です。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "这个一路冲值几目？它是黑棋的先手：白棋先下的话，就是在这里挡。",
+              "How many points is this first-line push worth? It is Black's sente; if White plays first, White simply blocks here.",
+              "이 1선 밀기는 몇 집짜리일까요? 흑의 선수입니다. 백이 먼저 두면 여기를 막습니다.",
+              "この一線の押しは何目の手でしょう？黒の先手です。白が先なら、ここを止めます。",
+            ),
+            problem: egValue(EG_PUSH, 1, [1, 2, 3]),
+            success: L("1目，先手。", "1 point, in sente.", "선수 1집입니다.", "先手1目です。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "这次两边的墙停在三路，扳粘在二路。值几目？",
+              "This time both walls stop on the third line, so the hane and connection is on the second line. How many points is it worth?",
+              "이번에는 두 벽이 3선에서 멈춰서 젖혀 잇기가 2선에서 생깁니다. 몇 집짜리일까요?",
+              "今度は両方の壁が三線で止まっているので、ハネツギは二線です。何目の手でしょう？",
+            ),
+            problem: egValue(EG_HANE_2, 6, [3, 4, 6, 8]),
+            success: L("6目：二路的扳粘是一路的三倍。", "6 points: three times the first-line hane.", "6집: 1선 젖혀 잇기의 세 배입니다.", "6目：一線のハネツギの三倍です。"),
+          },
+        ],
+      },
+      {
+        id: "endgame-big",
+        title: L("官子的大小", "Big, middle and small endgame", "끝내기의 크기", "ヨセの大きさ"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "官子大致分三级：大官子（十目以上，比如救回被切断的子、三路的大边界），中官子（几目，比如二路扳粘），小官子（一两目，比如一路扳粘和冲），最后是单官。比大小时，先手和双先要看后续：对方不应时你能得到的，如果比别处最大的后手还小，对方就会脱先。所以小小的双先并不总是最先下。图中右边两颗黑子被切断了，救回来是十几目的后手，比左边2目的双先（三角）大得多。",
+              "Endgame moves come roughly in three sizes: big (ten points or more, such as rescuing stones that have been cut off, or a large border on the third line), middle (a few points, such as a second-line hane), and small (one or two points, such as first-line hanes and pushes); neutral points come last. When you compare, look at what a sente or double sente move threatens: if what you would gain when the opponent ignores it is smaller than the biggest gote move elsewhere, the opponent will ignore it. So a small double sente does not always come first. On the right, two black stones have been cut off; rescuing them is a gote move worth well over ten points, far more than the 2-point double sente on the left (triangle).",
+              "끝내기는 대략 세 가지 크기로 나뉩니다. 큰 끝내기(10집 이상, 예를 들어 끊긴 돌을 살리는 수나 3선의 큰 경계), 중간 크기의 끝내기(몇 집, 예를 들어 2선 젖혀 잇기), 작은 끝내기(1~2집, 예를 들어 1선 젖혀 잇기와 밀기), 그리고 마지막이 공배입니다. 크기를 비교할 때 선수와 양선수는 그 뒤를 봐야 합니다. 상대가 받지 않을 때 내가 얻는 것이 다른 곳의 가장 큰 후수보다 작으면 상대는 받지 않습니다. 그래서 작은 양선수가 언제나 먼저는 아닙니다. 그림 오른쪽에서 흑 두 점이 끊겼습니다. 이를 살리는 수는 10집이 훨씬 넘는 후수로, 왼쪽의 2집짜리 양선수(세모)보다 훨씬 큽니다.",
+              "ヨセはおおよそ三つの大きさに分かれます。大ヨセ（10目以上。切り離された石を助ける手や三線の大きな境界など）、中くらいのヨセ（数目。二線のハネツギなど）、小ヨセ（1、2目。一線のハネツギや押しなど）、そして最後がダメです。大きさを比べるときは、先手や両先手の後を見ます。相手が受けなかったときに得られるものが他の一番大きい後手より小さければ、相手は受けません。だから小さな両先手がいつも一番先とは限りません。図の右では黒二子が切り離されています。これを助けるのは10目を大きく超える後手で、左の2目の両先手（三角）よりずっと大きいのです。",
+            ),
+            board: egBoard(EG_DOUBLE_CUT, [{ x: 5, y: 3, type: "triangle" }, { x: 11, y: 3, type: "circle" }, { x: 11, y: 4, type: "circle" }]),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。左边有一个小双先，右边你的两颗子被切断了。比较一下，下最大的一手。",
+              "Black to play. There is a small double sente on the left, and two of your stones have been cut off on the right. Compare, and play the biggest move.",
+              "흑선. 왼쪽에 작은 양선수가 있고, 오른쪽에서는 흑 두 점이 끊겼습니다. 비교해서 가장 큰 수를 두세요.",
+              "黒先。左に小さな両先手、右では黒二子が切り離されています。比べて、一番大きい手を打ちましょう。",
+            ),
+            problem: egMove(EG_DOUBLE_CUT, [[12, 3]], 5),
+            success: L("救回两颗子：大的后手比小的双先重要。", "The two stones are back: a big gote move beats a small double sente.", "두 점을 살렸습니다. 큰 후수가 작은 양선수보다 중요합니다.", "二子を助けました。大きい後手は小さい両先手より大事です。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。左边有一个一路冲（先手1目），右边两颗子被切断。白棋不会去应那个冲，而会来吃你的子。你先救。",
+              "Black to play. On the left there is a first-line push (1 point in sente), on the right the two cut-off stones. White would not answer the push: White would capture your stones instead. Rescue them first.",
+              "흑선. 왼쪽에는 1선 밀기(선수 1집), 오른쪽에는 끊긴 두 점이 있습니다. 백은 밀기에 받지 않고 흑돌을 잡으러 올 것입니다. 먼저 살리세요.",
+              "黒先。左には一線の押し（先手1目）、右には切り離された二子があります。白は押しには受けず、黒石を取りに来ます。先に助けましょう。",
+            ),
+            problem: egMove(EG_PUSH_CUT, [[9, 3]], 6),
+            success: L("小先手可以留着，大后手不能让。", "The small sente can wait; the big gote cannot.", "작은 선수는 남겨 둘 수 있지만, 큰 후수는 양보할 수 없습니다.", "小さい先手は残しておけますが、大きい後手は譲れません。"),
           },
         ],
       },
       {
         id: "endgame-japanese-counting",
-        title: L("单官与补棋", "Neutral points and the last defence", "공배와 손질", "ダメ詰めと手入れ"),
+        title: L("小官子与单官", "Small endgame and neutral points", "작은 끝내기와 공배", "小ヨセとダメ"),
         steps: [
           {
             kind: "read",
             text: L(
-              "日本规则：双方停一手以后，拿掉死子，把提子填进对方的地，再数目。单官不算目，但要填完。小心：填单官可能让你的子被打吃，这时必须在自己地里补一手（补棋），自己的地就少一目。",
-              "Under Japanese rules, after both players pass, dead stones are removed, prisoners are placed in the opponent's territory, and the territory is counted. Neutral points are worth nothing, but they are all filled. Be careful: filling one can put your stones in atari, and then you must add a defensive stone inside your own territory, which costs you a point.",
-              "일본 규칙에서는 두 사람이 패스한 뒤 사석을 들어내고, 따낸 돌을 상대 집에 메운 다음 계가합니다. 공배는 집이 아니지만 모두 메웁니다. 주의할 점: 공배를 메우다가 내 돌이 단수가 될 수 있고, 그러면 내 집 안에 손질을 해야 해서 한 집이 줄어듭니다.",
-              "日本ルールでは、双方パスの後、死に石を取り上げ、アゲハマを相手の地に埋めて整地します。ダメは目になりませんが、すべて詰めます。注意：ダメを詰めると自分の石がアタリになることがあり、そのときは自分の地の中に手入れが必要で、一目減ります。",
+              "日本规则：双方停一手以后拿掉死子，提子填进对方的地，再数目。单官不算目，但也要填完。有的单官很特别：图中三角的单官，黑棋填了，白棋那颗子就被打吃，白棋必须在自己地里补一手（补棋），少一目；圆圈的单官填不填都一样。所以收单官时，先填会逼对方补棋的那个。中国规则用数子法，每个单官都算一个子，见“数子法”一课。",
+              "Under Japanese rules, after both players pass, dead stones are removed, prisoners are placed in the opponent's territory, and territory is counted. Neutral points are worth nothing, but they are all filled. Some are special: if Black fills the marked neutral point (triangle), a white stone is in atari and White must add a defensive stone inside its own territory, which costs a point; filling the circled one changes nothing. So fill the neutral point that forces a defensive move first. Chinese rules use area scoring, where every neutral point is worth a point; see the lesson on area scoring.",
+              "일본 규칙에서는 두 사람이 패스한 뒤 사석을 들어내고, 따낸 돌을 상대 집에 메운 다음 계가합니다. 공배는 집이 아니지만 모두 메웁니다. 특별한 공배도 있습니다. 세모 표시한 공배를 흑이 메우면 백 한 점이 단수가 되어 백은 자기 집 안에 손질을 해야 하고, 한 집이 줄어듭니다. 동그라미 공배는 메워도 아무 일이 없습니다. 그러니 손질을 강요하는 공배부터 메우세요. 중국 규칙은 계자(수 세기)로, 공배 하나하나가 한 점입니다. '계자' 강의를 보세요.",
+              "日本ルールでは、双方パスの後、死に石を取り上げ、アゲハマを相手の地に埋めて整地します。ダメは目になりませんが、すべて詰めます。特別なダメもあります。三角印のダメを黒が詰めると白一子がアタリになり、白は自分の地の中に手入れが必要で一目減ります。丸印のダメは詰めても何も起きません。だから、手入れを強いるダメから詰めましょう。中国ルールは計子で、ダメも一つ一目になります。「計子」の課を見てください。",
             ),
-            board: { ...EG_COUNT, marks: [{ x: 4, y: 4, type: "triangle" }, { x: 4, y: 1, type: "circle" }] },
+            board: egBoard(EG_DEFENCE, [{ x: 4, y: 2, type: "triangle" }, { x: 10, y: 2, type: "circle" }]),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "还剩两个单官。其中一个要紧：如果白棋填它，你的一颗子会被打吃。自己先把这个单官填掉。",
-              "Two neutral points are left. One of them matters: if White fills it, one of your stones will be in atari. Fill that one yourself.",
-              "공배가 둘 남았습니다. 그중 하나가 중요합니다. 백이 메우면 흑 한 점이 단수가 됩니다. 그 공배를 먼저 메우세요.",
-              "ダメが二つ残っています。そのうち一つが大事です。白に詰められると黒一子がアタリになります。そのダメを自分で先に詰めましょう。",
+              "黑先。白棋可以从左边沿一路冲进来，这是一目的官子；另外还有两个单官。先挡住冲，单官最后再填。",
+              "Black to play. White can push along the first line on the left, a one-point endgame move; two neutral points are also left. Block the push first and fill neutral points last.",
+              "흑선. 백은 왼쪽에서 1선으로 밀고 들어올 수 있습니다. 1집짜리 끝내기입니다. 공배도 둘 남아 있습니다. 밀기를 먼저 막고, 공배는 마지막에 메우세요.",
+              "黒先。白は左から一線を押し込めます。1目のヨセです。ダメも二つ残っています。押しを先に止め、ダメは最後に詰めましょう。",
             ),
-            board: EG_COUNT,
-            toMove: BLACK,
-            accept: pts([4, 4]),
-            success: L("填了这里，就不用在自己地里补棋。", "Filled: now you will not need a defensive move inside your territory.", "여기를 메웠으니 집 안에 손질할 필요가 없습니다.", "ここを詰めたので、地の中の手入れは要りません。"),
-            wrong: L(
-              "看你那颗突出的子：它只有两口气，其中一口是单官。",
-              "Look at your stone that sticks out: it has two liberties, and one of them is a neutral point.",
-              "튀어나온 흑돌을 보세요. 활로가 둘인데 그중 하나가 공배입니다.",
-              "突き出た黒石を見ましょう。呼吸点は二つで、そのうち一つがダメです。",
-            ),
+            problem: egMove(EG_ONE_POINT, [[3, 3]], 1),
+            success: L("一目也是目，单官放到最后。", "A point is a point; neutral points come last.", "한 집도 집입니다. 공배는 마지막입니다.", "一目も目のうち。ダメは最後です。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "白棋填了那个单官，你的子被打吃了。在自己地里粘上：少一目，总比丢子好。",
-              "White filled that neutral point and your stone is in atari. Connect inside your own territory: a point lost is better than a stone lost.",
-              "백이 그 공배를 메워 흑돌이 단수입니다. 자기 집 안에서 이으세요. 한 집 줄어도 돌을 잃는 것보다 낫습니다.",
-              "白がそのダメを詰め、黒石がアタリです。自分の地の中で継ぎましょう。一目減っても、石を取られるよりましです。",
+              "黑先。只剩两个单官。哪一个会逼白棋在自己地里补一手？先填那一个。",
+              "Black to play. Only two neutral points are left. Which one forces White to add a stone inside its territory? Fill that one first.",
+              "흑선. 공배가 둘만 남았습니다. 어느 쪽이 백에게 자기 집 안의 손질을 강요할까요? 그곳을 먼저 메우세요.",
+              "黒先。ダメが二つだけ残っています。どちらが白に地の中の手入れを強いるでしょう？そちらを先に詰めましょう。",
             ),
-            board: b9(wall({ ...JP_ROWS, 1: ". . . X X O . . .", 4: ". . . X O O . . ." })),
-            toMove: BLACK,
-            accept: pts([3, 5]),
-            success: L("补好了。现在可以停一手了。", "Defended. Now you can pass.", "손질을 마쳤습니다. 이제 패스해도 됩니다.", "手入れが済みました。これでパスできます。"),
-            wrong: L(
-              "下在被打吃的黑子剩下的那口气上。",
-              "Play on the last liberty of your stone in atari.",
-              "단수당한 흑돌의 마지막 활로에 두세요.",
-              "アタリの黒石の最後の呼吸点に打ちましょう。",
-            ),
+            problem: egMove(EG_DEFENCE, [[4, 2]], 1),
+            success: L("白棋只好补棋，你多得一目。", "White has to defend, and you gain a point.", "백이 손질할 수밖에 없어 한 집을 더 얻었습니다.", "白は手入れするしかなく、一目得しました。"),
           },
         ],
       },
@@ -1677,61 +1864,37 @@ export const INTERMEDIATE = [
         title: L("官子的顺序", "Endgame order", "끝내기 순서", "ヨセの順番"),
         steps: [
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "棋盘上有三个官子：中间的双先，下边你的先手冲，上边后手的扳。按顺序下，先下双先。",
-              "Three endgame moves are left: the double sente point in the middle, your sente push at the bottom and the gote hane at the top. Play them in order, double sente first.",
-              "끝내기가 세 곳 남았습니다. 가운데 양선수, 아래쪽 흑의 선수 밀기, 위쪽 후수 젖힘입니다. 순서대로, 양선수부터 두세요.",
-              "ヨセが三か所残っています。真ん中の両先手、下の黒の先手の押し、上の後手のハネです。順番に、両先手から打ちましょう。",
+              "黑先。三处官子：左边两颗子被切断（大官子），中间有一个一路冲，右边有一个一路扳。从最大的下起。",
+              "Black to play. Three endgame spots: two stones cut off on the left (big endgame), a first-line push in the middle and a first-line hane on the right. Start with the biggest.",
+              "흑선. 끝내기가 세 곳입니다. 왼쪽에 끊긴 두 점(큰 끝내기), 가운데에 1선 밀기, 오른쪽에 1선 젖힘이 있습니다. 가장 큰 곳부터 두세요.",
+              "黒先。ヨセが三か所あります。左に切り離された二子（大ヨセ）、真ん中に一線の押し、右に一線のハネ。一番大きい所から打ちましょう。",
             ),
-            board: b9(EG_PRACTICE_ROWS),
-            toMove: BLACK,
-            accept: pts([4, 5]),
-            success: L("白棋粘上，又轮到你。", "White connects, and it is your turn again.", "백이 잇고, 다시 흑 차례입니다.", "白が継ぎ、また黒番です。"),
-            wrong: L(
-              "双先是黑白两颗突出的子共同的那口气。",
-              "The double sente point is the liberty shared by the jutting black and white stones.",
-              "양선수는 튀어나온 흑돌과 백돌이 함께 쓰는 활로입니다.",
-              "両先手は、突き出た黒石と白石の共通の呼吸点です。",
-            ),
+            problem: egMove(EG_THREE, [[4, 3]], 7),
+            success: L("大官子在先。", "Big endgame first.", "큰 끝내기가 먼저입니다.", "大ヨセが先です。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "接下来是下边的先手冲。",
-              "Next, the sente push at the bottom.",
-              "다음은 아래쪽 선수 밀기입니다.",
-              "次は下の先手の押しです。",
+              "黑先。左边有二路的扳粘（中官子，后手6目），右边白棋有一路冲的先手，先去挡是逆收，只值1目，大约相当于后手2目。下二路扳。",
+              "Black to play. On the left there is a second-line hane (middle endgame, 6 points in gote); on the right White has a sente push along the first line, and blocking it first is a reverse sente worth 1 point, about a 2-point gote move. Play the second-line hane.",
+              "흑선. 왼쪽에는 2선 젖혀 잇기(중간 크기, 후수 6집)가 있고, 오른쪽에는 백의 1선 밀기 선수가 있습니다. 그것을 먼저 막는 역끝내기는 1집, 후수 2집쯤입니다. 2선에서 젖히세요.",
+              "黒先。左には二線のハネツギ（中くらいのヨセ、後手6目）、右には白の一線の押しの先手があります。それを先に止める逆ヨセは1目、後手2目くらいです。二線でハネましょう。",
             ),
-            board: b9(wall({ ...EG_PRACTICE_ROWS, 4: ". . . X O O O . .", 5: ". . . X X O . . ." })),
-            toMove: BLACK,
-            accept: pts([4, 8]),
-            success: L("白棋挡，还是你的先手。", "White blocks, and you still have sente.", "백이 막고, 여전히 흑의 선수입니다.", "白が止めて、まだ黒の先手です。"),
-            wrong: L(
-              "后手的扳留到最后。先在下边沿一路冲。",
-              "Leave the gote hane for last. Push along the first line at the bottom.",
-              "후수 젖힘은 마지막에 둡니다. 아래쪽 1선을 밀고 들어가세요.",
-              "後手のハネは最後です。下の一線を押し込みましょう。",
-            ),
+            problem: egMove(EG_HANE2_PUSH, [[4, 3]], 1),
+            success: L("后手6目比逆收1目大。", "A 6-point gote move beats a 1-point reverse sente.", "후수 6집이 역끝내기 1집보다 큽니다.", "後手6目は逆ヨセ1目より大きいのです。"),
           },
           {
-            kind: "place",
+            kind: "problem",
             text: L(
-              "最后是上边的后手：一路扳。",
-              "Last, the gote move at the top: the first-line hane.",
-              "마지막은 위쪽 후수, 1선 젖힘입니다.",
-              "最後は上の後手、一線のハネです。",
+              "黑先。只剩小官子：左边一个一路冲（先手），右边一个一路扳（后手）。大小差不多时，先手先下。",
+              "Black to play. Only small moves are left: a first-line push on the left (sente) and a first-line hane on the right (gote). When the sizes are close, sente comes first.",
+              "흑선. 작은 끝내기만 남았습니다. 왼쪽 1선 밀기(선수)와 오른쪽 1선 젖힘(후수). 크기가 비슷하면 선수가 먼저입니다.",
+              "黒先。小ヨセだけが残っています。左の一線の押し（先手）と右の一線のハネ（後手）。大きさが近ければ先手が先です。",
             ),
-            board: b9(wall({ ...EG_PRACTICE_ROWS, 4: ". . . X O O O . .", 5: ". . . X X O . . .", 8: ". . . X X O . . ." })),
-            toMove: BLACK,
-            accept: pts([4, 0]),
-            success: L("双先、先手、后手：这个顺序让你每一处都不吃亏。", "Double sente, then sente, then gote: in this order you lose nothing anywhere.", "양선수, 선수, 후수. 이 순서면 어디서도 손해가 없습니다.", "両先手、先手、後手。この順番なら、どこでも損をしません。"),
-            wrong: L(
-              "在一路上扳：斜挨着你二路的子，紧贴白子。",
-              "Hane on the first line, diagonally next to your second-line stone and touching White's stone.",
-              "1선에서 젖히세요. 흑의 2선 돌과 대각선이면서 백돌에 붙은 곳입니다.",
-              "一線でハネましょう。黒の二線の石と斜めで、白石に接する所です。",
-            ),
+            problem: egMove(EG_PUSH_HANE, [[5, 3]], 1),
+            success: L("大、中、小，再加上先手优先：这就是官子的顺序。", "Big, middle, small, and sente first among equals: that is the order of the endgame.", "큰 것, 중간, 작은 것, 그리고 비슷하면 선수 먼저. 이것이 끝내기 순서입니다.", "大、中、小、そして同じくらいなら先手から。これがヨセの順番です。"),
           },
         ],
       },
@@ -2038,6 +2201,352 @@ export const INTERMEDIATE = [
               diagram: [", , , , , , , ,", "O O O O O O O ,", "O X X x X X O ,", "O X . . . X O ,"],
             },
             success: L("两只眼，活了：在白棋的势力里安定下来。", "Two eyes and alive: a settled group in White's sphere.", "두 눈으로 살았습니다. 백의 세력 안에서 안정했습니다.", "二眼で生きました。白の勢力の中で安定しました。"),
+          },
+        ],
+      },
+    ],
+  },
+  /* ======================================================== UNIT 14 (v13) */
+  {
+    id: "ko-fighting",
+    level: "intermediate",
+    title: L("打劫", "Ko fighting", "패싸움", "コウ争い"),
+    summary: L(
+      "什么是劫材，对方必须应的劫材，数劫材决定何时开劫，缓气劫的道理，以及怎样消劫：粘劫或提子。",
+      "What a ko threat is, threats the opponent must answer, counting threats to decide when to start a ko, the idea of an approach ko, and how to end a ko: connect or capture.",
+      "팻감이란 무엇인가, 상대가 받아야 하는 팻감, 팻감을 세어 패를 걸 때를 정하기, 늘어진 패의 원리, 그리고 패를 끝내는 법: 잇기와 따내기.",
+      "コウダテとは何か、相手が受けなければならないコウダテ、コウダテを数えてコウを仕掛ける時を決めること、ヨセコウの考え方、そしてコウの解消：継ぐか取るか。",
+    ),
+    lessons: [
+      {
+        id: "ko-threat",
+        title: L("劫材", "Ko threats", "팻감", "コウダテ"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "白棋刚在中间提了劫（三角是黑棋想提回的点）。按规则，黑棋不能马上提回，必须先在别处下一手。如果这一手厉害到白棋必须应，白棋应了以后，黑棋就可以提回：这样的一手叫劫材。这里黑棋在上边切断（圆圈），威胁吃掉白棋两颗子，就是劫材。",
+              "White has just taken the ko in the middle (the triangle is where Black would like to take back). By the rules Black may not retake at once; Black must play elsewhere first. If that move is so strong that White has to answer it, Black can retake after the answer: such a move is a ko threat. Here Black's cut at the top (circle), threatening to capture two white stones, is a ko threat.",
+              "백이 방금 가운데에서 패를 따냈습니다(세모는 흑이 되따내고 싶은 곳). 규칙상 흑은 바로 되따낼 수 없고, 먼저 다른 곳에 한 수를 두어야 합니다. 그 수가 백이 받지 않을 수 없을 만큼 강하면, 백이 받은 뒤 흑이 되따낼 수 있습니다. 이런 수를 팻감이라고 합니다. 여기서는 위쪽에서 끊어 백 두 점을 잡겠다고 위협하는 수(동그라미)가 팻감입니다.",
+              "白が真ん中でコウを取ったところです（三角は黒が取り返したい点）。ルールで黒はすぐには取り返せず、まず他に一手打たなければなりません。その手が白の受けなければならないほど厳しければ、白が受けた後に黒は取り返せます。このような手がコウダテです。ここでは上で切って白二子を取ろうとする手（丸）がコウダテです。",
+            ),
+            board: { ...b9(KO_ROWS), marks: [{ x: 5, y: 4, type: "triangle" }, { x: 5, y: 2, type: "circle" }] },
+          },
+          {
+            kind: "place",
+            text: L(
+              "白棋刚提了劫，你不能马上提回。先找一个白棋必须应的劫材：切断上边的两颗白子。",
+              "White has just taken the ko and you may not retake at once. First find a threat White must answer: cut off the two white stones at the top.",
+              "백이 방금 패를 따내서 바로 되따낼 수 없습니다. 먼저 백이 받아야 하는 팻감을 찾으세요. 위쪽 백 두 점을 끊으세요.",
+              "白がコウを取ったばかりで、すぐには取り返せません。まず白が受けなければならないコウダテを探しましょう。上の白二子を切りましょう。",
+            ),
+            board: b9(KO_ROWS),
+            toMove: BLACK,
+            accept: pts([5, 2]),
+            success: L("白棋不应，你就吃掉两颗子，冲进右上的白地。", "If White does not answer, you capture two stones and break into White's upper right.", "백이 받지 않으면 두 점을 잡고 오른쪽 위 백집으로 뚫고 들어갑니다.", "白が受けなければ二子を取って、右上の白地に入り込めます。"),
+            wrong: L(
+              "提回是犯规的。下在上边两颗白子和下面白墙之间的断点上。",
+              "Retaking is against the rules. Play on the cutting point between the two white stones at the top and the white wall below them.",
+              "되따내기는 반칙입니다. 위쪽 백 두 점과 그 아래 백 벽 사이의 끊는 점에 두세요.",
+              "取り返すのは反則です。上の白二子とその下の白の壁の間の切りの点に打ちましょう。",
+            ),
+          },
+          {
+            kind: "place",
+            text: L(
+              "白棋粘上应了你的劫材。现在可以提回劫了。",
+              "White has connected to answer your threat. Now you may take the ko back.",
+              "백이 이어서 팻감을 받았습니다. 이제 패를 되따낼 수 있습니다.",
+              "白が継いでコウダテに受けました。これでコウを取り返せます。",
+            ),
+            board: b9(KO_ANSWERED_ROWS),
+            toMove: BLACK,
+            accept: pts([5, 4]),
+            success: L("提回了。现在轮到白棋找劫材。", "Retaken. Now it is White who needs a threat.", "되따냈습니다. 이제 백이 팻감을 찾아야 합니다.", "取り返しました。今度は白がコウダテを探す番です。"),
+            wrong: L(
+              "提掉夹在黑子中间、只剩一口气的那颗白子。",
+              "Capture the white stone wedged between your stones with one liberty left.",
+              "흑돌 사이에 끼어 활로가 하나 남은 백돌을 따내세요.",
+              "黒石の間にはさまれ、呼吸点が一つの白石を取りましょう。",
+            ),
+          },
+        ],
+      },
+      {
+        id: "ko-threat-answer",
+        title: L("必须应的劫材", "Threats that must be answered", "받아야 하는 팻감", "受けなければならないコウダテ"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "劫材要让对方不应就亏得比劫更多。去吃一颗本来就死了的子，或者只威胁一两目，对方会干脆不应，把劫粘掉。反过来，对方下了劫材，你要比较：不应的损失比劫大，就应；比劫小，就消劫。",
+              "A ko threat must make ignoring it cost more than the ko is worth. Attacking a stone that is already dead, or threatening a point or two, lets the opponent simply ignore you and end the ko. The other way round, when the opponent plays a threat, compare: if ignoring it costs more than the ko, answer it; if less, end the ko.",
+              "팻감은 상대가 받지 않으면 패보다 더 큰 손해를 보게 하는 수여야 합니다. 이미 죽은 돌을 공격하거나 한두 집만 위협하면 상대는 받지 않고 패를 이어 버립니다. 반대로 상대가 팻감을 쓰면 비교하세요. 받지 않을 때의 손해가 패보다 크면 받고, 작으면 패를 해소합니다.",
+              "コウダテは、受けないと相手がコウより大きく損をする手でなければなりません。もう死んでいる石を攻めたり、一、二目を狙うだけの手なら、相手は受けずにコウを解消してしまいます。逆に相手がコウダテを打ったら比べましょう。受けないときの損がコウより大きければ受け、小さければコウを解消します。",
+            ),
+          },
+          {
+            kind: "place",
+            text: L(
+              "白棋又提了劫。你的地里有一颗白子，它已经活不了。去打吃它不是劫材，白棋会不理。找真正的劫材。",
+              "White has taken the ko again. There is a white stone inside your area that cannot live. Attacking it is not a threat; White would ignore it. Find the real threat.",
+              "백이 다시 패를 따냈습니다. 흑집 안에 살 수 없는 백돌이 하나 있습니다. 그것을 단수치는 것은 팻감이 아니어서 백은 무시합니다. 진짜 팻감을 찾으세요.",
+              "白がまたコウを取りました。黒地の中に生きられない白石が一つあります。それをアタリにしてもコウダテにならず、白は無視します。本当のコウダテを探しましょう。",
+            ),
+            board: b9(KO_DEAD_STONE_ROWS),
+            toMove: BLACK,
+            accept: pts([5, 2]),
+            success: L("切断威胁到两颗活子和右上的地，白棋必须应。", "The cut threatens two living stones and the upper right: White has to answer.", "끊기는 살아 있는 두 점과 오른쪽 위 집을 위협하므로 백은 받아야 합니다.", "切りは生きている二子と右上の地を狙うので、白は受けなければなりません。"),
+            wrong: L(
+              "死子不用管。切断上边的两颗白子。",
+              "Leave the dead stone alone. Cut off the two white stones at the top.",
+              "죽은 돌은 그냥 두세요. 위쪽 백 두 점을 끊으세요.",
+              "死に石は放っておきましょう。上の白二子を切りましょう。",
+            ),
+          },
+          {
+            kind: "place",
+            text: L(
+              "你执白。你提了劫，黑棋在上边切断作劫材。不应的话要丢两颗子和右上的地，比这个劫大得多。应：把两颗子连回去。",
+              "You are White. You took the ko, and Black has cut at the top as a threat. Ignoring it would cost two stones and the upper right, far more than this ko. Answer it: connect the two stones.",
+              "백입니다. 패를 따냈더니 흑이 위쪽에서 끊어 팻감을 썼습니다. 받지 않으면 두 점과 오른쪽 위 집을 잃어 이 패보다 훨씬 큽니다. 받으세요. 두 점을 이으세요.",
+              "白番です。コウを取ったら、黒が上で切ってコウダテを打ちました。受けなければ二子と右上の地を失い、このコウよりずっと大きい損です。受けましょう。二子をつなぎましょう。",
+            ),
+            board: b9({ ...KO_ROWS, 2: ". . . X X X O . ." }),
+            toMove: WHITE,
+            accept: pts([6, 1]),
+            success: L("应了劫材，劫还在，轮到黑棋提回。", "Threat answered. The ko goes on, and Black may retake.", "팻감을 받았습니다. 패는 계속되고 흑이 되따낼 차례입니다.", "コウダテに受けました。コウは続き、黒が取り返す番です。"),
+            wrong: L(
+              "两颗白子只剩两口气。在它们旁边粘上，和下面的白子连成一块。",
+              "The two white stones have only two liberties left. Connect next to them, joining them to the white stones below.",
+              "백 두 점은 활로가 둘뿐입니다. 그 옆에 이어서 아래 백돌과 하나로 만드세요.",
+              "白二子は呼吸点が二つしかありません。その横に継いで、下の白石とつなげましょう。",
+            ),
+          },
+        ],
+      },
+      {
+        id: "ko-count",
+        title: L("数劫材：什么时候开劫", "Counting threats: when to start a ko", "팻감 세기: 언제 패를 걸까", "コウダテを数える：いつコウを仕掛けるか"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "开劫之前先数劫材：双方各有几个对方必须应的劫材？劫材多的一方打得赢，劫材少的一方最好别开劫，或者先去消掉对方的劫材。这里的劫还没开始，黑棋有上边的切断（圆圈）一个劫材，白棋一个也没有，黑棋可以放心提（三角）。还有一种劫叫缓气劫：要提的子还有一口外气，必须先紧一口气才能提。紧气要多花一手，等于少了一个劫材，所以缓气劫对需要紧气的一方很不利。",
+              "Before starting a ko, count threats: how many threats the opponent must answer does each side have? The side with more threats wins the ko; the side with fewer should not start it, or should first remove the opponent's threats. Here the ko has not started: Black has one threat, the cut at the top (circle), and White has none, so Black can take (triangle) with confidence. There is also the approach ko: the stone you want to capture still has an outside liberty, so you must fill that liberty before you can take. The extra move is like being one threat short, so an approach ko is a heavy handicap for the side that must approach.",
+              "패를 걸기 전에 팻감을 세세요. 상대가 받아야 하는 팻감이 양쪽에 몇 개씩 있습니까? 팻감이 많은 쪽이 패를 이기고, 적은 쪽은 패를 걸지 않거나 먼저 상대의 팻감을 없애는 것이 좋습니다. 여기서는 아직 패가 시작되지 않았습니다. 흑은 위쪽 끊기(동그라미)라는 팻감이 하나 있고 백은 하나도 없으니, 흑은 안심하고 따낼(세모) 수 있습니다. 늘어진 패라는 것도 있습니다. 따내려는 돌에 바깥 활로가 하나 더 있어서, 먼저 그 활로를 메워야 따낼 수 있는 패입니다. 한 수를 더 써야 하니 팻감이 하나 모자란 것과 같아서, 메워야 하는 쪽이 크게 불리합니다.",
+              "コウを仕掛ける前にコウダテを数えましょう。相手が受けなければならないコウダテが、それぞれいくつあるでしょうか。コウダテの多い方がコウに勝ち、少ない方は仕掛けないか、先に相手のコウダテを消しておくのがよいのです。ここではコウはまだ始まっていません。黒には上の切り（丸）というコウダテが一つあり、白には一つもないので、黒は安心して取れます（三角）。ヨセコウというコウもあります。取りたい石にもう一つ外側の呼吸点があり、先にそれをふさがないと取れないコウです。一手余計にかかるのはコウダテが一つ足りないのと同じで、詰める側がたいへん不利です。",
+            ),
+            board: { ...b9(KO_FRESH_ROWS), marks: [{ x: 5, y: 4, type: "triangle" }, { x: 5, y: 2, type: "circle" }] },
+          },
+          {
+            kind: "place",
+            text: L(
+              "劫还没开始。你有一个劫材，白棋一个也没有。开劫：提掉那颗白子。",
+              "The ko has not started yet. You have a threat and White has none. Start the ko: capture the white stone.",
+              "패는 아직 시작되지 않았습니다. 흑은 팻감이 하나 있고 백은 없습니다. 패를 거세요. 백돌을 따내세요.",
+              "コウはまだ始まっていません。黒にはコウダテが一つあり、白にはありません。コウを仕掛けましょう。白石を取りましょう。",
+            ),
+            board: b9(KO_FRESH_ROWS),
+            toMove: BLACK,
+            accept: pts([5, 4]),
+            success: L("白棋找不到劫材，这个劫是你的。", "White has no threat to play: this ko is yours.", "백은 쓸 팻감이 없으니 이 패는 흑의 것입니다.", "白には打つコウダテがないので、このコウは黒のものです。"),
+            wrong: L(
+              "提掉夹在黑子中间、只剩一口气的那颗白子。",
+              "Capture the white stone wedged between your stones with one liberty left.",
+              "흑돌 사이에 끼어 활로가 하나 남은 백돌을 따내세요.",
+              "黒石の間にはさまれ、呼吸点が一つの白石を取りましょう。",
+            ),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。你提了劫，白棋没有劫材，下在了别处。马上把劫粘掉，让它不再是劫。",
+              "Black to play. You took the ko; White had no threat and played elsewhere. End the ko now by connecting, so it is no longer a ko.",
+              "흑선. 흑이 패를 따냈고, 백은 팻감이 없어 다른 곳에 두었습니다. 지금 이어서 패를 끝내세요.",
+              "黒先。黒がコウを取り、白はコウダテがなくて他に打ちました。今すぐ継いで、コウを解消しましょう。",
+            ),
+            problem: { goal: "save", size: 9, diagram: KO_CONNECT },
+            success: L("劫粘掉了。劫材多，劫就是你的。", "The ko is over. More threats, and the ko was yours.", "패를 이었습니다. 팻감이 많으면 패는 내 것입니다.", "コウを解消しました。コウダテが多ければ、コウは自分のものです。"),
+          },
+        ],
+      },
+      {
+        id: "ko-resolve",
+        title: L("消劫：粘还是提", "Ending a ko: connect or capture", "패 해소: 잇기냐 따내기냐", "コウの解消：継ぐか取るか"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "打赢了劫，要找机会把它消掉，否则对方找到劫材还会再打。最常见的是粘劫：把对方要提回的那个点填上。有时还有更好的办法：如果围着劫的对方棋子气紧了，直接提掉它们，劫消失了，还多吃了子。消劫之前先看一眼有没有可以提的子。",
+              "Once you have won a ko, end it when you can; otherwise the opponent will start it again as soon as a threat turns up. The usual way is to connect: fill the point where the opponent would take back. Sometimes there is something better: if the opponent's stones around the ko are short of liberties, capture them. The ko disappears, and you have taken stones as well. Before you connect, look for stones you can capture.",
+              "패를 이겼으면 기회를 봐서 해소하세요. 그렇지 않으면 상대가 팻감을 찾는 대로 다시 패를 겁니다. 가장 흔한 방법은 패를 잇는 것, 곧 상대가 되따낼 점을 메우는 것입니다. 더 좋은 방법이 있을 때도 있습니다. 패를 둘러싼 상대 돌의 활로가 모자라면 그 돌을 따내세요. 패가 없어지고 돌까지 잡습니다. 잇기 전에 따낼 돌이 있는지 먼저 보세요.",
+              "コウに勝ったら、機会を見て解消しましょう。そうしないと、相手はコウダテが見つかり次第またコウを仕掛けてきます。ふつうはコウを継ぎます。相手が取り返す点を埋めるのです。もっとよい方法があることもあります。コウを囲む相手の石の呼吸点が少なければ、それを取ってしまいましょう。コウはなくなり、石も取れます。継ぐ前に、取れる石がないか見ましょう。",
+            ),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。白棋没有提回，下在了别处。这次不用粘：提劫时有一颗白子被打吃了，提掉它，劫就没有了。",
+              "Black to play. White did not take back and played elsewhere. You need not connect this time: when you took the ko, a white stone was left in atari. Capture it and the ko is gone.",
+              "흑선. 백은 되따내지 않고 다른 곳에 두었습니다. 이번에는 이을 필요가 없습니다. 패를 따낼 때 백 한 점이 단수가 되었으니, 그것을 따내면 패가 없어집니다.",
+              "黒先。白は取り返さずに他に打ちました。今回は継ぐ必要はありません。コウを取ったとき白一子がアタリになったので、それを取ればコウはなくなります。",
+            ),
+            problem: { goal: "capture", size: 9, diagram: KO_CAPTURE },
+            success: L("提子消劫，比粘更好。", "Capturing ends the ko, and it is better than connecting.", "따내서 패를 해소했습니다. 잇기보다 좋습니다.", "取ってコウを解消しました。継ぐよりよい手です。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "白先。你提了劫，黑棋没有劫材，下在了别处。把劫粘上，消掉它。",
+              "White to play. You took the ko; Black had no threat and played elsewhere. Connect and end the ko.",
+              "백선. 백이 패를 따냈고, 흑은 팻감이 없어 다른 곳에 두었습니다. 패를 이어 해소하세요.",
+              "白先。白がコウを取り、黒はコウダテがなくて他に打ちました。コウを継いで解消しましょう。",
+            ),
+            problem: { goal: "save", size: 9, diagram: KO_WHITE_CONNECT },
+            success: L("粘上了，这个劫结束了。", "Connected; this ko is over.", "이었습니다. 이 패는 끝났습니다.", "継ぎました。このコウは終わりです。"),
+          },
+        ],
+      },
+    ],
+  },
+  /* ======================================================== UNIT 15 (v13) */
+  {
+    id: "judgement",
+    level: "intermediate",
+    title: L("形势判断", "Judging the position", "형세 판단", "形勢判断"),
+    summary: L(
+      "在棋局中途数一数：双方各有多少地，加上贴目谁领先；领先时稳健，落后时找机会。",
+      "Counting in the middle of a game: how much territory each side has, who is ahead once komi is added, and how to play when you are ahead or behind.",
+      "대국 중에 집을 세어 보기: 양쪽 집이 얼마인지, 덤을 더하면 누가 앞서는지, 앞설 때와 뒤질 때 어떻게 둘지.",
+      "対局の途中で数えてみる：双方の地はいくつか、コミを足すとどちらがリードしているか、リードしているときと遅れているときの打ち方。",
+    ),
+    lessons: [
+      {
+        id: "judge-count",
+        title: L("数一数，谁领先", "Count: who is ahead?", "세어 보기: 누가 앞서나", "数えてみる：どちらがリードか"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "形势判断就是在棋局中途数地。先数已经围好的地：这里左边黑地30目，右边白地24目，再给白棋加上贴目6目半。只剩下边一处一路扳粘没下。黑棋扳到的话，黑31目对白24目加6目半，黑胜半目；白棋扳到的话，黑30目对白25目加6目半，白胜1目半。这一手决定胜负。",
+              "Judging the position means counting in the middle of the game. First count the territory that is already closed: here Black has 30 points on the left, White 24 on the right, and White gets 6.5 points of komi. Only the first-line hane and connection at the bottom is left. If Black plays it, Black has 31 against White's 24 + 6.5: Black wins by half a point. If White plays it, Black has 30 against 25 + 6.5: White wins by 1.5. This one move decides the game.",
+              "형세 판단은 대국 중에 집을 세는 것입니다. 먼저 이미 다 지은 집을 셉니다. 여기서는 왼쪽 흑집이 30집, 오른쪽 백집이 24집이고, 백은 덤 6집 반을 받습니다. 아래쪽 1선 젖혀 잇기 하나만 남았습니다. 흑이 두면 흑 31집 대 백 24집+6집 반으로 흑의 반집승, 백이 두면 흑 30집 대 백 25집+6집 반으로 백의 1집 반 승입니다. 이 한 수가 승부를 가릅니다.",
+              "形勢判断とは、対局の途中で地を数えることです。まず、もう囲い終わった地を数えます。ここでは左の黒地が30目、右の白地が24目で、白にはコミ6目半があります。残っているのは下の一線のハネツギだけです。黒が打てば黒31目対白24目＋6目半で黒の半目勝ち、白が打てば黒30目対白25目＋6目半で白の1目半勝ちです。この一手が勝負を決めます。",
+            ),
+            board: b9(JUDGE_ROWS),
+          },
+          {
+            kind: "place",
+            text: L(
+              "黑先。数过了：这一手决定胜负。在下边一路扳。",
+              "Black to play. You have counted: this move decides the game. Hane on the first line at the bottom.",
+              "흑선. 세어 보았듯이 이 한 수가 승부를 가릅니다. 아래쪽 1선에서 젖히세요.",
+              "黒先。数えた通り、この一手が勝負を決めます。下の一線でハネましょう。",
+            ),
+            board: b9(JUDGE_ROWS),
+            toMove: BLACK,
+            accept: pts([4, 8]),
+            success: L("扳粘之后黑31目，白24目加6目半：黑胜半目。", "After the hane and connection: Black 31, White 24 + 6.5. Black wins by half a point.", "젖혀 이은 뒤 흑 31집, 백 24집+6집 반. 흑의 반집승입니다.", "ハネツギの後は黒31目、白24目＋6目半。黒の半目勝ちです。"),
+            wrong: L(
+              "斜挨着你二路的子、紧贴白墙的一路上的点。",
+              "The first-line point diagonally below your second-line stone, touching White's wall.",
+              "흑의 2선 돌과 대각선이면서 백 벽에 붙은 1선의 점입니다.",
+              "黒の二線の石と斜めで、白の壁に接する一線の点です。",
+            ),
+          },
+          {
+            kind: "place",
+            text: L(
+              "这次你执白，同一个局面。你先扳就赢1目半。",
+              "This time you are White in the same position. Hane first and you win by 1.5.",
+              "이번에는 같은 국면에서 백입니다. 먼저 젖히면 1집 반 이깁니다.",
+              "今度は同じ局面で白番です。先にハネれば1目半勝ちです。",
+            ),
+            board: b9(JUDGE_ROWS),
+            toMove: WHITE,
+            accept: pts([3, 8]),
+            success: L("贴目让很小的差别也能决定胜负。", "With komi, even a tiny difference decides the game.", "덤이 있어서 아주 작은 차이도 승부를 가릅니다.", "コミがあるので、ほんの少しの差でも勝負が決まります。"),
+            wrong: L(
+              "从白墙一侧扳：斜挨着你二路的子、紧贴黑墙的一路上的点。",
+              "Hane from White's side: the first-line point diagonally below your second-line stone, touching Black's wall.",
+              "백 쪽에서 젖히세요. 백의 2선 돌과 대각선이면서 흑 벽에 붙은 1선의 점입니다.",
+              "白の側からハネましょう。白の二線の石と斜めで、黒の壁に接する一線の点です。",
+            ),
+          },
+        ],
+      },
+      {
+        id: "judge-ahead",
+        title: L("领先时求稳", "Ahead: play safe", "앞설 때는 안전하게", "リードしたら手堅く"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "数完地以后再决定怎么下。领先时不需要冒险：补好自己的毛病，让对方没有翻盘的机会，多抢一两目不如稳稳当当。落后时则相反，按部就班地收官只会输得少一点，要找能改变局面的一手：攻击对方的弱棋，或者吃掉切断你的子。贴目也要算进去：中国规则贴7目半，日本、韩国规则贴6目半。",
+              "Decide how to play after you have counted. When you are ahead there is no need to take risks: mend your weaknesses and leave the opponent no way back; it is better than grabbing a point or two more. When you are behind it is the other way round: ordinary endgame moves only make you lose by less, so look for a move that changes the game, such as an attack on a weak group or capturing stones that cut you. Count komi in as well: 7.5 points under Chinese rules, 6.5 under Japanese and Korean rules.",
+              "집을 세고 나서 어떻게 둘지 정합니다. 앞서고 있다면 모험할 필요가 없습니다. 자기 약점을 보강해서 상대에게 역전의 기회를 주지 마세요. 한두 집 더 버는 것보다 낫습니다. 뒤지고 있다면 반대입니다. 평범한 끝내기로는 덜 지는 것뿐이니, 상대의 약한 돌을 공격하거나 끊고 있는 돌을 잡는 것처럼 판을 바꿀 수를 찾으세요. 덤도 셈에 넣으세요. 중국 규칙은 7집 반, 일본·한국 규칙은 6집 반입니다.",
+              "数え終わってから打ち方を決めます。リードしているなら冒険は要りません。自分の弱点を補強して、相手に逆転の機会を与えないことです。一、二目多く取るよりそのほうがよいのです。遅れているなら逆です。ふつうのヨセでは負けが少し減るだけなので、相手の弱い石を攻める、切っている石を取るといった、局面を変える手を探しましょう。コミも数に入れます。中国ルールは7目半、日本・韓国ルールは6目半です。",
+            ),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。数一数：盘面黑32目，白24目，加上贴目黑棋还领先1目半。但下边两颗黑子有毛病：白棋在它们左上一断就能吃掉。领先时先补好。",
+              "Black to play. Count: Black has 32 points on the board, White 24, so Black is still ahead by 1.5 after komi. But your two stones at the bottom have a weakness: a white cut above and to the left of them would capture them. When you are ahead, mend it first.",
+              "흑선. 세어 보면 흑 32집, 백 24집으로 덤을 빼도 흑이 1집 반 앞섭니다. 하지만 아래쪽 흑 두 점에 약점이 있어서, 백이 그 왼쪽 위를 끊으면 잡힙니다. 앞설 때는 먼저 보강하세요.",
+              "黒先。数えると黒32目、白24目で、コミを引いても黒が1目半リードしています。でも下の黒二子には弱点があり、白にその左上を切られると取られます。リードしているときは先に補強しましょう。",
+            ),
+            problem: { goal: "save", size: 9, diagram: JUDGE_SAFE },
+            success: L("补好了，半点机会也不给白棋。", "Mended: White has no way back.", "보강했으니 백에게 역전의 기회가 없습니다.", "補強したので、白に逆転の機会はありません。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。黑棋盘面34目，白棋22目，领先5目半。上边两颗黑子被白棋夹住，只剩两口气，白棋一打吃就跑不掉。不要贪别处，先救它们。",
+              "Black to play. Black has 34 points on the board and White 22: you lead by 5.5. Your two stones at the top are squeezed by White and have two liberties; one white atari and they cannot escape. Do not reach for anything else: save them first.",
+              "흑선. 흑 34집, 백 22집으로 5집 반 앞서 있습니다. 위쪽 흑 두 점이 백에게 끼어 활로가 둘뿐이라, 백이 단수치면 도망갈 수 없습니다. 다른 곳을 탐내지 말고 먼저 살리세요.",
+              "黒先。黒34目、白22目で5目半リードしています。上の黒二子は白にはさまれて呼吸点が二つしかなく、白にアタリされると逃げられません。他を欲張らず、先に助けましょう。",
+            ),
+            problem: { goal: "save", size: 9, diagram: JUDGE_SAFE_TOP },
+            success: L("连回来了。领先时，每一块棋都要安全。", "Connected. When you are ahead, keep every group safe.", "이었습니다. 앞설 때는 모든 돌을 안전하게.", "つながりました。リードしているときは、どの石も安全に。"),
+          },
+        ],
+      },
+      {
+        id: "judge-behind",
+        title: L("落后时找机会", "Behind: look for a chance", "뒤질 때는 기회를 찾아서", "遅れたらチャンスを探す"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "落后的一方，普通的官子赢不回来。先数清楚差多少，再在棋盘上找能弥补差距的地方：对方没补的断点、气紧的子、还没活干净的棋。找到了就果断下，没有把握时也要选能把局面搅乱的下法，而不是安安静静输掉。",
+              "When you are behind, ordinary endgame moves will not win the game back. First count how far behind you are, then look for something on the board that can make up the difference: a cutting point the opponent has not mended, stones short of liberties, a group that is not quite alive. When you find it, play it without hesitation; even when you are not sure, choose a move that makes the game complicated rather than losing quietly.",
+              "뒤지고 있는 쪽은 평범한 끝내기로는 따라잡을 수 없습니다. 먼저 얼마나 뒤지는지 정확히 세고, 그 차이를 메울 수 있는 곳을 판에서 찾으세요. 상대가 보강하지 않은 끊는 점, 활로가 모자란 돌, 아직 완전히 살지 않은 돌입니다. 찾으면 망설이지 말고 두세요. 확신이 없을 때도 조용히 지기보다 판을 복잡하게 만드는 수를 고르세요.",
+              "遅れている側は、ふつうのヨセでは追いつけません。まずどれだけ遅れているかをきちんと数え、その差を埋められる所を盤上で探しましょう。相手が補強していない切りの点、呼吸点の少ない石、まだ完全には生きていない石です。見つけたら迷わず打ちましょう。確信がなくても、静かに負けるより局面を複雑にする手を選ぶことです。",
+            ),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。数一数：如果白棋把上边两颗子连回去，盘面黑29目，白24目，加上贴目白胜1目半。但这两颗白子已经被你切断，只剩两口气。吃掉它们，局面就翻过来了。",
+              "Black to play. Count: if White gets the two stones at the top back home, Black has 29 points and White 24, and White wins by 1.5 with komi. But you have already cut those two stones off and they have only two liberties. Capture them and the game turns around.",
+              "흑선. 세어 보면 백이 위쪽 두 점을 이어 가면 흑 29집, 백 24집으로 덤까지 백의 1집 반 승입니다. 하지만 그 두 점은 이미 흑에게 끊겨 활로가 둘뿐입니다. 잡으면 판이 뒤집힙니다.",
+              "黒先。数えると、白が上の二子をつなげば黒29目、白24目で、コミを入れて白の1目半勝ちです。でもその二子はもう黒に切られていて、呼吸点が二つしかありません。取れば形勢は逆転します。",
+            ),
+            problem: { goal: "capture", size: 9, diagram: JUDGE_BEHIND },
+            success: L("吃掉两颗子，右上的白地也破了：黑棋反超。", "Two stones captured and White's upper right broken: Black is now ahead.", "두 점을 잡고 오른쪽 위 백집도 깨졌습니다. 흑이 역전했습니다.", "二子を取り、右上の白地も破れました。黒の逆転です。"),
+          },
+          {
+            kind: "problem",
+            text: L(
+              "黑先。又是落后的局面，这次是下边的两颗白子被你切断了，只剩两口气。别急着收官，先把它们吃掉。",
+              "Black to play. You are behind again; this time it is the two white stones at the bottom that you have cut off, and they have two liberties. Do not rush into the endgame: capture them first.",
+              "흑선. 또 뒤진 국면입니다. 이번에는 아래쪽 백 두 점이 흑에게 끊겨 활로가 둘뿐입니다. 서둘러 끝내기를 하지 말고 먼저 잡으세요.",
+              "黒先。また遅れている局面です。今度は下の白二子が黒に切られていて、呼吸点が二つしかありません。ヨセを急がず、先に取りましょう。",
+            ),
+            problem: { goal: "capture", size: 9, diagram: JUDGE_CUT },
+            success: L("抓住对方的毛病，才有翻盘的机会。", "Punishing a weakness is how you come back.", "상대의 약점을 찌르는 것이 역전의 길입니다.", "相手の弱点を突くことが逆転への道です。"),
           },
         ],
       },
