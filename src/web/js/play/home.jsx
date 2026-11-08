@@ -13,7 +13,7 @@
  * suggestedGame, through app/play-ctl.js recommendedGame).
  */
 import * as Games from "../data/games.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { classicYear, rankLabel } from "../app/play.jsx";
@@ -22,9 +22,14 @@ import { Button, Icon, MoreMenu, Thumb } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 import { useJobs } from "../app/background.jsx";
 
-/** A game is on the board and not finished. */
+/**
+ * A game is in progress: on the board, not finished, and with at least one
+ * move of the player's (v13: the same rule that keeps it when something
+ * replaces it, play-ctl unfinishedGame; a board where only the computer
+ * moved is not one).
+ */
 export function gameInProgress(g = state.game) {
-  return !!g && g.game.moveNumber > 0 && !g.game.current.result;
+  return C.unfinishedGame(g);
 }
 
 /** With more games than this the list gets its filter and search, and shows this many at first. */
@@ -122,7 +127,7 @@ export function Level() {
   if (!(e.games > 0)) return null;
   return (
     <p class="fine play-level">
-      {t("play.home.level")}: <strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {t("play.home.levelGames", [e.games])}
+      {t("v13ui.label", [t("play.home.level")])}<strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {tn("play.home.levelGames", e.games)}
     </p>
   );
 }
@@ -199,7 +204,7 @@ function MyGames() {
                   <span class="gr-text">
                     <strong>{recordTitle(g)}</strong>
                     <span>
-                      {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {t("play.moveN", [g.moves])}
+                      {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {tn("play.moveN", g.moves)}
                       {rowNote(g.id)}
                     </span>
                   </span>

@@ -93,6 +93,10 @@ that search source text. `docs/QA.md` lists what each gate covers.
   `docs/glossary.md` (correct Korean particles included). New interface
   strings go through `m(zh, en, ko, ja)`; `docs/l10n/strings.csv` is
   generated (`node scripts/export-strings.mjs`), never edited by hand.
+  A count goes through `tn(key, n)` (its English singular is `key.one`);
+  a label and its value through `v13ui.labelValue` (CJK takes a
+  full-width colon), never `` `${label}: ${value}` ``; a Korean particle
+  after a placeholder is written `{0:은/는}` and follows the word put in.
 - **No unreviewed generated content.** Problems, lessons, commentary or
   translations produced by an engine or a language model are not added
   until a strong player (for Go content) or a native speaker (for text)

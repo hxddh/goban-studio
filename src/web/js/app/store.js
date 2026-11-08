@@ -16,7 +16,6 @@ let scheduled = false;
 export const state = {
   ready: false,
   space: "today", // today | play | learn | library (v12)
-  playMode: "game", // game | review
   settings: null, // data/settings.js
   profile: null, // the one player model (model/player.js), stored as profile.json
   engine: { kind: "offline", name: "", available: false },
@@ -50,14 +49,35 @@ export function update(fn) {
   });
 }
 
+/** Call `l` after each batch of updates; returns the function that stops it. */
+export function subscribe(l) {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
 export function useAppState() {
   const [, force] = useState(0);
-  useEffect(() => {
-    const l = () => force((n) => n + 1);
-    listeners.add(l);
-    return () => listeners.delete(l);
-  }, []);
+  useEffect(() => subscribe(() => force((n) => n + 1)), []);
   return state;
+}
+
+/*
+ * v13: the game clock ticks four times a second. A tick re-renders only
+ * the clocks on screen (play.jsx ClockFace, through useClockTicks), not the
+ * whole app and its board; anything else the clock changes (the game ends
+ * on time) goes through update() as usual.
+ */
+const tickListeners = new Set();
+export function clockChanged() {
+  for (const l of tickListeners) l();
+}
+export function onClockTick(l) {
+  tickListeners.add(l);
+  return () => tickListeners.delete(l);
+}
+export function useClockTicks() {
+  const [, force] = useState(0);
+  useEffect(() => onClockTick(() => force((n) => n + 1)), []);
 }
 
 let toastId = 0;

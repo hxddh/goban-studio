@@ -39,6 +39,8 @@ function failingExportHost() {
         delete window.__files[p.key];
         return true;
       }
+      // The save dialog is the host's own command (v13); the write then fails.
+      if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
       if (command === "studio.writeTextFile") {
         window.__writes.push(p.path);
         throw new Error("AccessDenied");
@@ -73,6 +75,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click("[data-safe=readonly]");
     await page.waitForSelector(".safe-banner");
     await page.keyboard.press("Control+2");
+    // v13: no game is made up at launch; Play's home offers the suggested game.
+    await page.click(".play-home .hero .btn.primary");
     await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 10);
     await clickPoint(page, 3, 3);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);

@@ -10,6 +10,27 @@ import { setLang, t } from "../i18n.js";
 import { setSound } from "../audio.js";
 import { state, update } from "./store.js";
 
+/* ----------------------------------------------- v13: the game in play */
+
+/*
+ * What the review (review-ctl.js) needs of the game in play: write it, and
+ * let it carry on (the computer's move, pondering) once a review of it
+ * closes. play-ctl.js sets these when it loads, so the review controller
+ * does not import the play controller (which imports it).
+ */
+const gameHooks = { persist: () => {}, resume: () => {} };
+export function setGameHooks(hooks) {
+  Object.assign(gameHooks, hooks);
+}
+/** Write the game in play (play-ctl persistCurrent). */
+export function persistLive() {
+  gameHooks.persist();
+}
+/** Let the game in play carry on (play-ctl maybeComputerMove and ponder). */
+export function resumeLive() {
+  gameHooks.resume();
+}
+
 /* ------------------------------------------------------------ the player */
 
 /** Where the one player model is stored (model/player.js). */
@@ -80,8 +101,9 @@ export function closeSheet() {
   update({ sheet: null });
 }
 
-export function confirmAction({ title, body = "", confirm, cancel, danger = false, onConfirm, onCancel }) {
-  openSheet("confirm", { title, body, confirm, cancel, danger, onConfirm, onCancel });
+/** A question before an action (sheets.jsx ConfirmSheet; Cancel always just closes it). */
+export function confirmAction({ title, body = "", confirm, danger = false, onConfirm }) {
+  openSheet("confirm", { title, body, confirm, danger, onConfirm });
 }
 
 export function resultText(result) {

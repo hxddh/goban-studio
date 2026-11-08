@@ -14,7 +14,7 @@
   --line-2: rgba(29, 28, 26, 0.16);
   --text: #1d1c1a;
   --text-2: #5f5d58;
-  --text-3: #8a8780;
+  --text-3: #6c6964; /* v13: 4.6:1 on the sidebar, 5:1 on the page (WCAG AA for small text) */
   --on-primary: #ffffff;
   --accent: #34529a;
   --accent-soft: rgba(52, 82, 154, 0.1);
@@ -80,7 +80,7 @@
   --line-2: rgba(255, 255, 255, 0.15);
   --text: #edebe6;
   --text-2: #a9a69f;
-  --text-3: #858179;
+  --text-3: #9c988f; /* v13: 4.6:1 on a hovered or active row of a surface, 6:1 on the page */
   --on-primary: #191918;
   --accent: #8ea6e0;
   --accent-soft: rgba(142, 166, 224, 0.14);
@@ -811,3 +811,19 @@ button.group-row:hover { background: var(--fill); }
 .safe-files { margin: 0 0 var(--s-3); padding-left: var(--s-5); }
 .safe-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
 .safe-banner { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-2) var(--s-4); background: var(--fill); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); }
+
+/* v13 Windows high contrast (forced colours): the system draws text and
+ * surfaces in its own colours and drops box shadows and backgrounds, so
+ * what told focus, buttons and the selected choice apart comes back as
+ * system-coloured outlines and borders. */
+@media (forced-colors: active) {
+  :focus-visible, .board:focus-visible, .comment-box:focus { outline: 2px solid Highlight; outline-offset: 2px; }
+  .btn, .icon-btn, .chip, .segmented button, .preset, .lang-grid button, .mark-btn, .seg-mini button, .settings-tab { border: 1px solid ButtonText; }
+  .btn.primary { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
+  .btn:disabled, .icon-btn:disabled { border-color: GrayText; color: GrayText; }
+  .chip.on, .segmented button.on, .preset.on, .lang-grid button.on, .mark-btn.on, .seg-mini button.on, .settings-tab.on, .sb-item.on, .icon-btn.on, .story button.on, .key-move.on {
+    outline: 2px solid Highlight; outline-offset: -2px; color: HighlightText; background: Highlight; forced-color-adjust: none;
+  }
+  .menu, .sheet, .card, .toast { border: 1px solid CanvasText; }
+  .board-frame { outline: 1px solid CanvasText; }
+}

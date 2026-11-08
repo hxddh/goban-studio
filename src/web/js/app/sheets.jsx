@@ -423,7 +423,7 @@ function SettingsSheet({ pane: open }) {
                     {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
                   </span>
                   <span class="fine">{t("settings.offline")}</span>
-                  <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
+                  <span class="fine">{t("v13ui.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
                 </p>
                 <UpdateRow />
                 <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />

@@ -91,7 +91,11 @@ export function MoreMenu({ id, items, label }) {
     const close = (e) => {
       if (ref.current && !ref.current.contains(e.target)) update({ menu: null });
     };
-    setTimeout(() => document.addEventListener("pointerdown", close), 0);
+    // v13: registered at once, so the cleanup always removes it. (A timer
+    // here added it after a cleanup that ran first: a listener left behind
+    // for every menu closed within the same tick.) The click that opened the
+    // menu has already had its pointerdown, so it does not close it.
+    document.addEventListener("pointerdown", close);
     ref.current?.querySelector("[role=menuitem]")?.focus();
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
