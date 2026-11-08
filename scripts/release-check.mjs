@@ -2,7 +2,8 @@
  * Release gate for the content and packaging promises.
  *
  * Counts what is real: a course of at least 13 units / 60 lessons / 240
- * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades,
+ * steps (beginner and intermediate) plus at least 8 advanced units / 27
+ * advanced lessons (v13), at least 250 solver-verified problems with themes with measured grades,
  * 20 classics, four languages
  * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
  * licences and one version string.
@@ -26,6 +27,10 @@ const lessons = COURSE.flatMap((u) => u.lessons);
 const steps = lessons.flatMap((l) => l.steps);
 assert.ok(COURSE.length >= 13, "at least 13 course units");
 assert.ok(COURSE.filter((u) => u.level === "intermediate").length >= 5, "at least 5 intermediate units");
+const advanced = COURSE.filter((u) => u.level === "advanced");
+assert.ok(advanced.length >= 8, "at least 8 advanced units");
+assert.ok(advanced.flatMap((u) => u.lessons).length >= 27, "at least 27 advanced lessons");
+for (const id of ["adv-opening", "adv-joseki", "adv-handicap"]) assert.ok(advanced.some((u) => u.id === id), `advanced unit ${id}`);
 assert.ok(lessons.length >= 60, "at least 60 lessons");
 assert.ok(steps.length >= 240, "at least 240 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);

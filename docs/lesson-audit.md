@@ -150,6 +150,29 @@ check of the changed steps with the same script (800 / 300 visits).
   rules, tactics proved by the solver in the same lesson, and principles
   a single position cannot prove.
 
+## v13 units waiting for a run
+
+The v13 units `adv-opening` (view whole), `adv-joseki` (local;
+`adv-joseki-choose` whole) and `adv-handicap` (whole;
+`adv-handicap-simple` local) were written after the latest run, so the
+generated section below does not list them yet. Before KataGo sees them:
+
+- Every opening and joseki step whose position is in the opening book
+  (`content/book.json`, KataGo 1.18.1, 2000 visits) accepts only moves the
+  book rates within `JOSEKI_LOSS` (1.5 points) of its best;
+  `scripts/tests/core-course-v13.mjs` enforces this. The worst accepted
+  book move is 0.8 points (the low Chinese opening's side stone).
+- Not covered by the book, so the next run is their first check: the
+  urgent-point lesson (`adv-open-urgent`, whose life-and-death part the
+  solver proves), the small knight's enclosure (`adv-joseki-knight#1`),
+  the block toward the Chinese opening (`adv-joseki-choose#2`), the 3-4
+  approach F16 in `adv-open-direction#1`, the three-space pincers in
+  `adv-joseki-choose#1` and `adv-handicap-stones#1`, and the nine-stone
+  steps of `adv-handicap-simple` and `adv-handicap-white#1`.
+- Two read-step claims were added for the run: `adv-open-direction#0`
+  (the approach from the top is not worse than from the left) and
+  `adv-open-urgent#0` (living in the corner comes before the empty corner).
+
 ## Latest run
 
 <!-- generated:start -->

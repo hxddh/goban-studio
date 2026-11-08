@@ -27,7 +27,7 @@ const MIN_UNITS = 18;
 const MIN_LESSONS = 75;
 const MIN_STEPS = 280;
 const LEVELS = [undefined, "intermediate", "advanced"];
-const MIN_ADVANCED_LESSONS = 15;
+const MIN_ADVANCED_LESSONS = 27;
 const MAX_PROBLEM_MS = 2000;
 const showLines = process.argv.includes("--lines");
 

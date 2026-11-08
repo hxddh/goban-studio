@@ -69,7 +69,7 @@ const EG = Object.fromEntries(
 /** Problem titles: the idea, not the answer. The UI adds a running number. */
 const TITLE = {
   capture: L("提子", "Capture", "따내기", "石を取る"),
-  rescue: L("提子解围", "Capture to rescue", "따내서 살리기", "取って助ける"),
+  rescue: L("提子解围", "Capture to save", "따내서 살리기", "取って助ける"),
   atariDir: L("打吃的方向", "Which side to atari", "단수의 방향", "アタリの方向"),
   ladder: L("征子", "Ladder", "축", "シチョウ"),
   snapback: L("倒扑", "Snapback", "환격", "ウッテガエシ"),
@@ -91,7 +91,7 @@ const TITLE = {
   pyramidFour: L("丁四", "Pyramid four", "삿갓 사궁", "丁四"),
   bulkyFive: L("刀把五", "Bulky five", "뭉친 오궁", "刀五"),
   crossFive: L("梅花五", "Crossed five", "오궁도화", "花五"),
-  flowerSix: L("梅花六", "Flower six", "매화육궁", "花六"),
+  flowerSix: L("梅花六", "Rabbity six", "매화육궁", "花六"),
   cornerShape: L("角上的眼形", "Corner eye shape", "귀의 궁도", "隅の眼形"),
   reduce: L("缩小眼位", "Reduce the eye space", "궁도 줄이기", "眼形を狭める"),
   falseEye: L("破眼成假眼", "Make a false eye", "옥집 만들기", "欠け眼にする"),
@@ -118,7 +118,7 @@ const HINT = {
     "数一数白棋还剩几口气，把最后一口气堵住。",
     "Count White's liberties and fill the last one.",
     "백의 활로를 세어 보고 마지막 활로를 막으세요.",
-    "白のダメを数えて、最後のダメを詰めましょう。",
+    "白の呼吸点を数えて、最後の呼吸点をふさぎましょう。",
   ),
   rescue: L(
     "你的棋子被打吃了。与其逃跑，不如先吃掉打吃你的白子。",
@@ -160,7 +160,7 @@ const HINT = {
     "先在白棋的虎口里送一子。白棋提掉之后，自己只剩一口气。",
     "Put a stone where White can capture it. After capturing, White is left with one liberty.",
     "백이 따낼 수 있는 곳에 한 점을 먹여 주세요. 따낸 백은 활로가 하나만 남습니다.",
-    "白が取れる所に一子を打ち込みましょう。取った白はダメが一つしか残りません。",
+    "白が取れる所に一子を打ち込みましょう。取った白は呼吸点が一つしか残りません。",
   ),
   shortage: L(
     "从白棋接不上的一侧打吃：白棋一接就自己紧了气。",
@@ -172,7 +172,7 @@ const HINT = {
     "先扑入一子让白棋提，白棋的气就少了一口。",
     "Throw in a stone for White to capture: capturing costs White a liberty.",
     "한 점을 먹여 쳐서 백이 따내게 하면 백의 활로가 하나 줄어듭니다.",
-    "ホウリコミを打って一子を白に取らせると、白のダメが一つ減ります。",
+    "ホウリコミを打って一子を白に取らせると、白の呼吸点が一つ減ります。",
   ),
   doubleAtari: L(
     "找一步能同时打吃两颗白子的棋。",
@@ -184,19 +184,19 @@ const HINT = {
     "向宽阔的方向长出，增加自己的气。",
     "Extend toward open space to gain liberties.",
     "넓은 쪽으로 뻗어 활로를 늘리세요.",
-    "広い方へ伸びてダメを増やしましょう。",
+    "広い方へ伸びて呼吸点を増やしましょう。",
   ),
   extendSide: L(
     "两个方向都能长，选长出后气多、白棋追不上的那一边。",
     "You can extend two ways; pick the one that gives you more liberties so White cannot keep chasing.",
     "두 방향으로 뻗을 수 있습니다. 활로가 더 많아져 백이 쫓아올 수 없는 쪽을 고르세요.",
-    "二方向に伸びられます。ダメが多くなり、白が追いかけられない方を選びましょう。",
+    "二方向に伸びられます。呼吸点が多くなり、白が追いかけられない方を選びましょう。",
   ),
   escapeCapture: L(
     "包围你的白子中有一块气很紧，先吃掉它。",
     "One of the surrounding white groups is short of liberties: capture it first.",
     "포위한 백돌 중 활로가 적은 돌이 있습니다. 그것부터 따내세요.",
-    "囲んでいる白石の中にダメの少ない石があります。先に取りましょう。",
+    "囲んでいる白石の中に呼吸点の少ない石があります。先に取りましょう。",
   ),
   connect: L(
     "找到白棋想切断的地方，先接上。",
@@ -272,13 +272,13 @@ const HINT = {
   ),
   crossFive: L(
     "十字形的五个眼位，要点在正中央。",
-    "In a cross-shaped five, the vital point is the very centre.",
+    "In a crossed five, the vital point is the very centre.",
     "십자 모양 다섯 칸은 한가운데가 급소입니다.",
     "十字形の五目は、ど真ん中が急所です。",
   ),
   flowerSix: L(
     "梅花六的要点在中心，那一点与四个眼位相邻。",
-    "In a flower six, the vital point is the centre, touching four of the other points.",
+    "In a rabbity six, the vital point is the centre, touching four of the other points.",
     "매화육궁은 네 칸과 닿는 가운데가 급소입니다.",
     "花六は、四つの目に接する真ん中が急所です。",
   ),
