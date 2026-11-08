@@ -7,7 +7,7 @@
  * and learn controllers. None of it touches the DOM.
  */
 import { BLACK, formatPoints } from "../rules.js";
-import { loadSGF } from "../sgf.js";
+import { decodeSgfBytes, loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
@@ -16,7 +16,7 @@ import { exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, par
 import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.js";
 import { detectLang, setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
+import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readFileBytes, readTextFile } from "../host.js";
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
@@ -299,6 +299,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
 
 /** A record under rules the app cannot score names those rules. */
 function importErrorText(e) {
+  if (e?.code === "unsupported-size") return t("sgf.unsupportedSize", [String(e.size || "?")]);
   if (e?.code !== "unsupported-rules") return t("library.importError");
   const name = String(e.rules || "").replace(/\s+/g, " ").trim().slice(0, 40) || "?";
   return t("rules.unsupported", [name]);
@@ -307,7 +308,7 @@ function importErrorText(e) {
 export async function importFromFile(file) {
   if (!file) return;
   try {
-    await importSGFText(await file.text(), file.name);
+    await importSGFText(decodeSgfBytes(new Uint8Array(await file.arrayBuffer())), file.name);
   } catch (e) {
     toast(importErrorText(e), "error");
   }
@@ -315,9 +316,9 @@ export async function importFromFile(file) {
 
 export async function importFromPath(path) {
   try {
-    const text = await readTextFile(path);
-    if (text == null) throw new Error("read failed");
-    await importSGFText(text, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
+    const bytes = await readFileBytes(path);
+    if (bytes == null) throw new Error("read failed");
+    await importSGFText(decodeSgfBytes(bytes), String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
     toast(importErrorText(e), "error");

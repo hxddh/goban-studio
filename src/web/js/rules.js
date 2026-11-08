@@ -95,10 +95,14 @@ export function rulesetById(id) {
   return RULESETS.find((r) => r.id === v);
 }
 
-/** The komi a new game gets under `rules` with `handicap` stones. */
+/**
+ * The komi a new game gets under `rules` with `handicap` stones. A handicap
+ * of one is no stone at all: Black simply plays first without komi, so it
+ * takes the handicap komi too (the New game sheet has always sent 0.5).
+ */
 export function defaultKomi(rules, handicap = 0) {
   const r = rulesetById(rules);
-  return Number(handicap) >= 2 ? r.handicapKomi : r.komi;
+  return Number(handicap) >= 1 ? r.handicapKomi : r.komi;
 }
 
 /** Points White receives at the count for `handicap` stones under `rules`. */
@@ -177,6 +181,105 @@ export function handicapPoints(size, count) {
 
 export function boardKey(board) {
   return board.signMap.map((row) => row.join("")).join("/");
+}
+
+/*
+ * Zobrist hashing for the superko check. Each node caches the hash of its
+ * board (computed on first use), so checking a move against its ancestors
+ * compares short strings instead of building a string of the whole board
+ * per ancestor. Two 32-bit halves make an accidental match unlikely; a match
+ * is still confirmed against the boards themselves.
+ */
+const ZOBRIST = new Map();
+
+function zobristTable(size) {
+  let table = ZOBRIST.get(size);
+  if (!table) {
+    // A fixed xorshift seed: the same table on every run.
+    let seed = (0x9e3779b9 ^ size) | 0;
+    const next = () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return seed >>> 0;
+    };
+    table = new Uint32Array(size * size * 4);
+    for (let i = 0; i < table.length; i++) table[i] = next();
+    ZOBRIST.set(size, table);
+  }
+  return table;
+}
+
+/** The board's Zobrist hash, as a string of two 32-bit halves. */
+export function boardHash(board) {
+  const size = board.width;
+  const table = zobristTable(size);
+  const map = board.signMap;
+  let lo = 0;
+  let hi = 0;
+  for (let y = 0; y < size; y++) {
+    const row = map[y];
+    for (let x = 0; x < size; x++) {
+      const v = row[x];
+      if (!v) continue;
+      const i = ((y * size + x) * 2 + (v === BLACK ? 0 : 1)) * 2;
+      lo ^= table[i];
+      hi ^= table[i + 1];
+    }
+  }
+  return (lo >>> 0).toString(36) + ":" + (hi >>> 0).toString(36);
+}
+
+function sameBoard(a, b) {
+  const size = a.width;
+  for (let y = 0; y < size; y++) {
+    const ra = a.signMap[y];
+    const rb = b.signMap[y];
+    for (let x = 0; x < size; x++) if (ra[x] !== rb[x]) return false;
+  }
+  return true;
+}
+
+function nodeHash(node) {
+  // Cached with the board it was computed from: a board replaced on the
+  // node (Game.setup, an SGF root setup) gets a fresh hash.
+  if (node._hashBoard !== node.board) {
+    Object.defineProperty(node, "_hash", { value: boardHash(node.board), writable: true, configurable: true, enumerable: false });
+    Object.defineProperty(node, "_hashBoard", { value: node.board, writable: true, configurable: true, enumerable: false });
+  }
+  return node._hash;
+}
+
+/**
+ * Stones a record sets up in the middle of a game (SGF AB / AW / AE),
+ * applied to a copy of `board`: { black: [{x, y}], white: [...], empty: [...] }.
+ * AE first, then AB, then AW.
+ */
+export function applySetup(board, setup) {
+  const out = board.clone();
+  if (!setup) return out;
+  for (const p of setup.empty || []) out.set([p.x, p.y], EMPTY);
+  for (const p of setup.black || []) out.set([p.x, p.y], BLACK);
+  for (const p of setup.white || []) out.set([p.x, p.y], WHITE);
+  return out;
+}
+
+/**
+ * The position an engine is given for `node`: the board where stones were
+ * last set up on its line (the root, or the board a mid-game AB / AW / AE
+ * produced, before that node's own move) and the moves played since.
+ * { board, moves: [move], fromRoot }. An engine has no "set up" step in the
+ * middle of a game, so the setup becomes its starting position (prisoners
+ * taken before it are not part of what the engine sees).
+ */
+export function positionBase(node) {
+  const moves = [];
+  for (let n = node; n; n = n.parent) {
+    if (!n.parent) return { board: n.board, moves: moves.reverse(), fromRoot: true };
+    if (n.move) moves.push(n.move);
+    if (n.setup) return { board: applySetup(n.parent.board, n.setup), moves: moves.reverse(), fromRoot: false };
+  }
+  return { board: null, moves: [], fromRoot: true };
 }
 
 export function boardFromSignMap(signMap) {
@@ -381,12 +484,20 @@ export class Game {
     playerBlack = "Black",
     playerWhite = "White",
     event = "",
+    placeHandicap = true,
   } = {}) {
     this.size = size;
     // v5: "japanese" | "chinese" | "korean" (see RULESETS). Unknown values
     // fall back to Japanese, the default.
     this.rules = normalizeRules(rules);
-    this.handicap = Math.max(0, Math.min(9, Number(handicap) || 0));
+    this.handicap = Math.max(0, Math.min(9, Math.floor(Number(handicap) || 0)));
+    // Handicap stones: two or more, on the standard points. A handicap of one
+    // places nothing (Black plays first, without komi). A board size with
+    // fewer standard points than asked gets what it has, and one without
+    // any is an even game. An SGF import passes placeHandicap: false, since
+    // the record places its own stones (AB, or its first moves).
+    const stones = placeHandicap && this.handicap >= 2 ? handicapPoints(size, this.handicap) : [];
+    if (placeHandicap && this.handicap >= 2 && stones.length < this.handicap) this.handicap = stones.length >= 2 ? stones.length : 0;
     // Without an explicit komi, the ruleset's default for this handicap.
     this.komi = komi === undefined || komi === null || komi === "" ? defaultKomi(this.rules, this.handicap) : Number(komi);
     this.date = date instanceof Date ? date : new Date(date);
@@ -396,13 +507,13 @@ export class Game {
     this.warnings = [];
 
     const board = GoBoard.fromDimensions(size);
-    for (const [x, y] of handicapPoints(size, this.handicap)) board.set([x, y], BLACK);
+    for (const [x, y] of stones) board.set([x, y], BLACK);
     this.root = this._node({
       parent: null,
       move: null,
       board,
       captures: [0, 0],
-      turn: this.handicap > 0 ? WHITE : BLACK,
+      turn: stones.length ? WHITE : BLACK,
       passes: 0,
       phase: "playing",
       result: null,
@@ -430,6 +541,10 @@ export class Game {
       // v5: SGF properties this app does not interpret, kept for the round
       // trip ({ KEY: [raw values] }), or null.
       extra: fields.extra || null,
+      // v13: stones the record set up just before this node's move (SGF
+      // AB / AW / AE in the middle of a game; see applySetup), or null. The
+      // board above already includes them.
+      setup: fields.setup || null,
     };
   }
 
@@ -439,10 +554,16 @@ export class Game {
     return node;
   }
 
+  /**
+   * Positional superko: has `board` occurred on the line up to `upto`? The
+   * line ends where the record set stones up (a node with `setup`): the
+   * positions before an edited board are not part of this game's history.
+   */
   _positionSeen(board, upto) {
-    const key = boardKey(board);
+    const key = boardHash(board);
     for (let n = upto; n; n = n.parent) {
-      if (boardKey(n.board) === key) return true;
+      if (nodeHash(n) === key && sameBoard(n.board, board)) return true;
+      if (n.setup) break;
     }
     return false;
   }
@@ -520,12 +641,16 @@ export class Game {
     return { ok: true };
   }
 
-  play(x, y, { color = null, force = false } = {}) {
+  /**
+   * Play a stone. `setup` (SGF import only) is a mid-game AB / AW / AE
+   * applied to the board just before the move; it is stored on the new node.
+   */
+  play(x, y, { color = null, force = false, setup = null } = {}) {
     if (!force && this.current.phase !== "playing") return { ok: false, reason: "phase" };
     const sign = color || this.current.turn;
     if (!force && sign !== this.current.turn) return { ok: false, reason: "turn" };
     if (x < 0 || y < 0 || x >= this.size || y >= this.size) return { ok: false, reason: "outside" };
-    const board = this.current.board;
+    const board = setup ? applySetup(this.current.board, setup) : this.current.board;
     if (board.get([x, y]) !== EMPTY) return { ok: false, reason: "occupied" };
     const analysis = board.analyzeMove(sign, [x, y]);
     if (analysis.ko && !force) return { ok: false, reason: "ko" };
@@ -539,6 +664,7 @@ export class Game {
     if (!force && this._positionSeen(next, this.current)) return { ok: false, reason: "superko" };
     const node = this._append(this.current, {
       move: { color: sign, x, y, pass: false },
+      setup,
       board: next,
       captures: [next.getCaptures(BLACK) || 0, next.getCaptures(WHITE) || 0],
       turn: other(sign),
@@ -556,13 +682,15 @@ export class Game {
     };
   }
 
-  pass({ color = null, force = false } = {}) {
+  pass({ color = null, force = false, setup = null } = {}) {
     if (!force && this.current.phase !== "playing") return { ok: false, reason: "phase" };
     const sign = color || this.current.turn;
-    const passes = (this.current.passes || 0) + 1;
+    // A setup between two passes means the position changed: not game over.
+    const passes = setup ? 1 : (this.current.passes || 0) + 1;
     const node = this._append(this.current, {
       move: { color: sign, x: null, y: null, pass: true },
-      board: cloneBoard(this.current.board),
+      setup,
+      board: setup ? applySetup(this.current.board, setup) : cloneBoard(this.current.board),
       captures: [this.current.board.getCaptures(BLACK) || 0, this.current.board.getCaptures(WHITE) || 0],
       turn: other(sign),
       passes,
@@ -862,23 +990,42 @@ export class Game {
     if (ab.length || aw.length) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
     head += marksText(root.marks, sgfCoord, esc) + extraText(root.extra, esc);
     head += "\n";
+    const points = (list) => (list || []).map((p) => sgfCoord(p.x, p.y));
     const nodeText = (n) => {
       if (!n.move) return "";
+      let s = "";
+      // v13: a mid-game setup is a move-less node of its own before the move.
+      if (n.setup) {
+        let props = "";
+        for (const [key, list] of [["AE", n.setup.empty], ["AB", n.setup.black], ["AW", n.setup.white]]) {
+          const vals = points(list);
+          if (vals.length) props += key + "[" + vals.join("][") + "]";
+        }
+        if (props) s += ";" + props;
+      }
       const c = n.move.color === BLACK ? "B" : "W";
       const v = n.move.pass ? "" : sgfCoord(n.move.x, n.move.y);
-      let s = ";" + c + "[" + v + "]";
+      s += ";" + c + "[" + v + "]";
       if (n.comment) s += "C[" + esc(n.comment) + "]";
       s += marksText(n.marks, sgfCoord, esc) + extraText(n.extra, esc);
       return s;
     };
-    const walk = (n) => {
-      let s = nodeText(n);
-      if (n.children.length === 0) return s;
-      if (n.children.length === 1) return s + walk(n.children[0]);
-      for (const child of n.children) s += "(" + walk(child) + ")";
-      return s;
-    };
-    let body = walk(root);
+    // v13: iterative, so a record of any length or depth cannot overflow the
+    // stack. A string on the stack is a parenthesis to write.
+    const parts = [];
+    const stack = [root];
+    while (stack.length) {
+      const item = stack.pop();
+      if (typeof item === "string") {
+        parts.push(item);
+        continue;
+      }
+      parts.push(nodeText(item));
+      const kids = item.children;
+      if (kids.length === 1) stack.push(kids[0]);
+      else for (let i = kids.length - 1; i >= 0; i--) stack.push(")", kids[i], "(");
+    }
+    let body = parts.join("");
     // A root with no moves is still a valid SGF.
     if (!body) body = ";";
     return head + body + ")\n";

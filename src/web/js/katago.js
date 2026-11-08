@@ -37,7 +37,7 @@
  * unavailable and engine.js uses its offline fallbacks.
  */
 import { hasNative, nativeInvoke } from "./host.js";
-import { BLACK, LETTERS, coordLabel, rulesetById } from "./rules.js";
+import { BLACK, LETTERS, coordLabel, positionBase, rulesetById } from "./rules.js";
 
 const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
 
@@ -92,10 +92,14 @@ export function maxTimeFor(visits) {
  * stones is a set-up position, and placing White first keeps KataGo from
  * counting any of it as handicap. That is the same reading as
  * Game.handicap after SGF import, so the app's count and KataGo's agree.
+ *
+ * v13: the stones are those of the position's base (rules.js positionBase):
+ * the root, or the board a mid-game SGF setup (AB / AW / AE) produced on
+ * the line to the node, whose moves then follow.
  */
-function setupStones(game) {
+function setupStones(game, base = positionBase(game.root)) {
   const size = game.size;
-  const root = game.root.board.signMap;
+  const root = base.board.signMap;
   const black = [];
   const white = [];
   for (let y = 0; y < size; y++) {
@@ -116,12 +120,9 @@ export function katagoRules(game) {
   return rulesetById(game?.rules).katago;
 }
 
-/** The moves from the root to `node`: ["B D4", "W pass", ...]. */
-function lineMoves(game, node) {
-  const line = [];
-  for (let n = node; n && n.parent; n = n.parent) if (n.move) line.push(n.move);
-  line.reverse();
-  return line.map((move) => `${move.color === BLACK ? "B" : "W"} ${move.pass ? "pass" : coordLabel(move.x, move.y, game.size)}`);
+/** The moves from the base (see setupStones) to `node`: ["B D4", "W pass", ...]. */
+function lineMoves(game, node, base = positionBase(node)) {
+  return base.moves.map((move) => `${move.color === BLACK ? "B" : "W"} ${move.pass ? "pass" : coordLabel(move.x, move.y, game.size)}`);
 }
 
 /**
@@ -130,14 +131,15 @@ function lineMoves(game, node) {
  */
 export function positionPayload(game, node = game.current, visits = 64) {
   const v = Math.max(1, Math.round(visits));
+  const base = positionBase(node);
   return {
     size: game.size,
     // The game's komi only: under Chinese rules KataGo adds the handicap
     // compensation itself (see RULESETS in rules.js).
     komi: game.komi,
     rules: katagoRules(game),
-    setup: setupStones(game).join(" "),
-    moves: lineMoves(game, node).join(" "),
+    setup: setupStones(game, base).join(" "),
+    moves: lineMoves(game, node, base).join(" "),
     color: node.turn === BLACK ? "B" : "W",
     visits: v,
     maxTime: maxTimeFor(v),
@@ -158,8 +160,9 @@ function positionScript(game, node, visits) {
   // GTP `play` does not have to alternate, so setup stones are simply
   // placed one by one before the game's own moves (White's first, so that
   // only a black-only root reads as a handicap; see setupStones).
-  for (const stone of setupStones(game)) commands.push(`play ${stone}`);
-  for (const move of lineMoves(game, node)) commands.push(`play ${move}`);
+  const base = positionBase(node);
+  for (const stone of setupStones(game, base)) commands.push(`play ${stone}`);
+  for (const move of lineMoves(game, node, base)) commands.push(`play ${move}`);
   return commands.join("\n");
 }
 

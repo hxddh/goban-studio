@@ -9,6 +9,7 @@ import { m } from "./messages/m.js";
 import { SHELL } from "./messages/shell.js";
 import { PLAY } from "./messages/play.js";
 import { LEARN } from "./messages/learn.js";
+import { CORE13 } from "./messages/v13-core.js";
 
 export const MESSAGES = {
 
@@ -920,4 +921,5 @@ export const MESSAGES = {
   ...SHELL,
   ...PLAY,
   ...LEARN,
+  ...CORE13,
 };

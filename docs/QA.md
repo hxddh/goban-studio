@@ -22,6 +22,8 @@ README.
 - SGF columns skip I on import and export (J…T are not shifted)
 - SGF import with pass, setup, comments and `YYYY-MM-DD` dates
 - invalid SGF rejection
+- v13 SGF: setup in the second node is the root position; mid-game AB/AW/AE applied before the next move (captures, legality, the KataGo position) and exported back; sizes other than 9/13/19 rejected with a message; invalid points warned (only `[]` and `tt` pass); HA without AB places no stones; CA charsets (GB2312/GBK/GB18030, Big5, Shift_JIS, EUC-JP, EUC-KR, ISO-8859-1, UTF-8); 10,000-move and 5,000-deep records parse and export without recursion
+- v13 rules: a handicap of one is no stone (Black first, handicap komi); superko uses per-node Zobrist hashes
 - every UI string present in zh/en/ko/ja
 - the eight basics cards present in all four languages
 - Moka 9×9 assets present, model size matches its manifest, attribution files shipped
