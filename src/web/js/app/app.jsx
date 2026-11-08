@@ -25,6 +25,7 @@ import { Sheets } from "./sheets.jsx";
 import { ExplorerView } from "./explorer.jsx";
 import { useAnnouncements } from "./announcer.js";
 import { installKeys, textSizeKeys } from "./a11y-keys.js";
+import { BootError, ReadOnlyBanner, StoreProblem } from "./safety.jsx";
 
 function Toasts() {
   return (
@@ -59,7 +60,10 @@ function App() {
     document.title = "Goban Studio";
   });
   useAnnouncements(); // v6 a11y: review moves, problems, lessons
+  // v13: no bridge in the packaged app, or the store could not be read (app/safety.jsx).
+  if (s.bootError) return <BootError />;
   if (!s.ready) return null;
+  if (s.storeProblem && !s.storeProblem.continued) return <StoreProblem />;
   const focus = isFocus();
   // The game that ends turns into its review on the same page (no new place).
   const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
@@ -68,6 +72,7 @@ function App() {
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
+        {s.storeProblem && <ReadOnlyBanner />}
         <div class="place" key={s.space + reviewKey + page}>
           {s.space === "today" && <TodayView />}
           {s.space === "play" && <PlaySpace />}

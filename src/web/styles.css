@@ -802,3 +802,12 @@ button.group-row:hover { background: var(--fill); }
 /* v8 beginner path: the lesson bridge's one line, and the first count's note */
 .celebrate .bridge-lead { max-width: 360px; font: var(--t-body); color: var(--text-2); }
 .score-card .first-count { font: var(--t-small); }
+
+/* v13 safe state (app/safety.jsx): no bridge, or the store could not be read */
+.safe-screen { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--s-5); background: var(--bg); overflow: auto; }
+.safe-card { max-width: 520px; width: 100%; padding: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
+.safe-card h1 { margin: 0 0 var(--s-3); font: 600 18px/26px var(--font); }
+.safe-card p { margin: 0 0 var(--s-3); }
+.safe-files { margin: 0 0 var(--s-3); padding-left: var(--s-5); }
+.safe-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
+.safe-banner { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-2) var(--s-4); background: var(--fill); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); }

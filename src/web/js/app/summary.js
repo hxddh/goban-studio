@@ -67,6 +67,16 @@ export function settledShare(ownership) {
 }
 
 /**
+ * A position's settled share: from its ownership, or from `firm`, which a
+ * stored analysis keeps in place of the map (v13, data/pack.js).
+ */
+export function firmOf(point) {
+  if (!point) return null;
+  if (point.ownership?.length) return settledShare(point.ownership);
+  return Number.isFinite(point.firm) ? point.firm : null;
+}
+
+/**
  * Phase boundaries for a main line of `n` positions (index 0 = start, so a
  * move's index is its move number). Returns
  *   { opening: [from, to], middle: [from, to], endgame: [from, to], method }
@@ -81,13 +91,13 @@ export function phaseBoundaries(size, points, n) {
   let method = "moves";
   const tail = [];
   for (let i = oEnd + 1; i <= last; i++) tail.push(i);
-  const withOwn = tail.filter((i) => points[i]?.ownership?.length);
+  const withOwn = tail.filter((i) => firmOf(points[i]) != null);
   if (tail.length && withOwn.length >= tail.length * 0.8) {
     method = "ownership";
     eStart = last + 1;
     for (const i of withOwn) {
-      const here = settledShare(points[i].ownership);
-      const later = points[Math.min(last, i + 2)]?.ownership ? settledShare(points[Math.min(last, i + 2)].ownership) : here;
+      const here = firmOf(points[i]);
+      const later = firmOf(points[Math.min(last, i + 2)]) ?? here;
       if (here >= SETTLED && later >= SETTLED) {
         eStart = i;
         break;

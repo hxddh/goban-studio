@@ -191,6 +191,30 @@ group per screen region.
   as quicker games); opponent, strength and colour on one row each; time,
   handicap and komi under *More options*.
 
+* **Unfinished games (v13).** Nothing replaces a game in progress
+  silently. A game with at least one move of the player's and no result
+  that New game, *Play from here* (a review, the explorer), onboarding or
+  continuing another game would replace is first saved to the Library,
+  where its row says *Unfinished*, and a toast says so. Opening it there
+  continues it — the same record, opponent, colour, clock and rating
+  setting — instead of opening its review; finishing it fills in that
+  record. An unfinished game is not rated, does not count in the week, and
+  is not analysed in the background until it is finished. This was chosen
+  over a confirmation sheet ("Replace the game in progress?"): saving costs
+  the player nothing and never interrupts, and a game saved by mistake is
+  one Delete away. (Explicitly saved games without a result behave the
+  same way.)
+* **Safe state (v13).** When the app's own files cannot be read it shows
+  one card in place of the app (no onboarding): what could not be read,
+  *Retry* (the one primary, focused), *Continue read-only*, and *Start
+  these files over* when the files were only damaged and a copy is kept;
+  after *Continue read-only*, one quiet line above the page says changes
+  are not saved, with *Retry*. The packaged app without its bridge shows
+  the same card with *Retry*. See `docs/storage.md`.
+* **Dangerous confirmations (v13).** A sheet that deletes or replaces
+  something (delete a game, clear data, restore or undo a restore) opens
+  with *Cancel* focused, so Enter alone never confirms it.
+
 * **Less on screen (v8).** Every element has to serve playing or learning.
   The play panel says nothing before the first move but one quiet line;
   the review keeps its status (analysis, where the game left the book) on

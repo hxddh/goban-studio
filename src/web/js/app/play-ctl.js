@@ -16,7 +16,7 @@ import { moveText } from "../a11y.js";
 import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { describeMistakes, dropReview, openReview } from "./review-ctl.js";
+import { describeMistakes, dropReview, openReview, saveEdits } from "./review-ctl.js";
 import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 
@@ -79,6 +79,8 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
+      // v13: its Library record (game files are read when needed) is read now, for the review and the result.
+      if (saved.recordId && !Games.isLoaded(saved.recordId)) Games.loadGame(saved.recordId);
       // v8: a game saved during the count (both passed) counts again;
       // otherwise it would have neither a count nor its play controls.
       if (game.phase === "scoring" && !game.current.result) startScoring();
@@ -139,6 +141,88 @@ export function saveToLibrary({ quiet = false } = {}) {
   update();
   if (!quiet) toast(t("toast.saved"));
   return rec;
+}
+
+/* ------------------------------------------- v13: unfinished games */
+
+/** Moves the player made in a game (both sides' in a game between two people). */
+export function humanMoves(g = state.game) {
+  if (!g) return 0;
+  let n = 0;
+  for (const node of g.game.mainLine()) if (node.move && (g.opponent === "human" || node.move.color === g.humanColor)) n++;
+  return n;
+}
+
+/** A game in progress that replacing it would lose: no result, and at least one move of the player's. */
+export function unfinishedGame(g = state.game) {
+  return !!g && !g.game.mainLine().at(-1)?.result && !g.game.current.result && humanMoves(g) > 0;
+}
+
+/**
+ * Before anything replaces the game on the board (New game, Play from
+ * here, a game of the Library resumed, the explorer's Play from here): a
+ * game in progress is saved to the Library as unfinished, with what it
+ * takes to continue it (docs/design.md, "Unfinished games"). Opening it
+ * there continues it (resumeRecord). It is not rated until it is finished.
+ * Returns its record, or null when there was nothing to keep.
+ */
+export function parkCurrent({ quiet = false } = {}) {
+  const g = state.game;
+  if (!unfinishedGame(g)) return null;
+  // A review of this game open on top (Review so far) keeps its edits.
+  if (state.review?.source === "current" && state.review.game === g.game) saveEdits(state.review);
+  const rec = Games.saveGame(g.game, { ...recordMeta(g), clock: g.clock || null, rated: !!g.rated });
+  g.recordId = rec.id;
+  g.saved = true;
+  if (!quiet) toast(t("v13.parked"));
+  return rec;
+}
+
+/**
+ * Continue an unfinished game from the Library: it becomes the game on the
+ * board, with its opponent, colour, clock and rating as they were (the
+ * game it replaces is parked first). Its record stays the same record, so
+ * finishing it updates that entry.
+ */
+export async function resumeRecord(id) {
+  if (!Games.isLoaded(id) && !(await Games.loadGame(id))) return toast(t("store.readFailed"), "error", 5000, { key: "store" });
+  const rec = Games.getGame(id);
+  if (!rec?.sgf) return;
+  if (state.game?.recordId === id && unfinishedGame(state.game)) return continueCurrent();
+  let game;
+  try {
+    game = loadSGF(rec.sgf).game;
+  } catch (_) {
+    return toast(t("library.importError"), "error");
+  }
+  parkCurrent();
+  Engine.cancel();
+  remember();
+  if (state.review) dropReview();
+  if (state.game) state.game.gen++;
+  update((s) => {
+    s.game = freshGameState(game, {
+      recordId: rec.id,
+      name: rec.name,
+      opponent: rec.opponent,
+      humanColor: rec.humanColor,
+      rank: rec.rank,
+      impl: rec.impl,
+      undos: rec.undos,
+      hints: rec.hints,
+      clock: rec.clock || null,
+      rated: rec.rated === true,
+    });
+    s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
+    s.sheet = null;
+    s.review = null;
+  });
+  if (game.phase === "scoring" && !game.current.result) startScoring();
+  persistCurrent();
+  syncMenus();
+  maybeComputerMove();
+  ponder();
 }
 
 /** Play shows a review instead of the live game. */
@@ -225,6 +309,8 @@ export function newGame(opts = {}) {
   if (opts.opponentRank != null) setSetting("opponentRank", opts.opponentRank);
   const tc = opts.timeControl ?? state.settings.timeControl;
   if (opts.timeControl) setSetting("timeControl", opts.timeControl);
+  // v13: the game in progress is not lost (it goes to the Library as unfinished).
+  parkCurrent();
   Engine.cancel();
   remember();
   // The last game's review: its analysis goes on in the background.
@@ -822,17 +908,28 @@ export async function exportSGF(game = state.game?.game, name = state.game?.name
   await saveText((name || "goban-studio") + ".sgf", game.toSGF(), "application/x-go-sgf");
 }
 
-/** Save text through the native save dialog, or as a browser download. */
-export async function saveText(filename, text, mime = "text/plain") {
-  if (hasNative() && hasFileDialogs()) {
+/**
+ * Save text through the native save dialog, or as a browser download.
+ * Resolves true when it was saved. v13: in the app a failed write is an
+ * error, never a silent fallback to a download link (a WebView ignores
+ * those); the link is the browser preview's only.
+ */
+export async function saveText(filename, text, mime = "text/plain", { done = t("toast.exported") } = {}) {
+  if (hasNative()) {
+    if (!hasFileDialogs()) {
+      toast(t("v13.exportFailed"), "error", 6000);
+      return false;
+    }
     const path = await saveFileDialog({ title: t("common.export"), defaultName: filename });
-    if (path == null || (Array.isArray(path) && path.length === 0)) return;
+    if (path == null || (Array.isArray(path) && path.length === 0)) return false;
     const chosen = normalizePaths(path)[0];
     if (chosen && (await writeTextFile(chosen, text))) {
       revealPath(chosen);
-      toast(t("toast.exported"));
-      return;
+      toast(done);
+      return true;
     }
+    toast(t("v13.exportFailed"), "error", 6000);
+    return false;
   }
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -843,7 +940,8 @@ export async function saveText(filename, text, mime = "text/plain") {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast(t("toast.exported"));
+  toast(done);
+  return true;
 }
 
 export function continueCurrent() {

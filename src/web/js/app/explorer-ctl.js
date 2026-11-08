@@ -17,7 +17,7 @@ import { bookDepth, loadBook, lookup, setupSignMap, stonesOf, tagOf, decodeMove 
 import BOOK_JSON from "../content/book.json";
 import { state, update, announce } from "./store.js";
 import { remember } from "./ctl-core.js";
-import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
+import { freshGameState, parkCurrent, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 
 export const EXPLORER_MODES = ["whole", "corner"];
 
@@ -349,6 +349,8 @@ export function explorerPlayFromHere() {
   const line = [];
   for (let n = src.current; n && n.parent; n = n.parent) line.unshift(n.move);
   for (const m of line) game.play(m.x, m.y, { color: m.color, force: true });
+  // v13: the game in progress goes to the Library as unfinished first.
+  parkCurrent();
   if (state.game) state.game.gen++;
   remember();
   const humanColor = game.turn;

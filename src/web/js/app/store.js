@@ -35,6 +35,8 @@ export const state = {
   // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
   learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   models: initialModels(), // optional downloads (app/models-ctl.js)
+  bootError: null, // v13: { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
+  storeProblem: null, // v13: the safe state, controller.js storeProblemOf (+ continued)
 };
 
 export function update(fn) {

@@ -8,6 +8,22 @@ export function hasNative() {
   return typeof global.zero === "object" && global.zero != null && typeof global.zero.invoke === "function";
 }
 
+/**
+ * v13: the page runs inside the packaged app rather than the browser
+ * preview: the shell serves it from its own zero:// origin (macOS, Linux)
+ * or from WebView2's virtual host native-sdk-app.localhost (Windows).
+ * Packaged, a missing bridge is an error to show, never a reason to fall
+ * back to the browser's storage.
+ */
+export function isPackaged() {
+  try {
+    const loc = global.location;
+    return loc?.protocol === "zero:" || loc?.hostname === "native-sdk-app.localhost";
+  } catch (_) {
+    return false;
+  }
+}
+
 function invoke(command, payload = {}) {
   if (!hasNative()) return Promise.reject(new Error("no native host"));
   return Promise.resolve(global.zero.invoke(command, payload));

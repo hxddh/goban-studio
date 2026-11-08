@@ -62,7 +62,8 @@ await test("data games: one file per game; the game in progress is separate and 
     assert.match(rec.id, /^[a-z0-9-]+$/);
     assert.deepEqual(store.list("games/"), [`games/${rec.id}.json`]);
     const file = store.get(`games/${rec.id}.json`);
-    assert.deepEqual(Object.keys(file).sort(), ["createdAt", "finishedAt", "id", "meta", "sgf", "source", "updatedAt"]);
+    assert.deepEqual(Object.keys(file).sort(), ["createdAt", "finishedAt", "id", "meta", "sgf", "source", "updatedAt", "v"]);
+    assert.equal(file.v, 13, "a game file carries the store's format version");
     assert.equal(file.meta.moves, 2);
     assert.equal(file.meta.thumb.length, 361);
     assert.equal(Games.getGame(rec.id).name, "test game");
@@ -89,7 +90,8 @@ await test("data games: one file per game; the game in progress is separate and 
     Games.clearCurrent();
     assert.equal(Games.loadCurrent(), null);
     assert.equal(await store.flush(), true);
-    assert.deepEqual([...map.keys()].sort(), [`t:games/${Games.listGames()[0].id}.json`]);
+    assert.deepEqual([...map.keys()].sort(), ["t:games-index.json", `t:games/${Games.listGames()[0].id}.json`]);
+    assert.deepEqual(Object.keys(JSON.parse(map.get("t:games-index.json")).games), [Games.listGames()[0].id], "the index follows saves and deletes");
   } finally {
     Games.useStore(null);
   }
@@ -122,13 +124,13 @@ await test("data games: the analysis and the review live in the game's own file 
     // Deleting a game deletes its analysis with it: there is no other key.
     Games.patchGame(b.id, { analysis: points });
     Games.deleteGame(b.id);
-    assert.deepEqual(store.list(""), [`games/${a.id}.json`]);
+    assert.deepEqual(store.list(""), ["games-index.json", `games/${a.id}.json`]);
   } finally {
     Games.useStore(null);
   }
 });
 
-await test("data games: KataGo's ownership maps come back from the file as arrays, with the same phases", async () => {
+await test("data games: a stored analysis keeps ownership maps (as arrays) only around the key moments, a settled share everywhere, and the same phases", async () => {
   const { phaseBoundaries } = await import("../../src/web/js/app/summary.js");
   const { store, map } = memStore();
   Games.useStore(store);
@@ -137,7 +139,8 @@ await test("data games: KataGo's ownership maps come back from the file as array
     // 61 positions of a 9×9 game; the board settles from move 11 on (as katago.js parses it: Float32Array).
     const points = Array.from({ length: 61 }, (_, i) => ({
       source: "katago",
-      scoreLead: 0,
+      // One key moment: the score drops by 6 at move 11.
+      scoreLead: i >= 11 ? -6 : 0,
       ownership: Float32Array.from({ length: 81 }, (_, k) => (i >= 11 ? (k % 2 ? 0.97 : -0.96) : (k % 3) * 0.1 - 0.1)),
     }));
     const before = phaseBoundaries(9, points, 61);
@@ -148,9 +151,14 @@ await test("data games: KataGo's ownership maps come back from the file as array
     await again.open();
     Games.useStore(again);
     const back = Games.getGame(rec.id).analysis;
-    assert.ok(Array.isArray(back[20].ownership), "an array, not an object with numbered keys");
-    assert.equal(back[20].ownership.length, 81);
-    assert.ok(Math.abs(back[20].ownership[1] - 0.97) < 0.001);
+    // The swing at move 11 is the key moment: positions 10 and 11 keep their maps.
+    assert.ok(Array.isArray(back[10].ownership) && !("ownership" in back[12]));
+    assert.ok(Array.isArray(back[11].ownership), "an array, not an object with numbered keys");
+    assert.equal(back[11].ownership.length, 81);
+    assert.ok(Math.abs(back[11].ownership[1] - 0.97) < 0.001);
+    assert.ok(!("ownership" in back[20]), "no map away from the key moments");
+    assert.equal(back[20].firm, 1, "its settled share instead");
+    assert.ok(map.get(`t:games/${rec.id}.json`).length < 61 * 81 * 3, "the file is a fraction of the maps' size");
     assert.deepEqual(phaseBoundaries(9, back, 61), before, "the same phases after the round trip");
     assert.equal(before.method, "ownership");
   } finally {
@@ -200,8 +208,8 @@ await test("data games: a backup holds every game file with its analysis, and re
     Games.patchGame(a.id, { analysis: [{ scoreLead: 1 }], report: { v: 1 } });
     saveSettings(store, { ...DEFAULT_SETTINGS, lang: "ja" });
     store.put("profile.json", { v: 9 });
-    const doc = exportBackup(store, 5);
-    assert.deepEqual(Object.keys(doc.data).sort(), [`games/${a.id}.json`, "profile.json", "settings.json"]);
+    const doc = await exportBackup(store, 5);
+    assert.deepEqual(Object.keys(doc.data).sort(), [`games/${a.id}.json`, "profile.json", "settings.json"], "the games index is rebuilt, not backed up");
     const other = memStore().store;
     Games.useStore(other);
     other.put("current.json", { sgf: "(;)" });
@@ -210,6 +218,7 @@ await test("data games: a backup holds every game file with its analysis, and re
     assert.equal(r.summary.games, 1);
     assert.equal(Games.loadCurrent(), null, "everything is replaced");
     assert.deepEqual(Games.getGame(a.id).analysis, [{ scoreLead: 1 }]);
+    assert.ok(r.snapshot.startsWith("backups/pre-restore-"), "what was there is kept as a snapshot");
     assert.equal(loadSettings(other).lang, "ja");
   } finally {
     Games.useStore(null);

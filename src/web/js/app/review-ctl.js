@@ -24,7 +24,7 @@ import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, 
 import { state, update, toast, announce } from "./store.js";
 import { back, canGoBack, changeProfile, remember, isRestoring } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
-import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
+import { freshGameState, parkCurrent, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { buildReview, drillOf, judgeTry, keyMovesOf as keyMistakes, reviewFits, tryMoments } from "../play/review-model.js";
 import { analyzeLine, isOwnGame, knownPoints, notePoints, queueAnalysis, storeAnalysis, storedAnalysis, takeOver, visitsFor } from "../play/analysis.js";
 
@@ -977,6 +977,8 @@ export function playFromHere() {
   // v5: the record's rules and handicap carry over (the handicap is what
   // the Chinese count compensates); the root stones are set up.
   const game = gameAt(r.game, r.game.current);
+  // v13: the game in progress goes to the Library as unfinished first.
+  parkCurrent();
   dropReview(r);
   if (state.game) state.game.gen++;
   remember();
@@ -1007,14 +1009,16 @@ export async function exportReviewImage() {
   const filename = `goban-studio-review-${day}.png`;
   const blob = await renderReviewPNG(model, { date, rating: reviewRating(r) });
   if (!blob) return toast(t("report.exportFailed"), "warn");
-  if (hasNative() && hasFileDialogs()) {
+  // v13: in the app a failed write is an error, never a download link (a WebView ignores those).
+  if (hasNative()) {
+    if (!hasFileDialogs()) return toast(t("report.exportFailed"), "error", 6000);
     const path = await saveFileDialog({ title: t("report.exportImage"), defaultName: filename });
     if (path == null || (Array.isArray(path) && path.length === 0)) return;
     const chosen = normalizePaths(path)[0];
     if (chosen && (await writeBinaryFile(chosen, new Uint8Array(await blob.arrayBuffer())))) {
       revealPath(chosen);
       toast(t("report.exported"));
-    } else toast(t("report.exportFailed"), "warn");
+    } else toast(t("report.exportFailed"), "error", 6000);
     return;
   }
   const url = URL.createObjectURL(blob);
