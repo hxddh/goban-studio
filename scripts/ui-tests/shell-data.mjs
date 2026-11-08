@@ -145,7 +145,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(".settings-group .btn >> text=Restore from backup")]);
     await chooser.setFiles(file);
     await page.waitForSelector(".sheet [data-confirm-cancel]");
-    assert(await page.evaluate(() => document.activeElement?.hasAttribute("data-confirm-cancel")), "Cancel is focused on a dangerous confirm");
+    // Focus moves once the sheet has painted (the modal's autofocus runs after render).
+    const focused = await page
+      .waitForFunction(() => document.activeElement?.hasAttribute("data-confirm-cancel"), null, { timeout: 2000 })
+      .then(() => true, () => false);
+    assert(focused, "Cancel is focused on a dangerous confirm");
     await Promise.all([page.waitForNavigation(), page.click(".sheet-foot .btn.primary")]);
     await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /Backup restored/.test(t.message)));
     const keys = await page.evaluate(() => Object.keys(localStorage));
