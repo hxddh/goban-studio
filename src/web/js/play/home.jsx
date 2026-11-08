@@ -13,7 +13,7 @@
  * suggestedGame, through app/play-ctl.js recommendedGame).
  */
 import * as Games from "../data/games.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { classicYear, rankLabel } from "../app/play.jsx";
@@ -127,7 +127,7 @@ export function Level() {
   if (!(e.games > 0)) return null;
   return (
     <p class="fine play-level">
-      {t("play.home.level")}: <strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {t("play.home.levelGames", [e.games])}
+      {t("v13ui.label", [t("play.home.level")])}<strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {tn("play.home.levelGames", e.games)}
     </p>
   );
 }
@@ -204,7 +204,7 @@ function MyGames() {
                   <span class="gr-text">
                     <strong>{recordTitle(g)}</strong>
                     <span>
-                      {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {t("play.moveN", [g.moves])}
+                      {fmtDate(g.updatedAt)} · {g.size} × {g.size} · {tn("play.moveN", g.moves)}
                       {rowNote(g.id)}
                     </span>
                   </span>

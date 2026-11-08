@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, useClockTicks } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
@@ -88,7 +88,7 @@ function gameFacts(g) {
     t("play.komiN", [formatPoints(game.komi)]),
     game.handicap ? t("play.handicapN", [game.handicap]) : null,
     g.clock ? t("time." + g.clock.mode) : null,
-    game.moveNumber ? t("play.moveN", [game.moveNumber]) : null,
+    game.moveNumber ? tn("play.moveN", game.moveNumber) : null,
   ]
     .filter(Boolean)
     .join(" · ");

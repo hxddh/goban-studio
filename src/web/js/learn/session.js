@@ -16,7 +16,7 @@
  * Item: { kind: "lesson" | "capture" | "mistake" | "problem" | "game", id?,
  * unit?, role, why?, key }; the session: { date, items, done: [key], current }.
  */
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { changeProfile, isRestoring, remember } from "../app/ctl-core.js";
 import { bridgeAfter, evidenceOf, focus, focusLesson, keepFocus, learnPath as pathOf } from "../model/player.js";
@@ -59,7 +59,8 @@ export function weekFocus(now = Date.now()) {
   return {
     keys: view.focus.map((a) => a.key),
     names: view.focus.map((a) => focusName(a.key)),
-    why: view.focus.map((a) => evidenceOf(a)[0]).filter(Boolean).map((e) => t(e.key, e.params)),
+    // v13: "came up 1 times" reads "came up once" (i18n.js tn, by the first count).
+    why: view.focus.map((a) => evidenceOf(a)[0]).filter(Boolean).map((e) => tn(e.key, e.params?.[0], e.params)),
     lesson,
   };
 }

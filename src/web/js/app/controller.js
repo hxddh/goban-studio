@@ -15,7 +15,7 @@ import { SETTINGS_KEY, loadSettings } from "../data/settings.js";
 import { CURRENT_KEY, GAMES_PREFIX, migrateFile } from "../data/migrate.js";
 import { BACKUPS_PREFIX, exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, latestSnapshot, parseBackup, undoRestore as undoRestoreDoc } from "../data/backup.js";
 import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.js";
-import { detectLang, setLang, t } from "../i18n.js";
+import { detectLang, setLang, t, tn } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, readFileBytes, readTextFile } from "../host.js";
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
@@ -525,7 +525,7 @@ export function offerRestore(doc) {
   if (!c.ok) return toast(restoreError(c.error), "warn");
   confirmAction({
     title: t("backup.confirmTitle"),
-    body: t("backup.confirmFiles", [c.summary.games, c.summary.keys]) + " " + t("v13.restore.safety"),
+    body: tn("backup.confirmFiles", c.summary.games, [c.summary.games, c.summary.keys]) + " " + t("v13.restore.safety"),
     confirm: t("backup.restore"),
     danger: true,
     onConfirm: () => restoreNow(doc),

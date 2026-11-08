@@ -7,7 +7,7 @@
 import { useState } from "preact/hooks";
 import { BLACK } from "../rules.js";
 import * as S from "../solver.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
@@ -293,7 +293,7 @@ function ProblemControls({ P, onNext, nextLabel }) {
 /** What this problem is: difficulty, theme, and your record with it. */
 function ProblemFacts({ def, grade }) {
   const rec = state.profile.problems[def.id];
-  const record = !rec ? t("practice.recordNew") : rec.solved ? t("practice.recordSolved", [rec.tries]) : t("practice.recordTried", [rec.tries]);
+  const record = !rec ? t("practice.recordNew") : rec.solved ? tn("practice.recordSolved", rec.tries) : tn("practice.recordTried", rec.tries);
   return (
     <dl class="facts">
       <dt>{t("practice.difficulty")}</dt>

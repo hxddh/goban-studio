@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { areaOf } from "../engine.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { storyText } from "./story.js";
@@ -287,7 +287,7 @@ function KeyMove({ km }) {
       <button type="button" class="key-head" aria-expanded={open} onClick={() => C.focusMistake(km)}>
         <Stone color={km.move.color} size={12} />
         <span>{t("review.moveLabel", [km.index, colorName(km.move.color), coordLabel(km.move.x, km.move.y, size)])}</span>
-        <em>{t("review.lossN", [formatPoints(Math.round(km.loss * 2) / 2)])}</em>
+        <em>{tn("review.lossN", Math.round(km.loss * 2) / 2, [formatPoints(Math.round(km.loss * 2) / 2)])}</em>
       </button>
       {open && (
         <>

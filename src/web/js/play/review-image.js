@@ -8,7 +8,7 @@
  * review looks the same whatever the viewer's appearance setting was.
  */
 import { BLACK, coordLabel, formatPoints, rulesetById } from "../rules.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { resultText } from "../app/ctl-core.js";
 import { storyText } from "../app/story.js";
 
@@ -43,7 +43,7 @@ export function momentWords(model, mo) {
     title: t("report.move", [mo.index]),
     played: t("report.played", [coordLabel(mo.played.x, mo.played.y, model.size)]),
     better: mo.best ? t("report.better", [coordLabel(mo.best.x, mo.best.y, model.size)]) : "",
-    lost: mo.loss != null ? t("report.lost", [half(mo.loss)]) : "",
+    lost: mo.loss != null ? tn("report.lost", Number(half(mo.loss)), [half(mo.loss)]) : "",
     why: mo.why ? storyText(mo.why) : "",
   };
 }
