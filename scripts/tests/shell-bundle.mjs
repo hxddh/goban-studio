@@ -33,7 +33,7 @@ await test("shell bundle: the self-test and the tour load only when the host's c
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.jsx?$/.test(e.name) && e.name !== "bundle.js" && /["']\.\.?\/(?:\.\.\/)?(selftest|tour)\.js["']/.test(fs.readFileSync(p, "utf8"))) uses.push(path.relative(root, p));
+      else if (/\.jsx?$/.test(e.name) && e.name !== "bundle.js" && /["']\.\.?\/(?:\.\.\/)?(selftest|tour)\.js["']/.test(fs.readFileSync(p, "utf8"))) uses.push(path.relative(root, p).split(path.sep).join("/"));
     }
   };
   walk(path.join(root, "src/web/js"));
