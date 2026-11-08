@@ -32,13 +32,14 @@ function Screen({ title, children, actions }) {
     ref.current?.querySelector("[data-autofocus]")?.focus({ preventScroll: true });
   }, []);
   return (
-    <div class="safe-screen" role="alertdialog" aria-modal="true" aria-labelledby="safe-title" aria-describedby="safe-body" ref={ref}>
-      <div class="safe-card">
+    // v13: the page's main landmark (the screen replaces the whole app), the card its dialog.
+    <main class="safe-screen" id="main" ref={ref}>
+      <div class="safe-card" role="alertdialog" aria-modal="true" aria-labelledby="safe-title" aria-describedby="safe-body">
         <h1 id="safe-title">{title}</h1>
         <div id="safe-body">{children}</div>
         <div class="safe-actions">{actions}</div>
       </div>
-    </div>
+    </main>
   );
 }
 

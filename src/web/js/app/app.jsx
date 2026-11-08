@@ -358,9 +358,16 @@ export async function start() {
       drainOpenFiles();
       if (++n >= 6) clearInterval(timer);
     }, 1500);
-    setTimeout(() => import("../selftest.js").then((m) => m.runSelfTest({ state })), 900);
-    // v4 release checks: the screenshot tour, only when the host was launched with GOBAN_TOUR_OUT.
-    setTimeout(() => Host.selftestConfig().then((c) => c?.tour && import("../tour.js").then((m) => m.runTour(c))), 1200);
+    // Release checks: the packaged self-test (GOBAN_SELFTEST_OUT, or the
+    // updater's probe) and the screenshot tour (GOBAN_TOUR_OUT). v13: one
+    // look at the host's configuration, and their modules are evaluated
+    // only when it asks for them (never in a normal launch).
+    setTimeout(() => {
+      Host.selftestConfig().then((c) => {
+        if (c?.enabled || c?.updateProbe) import("../selftest.js").then((m) => m.runSelfTest({ state }));
+        if (c?.tour) setTimeout(() => import("../tour.js").then((m) => m.runTour(c)), 300);
+      });
+    }, 900);
   }
   // Whatever the store has not written yet goes out when the page goes (data/store.js).
   window.addEventListener("pagehide", () => {

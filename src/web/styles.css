@@ -80,7 +80,7 @@
   --line-2: rgba(255, 255, 255, 0.15);
   --text: #edebe6;
   --text-2: #a9a69f;
-  --text-3: #8e8a82; /* v13: 4.6:1 on a surface, 5:1 on the page */
+  --text-3: #9c988f; /* v13: 4.6:1 on a hovered or active row of a surface, 6:1 on the page */
   --on-primary: #191918;
   --accent: #8ea6e0;
   --accent-soft: rgba(142, 166, 224, 0.14);

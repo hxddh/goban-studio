@@ -38,6 +38,8 @@ function failingExportHost() {
         delete window.__files[p.key];
         return true;
       }
+      // The save dialog is the host's own command (v13); the write then fails.
+      if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
       if (command === "studio.writeTextFile") {
         window.__writes.push(p.path);
         throw new Error("AccessDenied");
@@ -72,6 +74,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click("[data-safe=readonly]");
     await page.waitForSelector(".safe-banner");
     await page.keyboard.press("Control+2");
+    // v13: no game is made up at launch; Play's home offers the suggested game.
+    await page.click(".play-home .hero .btn.primary");
     await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 10);
     await clickPoint(page, 3, 3);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
@@ -144,6 +148,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(".settings-group .btn >> text=Restore from backup")]);
     await chooser.setFiles(file);
     await page.waitForSelector(".sheet [data-confirm-cancel]");
+    // The sheet focuses its control after its first paint (sheets.jsx Modal): wait for it.
+    await page.waitForFunction(() => document.activeElement?.hasAttribute("data-confirm-cancel"), null, { timeout: 1500 }).catch(() => {});
     assert(await page.evaluate(() => document.activeElement?.hasAttribute("data-confirm-cancel")), "Cancel is focused on a dangerous confirm");
     await Promise.all([page.waitForNavigation(), page.click(".sheet-foot .btn.primary")]);
     await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /Backup restored/.test(t.message)));

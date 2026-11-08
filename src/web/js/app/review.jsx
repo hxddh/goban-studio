@@ -18,6 +18,7 @@ import { accuracyText, lossText, momentWords, ratingChangeText, reviewFacts, rev
 import { Toolbar } from "./chrome.jsx";
 import { BookExitNote } from "./explorer.jsx";
 import { classicYear, colorName, moveNumbers } from "./game-view.js";
+import { rankText } from "./estimate-label.js";
 
 export function ReviewView() {
   const s = state;

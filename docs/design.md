@@ -75,7 +75,7 @@ Neutral greys with a faint warmth, one accent, two signals.
 | `--line` | rgba(29,28,26,.09) | rgba(255,255,255,.08) | hairlines |
 | `--text` | #1D1C1A | #EDEBE6 | primary text, **primary button** |
 | `--text-2` | #5F5D58 | #A9A69F | secondary text |
-| `--text-3` | #8F8C86 | #77746E | tertiary text, disabled |
+| `--text-3` | #6C6964 | #8E8A82 | tertiary text, disabled (v13: ≥ 4.5:1 on every page background) |
 | `--accent` | #34529A | #8EA6E0 | focus ring, selection, progress, board hints |
 | `--good` | #2E7D4F | #6CC08F | correct, won |
 | `--bad` | #B3402C | #E58A74 | wrong, lost, mistake markers |
@@ -157,7 +157,17 @@ group per screen region.
   place before the first path); your level; this week in one line; the
   last three games. Nothing empty is shown as a card.
 * **Play (v12).** The board. With no game on it: the suggested game (the
-  one primary) and *New game* in the toolbar.
+  one primary) and *New game* in the toolbar. v13: "no game on it" is
+  literal — with nothing saved, Play opens on that home (the suggested
+  game with its handicap), not on a blank board against the last chosen
+  rank; a game restored at launch with no move of the player's yet (only
+  the computer moved) also leaves Play on its home, while a game started
+  in this session stays on the board. Today's hero and Play's *Continue*
+  use the same rule as unfinished games below.
+* **The computer's move (v13).** When the engine cannot give one, the
+  offline engine plays it; when that fails too, the panel says so and
+  offers *Retry* (the one primary). The game is never left waiting on the
+  computer with nothing to press.
 * **Practice (v9 Learn; v12 name).** One path chosen for you: a short ordered list of rows
   (5–8: the next lesson, reviews due, the week's focus, one stretch
   problem, the beginner bridges), each saying why it is there in a few
@@ -251,7 +261,8 @@ dark, in all four languages, before every release:
 - [ ] No explanatory grey text visible that is not needed right now.
 - [ ] Board lines are crisp at 1× and 2×; star points and stones to spec.
 - [ ] Focus ring visible on every interactive element via keyboard.
-- [ ] Contrast: body text ≥ 4.5:1, secondary ≥ 4.5:1, tertiary ≥ 3:1.
+- [ ] Contrast: body, secondary and tertiary text ≥ 4.5:1 (large text ≥ 3:1; v13, was 3:1 for tertiary).
+- [ ] Windows high contrast (forced colours): focus, buttons and the selected choice stay visible (v13 `@media (forced-colors: active)`).
 - [ ] Nothing truncates or wraps awkwardly in Korean, Japanese or Chinese.
 - [ ] Reduced motion: nothing animates except opacity.
 
@@ -264,3 +275,6 @@ review (every tab), a finished game's post-game review (every tab), every
 Settings pane — in four combinations of language, light/dark and larger text, and
 runs the accessibility audit, the raw-key, clipping, sideways-scroll and
 one-primary checks on each. A new page joins that list in the same change.
+v13 adds `scripts/ui-tests/shell-v13ui.mjs` (Play's home for a new player,
+the confirm-move switches, *Undo restore*, the safe state, *Retry* and a
+problem shown turned, in four languages), and the audit asks 4.5:1 of small text.

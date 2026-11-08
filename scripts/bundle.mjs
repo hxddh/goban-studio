@@ -66,8 +66,13 @@ await build({
   format: "iife",
   platform: "browser",
   target: ["safari15", "chrome110"],
-  minify: false,
-  sourcemap: false,
+  // v13: minified (about half the bytes to read and parse at start-up).
+  // Names are kept, so a stack trace in a bug report still names the
+  // function; GOBAN_SOURCEMAP=1 inlines a source map for local debugging
+  // (never in a release: it would double the file).
+  minify: true,
+  keepNames: true,
+  sourcemap: process.env.GOBAN_SOURCEMAP === "1" ? "inline" : false,
   legalComments: "none",
   jsx: "automatic",
   jsxImportSource: "preact",
