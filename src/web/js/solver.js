@@ -899,7 +899,14 @@ class Search {
     // a position played above this one, holds only on this line (the graph
     // history problem): it is returned but not stored, so another line that
     // reaches this position reads it afresh.
-    if (dep >= ply) this.tt.set(k, { win: result, exact, depth, pushes });
+    //
+    // v13: once the node budget has run out, every unfinished subtree
+    // answers "the attacker does not win", so an inexact result computed
+    // after that point is an artefact of the budget, not of the depth: it
+    // is returned (marked inexact) but never stored, or a later search with
+    // budget left would read it back as a depth-limited result. Inexact
+    // results stored before the budget ran out are depth-limited only.
+    if (dep >= ply && (exact || !this.exhausted)) this.tt.set(k, { win: result, exact, depth, pushes });
     return out;
   }
 }
@@ -923,7 +930,9 @@ export function attackerWins(pz, st, budget, master = -pz.userColor, strict = fa
 
 /**
  * Learner's result; `koOk` true makes the learner ko master, `strict` asks a
- * defending learner for independent life (seki is not enough).
+ * defending learner for independent life (seki is not enough). `exact`
+ * false means the search ran out of depth or nodes: `win` is then a guess
+ * that reply() and status() treat as unknown, never as a result.
  */
 function userWins(pz, st, budget, koOk = pz.koOk, strict = false) {
   const master = koOk ? pz.userColor : -pz.userColor;
@@ -992,9 +1001,10 @@ export function reply(pz, st) {
   const keyIdx = keyIndices(pz);
   if (terminal(pz, st, keyIdx)) return null;
   const moves = candidates(pz, st, keyIdx);
+  // v13: only a proved loss is a refutation; an inexact one is unknown.
+  const loses = (r) => r.exact && !r.win;
   for (const m of moves) {
-    const r = userWins(pz, m.next);
-    if (!r.win) return { ...pointOf(pz, m.i), refutes: true };
+    if (loses(userWins(pz, m.next))) return { ...pointOf(pz, m.i), refutes: true };
   }
   // A lost side plays the move a person would: the best shape, which for
   // the stones under attack means the most liberties (extend, connect,
@@ -1002,16 +1012,16 @@ export function reply(pz, st) {
   let best = moves.length ? moves[0].i : null;
   // In a ko problem the opponent fights the ko rather than lose outright.
   if (pz.koOk) {
-    const fight = moves.find((m) => !userWins(pz, m.next, undefined, false).win);
+    const fight = moves.find((m) => loses(userWins(pz, m.next, undefined, false)));
     if (fight) best = fight.i;
   }
   // In a seki problem the opponent keeps the learner from independent life,
   // so the answer ends in the seki the problem is about.
   if (pz.sekiGoal) {
-    const firm = moves.find((m) => !userWins(pz, m.next, undefined, pz.koOk, true).win);
+    const firm = moves.find((m) => loses(userWins(pz, m.next, undefined, pz.koOk, true)));
     if (firm) best = firm.i;
   }
-  if (!userWins(pz, st).win) return { pass: true, refutes: true, ko: st.ko >= 0 };
+  if (loses(userWins(pz, st))) return { pass: true, refutes: true, ko: st.ko >= 0 };
   if (best === null) return { pass: true, refutes: false };
   return { ...pointOf(pz, best), refutes: false };
 }
@@ -1032,15 +1042,19 @@ export function status(pz, st) {
   const term = terminal(pz, st, keyIdx);
   const attackGoal = pz.userColor === pz.attacker;
   if (term) return (term > 0) === attackGoal ? "won" : "lost";
+  // v13: only proved results decide; an inexact search (out of depth or
+  // nodes) leaves the problem open.
+  const wins = (r) => r.exact && r.win;
+  const loses = (r) => r.exact && !r.win;
   // A ko problem is solved once the ko is on the board and the learner, with
   // the threats, wins it: the fight itself is played with ko threats
   // elsewhere, which a problem board does not show.
-  if (pz.koOk && st.ko >= 0 && userWins(pz, st).win) return "won";
-  if (st.toMove !== pz.userColor) return userWins(pz, st).win ? "open" : "lost";
+  if (pz.koOk && st.ko >= 0 && wins(userWins(pz, st))) return "won";
+  if (st.toMove !== pz.userColor) return loses(userWins(pz, st)) ? "lost" : "open";
   // Settled: the learner wins even if the opponent moves next.
   const tenuki = { ...st, toMove: -pz.userColor, ko: -1, passes: 0 };
-  if (userWins(pz, tenuki).win) return "won";
-  if (!userWins(pz, st).win) return "lost";
+  if (wins(userWins(pz, tenuki))) return "won";
+  if (loses(userWins(pz, st))) return "lost";
   return "open";
 }
 
