@@ -155,8 +155,17 @@ export class BoardView {
     cancelAnimationFrame(this.raf);
   }
 
-  /** Board text follows the interface font (per language, docs/design.md §2). */
+  /**
+   * Board text follows the interface font (per language, docs/design.md §2).
+   * v13: read once per language, text size and appearance (and again after
+   * a resize), not on every model update: getComputedStyle forces a style
+   * recalculation, and setModel runs on every render of a board place.
+   */
   readFont() {
+    const root = typeof document !== "undefined" ? document.documentElement : null;
+    const key = root ? `${root.lang}|${root.dataset?.text || ""}|${root.dataset?.theme || ""}` : "";
+    if (this.font && key === this.fontKey) return;
+    this.fontKey = key;
     this.font = (typeof getComputedStyle === "function" && getComputedStyle(this.canvas).getPropertyValue("--font").trim()) || FONT;
   }
 
@@ -234,6 +243,7 @@ export class BoardView {
     this.cssW = w;
     this.cssH = h;
     this.grainCache = null;
+    this.fontKey = null; // read the font again (board.js readFont)
     this.draw();
   }
 

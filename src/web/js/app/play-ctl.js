@@ -11,7 +11,7 @@ import { estimate, focus, implOpponent, recordGame, suggestedGame } from "../mod
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
-import { state, update, toast, announce } from "./store.js";
+import { state, update, toast, announce, clockChanged } from "./store.js";
 import { moveText } from "../a11y.js";
 import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setGameHooks, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
@@ -767,7 +767,7 @@ export function clockTick() {
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
   // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
-  if (!boardShown() || document.hidden) return;
+  if (!boardShown() || (typeof document !== "undefined" && document.hidden)) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
   // The computer's own thinking is not charged; only the person's clock runs.
@@ -782,7 +782,8 @@ export function clockTick() {
     finishGame();
     return;
   }
-  update();
+  // v13: only the clocks re-render (store.js clockChanged), not the app.
+  clockChanged();
 }
 
 /* ---------------------------------------------------------- scoring */

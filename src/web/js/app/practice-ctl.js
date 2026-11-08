@@ -124,7 +124,9 @@ export function problemView(pz) {
 }
 
 function problemState(pz) {
-  return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null, ghost: null, openedAt: Date.now() };
+  // v13: `tok` is this attempt's own: Retry, Show answer and a new problem
+  // make a new one, and the reply timers of the old attempt see it (later).
+  return { tok: {}, st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null, ghost: null, openedAt: Date.now() };
 }
 
 /**
@@ -332,6 +334,20 @@ function browseList(def) {
 
 /* ---------------------------------------------------------- problems */
 
+/**
+ * v13: run `fn` after `ms` only if the attempt that set it is still the one
+ * on screen: the same problem state (not left for another page or problem)
+ * and the same attempt (not retried or answered meanwhile). Before, a
+ * pending reply played into a retried problem, or recorded an attempt of
+ * a problem already left.
+ */
+function later(P, ms, fn) {
+  const tok = P.tok;
+  return setTimeout(() => {
+    if (P.tok === tok && currentProblem() === P) fn();
+  }, ms);
+}
+
 function currentProblem() {
   const v = state.learn.view;
   if (v === "problem") return state.learn.problem;
@@ -377,14 +393,14 @@ export function practicePlay(x, y) {
   P.feedback = null;
   Audio.stone(false);
   update();
-  setTimeout(() => respond(P), 60);
+  later(P, 60, () => respond(P));
 }
 
 function respond(P) {
   const pz = P.pz;
   const r = S.reply(pz, P.st);
   if (r && r.refutes) {
-    setTimeout(() => {
+    later(P, 320, () => {
       if (!r.pass) {
         const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
         if (after) {
@@ -395,7 +411,7 @@ function respond(P) {
         }
       }
       lost(P, { ko: !!r.ko });
-    }, 320);
+    });
     return;
   }
   const settled = S.status(pz, P.st);
@@ -403,7 +419,7 @@ function respond(P) {
     finishProblem(P);
     return;
   }
-  setTimeout(() => {
+  later(P, 320, () => {
     if (!r.pass) {
       const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
       if (after) {
@@ -423,7 +439,7 @@ function respond(P) {
     if (st === "lost") return lost(P);
     P.feedback = "keep";
     update();
-  }, 320);
+  });
 }
 
 /**
@@ -441,7 +457,7 @@ function lost(P, { ko = false } = {}) {
   announce(t("practice.wrong"));
   update();
   const st = P.st;
-  setTimeout(() => {
+  later(P, 1900, () => {
     if (P.st !== st || P.status !== "lost" || P.answer) return;
     let back = P.history.pop();
     while (P.history.length && back.toMove !== P.pz.userColor) back = P.history.pop();
@@ -450,7 +466,7 @@ function lost(P, { ko = false } = {}) {
     P.feedback = "retry";
     P.last = null;
     update();
-  }, 1900);
+  });
 }
 
 /**

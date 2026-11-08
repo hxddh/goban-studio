@@ -101,8 +101,9 @@ export function closeSheet() {
   update({ sheet: null });
 }
 
-export function confirmAction({ title, body = "", confirm, cancel, danger = false, onConfirm, onCancel }) {
-  openSheet("confirm", { title, body, confirm, cancel, danger, onConfirm, onCancel });
+/** A question before an action (sheets.jsx ConfirmSheet; Cancel always just closes it). */
+export function confirmAction({ title, body = "", confirm, danger = false, onConfirm }) {
+  openSheet("confirm", { title, body, confirm, danger, onConfirm });
 }
 
 export function resultText(result) {

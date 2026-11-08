@@ -1,6 +1,6 @@
 /**
  * Review: a layer over any game, and the post-game review of your own
- * (docs/v9.md, "Two spaces → Play"). Whole-game analysis, the review model
+ * (docs/v9.md, "Two spaces → Play"; Play and the Library since v12). Whole-game analysis, the review model
  * made from it (play/review-model.js: the result, the balance, the three
  * phases, the key moments), live analysis of the position on the board,
  * free variations, the stories of the key mistakes, editing the record

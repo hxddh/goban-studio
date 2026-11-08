@@ -2,9 +2,9 @@
  * Everything the app does, as plain functions over the state.
  *
  * This file is the hub the views import: it boots the app (the store
- * first), owns the two spaces (Play and Learn) and history restore, the
- * games' history, backups and onboarding, and re-exports the play, review
- * and learn controllers. None of it touches the DOM.
+ * first), owns the four spaces (Today, Play, Practice and Library; v12)
+ * and history restore, the games' history, backups and onboarding, and
+ * re-exports the play, review and learn controllers. None of it touches the DOM.
  */
 import { BLACK, formatPoints } from "../rules.js";
 import { decodeSgfBytes, loadSGF } from "../sgf.js";

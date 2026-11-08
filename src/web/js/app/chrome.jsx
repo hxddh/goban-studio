@@ -10,12 +10,14 @@ import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
 
-export const SPACES = [
-  { id: "today", icon: "today", key: "nav.today" },
-  { id: "play", icon: "play", key: "nav.play" },
-  { id: "learn", icon: "practice", key: "nav.learn" },
-  { id: "library", icon: "library", key: "nav.library" },
-];
+/** How each space looks in the sidebar; which spaces there are, and their order, is controller.js SPACES (v13: one list). */
+const SPACE_LOOK = {
+  today: { icon: "today", key: "nav.today" },
+  play: { icon: "play", key: "nav.play" },
+  learn: { icon: "practice", key: "nav.learn" },
+  library: { icon: "library", key: "nav.library" },
+};
+export const SPACES = C.SPACES.map((id) => ({ id, ...SPACE_LOOK[id] }));
 
 export function Sidebar() {
   return (
