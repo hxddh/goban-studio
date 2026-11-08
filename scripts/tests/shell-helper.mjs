@@ -12,6 +12,11 @@ import { test, assert, fs, path, root, sleep } from "./helpers.mjs";
 
 const helper = path.join(root, "src/updater/apply-macos.sh");
 const posix = process.platform !== "win32" && fs.existsSync("/bin/sh");
+// Off macOS the copy step (ditto) fails, so a helper past its marker exits 2
+// having changed nothing. On macOS the copy works and the helper goes on to
+// swap and wait for the (fake) new app, which test-updater.mjs covers on the
+// release runners; there only the lock and marker behaviour is checked here.
+const copyFails = process.platform !== "darwin";
 
 function fakeInstall() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "goban-helper-")));
@@ -61,10 +66,13 @@ if (posix) {
       // The app exits; the first helper goes on (the copy needs macOS and
       // fails here: nothing changed) and releases the lock on its way out.
       app.kill();
-      assert.equal(await a.exited, 2);
-      assert.ok(fs.existsSync(path.join(inst.target, "Contents", "MacOS")), "the installed app is untouched");
+      const code = await a.exited;
+      if (copyFails) {
+        assert.equal(code, 2);
+        assert.ok(fs.existsSync(path.join(inst.target, "Contents", "MacOS")), "the installed app is untouched");
+      }
       assert.equal(fs.existsSync(inst.lock), false, "the lock is released");
-      assert.deepEqual(fs.readdirSync(inst.dir).filter((n) => n.includes(".goban-")), []);
+      if (copyFails) assert.deepEqual(fs.readdirSync(inst.dir).filter((n) => n.includes(".goban-")), []);
     } finally {
       app.kill();
       fs.rmSync(inst.dir, { recursive: true, force: true });
@@ -94,7 +102,8 @@ if (posix) {
       fs.mkdirSync(inst.lock);
       fs.writeFileSync(path.join(inst.lock, "pid"), "2147483646\n");
       const h = runHelper(inst, { pid: 2147483646, token: "dd04" });
-      assert.equal(await h.exited, 2, "the copy fails off macOS");
+      const code = await h.exited;
+      if (copyFails) assert.equal(code, 2, "the copy fails off macOS");
       assert.ok(fs.existsSync(h.started), "it started");
       assert.match(fs.readFileSync(inst.log, "utf8"), /taking over a stale lock/);
       assert.equal(fs.existsSync(inst.lock), false);
