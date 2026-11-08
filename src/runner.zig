@@ -7,6 +7,10 @@ const manifest_shortcuts = if (@hasField(@TypeOf(app_manifest), "shortcuts")) ap
 const manifest_menus = if (@hasField(@TypeOf(app_manifest), "menus")) app_manifest.menus else .{};
 const manifest_windows = if (@hasField(@TypeOf(app_manifest), "windows")) app_manifest.windows else .{};
 
+/// The app's version from app.zon (kept equal to package.json and
+/// version.js by release-check). The updater compares against it (v13).
+pub const app_version: []const u8 = if (@hasField(@TypeOf(app_manifest), "version")) app_manifest.version else "0.0.0";
+
 pub const StdoutTraceSink = struct {
     pub fn sink(self: *StdoutTraceSink) native_sdk.trace.Sink {
         return .{ .context = self, .write_fn = write };
@@ -325,53 +329,18 @@ pub fn runWithOptions(app: native_sdk.App, options: RunOptions, init: std.proces
     }
 }
 
+// v13: the four backends used to have four copies of the same start-up
+// (window state, logging, menus, the Runtime); only how the platform
+// object is made differs, so that is all each one does now. `runOn` is
+// generic over the platform object, and only the backend chosen at compile
+// time is ever analysed, exactly as before.
+
 fn runNull(app: native_sdk.App, options: RunOptions, init: std.process.Init) !void {
     var buffers: StateBuffers = undefined;
     var app_info = options.appInfo(&buffers);
     const store = prepareStateStore(init.io, init.environ_map, &app_info, &buffers);
     var null_platform = native_sdk.NullPlatform.initWithOptions(.{}, webEngine(), app_info);
-    var trace_sink = StdoutTraceSink{};
-    var log_buffers: native_sdk.debug.LogPathBuffers = .{};
-    const log_setup = native_sdk.debug.setupLogging(init.io, init.environ_map, app_info.bundle_id, &log_buffers) catch null;
-    if (log_setup) |setup| native_sdk.debug.installPanicCapture(init.io, setup.paths);
-    var file_trace_sink: native_sdk.debug.FileTraceSink = undefined;
-    var fanout_sinks: [2]native_sdk.trace.Sink = undefined;
-    var fanout_sink: native_sdk.debug.FanoutTraceSink = undefined;
-    var runtime_trace_sink = trace_sink.sink();
-    if (log_setup) |setup| {
-        file_trace_sink = native_sdk.debug.FileTraceSink.init(init.io, setup.paths.log_dir, setup.paths.log_file, setup.format);
-        fanout_sinks = .{ trace_sink.sink(), file_trace_sink.sink() };
-        fanout_sink = .{ .sinks = &fanout_sinks };
-        runtime_trace_sink = fanout_sink.sink();
-    }
-    var shortcut_storage: ShortcutStorage = .{};
-    const shortcuts = options.resolvedShortcuts(&shortcut_storage);
-    var menu_storage: MenuStorage = .{};
-    const menus = options.resolvedMenus(&menu_storage);
-    var command_storage: CommandStorage = .{};
-    const commands = options.resolvedCommands(&command_storage);
-    // The Runtime is multi-megabyte; default thread stacks overflow on a
-    // stack instance, so construct it on the heap.
-    const runtime = try std.heap.page_allocator.create(native_sdk.Runtime);
-    defer std.heap.page_allocator.destroy(runtime);
-    native_sdk.Runtime.initAt(runtime, .{
-        .platform = null_platform.platform(),
-        .trace_sink = runtime_trace_sink,
-        .log_path = if (log_setup) |setup| setup.paths.log_file else null,
-        .bridge = options.bridge,
-        .builtin_bridge = options.builtin_bridge,
-        .security = options.security,
-        .js_window_api = options.js_window_api,
-        .web_layer = webLayerEnabled(),
-        .commands = commands,
-        .menus = menus,
-        .shortcuts = shortcuts,
-        .automation = if (build_options.automation) native_sdk.automation.Server.init(init.io, ".zig-cache/native-sdk-automation", app_info.resolvedWindowTitle()) else null,
-        .window_state_store = store,
-        .environ = init.minimal.environ,
-    });
-
-    try runtime.run(app);
+    try runOn(&null_platform, app, options, init, &app_info, store);
 }
 
 fn runMacos(app: native_sdk.App, options: RunOptions, init: std.process.Init) !void {
@@ -380,48 +349,7 @@ fn runMacos(app: native_sdk.App, options: RunOptions, init: std.process.Init) !v
     const store = prepareStateStore(init.io, init.environ_map, &app_info, &buffers);
     var mac_platform = try native_sdk.platform.macos.MacPlatform.initWithOptions(native_sdk.geometry.SizeF.init(720, 480), webEngine(), app_info);
     defer mac_platform.deinit();
-    var trace_sink = StdoutTraceSink{};
-    var log_buffers: native_sdk.debug.LogPathBuffers = .{};
-    const log_setup = native_sdk.debug.setupLogging(init.io, init.environ_map, app_info.bundle_id, &log_buffers) catch null;
-    if (log_setup) |setup| native_sdk.debug.installPanicCapture(init.io, setup.paths);
-    var file_trace_sink: native_sdk.debug.FileTraceSink = undefined;
-    var fanout_sinks: [2]native_sdk.trace.Sink = undefined;
-    var fanout_sink: native_sdk.debug.FanoutTraceSink = undefined;
-    var runtime_trace_sink = trace_sink.sink();
-    if (log_setup) |setup| {
-        file_trace_sink = native_sdk.debug.FileTraceSink.init(init.io, setup.paths.log_dir, setup.paths.log_file, setup.format);
-        fanout_sinks = .{ trace_sink.sink(), file_trace_sink.sink() };
-        fanout_sink = .{ .sinks = &fanout_sinks };
-        runtime_trace_sink = fanout_sink.sink();
-    }
-    var shortcut_storage: ShortcutStorage = .{};
-    const shortcuts = options.resolvedShortcuts(&shortcut_storage);
-    var menu_storage: MenuStorage = .{};
-    const menus = options.resolvedMenus(&menu_storage);
-    var command_storage: CommandStorage = .{};
-    const commands = options.resolvedCommands(&command_storage);
-    // The Runtime is multi-megabyte; default thread stacks overflow on a
-    // stack instance, so construct it on the heap.
-    const runtime = try std.heap.page_allocator.create(native_sdk.Runtime);
-    defer std.heap.page_allocator.destroy(runtime);
-    native_sdk.Runtime.initAt(runtime, .{
-        .platform = mac_platform.platform(),
-        .trace_sink = runtime_trace_sink,
-        .log_path = if (log_setup) |setup| setup.paths.log_file else null,
-        .bridge = options.bridge,
-        .builtin_bridge = options.builtin_bridge,
-        .security = options.security,
-        .js_window_api = options.js_window_api,
-        .web_layer = webLayerEnabled(),
-        .commands = commands,
-        .menus = menus,
-        .shortcuts = shortcuts,
-        .automation = if (build_options.automation) native_sdk.automation.Server.init(init.io, ".zig-cache/native-sdk-automation", app_info.resolvedWindowTitle()) else null,
-        .window_state_store = store,
-        .environ = init.minimal.environ,
-    });
-
-    try runtime.run(app);
+    try runOn(&mac_platform, app, options, init, &app_info, store);
 }
 
 fn runLinux(app: native_sdk.App, options: RunOptions, init: std.process.Init) !void {
@@ -430,48 +358,7 @@ fn runLinux(app: native_sdk.App, options: RunOptions, init: std.process.Init) !v
     const store = prepareStateStore(init.io, init.environ_map, &app_info, &buffers);
     var linux_platform = try native_sdk.platform.linux.LinuxPlatform.initWithOptions(native_sdk.geometry.SizeF.init(720, 480), webEngine(), app_info);
     defer linux_platform.deinit();
-    var trace_sink = StdoutTraceSink{};
-    var log_buffers: native_sdk.debug.LogPathBuffers = .{};
-    const log_setup = native_sdk.debug.setupLogging(init.io, init.environ_map, app_info.bundle_id, &log_buffers) catch null;
-    if (log_setup) |setup| native_sdk.debug.installPanicCapture(init.io, setup.paths);
-    var file_trace_sink: native_sdk.debug.FileTraceSink = undefined;
-    var fanout_sinks: [2]native_sdk.trace.Sink = undefined;
-    var fanout_sink: native_sdk.debug.FanoutTraceSink = undefined;
-    var runtime_trace_sink = trace_sink.sink();
-    if (log_setup) |setup| {
-        file_trace_sink = native_sdk.debug.FileTraceSink.init(init.io, setup.paths.log_dir, setup.paths.log_file, setup.format);
-        fanout_sinks = .{ trace_sink.sink(), file_trace_sink.sink() };
-        fanout_sink = .{ .sinks = &fanout_sinks };
-        runtime_trace_sink = fanout_sink.sink();
-    }
-    var shortcut_storage: ShortcutStorage = .{};
-    const shortcuts = options.resolvedShortcuts(&shortcut_storage);
-    var menu_storage: MenuStorage = .{};
-    const menus = options.resolvedMenus(&menu_storage);
-    var command_storage: CommandStorage = .{};
-    const commands = options.resolvedCommands(&command_storage);
-    // The Runtime is multi-megabyte; default thread stacks overflow on a
-    // stack instance, so construct it on the heap.
-    const runtime = try std.heap.page_allocator.create(native_sdk.Runtime);
-    defer std.heap.page_allocator.destroy(runtime);
-    native_sdk.Runtime.initAt(runtime, .{
-        .platform = linux_platform.platform(),
-        .trace_sink = runtime_trace_sink,
-        .log_path = if (log_setup) |setup| setup.paths.log_file else null,
-        .bridge = options.bridge,
-        .builtin_bridge = options.builtin_bridge,
-        .security = options.security,
-        .js_window_api = options.js_window_api,
-        .web_layer = webLayerEnabled(),
-        .commands = commands,
-        .menus = menus,
-        .shortcuts = shortcuts,
-        .automation = if (build_options.automation) native_sdk.automation.Server.init(init.io, ".zig-cache/native-sdk-automation", app_info.resolvedWindowTitle()) else null,
-        .window_state_store = store,
-        .environ = init.minimal.environ,
-    });
-
-    try runtime.run(app);
+    try runOn(&linux_platform, app, options, init, &app_info, store);
 }
 
 fn runWindows(app: native_sdk.App, options: RunOptions, init: std.process.Init) !void {
@@ -480,6 +367,19 @@ fn runWindows(app: native_sdk.App, options: RunOptions, init: std.process.Init) 
     const store = prepareStateStore(init.io, init.environ_map, &app_info, &buffers);
     var windows_platform = try native_sdk.platform.windows.WindowsPlatform.initWithOptions(native_sdk.geometry.SizeF.init(720, 480), webEngine(), app_info);
     defer windows_platform.deinit();
+    try runOn(&windows_platform, app, options, init, &app_info, store);
+}
+
+/// Logging, menus and the Runtime on an initialised platform object (the
+/// caller keeps it alive and deinitialises it).
+fn runOn(
+    platform_object: anytype,
+    app: native_sdk.App,
+    options: RunOptions,
+    init: std.process.Init,
+    app_info: *const native_sdk.AppInfo,
+    store: ?native_sdk.window_state.Store,
+) !void {
     var trace_sink = StdoutTraceSink{};
     var log_buffers: native_sdk.debug.LogPathBuffers = .{};
     const log_setup = native_sdk.debug.setupLogging(init.io, init.environ_map, app_info.bundle_id, &log_buffers) catch null;
@@ -505,7 +405,7 @@ fn runWindows(app: native_sdk.App, options: RunOptions, init: std.process.Init) 
     const runtime = try std.heap.page_allocator.create(native_sdk.Runtime);
     defer std.heap.page_allocator.destroy(runtime);
     native_sdk.Runtime.initAt(runtime, .{
-        .platform = windows_platform.platform(),
+        .platform = platform_object.platform(),
         .trace_sink = runtime_trace_sink,
         .log_path = if (log_setup) |setup| setup.paths.log_file else null,
         .bridge = options.bridge,

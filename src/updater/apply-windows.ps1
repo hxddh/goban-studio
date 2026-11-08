@@ -1,8 +1,15 @@
 # Goban Studio update helper (Windows), v5. Windows PowerShell 5.1 or later.
 #
 # The running app writes this file from its own embedded copy (it is never
-# downloaded), starts it hidden and detached, and quits. This script then:
+# downloaded), starts it hidden and detached, and quits once this script has
+# proved it runs. This script then:
 #
+#   0. (v13) takes the installation's lock — "<parent>\.<name>.goban-lock",
+#      opened without sharing and deleted when this process ends, however it
+#      ends; another helper for the same app means this one changes nothing
+#      — and creates the "started" marker (-StartedFile) the app is waiting
+#      for. The marker is created exclusively: if the app already gave up
+#      waiting and claimed it, this helper exits without touching anything;
 #   1. waits for the app process to exit, and for anything still running
 #      from the install folder (KataGo) to end;
 #   2. copies the verified, unpacked new package next to the install folder
@@ -18,7 +25,8 @@
 #      and starts the old app with --goban-update-failed.
 #
 # Exit codes: 0 updated; 1 rolled back (old version restored); 2 nothing was
-# changed; 3 the rollback itself failed (the old version is left at the
+# changed (including: another helper holds the lock, the app gave up
+# waiting); 3 the rollback itself failed (the old version is left at the
 # backup path, logged).
 
 param(
@@ -30,7 +38,8 @@ param(
   [int]$AckTimeout = 90,
   [int]$ExitTimeout = 300,
   [int]$LockRetries = 60,
-  [string]$CleanupDir = ""
+  [string]$CleanupDir = "",
+  [string]$StartedFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -145,6 +154,7 @@ try {
   exit 2
 }
 if (-not ([System.IO.Path]::GetFileName($AckFile) -like "goban-update-ack-*.txt")) { Log "bad ack path '$AckFile'"; exit 2 }
+if ($StartedFile -and -not ([System.IO.Path]::GetFileName($StartedFile) -like "goban-update-started-*.txt")) { Log "bad started path '$StartedFile'"; exit 2 }
 if (-not (Test-Path -LiteralPath (Join-Path $InstallDir $exeRel))) { Log "installed app not found at $InstallDir"; exit 2 }
 if (-not (Test-Path -LiteralPath (Join-Path $StagedDir $exeRel))) { Log "staged app not found at $StagedDir"; exit 2 }
 
@@ -154,6 +164,31 @@ $new = Join-Path $parent ".$name.goban-new-$PID"
 $old = Join-Path $parent ".$name.goban-old-$PID"
 $failed = Join-Path $parent ".$name.goban-failed-$PID"
 Log "update: target=$InstallDir staged=$StagedDir pid=$AppPid"
+
+# 0. One helper per installation: the lock file stays open, unshared, for
+# this whole script, and Windows deletes it when the handle closes (also
+# when the process is killed).
+$lockPath = Join-Path $parent ".$name.goban-lock"
+try {
+  $script:installLock = New-Object System.IO.FileStream($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None, 1, [System.IO.FileOptions]::DeleteOnClose)
+} catch {
+  Log "another update helper is working on $InstallDir; nothing changed"
+  exit 2
+}
+
+# Tell the app this helper runs (it quits only then). CreateNew: if the app
+# stopped waiting, it claimed the marker and this helper must not go on.
+if ($StartedFile) {
+  try {
+    $marker = [System.IO.File]::Open($StartedFile, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes("started $PID`n")
+    $marker.Write($bytes, 0, $bytes.Length)
+    $marker.Close()
+  } catch {
+    Log "the app stopped waiting for this helper; nothing changed"
+    exit 2
+  }
+}
 
 # 1. Wait for the app to quit.
 $proc = Get-Process -Id $AppPid -ErrorAction SilentlyContinue

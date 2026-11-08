@@ -16,6 +16,7 @@
 //! `max_file_bytes`.
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 /// Largest file the store keeps (a game with its full analysis is well under).
 pub const max_file_bytes: u64 = 8 * 1024 * 1024;
@@ -61,11 +62,43 @@ fn validPath(p: []const u8) bool {
     return seg > 0;
 }
 
-/// A storable key: `[a-z0-9_-]+` segments separated by `/`, ending in `.json`.
+/// Windows reserves these names in every directory, with or without an
+/// extension (`con.json` opens the console, `nul/x.json` cannot exist):
+/// CON, PRN, AUX, NUL, COM1-9, LPT1-9, in any letter case. `name` is one
+/// path segment; anything from its first dot on is the extension.
+pub fn isDeviceName(name: []const u8) bool {
+    const stem_end = std.mem.indexOfScalar(u8, name, '.') orelse name.len;
+    // "con " and "con  .txt" are the device too: Windows drops trailing spaces.
+    const stem = std.mem.trimEnd(u8, name[0..stem_end], " ");
+    if (stem.len == 3) {
+        for ([_][]const u8{ "con", "prn", "aux", "nul" }) |dev| {
+            if (std.ascii.eqlIgnoreCase(stem, dev)) return true;
+        }
+        return false;
+    }
+    if (stem.len == 4 and stem[3] >= '1' and stem[3] <= '9') {
+        return std.ascii.eqlIgnoreCase(stem[0..3], "com") or std.ascii.eqlIgnoreCase(stem[0..3], "lpt");
+    }
+    return false;
+}
+
+/// No segment of `p` (separated by `/`) is a Windows device name.
+fn noDeviceSegment(p: []const u8) bool {
+    var it = std.mem.splitScalar(u8, p, '/');
+    while (it.next()) |seg| {
+        if (isDeviceName(seg)) return false;
+    }
+    return true;
+}
+
+/// A storable key: `[a-z0-9_-]+` segments separated by `/`, ending in
+/// `.json`, none of them a Windows device name (the same key must work on
+/// both platforms: a backup made on macOS is restored on Windows).
 pub fn validKey(key: []const u8) bool {
     if (key.len <= ".json".len or key.len > max_key_bytes) return false;
     if (!std.mem.endsWith(u8, key, ".json")) return false;
-    return validPath(key[0 .. key.len - ".json".len]);
+    const p = key[0 .. key.len - ".json".len];
+    return validPath(p) and noDeviceSegment(p);
 }
 
 /// A list prefix: empty (everything), or a directory (`games` or `games/`).
@@ -73,7 +106,31 @@ pub fn validPrefix(prefix: []const u8) bool {
     if (prefix.len == 0) return true;
     if (prefix.len > max_key_bytes) return false;
     const p = if (prefix[prefix.len - 1] == '/') prefix[0 .. prefix.len - 1] else prefix;
-    return validPath(p);
+    return validPath(p) and noDeviceSegment(p);
+}
+
+/// Rename `from` over `to` in `dir`. On Windows a rename over a file that
+/// an antivirus scanner, the search indexer or a backup tool has open for a
+/// moment fails with AccessDenied / sharing violation; a few short retries
+/// (10, 20, 40, 80, 160 ms: about 0.3 s in all) ride that out instead of
+/// failing the write. Elsewhere a rename either works or does not.
+fn renameRetrying(io: std.Io, dir: std.Io.Dir, from: []const u8, to: []const u8) Error!void {
+    const attempts: u32 = if (builtin.os.tag == .windows) 6 else 1;
+    var delay_ms: i64 = 10;
+    var i: u32 = 0;
+    while (true) : (i += 1) {
+        dir.rename(from, dir, to, io) catch |err| {
+            if (i + 1 >= attempts) return error.Disk;
+            switch (err) {
+                error.AccessDenied, error.PermissionDenied, error.FileBusy, error.AntivirusInterference => {},
+                else => return error.Disk,
+            }
+            std.Io.sleep(io, .fromMilliseconds(delay_ms), .awake) catch {};
+            delay_ms *= 2;
+            continue;
+        };
+        return;
+    }
 }
 
 /// A key's path relative to the root, with the platform's separator.
@@ -180,7 +237,7 @@ pub const Store = struct {
             if (bytes.len > 0) file.writePositionalAll(self.io, bytes, offset) catch return error.Disk;
             if (done) file.sync(self.io) catch return error.Disk;
         }
-        if (done) dir.rename(tmp, dir, sub, self.io) catch return error.Disk;
+        if (done) try renameRetrying(self.io, dir, tmp, sub);
     }
 
     /// Remove `key` (and any unfinished write of it). A missing key is fine.
@@ -278,6 +335,9 @@ test "store keys are validated strictly" {
         "games/.json",         "games/x.json/",      "a\\b.json",        "c:/x.json",         "C:\\x.json",
         "games/x.json.tmp",    "x.y.json",           "sp ace.json",      "a/b/c/d/e.json",    "\x00.json",
         "games/\xc3\xa9.json", "profile.JSON",
+        // Windows device names, as a file or a directory.
+        "con.json",            "nul.json",           "aux.json",         "prn.json",          "com1.json",
+        "lpt9.json",           "games/con.json",     "con/x.json",       "games/lpt1.json",
     };
     for (bad) |k| try testing.expect(!validKey(k));
     var long: [max_key_bytes + 1]u8 = @splat('a');
@@ -292,6 +352,16 @@ test "store keys are validated strictly" {
     try testing.expect(!validPrefix("../"));
     try testing.expect(!validPrefix("games//"));
     try testing.expect(!validPrefix("/games/"));
+    try testing.expect(!validPrefix("con/"));
+    // Names that only start like a device are ordinary.
+    for ([_][]const u8{ "console.json", "com.json", "com0.json", "com10.json", "lpt.json", "nul-1.json", "auxiliary.json" }) |k| try testing.expect(validKey(k));
+}
+
+test "Windows device names are recognised in any case, with or without an extension" {
+    const devices = [_][]const u8{ "con", "CON", "Con", "prn", "aux", "nul", "NUL.txt", "com1", "COM9", "lpt1", "LPT9.json", "con.tar.gz", "con ", "aux .json" };
+    for (devices) |n| try testing.expect(isDeviceName(n));
+    const ordinary = [_][]const u8{ "", "co", "conn", "com", "com0", "com10", "lpt0", "lptx", "nul_", "x.con", "console.json", ".con" };
+    for (ordinary) |n| try testing.expect(!isDeviceName(n));
 }
 
 // ------------------------------------------------ files the user picks
@@ -349,7 +419,7 @@ pub fn writePath(io: std.Io, path: []const u8, bytes: []const u8, offset: u64, d
         if (bytes.len > 0) file.writePositionalAll(io, bytes, offset) catch return error.Disk;
         if (done) file.sync(io) catch return error.Disk;
     }
-    if (done) dir.rename(tmp, dir, name, io) catch return error.Disk;
+    if (done) try renameRetrying(io, dir, tmp, name);
 }
 
 test "a user file is written in chunks beside its target and read back from offsets" {
