@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build frontend/dist, compile ReleaseFast, package GobanStudio.app + zip.
+# Build frontend/dist, compile ReleaseSafe, package GobanStudio.app + zip.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -13,8 +13,8 @@ node scripts/sync-dist.mjs
 echo "==> unit tests"
 node scripts/test.mjs
 
-echo "==> zig build -Doptimize=ReleaseFast"
-zig build -Doptimize=ReleaseFast
+echo "==> zig build -Doptimize=ReleaseSafe"
+zig build -Doptimize=ReleaseSafe
 
 echo "==> native package"
 mkdir -p dist

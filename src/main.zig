@@ -588,8 +588,9 @@ const DialogPayload = struct {
 /// `studio.openFileDialog {title?, defaultPath?, allowMultiple?}` → the
 /// chosen paths (an array) or null when cancelled. v13: the page's way to
 /// let the user pick a file to import (an SGF, a backup); every path it
-/// returns may then be read once through `studio.readTextFile` (files.zig).
-/// Paths that are not one of the app's file types are left out.
+/// returns may then be read through `studio.readTextFile` if it is one of
+/// the app's file types (files.zig); any other pick is returned but stays
+/// unreadable, so the page reports a failed import.
 fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
     const runtime = self.runtime orelse return error.HandlerFailed;
@@ -610,7 +611,9 @@ fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     var it = std.mem.splitScalar(u8, result.paths, '\n');
     while (it.next()) |path| {
         if (path.len == 0 or !std.unicode.utf8ValidateSlice(path)) continue;
-        if (!self.grants.grant(path, .read, false)) continue;
+        // A file the app does not read (a .txt, say) is still returned, so
+        // the page can say it could not import it; it is just not granted.
+        _ = self.grants.grant(path, .read, false);
         const mark = n;
         if (count > 0 and !jsonAppend(output, &n, ",")) break;
         if (!jsonAppendString(output, &n, path)) {

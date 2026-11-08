@@ -77,7 +77,7 @@ for (const rules of ["japanese", "chinese", "korean"]) {
   assert.match(engineZig, new RegExp(`"kata-set-rules ${rules}"`), `the host sends kata-set-rules ${rules}`);
 }
 assert.match(mainZig, /"studio\.katagoAnalyzeAsync"/);
-assert.ok(!mainZig.includes("\"studio.katagoAnalyze\""), "the v2 synchronous KataGo command is gone");
+assert.doesNotMatch(mainZig, /\.name = "studio\.katago(Analyze|Move)"/, "the v2 synchronous KataGo commands are gone");
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");

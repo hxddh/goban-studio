@@ -154,7 +154,8 @@ function dialogPayload(options = {}) {
 
 /**
  * Let the user pick a file to read (`studio.openFileDialog`). Resolves the
- * chosen paths (an array; the host leaves out files the app cannot read)
+ * chosen paths (an array; a file the app does not read is listed but stays
+ * unreadable, so the import reports a failure)
  * or null when cancelled or unavailable.
  */
 export async function openFileDialog(options = {}, call = invoke) {

@@ -121,13 +121,17 @@ Static asset checks are intentionally limited to source inputs; the bundle and
 - `native validate` — `app.zon` is valid.
 - `native test -Dplatform=null` — 5/5 Zig tests pass (production source,
   Windows path unescaping, plain path, engine script vocabulary).
-- `native build -Dplatform=null` — ReleaseFast executable links and builds.
+- `native build -Dplatform=null` — the executable links and builds (v13:
+  packages default to ReleaseSafe; the dev server origin is allowed only in
+  Debug builds, `-Ddev-origin`).
 - Direct Linux KataGo v1.18.1 probe: model loads and returns one 19×19 GTP
   move in about 1.1 s cold; two moves in one process take about 1.7 s total.
 - `native package --target linux --assets frontend/dist` plus
   `scripts/install-engine.mjs` produces the expected
   `resources/frontend/dist/engine/{model,linux}` layout.
-- Native file open/save dialogs are wired through the Native SDK web API,
+- Native file open/save dialogs are the host's own commands
+  (`studio.openFileDialog` / `studio.saveFileDialog`, v13): only paths they
+  return (or that the OS opened or the user dropped) can be read or written,
   with a browser file-input/download fallback.
 - OS open-with events are forwarded by `src/main.zig` to the page as
   `open:files`; drag/drop uses `drop:files`. The native event delivery itself

@@ -105,7 +105,8 @@ static NSUInteger GobanApplicationShouldTerminate(id self, SEL _cmd, NSApplicati
     (void)self;
     (void)_cmd;
     (void)sender;
-    if (goban_quit_waiting) return NSTerminateLater;
+    /* A second quit while the first waits: that one will still answer. */
+    if (goban_quit_waiting) return NSTerminateCancel;
     if (goban_quit_callback == NULL) return NSTerminateNow;
     goban_quit_waiting = YES;
     if (!goban_quit_callback(goban_quit_context)) {

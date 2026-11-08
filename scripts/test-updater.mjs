@@ -407,7 +407,7 @@ if (!liveTag) {
     const startedA = path.join(root, "goban-update-started-aa01.txt");
     const startedB = path.join(root, "goban-update-started-bb02.txt");
     try {
-      const first = runHelper({ pid: app.pid, target, staged, ack: path.join(root, "goban-update-ack-aa01.txt"), log, exitTimeout: 10, started: startedA });
+      const first = runHelper({ pid: app.pid, target, staged, ack: path.join(root, "goban-update-ack-aa01.txt"), log, exitTimeout: 30, started: startedA });
       await waitFor(() => fs.existsSync(startedA), 60000, "the first helper's started marker");
       const second = await runHelper({ pid: app.pid, target, staged, ack: path.join(root, "goban-update-ack-bb02.txt"), log, exitTimeout: 10, started: startedB });
       assert.equal(second, 2, "the second helper refuses");
