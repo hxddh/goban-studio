@@ -33,9 +33,10 @@ await test("advanced: the advanced units follow the intermediate ones and keep e
   const order = ["beginner", "intermediate", "advanced"];
   for (let i = 1; i < levels.length; i++) assert.ok(order.indexOf(levels[i]) >= order.indexOf(levels[i - 1]), `unit ${COURSE[i].id} out of order`);
   const adv = COURSE.filter((u) => u.level === "advanced");
-  assert.ok(adv.length >= 4 && adv.length <= 6, `${adv.length} advanced units`);
+  // v13: opening frameworks, joseki choice and handicap strategy joined the v6 units.
+  assert.ok(adv.length >= 8 && adv.length <= 10, `${adv.length} advanced units`);
   const lessons = adv.flatMap((u) => u.lessons);
-  assert.ok(lessons.length >= 15 && lessons.length <= 20, `${lessons.length} advanced lessons`);
+  assert.ok(lessons.length >= 27 && lessons.length <= 40, `${lessons.length} advanced lessons`);
   for (const l of lessons) assert.match(l.id, /^adv-/);
   // The beginner and intermediate lessons are unchanged and come first.
   const before = COURSE.filter((u) => u.level !== "advanced").flatMap((u) => u.lessons.map((l) => l.id));

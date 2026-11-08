@@ -147,10 +147,10 @@ export const CLASSICS = [
     "date": "1933-10-16..1934-01-29",
     "result": "W+2",
     "note": {
-      "zh": "1933–34 年吴清源对本因坊秀哉。这局因“封手”争议和秀哉的名人身份成为传奇。",
-      "en": "Go Seigen vs Honinbo Shusai, 1933–34. The sealed-move controversy and Shusai’s Meijin status made this the Game of the Century.",
-      "ko": "1933–34년 오청원 대 혼인보 슈사이. 봉수 논란과 슈사이 명인의 지위 때문에 세기의 대국이 되었습니다.",
-      "ja": "1933–34年、呉清源対本因坊秀哉。封じ手論争と秀哉名人の立場から「世紀の対局」と呼ばれます。"
+      "zh": "1933–34 年吴清源对本因坊秀哉。秀哉的名人地位、吴清源崭新的布局，以及白棋一再打挂引起的争议，使这局成为“世纪之局”。",
+      "en": "Go Seigen vs Honinbo Shusai, 1933–34. Shusai’s standing as Meijin, Go Seigen’s new-style opening and the controversy over White’s many adjournments made this the Game of the Century.",
+      "ko": "1933–34년 오청원 대 혼인보 슈사이. 슈사이 명인의 지위, 오청원의 새로운 포석, 백이 거듭 대국을 중단한 것을 둘러싼 논란이 이 대국을 세기의 대국으로 만들었습니다.",
+      "ja": "1933–34年、呉清源対本因坊秀哉。秀哉名人の立場、呉清源の新しい布石、白が重ねた打ち掛けをめぐる論争から「世紀の対局」と呼ばれます。"
     },
     "moments": [
       {
@@ -162,10 +162,10 @@ export const CLASSICS = [
           "ja": "三々・星・天元"
         },
         "note": {
-          "zh": "吴清源执黑，前三手依次下在三三、星位和天元。在当时这是闻所未闻的布局，被视为对本因坊秀哉名人的挑战，也开启了“新布局”的时代。",
-          "en": "Go Seigen, with Black, opens on the 3-3 point, a star point and the centre. No one had opened like this; it was taken as a challenge to the Honinbo Shusai Meijin and opened the era of the New Fuseki.",
-          "ko": "오청원이 흑으로 삼삼, 화점, 천원에 차례로 둡니다. 전례 없는 포석으로 혼인보 슈사이 명인에 대한 도전으로 받아들여졌고, ‘신포석’ 시대를 열었습니다.",
-          "ja": "呉清源は黒番で三々・星・天元と打ち始めます。前例のない布石で本因坊秀哉名人への挑戦と受け取られ、「新布石」の時代を開きました。"
+          "zh": "吴清源执黑，前三手依次下在三三、星位和天元。在当时这是闻所未闻的布局，被视为对本因坊秀哉名人的挑战，也成为吴清源和木谷实那一年掀起的“新布局”的象征。",
+          "en": "Go Seigen, with Black, opens on the 3-3 point, a star point and the centre. No one had opened like this; it was taken as a challenge to the Honinbo Shusai Meijin and became the emblem of the New Fuseki that Go Seigen and Kitani Minoru had launched that year.",
+          "ko": "오청원이 흑으로 삼삼, 화점, 천원에 차례로 둡니다. 전례 없는 포석으로 혼인보 슈사이 명인에 대한 도전으로 받아들여졌고, 그해 오청원과 기타니 미노루가 일으킨 ‘신포석’의 상징이 되었습니다.",
+          "ja": "呉清源は黒番で三々・星・天元と打ち始めます。前例のない布石で本因坊秀哉名人への挑戦と受け取られ、その年に呉清源と木谷実が起こした「新布石」の象徴となりました。"
         }
       },
       {
@@ -212,7 +212,7 @@ export const CLASSICS = [
     "date": "1953-03-11..13",
     "result": "B+R",
     "note": {
-      "zh": "1953 年吴清源对藤泽库之助十番棋第六局。十番棋重新定义了现代围棋的竞争强度。",
+      "zh": "1953 年吴清源对藤泽库之助第三次十番棋第六局。十番棋重新定义了现代围棋的竞争强度。",
       "en": "Go Seigen vs Fujisawa Kuranosuke, 1953, game 6 of their third ten-game match. These matches redefined the intensity of modern Go.",
       "ko": "1953년 오청원 대 후지사와 구라노스케, 세 번째 십번기 6국. 이 십번기는 현대 바둑의 경쟁 강도를 다시 정의했습니다.",
       "ja": "1953年、呉清源対藤沢庫之助、第三期十番碁第6局。十番碁は近代囲碁の競争強度を塗り替えました。"
@@ -344,10 +344,10 @@ export const CLASSICS = [
     "date": "1996-08-03",
     "result": "B+R",
     "note": {
-      "zh": "1996 年富士通杯决赛。李昌镐中盘胜马晓春，开启了他的世界大赛统治。",
-      "en": "The 1996 Fujitsu Cup final. Lee Changho beat Ma Xiaochun by resignation, opening his run of world titles.",
-      "ko": "1996년 후지쓰배 결승. 이창호가 마샤오춘을 불계로 이기며 세계 대회 지배를 시작했습니다.",
-      "ja": "1996年富士通杯決勝。李昌鎬が馬暁春を中押しで破り、世界タイトル時代を切り開きました。"
+      "zh": "1996 年第 9 届富士通杯决赛。李昌镐中盘战胜马晓春夺冠。他的第一个世界冠军是四年前的 1992 年东洋证券杯。",
+      "en": "The final of the 9th Fujitsu Cup, 1996. Lee Changho beat Ma Xiaochun by resignation to take the title. His first world title had come four years earlier, at the 1992 Tong-Yang Cup.",
+      "ko": "1996년 제9회 후지쓰배 결승. 이창호가 마샤오춘에게 불계승을 거두고 우승했습니다. 그의 첫 세계 대회 우승은 4년 전인 1992년 동양증권배였습니다.",
+      "ja": "1996年第9回富士通杯決勝。李昌鎬が馬暁春に中押し勝ちして優勝しました。李昌鎬の最初の世界タイトルは、その4年前の1992年東洋証券杯です。"
     },
     "sgf": "(;\nEV[9th Fujitsu Cup]\nRO[Final]\nPB[Lee Changho]\nBR[9p]\nPW[Ma Xiaochun]\nWR[9p]\nTM[3h]\nKM[5.5]\nRE[B+R]\nDT[1996-08-03]\nPC[Kudan Kaikan, Tokyo]\n\n;B[pd];W[dd];B[pp];W[dp];B[fq];W[hq];B[fo];W[cn];B[ip];W[eq]\n;B[fr];W[qn];B[np];W[qk];B[iq];W[nc];B[qf];W[pb];B[cf];W[fc]\n;B[qc];W[qh];B[lc];W[ne];B[qb];W[ce];B[cl];W[bf];B[cq];W[dm]\n;B[cp];W[dl];B[cj];W[dk];B[ei];W[ck];B[ic];W[gi];B[bg];W[df]\n;B[cg];W[bj];B[bi];W[ci];B[ch];W[dj];B[be];W[bd];B[af];W[le]\n;B[gb];W[fb];B[gc];W[gd];B[hd];W[ge];B[he];W[gg];B[hf];W[kb]\n;B[kc];W[lb];B[mc];W[mb];B[nd];W[oc];B[od];W[jc];B[jd];W[jb]\n;B[kd];W[lq];B[qo];W[pn];B[or];W[ko];B[mo];W[io];B[hp];W[ai]\n;B[ah];W[bh];B[ee];W[eg];B[bi];W[co];B[er];W[bh];B[ed];W[ec]\n;B[bi];W[ro];B[rp];W[bh];B[na];W[ib];B[bi];W[hb];B[hc];W[ga]\n;B[aj];W[kg];B[pa];W[nb];B[hh];W[gh];B[md];W[rn];B[ef];W[dg]\n;B[de];W[cd];B[ff];W[di];B[dh];W[eh];B[gf];W[ad];B[fg];W[fh]\n;B[hi];W[gj];B[hj];W[gk];B[oh];W[kj];B[kl];W[oo];B[op];W[il]\n;B[jk];W[ji];B[ik];W[ln];B[mn];W[ho];B[go];W[ni];B[lm];W[jn]\n;B[ph];W[qg];B[oj];W[hk];B[hg];W[nh];B[qj];W[rj];B[pk];W[qi]\n;B[pj];W[ql];B[of];W[ml];B[rk];W[si];B[mk];W[lk];B[mj];W[ll]\n;B[lo];W[kp];B[om];W[pf];B[pg]\nC[Time used: B: 2h46m, W: 2h59m]\n)"
   },
@@ -460,7 +460,7 @@ export const CLASSICS = [
     "date": "2017-05-23",
     "result": "W+0.5",
     "note": {
-      "zh": "2017 年未来围棋峰会第一局。AlphaGo 执白半目胜柯洁，柯洁称这是最接近的一局。",
+      "zh": "2017 年未来围棋峰会第一局。AlphaGo 执白半目胜柯洁。",
       "en": "Game 1 of the 2017 Future of Go Summit. AlphaGo beat Ke Jie by half a point with White.",
       "ko": "2017년 미래 바둑 정상회담 1국. 알파고가 백으로 커제를 반집 차로 이겼습니다.",
       "ja": "2017年未来囲碁サミット第1局。AlphaGoが白番で柯潔に半目勝ちしました。"
@@ -555,7 +555,7 @@ export const CLASSICS = [
     "title": {
       "zh": "赵治勋对林海峰",
       "en": "Cho Chikun vs Rin",
-      "ko": "조치훈 대 린카이호",
+      "ko": "조치훈 대 임해봉",
       "ja": "趙治勲対林海峰"
     },
     "black": "Cho Chikun",
@@ -569,7 +569,7 @@ export const CLASSICS = [
     "whiteName": {
       "zh": "林海峰",
       "en": "Rin Kaiho",
-      "ko": "린카이호",
+      "ko": "임해봉",
       "ja": "林海峰"
     },
     "event": "1st Fujitsu Cup",
@@ -578,7 +578,7 @@ export const CLASSICS = [
     "note": {
       "zh": "1988 年首届富士通杯第二轮。林海峰执白胜赵治勋。",
       "en": "Round 2 of the first Fujitsu Cup, 1988. Rin Kaiho won with White against Cho Chikun.",
-      "ko": "1988년 제1회 후지쓰배 2회전. 린카이호가 백으로 조치훈을 이겼습니다.",
+      "ko": "1988년 제1회 후지쓰배 2회전. 임해봉이 백으로 조치훈을 이겼습니다.",
       "ja": "1988年第1回富士通杯2回戦。林海峰が白番で趙治勲を破りました。"
     },
     "sgf": "(;\nEV[1st Fujitsu Cup]\nRO[2]\nPB[Cho Chikun]\nBR[9p]\nPW[Rin Kaiho]\nWR[9p]\nKM[5.5]\nRE[W+R]\nDT[1988-06-04]\nPC[Nihon Ki-in, Tokyo]\n\n;B[pd];W[dd];B[pq];W[cp];B[eq];W[qo];B[pl];W[lq];B[do];W[co]\n;B[dm];W[dn];B[en];W[cn];B[em];W[op];B[oq];W[np];B[nq];W[mp]\n;B[rq];W[dq];B[er];W[cl];B[jq];W[jo];B[hp];W[qj];B[qm];W[nl]\n;B[nk];W[ml];B[ok];W[qf];B[qh];W[rh];B[ri];W[qi];B[rg];W[ph]\n;B[qg];W[pg];B[pf];W[rf];B[sh];W[sf];B[sg];W[rj];B[qe];W[of]\n;B[pe];W[oi];B[mk];W[lk];B[ro];W[lj];B[rl];W[jc];B[mc];W[dk]\n;B[ll];W[kl];B[lm];W[km];B[ln];W[nn];B[mi];W[mg];B[fd];W[ef]\n;B[kd];W[kh];B[dc];W[cc];B[ec];W[cb];B[ie];W[gf];B[hd];W[ed]\n;B[mj];W[ke];B[lh];W[kg];B[ki];W[kk];B[le];W[me];B[kf];W[lg]\n;B[md];W[gc];B[li];W[ih];B[nh];W[ng];B[hc];W[fc];B[fb];W[gb]\n;B[hb];W[gd];B[ga];W[ge];B[ek];W[ep];B[fp];W[ej];B[dj];W[di]\n;B[cj];W[ck];B[kn];W[jn];B[jm];W[ik];B[im];W[lo];B[jk];W[jl]\n;B[il];W[jj];B[ji];W[hk];B[ei];W[fj];B[eh];W[gh];B[ci];W[ch]\n;B[bh];W[cg];B[bg];W[bf];B[hi];W[hh];B[cr];W[dr];B[ds];W[bq]\n;B[kq];W[ko];B[lr];W[fq];B[eo];W[dp];B[gq];W[fr];B[es];W[fo]\n;B[gp];W[gn];B[gm];W[gl];B[fl];W[fk];B[hn];W[sk];B[re];W[rp]\n;B[qp];W[rn];B[po];W[so];B[pp];W[br];B[gr];W[qn];B[pn];W[sl]\n;B[eb];W[el];B[fm];W[nd];B[ne];W[oe])"
@@ -609,7 +609,7 @@ export const CLASSICS = [
     "date": "1969-12-24,25",
     "result": "W+R",
     "note": {
-      "zh": "1969 年第十期十段战第三局。大竹英雄执白胜坂田荣男。",
+      "zh": "1969 年第八期十段战第三局。大竹英雄执白胜坂田荣男。",
       "en": "Game 3 of the 8th Judan title, 1969. Otake Hideo won with White against Sakata Eio.",
       "ko": "1969년 제8기 십단전 3국. 오타케 히데오가 백으로 사카타 에이오를 이겼습니다.",
       "ja": "1969年第8期十段戦第3局。大竹英雄が白番で坂田栄男を破りました。"
@@ -634,8 +634,8 @@ export const CLASSICS = [
     },
     "whiteName": {
       "zh": "藤泽秀行",
-      "en": "Fujisawa Hideyuki",
-      "ko": "후지사와 히데유키",
+      "en": "Fujisawa Shuko",
+      "ko": "후지사와 슈코",
       "ja": "藤沢秀行"
     },
     "event": "1st Ing Cup",
@@ -643,8 +643,8 @@ export const CLASSICS = [
     "result": "B+1",
     "note": {
       "zh": "1988 年首届应氏杯半决赛。聂卫平执黑 1 点胜藤泽秀行。",
-      "en": "The 1988 Ing Cup semifinal. Nie Weiping beat Fujisawa Hideyuki by one point with Black.",
-      "ko": "1988년 제1회 잉창치배 준결승. 녜웨이핑이 흑으로 후지사와 히데유키를 1점 차로 이겼습니다.",
+      "en": "The 1988 Ing Cup semifinal. Nie Weiping beat Fujisawa Shuko by one point with Black.",
+      "ko": "1988년 제1회 잉창치배 준결승. 녜웨이핑이 흑으로 후지사와 슈코를 1점 차로 이겼습니다.",
       "ja": "1988年第1回応氏杯準決勝。聶衛平が黒番で藤沢秀行に1点勝ちしました。"
     },
     "sgf": "(;\nEV[1st Ing Cup]\nRO[Semifinal 1]\nPB[Nie Weiping]\nBR[9p]\nPW[Fujisawa Hideyuki]\nWR[9p]\nKM[8]\nRE[B+1]\nDT[1988-11-20]\n\n;B[pd];W[dd];B[pq];W[dp];B[qo];W[dj];B[fq];W[dn];B[jp];W[nc]\n;B[fc];W[df];B[db];W[qf];B[pf];W[pg];B[of];W[qd];B[qe];W[re]\n;B[pe];W[rg];B[qc];W[rd];B[og];W[ph];B[kc];W[kd];B[ld];W[jc]\n;B[lc];W[cc];B[hc];W[he];B[fe];W[ff];B[ge];W[gf];B[hf];W[hd]\n;B[gd];W[ic];B[ke];W[hb];B[gc];W[je];B[jd];W[if];B[hg];W[ig]\n;B[hh];W[id];B[ef];W[eg];B[ee];W[fg];B[de];W[ce];B[cb];W[dg]\n;B[hj];W[kf];B[lf];W[ii];B[hi];W[kg];B[im];W[pr];B[oq];W[gp]\n;B[gq];W[fp];B[hq];W[hl];B[hm];W[il];B[jl];W[ik];B[gm];W[gl]\n;B[fm];W[fl];B[em];W[cl];B[kk];W[jk];B[kj];W[ki];B[nk];W[qq]\n;B[or];W[rp];B[dl];W[dk];B[cm];W[bl];B[dm];W[bn];B[ql];W[ro]\n;B[qp];W[rr];B[rn];W[qn];B[pn];W[os];B[ns];W[ps];B[nr];W[bb]\n;B[ed];W[pc];B[oc];W[pb];B[ob];W[qb];B[dc];W[cd];B[rb];W[rc]\n;B[qa];W[dq];B[cn];W[bo];B[pa];W[qj];B[rj];W[ri];B[co];W[cp]\n;B[ep];W[do];B[dr];W[eq];B[er];W[bq];B[qk];W[pj];B[rs];W[qr]\n;B[sr];W[sn];B[sq];W[rm];B[rq];W[qm];B[pm];W[po];B[pp];W[sp]\n;B[qs];W[ho];B[kl];W[io];B[jo];W[qc];B[jj];W[ij];B[ji];W[jh]\n;B[el];W[ek];B[cr];W[br];B[li];W[lg];B[mg];W[nb];B[ih];W[fk]\n;B[oa];W[gb];B[fb];W[kb];B[lb];W[jb];B[kh];W[jg];B[ba];W[ab]\n;B[mh];W[la];B[ma];W[ka];B[od];W[in];B[jn];W[cs];B[ok];W[kd]\n;B[le];W[rk];B[rl];W[sj];B[sl];W[sm];B[fo];W[eo];B[go];W[hp]\n;B[ip];W[sb];B[ra];W[ni];B[oi];W[oh];B[nh];W[oj];B[nj];W[pi]\n;B[bm];W[am];B[hn];W[ep];B[en];W[pk];B[pl];W[mi];B[mj];W[oi]\n;B[lh];W[fr];B[gr];W[fa];B[ea];W[ga];B[sk];W[rj];B[bs];W[as]\n;B[ds];W[bs];B[fs];W[cq];B[jd];W[bc];B[kd];W[aa];B[ca];W[sc]\n;B[sa])"

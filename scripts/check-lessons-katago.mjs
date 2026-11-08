@@ -72,6 +72,9 @@ const UNIT_VIEW = {
   "adv-life": "local",
   "adv-tesuji": "local",
   "adv-middle": "whole",
+  "adv-opening": "whole",
+  "adv-joseki": "local",
+  "adv-handicap": "whole",
 };
 const LESSON_VIEW = {
   "game-order": "whole",
@@ -82,6 +85,8 @@ const LESSON_VIEW = {
   "adv-invade-where": "whole",
   "endgame-order": "whole",
   "fight-attack-distance": "local",
+  "adv-joseki-choose": "whole",
+  "adv-handicap-simple": "local",
 };
 /** Single steps whose click only points at something (an eye), so a move's value says nothing. */
 const STEP_VIEW = {
@@ -119,6 +124,8 @@ const CLAIMS = {
   "adv-judge-away#0": [{ type: "better", toMove: 1, what: "extending up the right side (A) is better than along the bottom (B)", a: [15, 9], b: [10, 16], tol: 0.5 }],
   "adv-reduce-shoulder#0": [{ type: "better", toMove: 1, what: "the two shoulder hits are about equal", a: [8, 3], b: [10, 3], tol: 1, both: true }],
   "adv-middle-attack-gain#0": [{ type: "better", toMove: 1, what: "A and B are about equal", a: [2, 7], b: [2, 11], tol: 1, both: true }],
+  "adv-open-direction#0": [{ type: "better", toMove: 1, what: "the approach from the top (A) is not worse than from the left (B)", a: [5, 2], b: [2, 5], tol: 0.5 }],
+  "adv-open-urgent#0": [{ type: "better", toMove: 1, what: "living in the corner (A) comes before the empty corner (B)", a: [0, 18], b: [15, 15], tol: 0.5 }],
   "opening-big-urgent#0": [{ type: "better", toMove: 1, what: "the urgent cutting point comes before the big empty corner", a: [8, 3], b: [15, 15], tol: 0.5 }],
 };
 
