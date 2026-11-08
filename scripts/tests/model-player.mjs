@@ -647,7 +647,9 @@ export default async function ({ test, assert, root }) {
       const { topic, theme } = P.focusTopic(key, PROBLEMS);
       assert.ok(PROBLEMS.some((x) => x.topic === topic && (!theme || x.theme === theme)), `${key} → ${topic}/${theme}`);
     }
-    assert.equal(P.focusLesson("ko", (id) => id === "stones-ko"), "adv-life-ko");
+    // v13: the ko unit comes between the ko rule and the advanced ko life and death.
+    assert.equal(P.focusLesson("ko", (id) => id === "stones-ko"), "ko-threat");
+    assert.equal(P.focusLesson("ko", (id) => ["stones-ko", "ko-threat", "ko-count", "ko-resolve"].includes(id)), "adv-life-ko");
     assert.equal(P.focusLesson("nothing"), null);
   });
 

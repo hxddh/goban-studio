@@ -67,6 +67,9 @@ const UNIT_VIEW = {
   shape: "local",
   endgame: "local",
   fighting: "whole",
+  // v13: the ko and judgement units play on finished-looking 9×9 games.
+  "ko-fighting": "whole",
+  judgement: "whole",
   "adv-judgement": "whole",
   "adv-invasion": "local",
   "adv-life": "local",
@@ -83,7 +86,6 @@ const LESSON_VIEW = {
   "opening-big-urgent": "whole",
   "opening-review": "whole",
   "adv-invade-where": "whole",
-  "endgame-order": "whole",
   "fight-attack-distance": "local",
   "adv-joseki-choose": "whole",
   "adv-handicap-simple": "local",
@@ -92,6 +94,10 @@ const LESSON_VIEW = {
 const STEP_VIEW = {
   "life-eye#1": "rule",
   "life-false-eye#1": "rule",
+  // v13: White has just taken a ko, so Black may not retake; a diagram cannot
+  // carry that ban, and the engine would retake at once.
+  "ko-threat#1": "rule",
+  "ko-threat-answer#1": "rule",
 };
 
 /**
@@ -111,12 +117,12 @@ const CLAIMS = {
   "game-dead#0": [{ type: "owner", toMove: 1, what: "the marked white stone is dead", color: 1, min: 0.7, pts: [[1, 1]] }],
   "life-two-eyes#0": [{ type: "owner", toMove: -1, what: "the black group with two eyes is alive", color: 1, min: 0.8, pts: [[1, 1], [3, 1], [0, 1]] }],
   "kill-straight-three#0": [{ type: "owner", toMove: 1, what: "after Black's middle point White is dead", color: 1, min: 0.7, pts: [[0, 1], [3, 1]], after: [[1, 0, 1]] }],
-  "endgame-sente-gote#0": [{ type: "answer", toMove: 1, what: "White must block Black's push on the first line", move: [4, 8], expect: [[5, 8]] }],
-  "endgame-double-sente#0": [
-    { type: "answer", toMove: 1, what: "after Black plays the marked point White must connect", move: [4, 5], expect: [[5, 4]] },
-    { type: "answer", toMove: -1, what: "after White plays the marked point Black must connect", move: [4, 5], expect: [[3, 6]] },
+  // v13: the endgame unit's boards are sealed sides counted by the solver (no claims here).
+  "ko-threat#0": [{ type: "answer", toMove: 1, what: "White must answer Black's cut at the top", move: [5, 2], expect: [[6, 1]] }],
+  "judge-count#0": [
+    { type: "lead", toMove: 1, what: "with Black to play Black wins by 0.5", value: 0.5, tol: 1 },
+    { type: "lead", toMove: -1, what: "with White to play White wins by 1.5", value: -1.5, tol: 1 },
   ],
-  "endgame-reverse-sente#0": [{ type: "answer", toMove: 1, what: "White must answer Black's push on the first line", move: [4, 8], expect: [[5, 8]] }],
   "adv-judge-bigger#0": [{ type: "better", toMove: 1, what: "A is bigger than B", a: [9, 3], b: [3, 9], tol: 0.5 }],
   "adv-judge-toward-thickness#0": [
     { type: "owner", toMove: 1, what: "White has lived low inside Black's wall", color: -1, min: 0.6, pts: [[2, 2], [2, 3], [2, 4], [2, 5]] },
@@ -134,6 +140,7 @@ const REVIEW = {
   rule: "states a rule; the board only illustrates it",
   tactic: "a tactical idea that the lesson's problem steps prove with the solver",
   principle: "a general principle (opening, shape, joseki, strategy) that a single position cannot prove",
+  count: "an endgame idea on a sealed position whose counts the lesson's problem steps prove with the solver",
 };
 const REVIEW_OF = {
   stones: "rule",
@@ -144,6 +151,7 @@ const REVIEW_OF = {
   kill: "tactic",
   race: "tactic",
   game: "rule",
+  endgame: "count",
   "adv-life": "tactic",
   "adv-tesuji": "tactic",
 };

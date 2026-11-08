@@ -173,6 +173,44 @@ generated section below does not list them yet. Before KataGo sees them:
   (the approach from the top is not worse than from the left) and
   `adv-open-urgent#0` (living in the corner comes before the empty corner).
 
+## v13: content pass (not yet re-run with KataGo)
+
+The v13 course changes below were made without an engine run (the next
+`lesson-check.yml` run will fill in the generated section). Every new
+interactive step is either proved by the solver (`check-course.mjs`) or a
+place step on a closed 9×9 game.
+
+The 12 place steps of the latest run with an accepted point more than 2.5
+points behind:
+
+| step | what v13 did |
+| --- | --- |
+| endgame-sente-gote#1, #2, #3 | Redesigned. The unit is rebuilt on sealed sides of the board (walls settled, only the boundary open); every interactive step is now an endgame problem (`goal: "endgame"`), counted exactly by the solver, so there are no place steps left for the engine to judge. |
+| endgame-reverse-sente#2 | Redesigned, as above (now a three-area problem: own sente first, proved margin 1). |
+| endgame-order#1 (and the doubtful #0) | Redesigned, as above: three problems, big → middle → small. The read claims `endgame-sente-gote#0` and `endgame-reverse-sente#0` (both "disagrees") were removed from `CLAIMS`; the endgame read steps are listed for review as "count". |
+| game-opening#3 | Redesigned: White's peeping stone got a partner (F6), so it is no longer a weak stone to atari (KataGo's best was the atari at F6); defending the cutting point should now be the urgent move. Not re-run. |
+| shape-empty-triangle#1 | Same board as game-opening#3, same change. Not re-run. |
+| shape-empty-triangle#2 | Redesigned: Black's lone stone got a partner (G4), so KataGo's best (the atari at F3) is gone. Not re-run. |
+| connect-hanging#1 | Left: three stones on an empty 9×9; a whole-board redesign of the beginner connection lessons is a follow-up. |
+| shape-bamboo#1, #2, shape-ponnuki#1 | Left, for the same reason (toy shape boards; the local answer is right, the score gap measures the empty board). |
+| joseki-33-white#3 | Left: the connection is the joseki move; the engine's cut gains on an otherwise empty board. Still flagged for a human reviewer. |
+
+New in v13:
+
+- **Ko fighting** (`ko-threat`, `ko-threat-answer`, `ko-count`,
+  `ko-resolve`): place steps on one closed 9×9 game. `ko-threat#1` and
+  `ko-threat-answer#1` are reported as rule steps: White has just taken
+  the ko, a ban a diagram cannot carry, so the engine would simply retake.
+  `ko-threat#0` carries an "answer" claim (White must answer the cut with
+  G8). The ending-a-ko steps are solver problems on the whole 9×9.
+- **Judging the position** (`judge-count`, `judge-ahead`, `judge-behind`):
+  `judge-count#0` claims the lead (Black +0.5 with Black to play, White
+  +1.5 with White to play; hand count 30 + 1 vs 24 + 6.5); its two place
+  steps are the only open boundary. The other steps are solver problems.
+- **Area scoring** (`game-area-scoring`): two neutral-point place steps on
+  unit 8's game; under Japanese rules every neutral point is worth nothing,
+  so any loss reported there is noise.
+
 ## Latest run
 
 <!-- generated:start -->

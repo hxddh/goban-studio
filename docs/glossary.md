@@ -37,6 +37,10 @@ in this table. Usage targets:
 | ko threat | 劫材 | ko threat | 팻감 | コウダテ | |
 | retake the ko | 提回 | retake | 되따내다 | 取り返す | |
 | connect at the ko | 粘劫 | connect | 패를 잇다 | コウを継ぐ / 解消 | |
+| start a ko | 开劫 | start a ko | 패를 걸다 | コウを仕掛ける | v13 unit `ko-fighting` |
+| end (resolve) a ko | 消劫 | end a ko | 패를 해소하다 | コウを解消する | v13; by connecting (粘劫) or by capturing |
+| count ko threats | 数劫材 | count threats | 팻감을 세다 | コウダテを数える | v13 |
+| approach ko | 缓气劫 | approach ko | 늘어진 패 | ヨセコウ | v13 `ko-count`; see review list |
 | pass | 停一手（虚着） | pass | 패스 | パス | |
 | resign | 认输 / 中盘胜 (result) | resign / by resignation | 기권 / 불계승 | 投了 / 中押し勝ち | |
 | win on time | 超时胜 | wins on time | 시간승 | 時間切れ勝ち | ja v3 used 時間勝ち |
@@ -203,11 +207,13 @@ in this table. Usage targets:
 | value as a swing ("the difference is N points") | 相差 N 目 | the difference is N points | N집 차이 | N目の差 | the course states values as the difference between Black and White playing first (出入り); it does not use miai counting |
 | defensive move inside own territory | 补棋 / 补一手 | defensive move (inside your territory) | 손질 | 手入れ | |
 | filling neutral points | 收单官 / 填单官 | filling neutral points | 공배 메우기 | ダメ詰め | |
-| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app never uses miai counting |
+| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app counts with deiri (v13 mentions miai counting once, as a note) |
 | how many points is a move worth | 这一手值几目 | how many points? | 몇 집짜리일까 | 何目の手か | v6 question title |
 | monkey jump (first-line large knight's slide) | 仙鹤大伸腿 / 大伸腿 | monkey jump | 눈목자 미끄러지기 | サルスベリ | ko is descriptive (large knight's move + slide) |
 | the biggest move / which is bigger | 哪一手最大 / 比较大小 | the biggest move / which is bigger | 가장 큰 수 / 어느 쪽이 큰가 | 一番大きい手 / どちらが大きいか | v6 |
 | capture in sente / atari in sente | 提子是先手 / 先手打吃 | a capture in sente / atari in sente | 선수로 따내기 / 선수 단수 | 先手で取る / 先手のアタリ | v6 problem titles |
+| big / middle / small endgame | 大官子 / 中官子 / 小官子 | big / middle / small endgame | 큰 끝내기 / 중간 크기의 끝내기 / 작은 끝내기 | 大ヨセ / 中くらいのヨセ / 小ヨセ | v13 lesson `endgame-big`; ko and ja middle forms are descriptive (ja 中ヨセ is also seen) |
+| miai counting (gote moves halved) | 见合计算 | miai counting | 미아이 계산 | 見合い計算 | v13: named once in `endgame-counting`; the app still counts every move by deiri |
 
 ## Middle game
 
@@ -435,3 +441,7 @@ The items I am least sure about:
    may have a set name); ko **임해봉** (Rin Kaiho) and **후지사와 슈코**
    (Fujisawa Shuko) in the classic games, which v12 wrote 린카이호 and
    후지사와 히데유키.
+13. v13 (ko, judgement, endgame): ko **늘어진 패** for the approach ko and
+   ja **ヨセコウ**; ko **중간 크기의 끝내기** / ja **中くらいのヨセ** for the
+   middle endgame (descriptive); ko **미아이 계산** / zh **见合计算** for miai
+   counting; ko **패를 해소하다** for ending a ko.
