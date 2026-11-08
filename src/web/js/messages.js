@@ -849,7 +849,7 @@ export const MESSAGES = {
     "一路上的白子有两口气。从你这一侧打吃：白棋必须粘，你保有先手。",
     "The white stone on the first line has two liberties. Atari it from your side: White has to connect, and you keep sente.",
     "1선의 백돌은 활로가 둘입니다. 흑 쪽에서 단수 치세요. 백은 이어야 하고 흑은 선수를 유지합니다.",
-    "一線の白石はダメが二つです。黒の側からアタリにしましょう。白は継ぐしかなく、黒は先手を保ちます。",
+    "一線の白石は呼吸点が二つです。黒の側からアタリにしましょう。白は継ぐしかなく、黒は先手を保ちます。",
   ),
   "problem.endgame.capture.title": m("提子是先手", "A capture in sente", "선수로 따내기", "先手で取る"),
   "problem.endgame.capture.hint": m(
