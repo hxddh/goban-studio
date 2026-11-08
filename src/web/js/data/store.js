@@ -23,6 +23,7 @@
  * on the next put of that key or the next flush. Nothing fails silently.
  */
 import { hasNative, nativeInvoke } from "../host.js";
+import { installFlushHook } from "../host.js";
 
 /** Raw bytes per bridge call (as store.zig chunk_bytes). */
 export const CHUNK_BYTES = 384 * 1024;
@@ -350,3 +351,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
 
 /** The app's store (opened by the shell at boot). */
 export const store = createStore();
+
+// v13: the host asks for a flush before the app quits or its window closes
+// and waits (at most 1.5 s) for the answer, so the last debounced writes —
+// a game's result, a solved problem — reach the disk (host.js).
+if (hasNative()) installFlushHook(() => store.flush());

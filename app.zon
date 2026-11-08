@@ -23,7 +23,9 @@
     },
     .security = .{
         .navigation = .{
-            .allowed_origins = .{ "zero://app", "zero://inline", "http://127.0.0.1:5173" },
+            // The Vite dev server (http://127.0.0.1:5173) is allowed only in
+            // development builds, by main.zig (-Ddev-origin), never here.
+            .allowed_origins = .{ "zero://app", "zero://inline" },
             .external_links = .{ .action = "deny" },
         },
     },

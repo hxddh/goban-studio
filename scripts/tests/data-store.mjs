@@ -143,15 +143,12 @@ export default async function ({ test, assert, root }) {
 
   await test("data store: the host registers the four file commands, with Zig tests", () => {
     const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+    // v13: one command table; the registry and the policies are built from
+    // it (and a Zig test checks every name is unique).
     for (const [name, fn] of [["studio.storeRead", "storeRead"], ["studio.storeWrite", "storeWrite"], ["studio.storeList", "storeList"], ["studio.storeRemove", "storeRemove"]]) {
-      assert.match(main, new RegExp(`\\.name = "${name.replace(".", "\\.")}",\\n\\s+\\.context = self,\\n\\s+\\.invoke_fn = ${fn},`), name);
+      assert.ok(main.includes(`.{ .name = "${name}", .invoke = ${fn} },`), name);
     }
-    // Every handler slot is filled, and each gets a policy.
-    const slots = [...main.matchAll(/self\.handlers\[(\d+)\] = /g)].map((m) => Number(m[1]));
-    const size = Number(main.match(/handlers: \[(\d+)\]native_sdk\.BridgeHandler/)[1]);
-    const asyncSize = Number(main.match(/async_handlers: \[(\d+)\]native_sdk\.bridge\.AsyncHandler/)[1]);
-    assert.deepEqual(slots.sort((a, b) => a - b), Array.from({ length: size }, (_, i) => i));
-    assert.equal(Number(main.match(/policies: \[(\d+)\]native_sdk\.BridgeCommandPolicy/)[1]), size + asyncSize);
+    assert.match(main, /test "every bridge command is registered once, with the same origins"/);
     // The data root: beside models/, with a test override.
     assert.match(main, /fn resolveDataDir\(/);
     assert.match(main, /GOBAN_DATA_DIR/);
@@ -160,8 +157,9 @@ export default async function ({ test, assert, root }) {
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /test "store keys are validated strictly"/);
     assert.match(zig, /test "store writes atomically, reads in chunks, lists and removes in a temp dir"/);
-    // Atomic: a temporary file in the same directory, renamed over the target.
-    assert.match(zig, /dir\.rename\(tmp, dir, sub, self\.io\)/);
+    // Atomic: a temporary file in the same directory, renamed over the
+    // target (retried briefly on Windows, where a scanner may hold it).
+    assert.match(zig, /try renameRetrying\(self\.io, dir, tmp, sub\)/);
     // No huge stack buffers in the handlers: the chunk is allocated.
     assert.match(main, /self\.allocator\.alloc\(u8, store_mod\.chunk_bytes\)/);
   });

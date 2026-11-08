@@ -32,6 +32,12 @@ export function windowDrag() {
 }
 
 /* ------------------------------------------------------- the user's files */
+//
+// v13: the host reads and writes only files it handed out itself — what
+// the open / save dialogs below returned, documents the OS opened with the
+// app, files dropped on the window — and only .sgf, .json and .png
+// (src/files.zig). Any other path is refused (`AccessDenied`), so these
+// helpers resolve null / false for it.
 
 /** Raw bytes per file call (as store.zig chunk_bytes; base64 fits one bridge message). */
 export const FILE_CHUNK_BYTES = 384 * 1024;
@@ -131,23 +137,47 @@ export function normalizePaths(input) {
     .filter(Boolean);
 }
 
+/** The host's own dialogs (v13) exist wherever the host does. */
 export function hasFileDialogs() {
-  return hasNative() && !!global.zero.dialogs && typeof global.zero.dialogs.openFile === "function" && typeof global.zero.dialogs.saveFile === "function";
+  return hasNative();
 }
 
-export async function openFileDialog(options = {}) {
-  if (!hasNative() || !global.zero.dialogs || typeof global.zero.dialogs.openFile !== "function") return null;
+/** Only what the native dialogs understand, as plain strings / booleans. */
+function dialogPayload(options = {}) {
+  const out = {};
+  if (options.title != null) out.title = String(options.title);
+  if (options.defaultName != null) out.defaultName = String(options.defaultName);
+  if (options.defaultPath != null) out.defaultPath = String(options.defaultPath);
+  if (options.allowMultiple) out.allowMultiple = true;
+  return out;
+}
+
+/**
+ * Let the user pick a file to read (`studio.openFileDialog`). Resolves the
+ * chosen paths (an array; the host leaves out files the app cannot read)
+ * or null when cancelled or unavailable.
+ */
+export async function openFileDialog(options = {}, call = invoke) {
+  if (call === invoke && !hasNative()) return null;
   try {
-    return await global.zero.dialogs.openFile(options);
+    const paths = await call("studio.openFileDialog", dialogPayload(options));
+    return Array.isArray(paths) && paths.length ? paths : null;
   } catch (_) {
     return null;
   }
 }
 
-export async function saveFileDialog(options = {}) {
-  if (!hasNative() || !global.zero.dialogs || typeof global.zero.dialogs.saveFile !== "function") return null;
+/**
+ * Let the user choose where to save (`studio.saveFileDialog`).
+ * `defaultName` must end in .sgf, .json or .png; the host adds that
+ * extension when the user types a name without one. Resolves the path, or
+ * null when cancelled or unavailable.
+ */
+export async function saveFileDialog(options = {}, call = invoke) {
+  if (call === invoke && !hasNative()) return null;
   try {
-    return await global.zero.dialogs.saveFile(options);
+    const path = await call("studio.saveFileDialog", dialogPayload(options));
+    return typeof path === "string" && path ? path : null;
   } catch (_) {
     return null;
   }
@@ -241,6 +271,35 @@ export function onMenuCommand(handler) {
   } catch (_) {
     return () => {};
   }
+}
+
+/* ---------------------------------------------------- v13 quit flush */
+
+/**
+ * Before the app quits or its window closes (⌘Q, the window's close button
+ * on Windows, an update restart), the host sends `app:flush` {id} and waits
+ * up to 1.5 s for `studio.flushDone` {id}. `flush()` writes whatever is
+ * pending (data/store.js). Installs the listener, tells the host the page
+ * has one (`studio.flushHook`), and returns an unsubscribe. `host` and
+ * `call` are parameters so the tests can drive it.
+ */
+export function installFlushHook(flush, { host = global.zero, call = invoke } = {}) {
+  if (!host || typeof host.on !== "function" || typeof flush !== "function") return () => {};
+  let off = () => {};
+  try {
+    off =
+      host.on("app:flush", (detail) => {
+        const id = detail && typeof detail === "object" ? Number(detail.id) : NaN;
+        Promise.resolve()
+          .then(() => flush())
+          .catch(() => {})
+          .finally(() => {
+            if (Number.isFinite(id)) Promise.resolve(call("studio.flushDone", { id })).catch(() => {});
+          });
+      }) || (() => {});
+    Promise.resolve(call("studio.flushHook", {})).catch(() => {});
+  } catch (_) {}
+  return off;
 }
 
 /** Release-build self-test configuration (empty in normal launches). */

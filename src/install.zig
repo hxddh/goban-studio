@@ -1488,6 +1488,13 @@ test "signed sums: a valid signature passes, anything else is refused" {
     try testing.expectError(error.BadSignature, verifySums(sums, "", pk));
     try testing.expectError(error.BadSignature, verifySums(sums, "not base64!", pk));
     try testing.expectError(error.BadSignature, verifySums(sums, b64[0..40], pk));
+    // Interop: what scripts/sign-sums.mjs (node:crypto) writes for the same
+    // seed and bytes verifies here, and the public key it derives is ours
+    // (scripts/tests/shell-signing.mjs checks the node side of this vector).
+    var pk_text_buf: [64]u8 = undefined;
+    try testing.expectEqualStrings("6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=", std.base64.standard.Encoder.encode(&pk_text_buf, &pk));
+    try verifySums(sums, "4kHujrlWGlr4MAOpyzUpWK3WQwCgMLuw5nH17j7qDklf+8RMm8Ji10GLVem333h8FDjqBGn25dE4a5nhNXtLAw==\n", pk);
+    try testing.expectEqualStrings("4kHujrlWGlr4MAOpyzUpWK3WQwCgMLuw5nH17j7qDklf+8RMm8Ji10GLVem333h8FDjqBGn25dE4a5nhNXtLAw==", b64);
     // The public key option: base64 of exactly 32 bytes, or empty.
     var pk_b64_buf: [64]u8 = undefined;
     const pk_b64 = std.base64.standard.Encoder.encode(&pk_b64_buf, &pk);
