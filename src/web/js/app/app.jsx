@@ -208,6 +208,7 @@ function onKeyDown(e) {
     if (state.menu) return update({ menu: null });
     if (state.sheet) return C.closeSheet();
     if (state.game?.ghost) return C.clearGhost();
+    if (C.clearProblemGhost()) return;
     if (state.review?.trial) return C.closeTrial();
     if (state.review?.variation) {
       state.review.variation = null;

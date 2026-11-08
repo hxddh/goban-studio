@@ -195,6 +195,7 @@ function puzzleModel(P, extra = {}) {
     showCoords: false,
     view: pz.view,
     hoverColor: P.st.toMove,
+    ghost: P.ghost ? { ...P.ghost, color: P.st.toMove } : null,
     interactive: P.status === "open" && !P.busy && !P.answer,
     ...extra,
   };
@@ -342,8 +343,10 @@ function ProblemView() {
           <Stone color={P.pz.userColor} size={14} /> {C.goalText(P.pz)}
         </p>
         {P.hintAt || P.used ? <p class="note">{C.tx(def.hint)}</p> : null}
+        {def.shown && <p class="fine">{t("practice.turned")}</p>}
         {P.pz.counting && P.pz.ask === "value" && <ValueChoices P={P} />}
         <ProblemFeedback P={P} />
+        {P.ghost && <p class="fine">{t("play.confirmHint")}</p>}
         <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t("common.continue") : t("practice.nextProblem")} />
         <ProblemFacts def={def} grade={grade} />
         {!daily && (

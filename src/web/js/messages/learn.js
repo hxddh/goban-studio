@@ -9,7 +9,6 @@ export const LEARN = {
   // The path: what each row is, and why it is there.
   "placement.eyebrow": m("开始之前", "Before you start", "시작하기 전에", "はじめる前に"),
   "placement.title": m("先测一测你的水平", "Find your level first", "먼저 실력을 알아보세요", "まずレベルを測りましょう"),
-  "placement.lead": m("{0} 道题，约 3 分钟。根据结果安排课程从哪里开始、先做哪些题。", "{0} problems, about 3 minutes. The result sets where the course starts and which problems come first.", "{0}문제, 약 3분. 결과에 따라 강좌의 시작점과 먼저 풀 문제가 정해집니다.", "{0}問、約3分。結果に合わせて、講座の始まりと最初に解く問題が決まります。"),
   "placement.start": m("开始测试", "Start", "시작", "はじめる"),
   "placement.skip": m("跳过", "Not now", "건너뛰기", "スキップ"),
   "placement.of": m("水平测试 · 第 {0} / {1} 题", "Placement · {0} of {1}", "실력 테스트 · {0}/{1}", "レベル測定 · {0}/{1}"),

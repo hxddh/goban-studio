@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   largeText: false,
   teaching: null, // null = decide from the estimate (on for newer players)
   confirmMove: false, // two-click placement
+  confirmProblemMove: false, // v13: two-click placement in problems
   showEval: false, // win-rate bar while playing
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
@@ -47,7 +48,7 @@ export function normalizeSettings(raw) {
   const s = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const out = { ...DEFAULT_SETTINGS, ...s };
   for (const [k, allowed] of Object.entries(ONE_OF)) if (!allowed.includes(out[k])) out[k] = DEFAULT_SETTINGS[k];
-  for (const k of ["coords", "sound", "numbers", "onboarded", "focus", "largeText", "confirmMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
+  for (const k of ["coords", "sound", "numbers", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
     if (typeof out[k] !== "boolean") out[k] = DEFAULT_SETTINGS[k];
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;

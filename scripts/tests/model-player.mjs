@@ -230,36 +230,67 @@ export default async function ({ test, assert, root }) {
 
   /* -------------------------------------------- problems, drills, lessons */
 
-  await test("model review: problems on the 1-3-7-21 ladder; help resets it; a late solve keeps the schedule", () => {
+  await test("model review: problems on the memory model — intervals grow past 21 days and retire; a miss shrinks, not resets; graded recall", () => {
     const id = PROBLEMS[PROBLEMS.length - 1].id;
     const t0 = NOW - 3 * DAY;
     let p = P.newProfile();
     const before = frozen(p);
     p = P.recordProblem(p, id, { solved: false }, t0);
     assert.equal(frozen(P.newProfile()), before);
-    assert.deepEqual(p.problems[id], { tries: 1, solved: false, clean: false, last: t0, due: t0 + DAY, streak: 0 });
+    const e0 = p.problems[id];
+    assert.deepEqual([e0.tries, e0.solved, e0.clean, e0.last, e0.due, e0.streak, e0.rating, e0.reps, e0.lapses], [1, false, false, t0, t0 + DAY, 0, P.RATING.AGAIN, 1, 0]);
     // A failed problem comes back first.
     assert.equal(P.dailySet(p, PROBLEMS, GRADES, 5, NOW)[0].id, id);
     assert.deepEqual(P.due(p, NOW).problems, [id]);
-    p = P.recordProblem(p, id, { solved: true, clean: true }, NOW);
-    assert.equal(p.problems[id].streak, 1);
-    assert.equal(p.problems[id].clean, true);
-    assert.equal(p.problems[id].due, NOW + DAY);
-    for (const [n, days] of [[2, 3], [3, 7], [4, 21], [5, 21]]) {
-      p = P.recordProblem(p, id, { solved: true }, NOW);
-      assert.equal(p.problems[id].streak, n);
-      assert.equal(p.problems[id].due, NOW + days * DAY, `rung ${n}`);
+    // Clean solves, each when it falls due: the intervals grow well past 21 days, then it retires.
+    let t = NOW;
+    p = P.recordProblem(p, id, { solved: true, clean: true }, t);
+    assert.deepEqual([p.problems[id].streak, p.problems[id].clean, p.problems[id].rating], [1, true, P.RATING.GOOD]);
+    const gaps = [];
+    while (!p.problems[id].retired && gaps.length < 12) {
+      gaps.push(Math.round((p.problems[id].due - t) / DAY));
+      t = p.problems[id].due;
+      p = P.recordProblem(p, id, { solved: true }, t);
     }
-    p = P.recordProblem(p, id, { solved: true, clean: false }, NOW);
-    assert.equal(p.problems[id].streak, 0, "a solve with help resets the ladder");
-    assert.equal(p.problems[id].solved, true);
-    assert.equal(p.problems[id].due, NOW + DAY);
-    assert.equal(p.problems[id].tries, 7);
-    // Missed, then solved in the same visit: solved, not clean, the miss's schedule stays.
+    for (let i = 1; i < gaps.length; i++) assert.ok(gaps[i] >= gaps[i - 1], `growing: ${gaps}`);
+    assert.ok(gaps.some((g) => g > 21), `past the old ladder's 21 days: ${gaps}`);
+    assert.ok(p.problems[id].retired, `retired after ${gaps}`);
+    assert.ok(p.problems[id].s > P.MEMORY.RETIRE_DAYS);
+    assert.equal(p.problems[id].due, 0);
+    assert.deepEqual(P.due(p, t + 400 * DAY).problems, [], "a retired problem is never due");
+    assert.ok(!P.dailySet(p, PROBLEMS, GRADES, 5, t + 400 * DAY).slice(0, 1).some((d) => d.id === id && p.problems[id].due), "not taken as a review");
+    // A miss after a long interval: back in a few days, not tomorrow; the stability shrinks.
+    let q = P.newProfile();
+    t = NOW;
+    for (let i = 0; i < 3; i++) {
+      q = P.recordProblem(q, id, { solved: true }, t);
+      t = q.problems[id].due;
+    }
+    const known = q.problems[id];
+    q = P.recordProblem(q, id, { solved: false }, t);
+    const lapsed = q.problems[id];
+    assert.ok(lapsed.s < known.s, "the stability shrinks");
+    assert.ok(lapsed.due - t > DAY, `not reset to one day: ${(lapsed.due - t) / DAY}`);
+    assert.ok(lapsed.due - t < known.due - known.last, "sooner than the interval before");
+    assert.deepEqual([lapsed.streak, lapsed.lapses, lapsed.rating], [0, 1, P.RATING.AGAIN]);
+    // Missed, then solved in the same visit without help: re-graded "hard" from the state before the miss.
+    const hard = P.recordProblem(q, id, { solved: true, late: true }, t + 60000).problems[id];
+    assert.deepEqual([hard.solved, hard.clean, hard.rating, hard.tries, hard.solvedAt], [true, false, P.RATING.HARD, lapsed.tries, t + 60000]);
+    assert.ok(hard.due > lapsed.due, "a slip put right at once is not a full lapse");
+    assert.equal(hard.before, undefined);
+    // …but after a hint or the answer it stays a miss.
+    const helped = P.recordProblem(q, id, { solved: true, late: true, used: true }, t + 60000).problems[id];
+    assert.deepEqual([helped.solved, helped.due, helped.rating], [true, lapsed.due, P.RATING.AGAIN]);
+    // A solve with a hint is "again"; a quick clean solve is "easy" and waits longer than "good".
     const other = PROBLEMS[0].id;
-    let q = P.recordProblem(P.newProfile(), other, { solved: false }, NOW);
-    q = P.recordProblem(q, other, { solved: true, late: true }, NOW + 1000);
-    assert.deepEqual(q.problems[other], { tries: 1, solved: true, clean: false, last: NOW + 1000, due: NOW + DAY, streak: 0, solvedAt: NOW + 1000 });
+    const hinted = P.recordProblem(P.newProfile(), other, { solved: true, clean: false, used: true }, NOW).problems[other];
+    assert.deepEqual([hinted.solved, hinted.streak, hinted.rating, hinted.due], [true, 0, P.RATING.AGAIN, NOW + DAY]);
+    const good = P.recordProblem(P.newProfile(), other, { solved: true }, NOW).problems[other];
+    const easy = P.recordProblem(P.newProfile(), other, { solved: true, quick: true }, NOW).problems[other];
+    assert.equal(easy.rating, P.RATING.EASY);
+    assert.ok(easy.due > good.due && good.due > NOW + DAY);
+    assert.equal(P.ratingOf({ solved: true, late: true }), P.RATING.HARD);
+    assert.equal(P.ratingOf({ solved: false }), P.RATING.AGAIN);
     // A late solve without a counted miss counts as a solve with help.
     const r = P.recordProblem(P.newProfile(), other, { late: true }, NOW);
     assert.deepEqual([r.problems[other].tries, r.problems[other].solved, r.problems[other].streak], [1, true, 0]);
@@ -269,14 +300,58 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(P.dailySet(P.newProfile(), PROBLEMS, GRADES, 5, NOW + 3600000), five);
   });
 
-  await test("model review: drills from your own games only, once, on the same ladder", () => {
+  await test("model review: an overdue backlog comes back most-forgotten first, a few a day", () => {
+    const ids = PROBLEMS.slice(0, 30).map((x) => x.id);
+    const problems = {};
+    // Thirty problems learned long ago with different stabilities, all overdue.
+    ids.forEach((id, i) => (problems[id] = { tries: 2, solved: true, clean: true, streak: 1, s: 2 + i, d: 5, reps: 2, lapses: 0, rating: 3, last: NOW - 60 * DAY, due: NOW - 30 * DAY }));
+    const p = P.normalizeProfile({ ...P.newProfile(), problems });
+    const list = P.due(p, NOW).problems;
+    assert.equal(list.length, P.MEMORY.REVIEW_CAP, "capped per day");
+    assert.deepEqual(list, ids.slice(0, P.MEMORY.REVIEW_CAP), "lowest retrievability (smallest stability here) first");
+    const r = list.map((id) => P.retrievability(p.problems[id], NOW));
+    for (let i = 1; i < r.length; i++) assert.ok(r[i] >= r[i - 1]);
+    assert.ok(P.retrievabilityAfter(0, 5) === 1 && Math.abs(P.retrievabilityAfter(5, 5) - 0.9) < 0.001, "90 % after s days");
+    assert.equal(P.intervalFor(10), 10);
+    // The path's reviews take the most-forgotten ones too.
+    const items = P.planProblems({ profile: p, model: null, pool: PROBLEMS, grades: GRADES, now: NOW });
+    const reviews = items.filter((i) => i.role === "review").map((i) => i.id);
+    assert.deepEqual(reviews, ids.slice(0, reviews.length));
+    assert.ok(reviews.length >= 3);
+  });
+
+  await test("model review: v9–v12 problem records migrate to the memory model (migrateProblemRecord)", () => {
+    const old = { tries: 3, solved: true, clean: true, last: NOW - 2 * DAY, due: NOW + 5 * DAY, streak: 3, solvedAt: NOW - 2 * DAY };
+    const m = P.migrateProblemRecord(old);
+    assert.deepEqual(m, { tries: 3, streak: 3, due: NOW + 5 * DAY, s: 7, d: 3.5, reps: 3, lapses: 0, rating: P.RATING.GOOD, solved: true, clean: true, last: NOW - 2 * DAY, solvedAt: NOW - 2 * DAY });
+    const missed = P.migrateProblemRecord({ tries: 1, solved: false, clean: false, last: NOW, due: NOW + DAY, streak: 0 });
+    assert.deepEqual([missed.s, missed.d, missed.lapses, missed.rating, missed.due], [P.MEMORY.S0[0], 6.5, 1, P.RATING.AGAIN, NOW + DAY]);
+    // Idempotent, pure, and the v13 shape passes through.
+    assert.deepEqual(P.migrateProblemRecord(m), m);
+    assert.deepEqual(old.s, undefined, "the input is not changed");
+    assert.equal(P.migrateProblemRecord(null), null);
+    assert.equal(P.migrateProblemRecord("x"), null);
+    // normalizeProfile reads both shapes.
+    const p = P.normalizeProfile({ ...P.newProfile(), problems: { a: old, b: m, c: 7 } });
+    assert.deepEqual(p.problems.a, m);
+    assert.deepEqual(p.problems.b, m);
+    assert.equal(p.problems.c, undefined);
+    // The next attempt continues from the migrated stability, not from scratch.
+    const next = P.recordProblem(p, "a", { solved: true }, NOW + 5 * DAY).problems.a;
+    assert.ok(next.s > 7 && next.due - (NOW + 5 * DAY) > 7 * DAY, JSON.stringify(next));
+    // A drill of v9–v12 migrates the same way.
+    const drill = P.normalizeProfile({ ...P.newProfile(), mistakes: [{ id: "g-1", theme: "cut", tries: 2, streak: 2, due: NOW, added: 0 }] }).mistakes[0];
+    assert.deepEqual([drill.s, drill.reps, drill.due], [3, 2, NOW]);
+  });
+
+  await test("model review: drills from your own games only, once, on the same memory model", () => {
     let p = P.newProfile();
     const m = { gameId: "g-1", index: 25, sgf: "(;)", color: 1, played: { x: 3, y: 3 }, best: { x: 6, y: 6 }, loss: 8, theme: "cut", size: 13 };
     p = P.addMistake(p, m, NOW);
     assert.equal(p.mistakes.length, 1);
     const d = p.mistakes[0];
     assert.equal(d.id, "g-1-25");
-    assert.deepEqual([d.added, d.due, d.tries, d.streak, d.solved], [NOW, NOW, 0, 0, false]);
+    assert.deepEqual([d.added, d.due, d.tries, d.streak, d.solved, d.s], [NOW, NOW, 0, 0, false, 0]);
     assert.deepEqual([d.gameId, d.index, d.theme, d.loss, d.sgf], ["g-1", 25, "cut", 8, "(;)"]);
     // Never twice: by id, or the same position under another id.
     assert.equal(P.addMistake(p, m, NOW).mistakes.length, 1);
@@ -285,12 +360,16 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.addMistake(p, { ...m, index: 7, own: false }, NOW).mistakes.length, 1);
     assert.deepEqual(P.due(p, NOW).mistakes.map((x) => x.id), ["g-1-25"]);
     p = P.recordMistake(p, "g-1-25", { solved: true }, NOW);
-    assert.deepEqual([p.mistakes[0].tries, p.mistakes[0].streak, p.mistakes[0].due, p.mistakes[0].last, p.mistakes[0].solved], [1, 1, NOW + DAY, NOW, true]);
-    p = P.recordMistake(p, "g-1-25", { solved: true }, NOW);
-    assert.equal(p.mistakes[0].due, NOW + 3 * DAY);
-    p = P.recordMistake(p, "g-1-25", { solved: false }, NOW);
-    assert.deepEqual([p.mistakes[0].streak, p.mistakes[0].due, p.mistakes[0].solved], [0, NOW + DAY, true]);
-    assert.deepEqual(P.due(p, NOW).mistakes, []);
+    const first = Math.round(P.MEMORY.S0[2]);
+    assert.deepEqual([p.mistakes[0].tries, p.mistakes[0].streak, p.mistakes[0].due, p.mistakes[0].last, p.mistakes[0].solved, p.mistakes[0].rating], [1, 1, NOW + first * DAY, NOW, true, P.RATING.GOOD]);
+    const later = NOW + first * DAY;
+    p = P.recordMistake(p, "g-1-25", { solved: true }, later);
+    assert.ok(p.mistakes[0].due - later > first * DAY, "found again when due: a longer wait");
+    const known = p.mistakes[0];
+    p = P.recordMistake(p, "g-1-25", { solved: false }, known.due);
+    assert.deepEqual([p.mistakes[0].streak, p.mistakes[0].solved, p.mistakes[0].lapses], [0, true, 1]);
+    assert.ok(p.mistakes[0].due > known.due && p.mistakes[0].s < known.s);
+    assert.deepEqual(P.due(p, known.due).mistakes, []);
     assert.deepEqual(P.recordMistake(p, "missing", { solved: true }, NOW).mistakes, p.mistakes, "an unknown drill changes nothing");
     // Newest first, at most 200.
     let many = P.newProfile();
@@ -463,12 +542,31 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.drillLast({ streak: 2, due: NOW + 3 * DAY, last: 5 }), 5, "v9 drills keep their last try");
   });
 
-  await test("model focus: the solving level from clean solves per grade", () => {
+  await test("model focus: the solving level needs consistency — five tries, 60 % clean, no weak grade below, smoothed towards the prior", () => {
     const r = (grade, miss) => ({ grade, miss });
+    const at = (grade, clean, missed) => [...Array(clean).fill(r(grade, false)), ...Array(missed).fill(r(grade, true))];
     assert.equal(P.solvingLevel([]), null);
-    assert.equal(P.solvingLevel([r(1, false), r(1, true)]), null);
-    assert.equal(P.solvingLevel([r(1, true), r(1, true), r(1, true)]), 1);
-    assert.equal(P.solvingLevel([r(1, false), r(1, false), r(1, true), r(2, false), r(2, false), r(2, false), r(3, true), r(3, true), r(3, false)]), 2);
+    assert.equal(P.solvingLevel(at(1, 3, 0)), null, "three tries are too few");
+    assert.equal(P.solvingLevel(at(1, 5, 0)), 1);
+    assert.equal(P.solvingLevel([...at(1, 4, 1), ...at(2, 4, 1), ...at(3, 1, 4)]), 2);
+    // A lucky run at grade 4 over misses at grade 2 is not level 4.
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 1, 4), ...at(4, 5, 0)]), 1);
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)]), 4, "consistent below: level 4");
+    // A grade without results does not block the grades above it.
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)]), 3);
+    // Three of five clean at grade 3: not enough alone (smoothed to 4/7), enough with a prior of 3 (4.5/7), not with a prior of 1.
+    assert.equal(P.solvingLevel(at(3, 3, 2)), 1);
+    assert.equal(P.solvingLevel(at(3, 3, 2), { prior: 3 }), 3);
+    assert.equal(P.solvingLevel(at(3, 3, 2), { prior: 1 }), 1);
+    assert.equal(P.solvingLevel(at(3, 3, 2), { prior: 3, fallback: false }), 3);
+    assert.equal(P.solvingLevel(at(3, 2, 3), { prior: 3, fallback: false }), null);
+    assert.ok(Math.abs(P.smoothedRate(3, 5, 3, 3) - 4.5 / 7) < 1e-9);
+    // evidence() smooths towards the placement.
+    const ids = PROBLEMS.filter((x) => GRADES[x.id]?.grade === 3).slice(0, 5).map((x) => x.id);
+    const problems = Object.fromEntries(ids.map((id, i) => [id, { tries: 1, solved: i < 3, clean: i < 3, streak: i < 3 ? 1 : 0, last: NOW - DAY, due: NOW + DAY }]));
+    const placed = P.normalizeProfile({ ...P.newProfile(), problems, placement: { grade: 3, at: 0 } });
+    assert.equal(P.evidence(placed, { ...content, now: NOW }).problems.level, 3);
+    assert.equal(P.evidence({ ...placed, placement: null }, { ...content, now: NOW }).problems.level, 1);
   });
 
   await test("model focus: this week's focus keeps to the evidence from before Monday", () => {
@@ -527,17 +625,19 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------------ Learn's path */
 
-  const cutGames = () => [0, 1, 2, 3].map((i) => game(i, { themes: { cut: 1, ko: i < 2 ? 1 : 0 }, themeLoss: { cut: 4, ko: i < 2 ? 5 : 0 } }));
+  // v13: the second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
+  const cutGames = () => [0, 1, 2, 3].map((i) => game(i, { themes: { cut: 1, snapback: i < 2 ? 1 : 0 }, themeLoss: { cut: 4, snapback: i < 2 ? 5 : 0 } }));
 
   await test("model path: reviews first, focus problems at the level, one stretch, stable for the day", () => {
     const problems = {};
-    for (const g of [1, 2]) for (const x of PROBLEMS.filter((y) => y.theme === "atari" && GRADES[y.id]?.grade === g).slice(0, 3)) problems[x.id] = { tries: 1, solved: true, clean: true, streak: 1, due: NOW + 3 * DAY, last: NOW - DAY };
+    // Five clean solves at grades 1 and 2 (v9–v12 records, read through migrateProblemRecord).
+    for (const g of [1, 2]) for (const x of PROBLEMS.filter((y) => !["cut", "ko", "net"].includes(y.theme) && GRADES[y.id]?.grade === g).slice(0, 5)) problems[x.id] = { tries: 1, solved: true, clean: true, streak: 1, due: NOW + 3 * DAY, last: NOW - DAY };
     const dueOne = PROBLEMS.find((x) => x.theme === "net");
     problems[dueOne.id] = { tries: 2, solved: true, clean: false, streak: 0, due: NOW - 1000, last: NOW - DAY };
     const mistakes = [{ id: "m1", theme: "cut", tries: 0, streak: 0, due: NOW - 1000, added: NOW - 2 * DAY }];
     const p = profile({ games: cutGames(), problems, mistakes });
     const model = P.focus(p, NOW, content);
-    assert.deepEqual(model.focus.map((a) => a.key), ["cut", "ko"]);
+    assert.deepEqual(model.focus.map((a) => a.key), ["cut", "snapback"]);
     assert.equal(model.problems.level, 2);
     const items = P.planProblems({ profile: p, model, pool: PROBLEMS, grades: GRADES, now: NOW });
     assert.equal(items.length, 5);
@@ -545,7 +645,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(items[0], { kind: "mistake", id: "m1", role: "review", why: "cut" });
     assert.deepEqual(items[1], { kind: "problem", id: dueOne.id, role: "review" });
     const focusItems = items.filter((i) => i.role === "focus");
-    assert.deepEqual(focusItems.map((i) => i.why), ["cut", "ko"], "the two focuses take turns");
+    assert.deepEqual(focusItems.map((i) => i.why), ["cut", "snapback"], "the two focuses take turns");
     for (const it of focusItems) assert.ok(GRADES[it.id].grade >= 2 && GRADES[it.id].grade <= 3);
     const stretch = items.filter((i) => i.role === "stretch");
     assert.equal(stretch.length, 1);
@@ -663,29 +763,47 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.implOpponent("nope"), null);
   });
 
-  await test("model placement: a staircase of six problems, one grade up or down; its grade sets the course start and the first problems", () => {
+  await test("model placement: 10–12 problems drawn per player, themes mixed, three of life and death; two solves pass a grade; never above about 10 kyu", () => {
     const GRADES = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));
-    const run = (answer) => {
+    const def = (id) => PROBLEMS.find((d) => d.id === id);
+    const run = (answer, seed = 1) => {
       const results = [];
       for (;;) {
-        const id = P.placementNext(results, PROBLEMS, GRADES);
+        const id = P.placementNext(results, PROBLEMS, GRADES, { seed });
         if (!id) break;
         const grade = GRADES[id].grade;
-        const def = PROBLEMS.find((d) => d.id === id);
-        assert.ok(P.PLACEMENT.GOALS.includes(def.goal), `${id}: ${def.goal}`);
+        assert.ok(P.PLACEMENT.GOALS.includes(def(id).goal), `${id}: ${def(id).goal}`);
         assert.ok(!results.some((r) => r.id === id), "each problem once");
-        assert.equal(grade, P.placementTarget(results), "at the staircase's grade");
+        assert.ok(grade <= P.PLACEMENT.MAX_GRADE + 1 && Math.abs(grade - P.placementTarget(results)) <= 1, `${id} grade ${grade}, target ${P.placementTarget(results)}`);
         results.push({ id, grade, solved: answer(grade) });
       }
-      assert.equal(results.length, P.PLACEMENT.LENGTH);
+      assert.ok(results.length >= P.PLACEMENT.MIN && results.length <= P.PLACEMENT.MAX, `${results.length} problems`);
       assert.equal(results[0].grade, P.PLACEMENT.START);
-      return P.placementGrade(results);
+      const life = results.filter((r) => P.PLACEMENT.LIFE_GOALS.includes(def(r.id).goal)).length;
+      assert.ok(life >= P.PLACEMENT.LIFE, `${life} life-and-death problems`);
+      assert.ok(new Set(results.map((r) => def(r.id).theme)).size >= 5, "themes mixed");
+      return { grade: P.placementGrade(results), ids: results.map((r) => r.id), n: results.length };
     };
-    assert.equal(run(() => true), 5, "every answer right");
-    assert.equal(run(() => false), 1, "every answer wrong");
-    assert.equal(run((g) => g <= 3), 3, "solves up to grade 3");
-    assert.equal(run((g) => g <= 2), 2);
+    assert.equal(run(() => true).grade, P.PLACEMENT.MAX_GRADE, "every answer right: capped");
+    const wrong = run(() => false);
+    assert.equal(wrong.grade, 1, "every answer wrong");
+    assert.equal(wrong.n, P.PLACEMENT.MIN, "a stable grade ends the quiz early");
+    assert.equal(run((g) => g <= 3).grade, 3, "solves up to grade 3");
+    assert.equal(run((g) => g <= 2).grade, 2);
+    // Drawn per player: another seed, another quiz; the same seed, the same quiz.
+    assert.notDeepEqual(run((g) => g <= 3, 1).ids, run((g) => g <= 3, 2).ids);
+    assert.deepEqual(run((g) => g <= 3, 7).ids, run((g) => g <= 3, 7).ids);
+    // Not the bank's order any more.
+    assert.notEqual(run(() => true, 3).ids[0], run(() => true, 4).ids[0]);
+    // A grade is passed with two solves and no more misses than solves.
+    const g3 = (solved) => ({ id: "x", grade: 3, solved });
     assert.equal(P.placementGrade([]), null);
+    assert.equal(P.placementGrade([g3(true)]), 1, "one solve is not enough");
+    assert.equal(P.placementGrade([g3(true), g3(true)]), 3);
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false)]), 3);
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false), g3(false)]), 1);
+    assert.equal(P.placementGrade([{ grade: 5, solved: true }, { grade: 5, solved: true }]), 1, "grade 5 is beyond the placement");
+    assert.ok(!P.placementDone([]));
 
     // Offered once to someone who knows the rules; taking or skipping it ends the offer.
     const fresh = P.newProfile({ rank: 25 });
@@ -695,26 +813,32 @@ export default async function ({ test, assert, root }) {
     const placed = P.normalizeProfile(JSON.parse(JSON.stringify(P.setPlacement(fresh, { grade: 4 }, 5))));
     assert.deepEqual(placed.placement, { grade: 4, at: 5 }, "kept through the store");
     assert.equal(P.normalizeProfile({ ...placed, placement: { grade: 9 } }).placement, null, "a bad grade is dropped");
+    // Never above about 10 kyu: a v10–v12 grade 5 reads as 4, and grade 4 stands for 10 kyu.
+    assert.deepEqual(P.setPlacement(fresh, { grade: 5 }, 5).placement, { grade: 4, at: 5 });
+    assert.equal(P.normalizeProfile({ ...placed, placement: { grade: 5, at: 1 } }).placement.grade, 4);
+    assert.equal(P.PLACEMENT_RANK[P.PLACEMENT.MAX_GRADE], 10);
+    assert.equal(P.gradeForRank(10), P.PLACEMENT.MAX_GRADE);
 
-    // The grade moves the course start: grade 4 skips the beginner units, grade 1 does not.
+    // The grade moves the course start: grade 4 skips the beginner units, grade 1 does not, and nothing reaches the advanced course.
     const content = { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: "rules", playerRank: 25 } };
     const first = (prof) => P.learnPath(prof, content, 1000).find((it) => it.kind === "lesson");
     const beginnerUnit = COURSE.find((u) => !u.level).id;
     assert.equal(first(P.setPlacement(fresh, { grade: 1 }, 1)).unit, beginnerUnit);
     const mid = first(P.setPlacement(fresh, { grade: 4 }, 1));
     assert.equal(COURSE.find((u) => u.id === mid.unit).level, "intermediate");
+    assert.equal(COURSE.find((u) => u.id === first(P.setPlacement(fresh, { grade: 5 }, 1)).unit).level, "intermediate", "a placement never sends to the advanced course");
     // And the first problems sit near the grade.
     const probs = P.learnPath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
     assert.ok(probs.length > 0);
     for (const it of probs) assert.ok(GRADES[it.id].grade >= 3, `${it.id} grade ${GRADES[it.id].grade}`);
 
-    // The quiz's own answers are problem results too: solved through grade 4, missed grade 5
-    // (grades 2, 3, 4, 5, 4, 5). Six tries on no grade three times must not read as level 1
-    // and outrank the placement; and the problems come from the whole bank, not only capturing.
+    // The quiz's own answers are problem results too: solved through grade 4. A dozen tries
+    // spread over grades must not read as level 1 and outrank the placement; and the problems
+    // come from the whole bank, not only capturing.
     let quizzed = fresh;
     const quiz = [];
     for (;;) {
-      const id = P.placementNext(quiz, PROBLEMS, GRADES);
+      const id = P.placementNext(quiz, PROBLEMS, GRADES, { seed: 5 });
       if (!id) break;
       const solved = GRADES[id].grade <= 4;
       quiz.push({ id, grade: GRADES[id].grade, solved });
@@ -728,4 +852,5 @@ export default async function ({ test, assert, root }) {
     const topics = new Set(after.map((it) => PROBLEMS.find((d) => d.id === it.id).topic));
     assert.ok([...topics].some((t) => t !== "capture"), `only capturing: ${[...topics]}`);
   });
+
 }
