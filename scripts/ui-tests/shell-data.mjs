@@ -25,8 +25,9 @@ function failingExportHost() {
   window.__writes = [];
   window.zero = {
     on: () => () => {},
-    dialogs: { openFile: async () => null, saveFile: async () => "/read-only/game.sgf" },
     invoke: async (command, p) => {
+      // v13: the save dialog is the host's own command (studio.saveFileDialog).
+      if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
       if (command === "studio.katagoStatus") return { available: false };
       if (command === "studio.storeList") return Object.keys(window.__files).filter((k) => k.startsWith(p.prefix || ""));
       if (command === "studio.storeRead") return window.__files[p.key] == null ? null : enc(window.__files[p.key]);
