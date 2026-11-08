@@ -17,7 +17,7 @@ README.
 - simple ko
 - Japanese territory scoring (territory + prisoners + komi)
 - dead-stone removal
-- sparse-board territory guard
+- sparse-board territory guard (v13: an open region is dame only while no living stone of the other colour divides the board; a group alive in a corner or on a side leaves the rest to the wall around it, under all three rulesets)
 - SGF export/import with setup stones, comments, result and variations
 - SGF columns skip I on import and export (J…T are not shifted)
 - SGF import with pass, setup, comments and `YYYY-MM-DD` dates

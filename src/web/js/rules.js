@@ -198,11 +198,22 @@ function cloneBoard(board) {
  * `exclude` (optional) is a Set of stone keys (y * size + x): a region that
  * touches any of them is left out. Territory scoring passes the stones in
  * seki, so a seki eye is not territory; area scoring passes nothing.
+ *
+ * Call it on a finished board: score() removes the dead stones first, so
+ * every stone left is alive (see "open regions" below).
  */
 export function territoryMap(board, { exclude = null } = {}) {
   const size = board.width;
   const out = emptySignMap(size);
   const seen = new Set();
+  // The colours with stones on the board (see "open regions").
+  const present = new Set();
+  for (let y = 0; y < size && present.size < 2; y++) {
+    for (let x = 0; x < size; x++) {
+      const v = board.get([x, y]);
+      if (v !== EMPTY) present.add(v);
+    }
+  }
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board.get([x, y]) !== EMPTY || seen.has(y * size + x)) continue;
@@ -235,15 +246,25 @@ export function territoryMap(board, { exclude = null } = {}) {
         }
       }
       // Territory (or the empty part of area) is an empty region bounded by
-      // stones of one colour. A region that still reaches all four sides of
-      // the board has not been separated from the rest of the board: a lone
-      // centre stone or a wall with gaps leaves exactly such a region, and
-      // it is dame, not territory. A corner eye (two sides) and a side
-      // territory (three sides) still count. This is the board-edge rule,
-      // not a stone-count heuristic; life and death are resolved by marking
-      // dead stones.
-      if (border.size === 1 && edges.size < 4 && !touchesExcluded) {
-        const color = [...border][0];
+      // stones of one colour.
+      //
+      // Open regions. A region that reaches all four sides of the board is
+      // either the whole open board around one side's stones (a lone centre
+      // stone, a wall with gaps, both players passing after a few moves) or
+      // the outside of a wall that has sealed the other side's living
+      // stones in (White lives in a corner and Black owns everything else).
+      // The two differ in whether the other colour has stones on the board
+      // at all: if it has, they lie in a region of their own, so the wall
+      // really divides the board and the region is territory; if it has
+      // none, nothing has been divided and the region is dame. Before v13
+      // every four-side region was dame, which gave the second case's owner
+      // nothing. The test runs after dead stones are removed, so only living
+      // stones divide the board: a game in which every stone of one side is
+      // dead (a resignation in all but name) still leaves the open board as
+      // dame, as before.
+      const color = border.size === 1 ? [...border][0] : 0;
+      const open = edges.size === 4 && !present.has(other(color));
+      if (color && !open && !touchesExcluded) {
         for (const [rx, ry] of region) out[ry][rx] = color;
       }
     }
