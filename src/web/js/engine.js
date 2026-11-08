@@ -339,12 +339,12 @@ export function humanRequest(human) {
  * When an optional process cannot answer, the nearest standard level plays
  * the move (and `impl` says so).
  */
-export async function decide(game, opponent, { signal, lane = "move" } = {}) {
+export async function decide(game, opponent, { signal, lane = "move", node = game.current } = {}) {
   const inst = installed();
   let it = resolveOpponent(opponent, inst);
   const rank = opponent && typeof opponent === "object" && Number.isFinite(Number(opponent.rank)) ? Number(opponent.rank) : Number.isFinite(Number(opponent)) ? Number(opponent) : implLabel(it.id);
   if (it.kind === "human") {
-    const analysis = await analyzeQ(game, { ...humanRequest(it.level.human), signal, lane });
+    const analysis = await analyzeQ(game, { ...humanRequest(it.level.human), node, signal, lane });
     if (signal?.aborted) return { move: null, analysis: null, mode: "human", impl: it.id };
     const move = analysis && humanMoveFromAnalysis(game, analysis, it.level.human);
     if (move) return { move, analysis, mode: "human", impl: it.id };
@@ -352,7 +352,7 @@ export async function decide(game, opponent, { signal, lane = "move" } = {}) {
     it = impl(levelFor(rank, { strong: inst.strong }).impl);
   }
   if (it.kind === "strong") {
-    const analysis = await analyzeQ(game, { visits: it.level.strong.visits, engine: "strong", signal, lane });
+    const analysis = await analyzeQ(game, { visits: it.level.strong.visits, engine: "strong", node, signal, lane });
     if (signal?.aborted) return { move: null, analysis: null, mode: "strong", impl: it.id };
     const move = analysis && moveFromAnalysis(game, analysis, it.level);
     if (move) {
@@ -362,7 +362,7 @@ export async function decide(game, opponent, { signal, lane = "move" } = {}) {
     if (!analysis) strongFailures++;
     it = impl(levelFor(rank, {}).impl);
   }
-  const analysis = await analyzeQ(game, { visits: it.level.visits, signal, lane });
+  const analysis = await analyzeQ(game, { visits: it.level.visits, node, signal, lane });
   if (signal?.aborted) return { move: null, analysis: null, mode: "standard", impl: it.id };
   if (analysis) {
     const move = moveFromAnalysis(game, analysis, it.level);
@@ -370,6 +370,17 @@ export async function decide(game, opponent, { signal, lane = "move" } = {}) {
   }
   const move = await chooseLocal(game, { level: it.level.local, color: game.turn });
   return { move, analysis: null, mode: "offline", impl: it.id };
+}
+
+/**
+ * v13: the offline engine's move (ai.js) at the local level of what plays
+ * `opponent` here: the computer's move when the search could not give one
+ * (app/play-ctl.js falls back to it before it offers Retry).
+ */
+export async function offlineMove(game, opponent) {
+  const it = resolveOpponent(opponent, installed());
+  const std = it.kind === "standard" ? it : impl(levelFor(implLabel(it.id), {}).impl);
+  return chooseLocal(game, { level: std?.level?.local ?? 3, color: game.turn });
 }
 
 /** A quick look at the position (for teaching mode and the eval bar): pondering. */
@@ -402,12 +413,15 @@ export async function chooseMove(game, opponent, opts = {}) {
 }
 
 /** The engine's suggestion for the side to move, with a short line (the player waits on it). */
-export async function hint(game, { signal, lane = "move" } = {}) {
-  const analysis = await analysisQ(game, { visits: 200, signal, lane });
+export async function hint(game, { signal, lane = "move", node = game.current } = {}) {
+  // v13: the position asked about, fixed now (a queued search would otherwise read the board when it runs).
+  const analysis = await analysisQ(game, { node, visits: 200, signal, lane });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
     return { ...toMove(top), pv: top.pv || [], source: "katago" };
   }
+  // The board moved on meanwhile (an undo): no answer for a position no longer there.
+  if (signal?.aborted || game.current !== node) return null;
   const move = await chooseLocal(game, { level: 4, color: game.turn });
   return { ...move, pv: [], source: "offline" };
 }
@@ -448,10 +462,10 @@ export function estimateNode(game, node) {
  * dead when the area under it clearly belongs to the other colour. Returns
  * [] when the engine is unavailable; the player marks stones by hand then.
  */
-export async function deadStones(game, { signal, lane = "interactive" } = {}) {
-  const a = await analysisQ(game, { visits: 160, signal, lane });
+export async function deadStones(game, { signal, lane = "interactive", node = game.current } = {}) {
+  const a = await analysisQ(game, { node, visits: 160, signal, lane });
   if (!a?.ownership) return { stones: [], source: "manual" };
-  return { stones: deadFromOwnership(game.board, a.ownership), source: "katago", ownership: a.ownership };
+  return { stones: deadFromOwnership(node.board, a.ownership), source: "katago", ownership: a.ownership };
 }
 
 /**

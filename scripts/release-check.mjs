@@ -1,13 +1,15 @@
 /**
  * Release gate for the content and packaging promises.
  *
- * Counts what is real: a course of at least 13 units / 60 lessons / 240
- * steps (beginner and intermediate), at least 250 solver-verified problems with themes with measured grades,
+ * Counts what is real: a course of at least 20 units / 90 lessons / 310
+ * steps (v13: with the ko and judgement units and area scoring) including
+ * at least 8 advanced units / 27 advanced lessons, at least 250 solver-verified problems with themes with measured grades,
  * 20 classics, four languages
  * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
  * licences and one version string.
  */
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,10 +26,14 @@ const assertLocalized = (item, fields, label) => {
 
 const lessons = COURSE.flatMap((u) => u.lessons);
 const steps = lessons.flatMap((l) => l.steps);
-assert.ok(COURSE.length >= 13, "at least 13 course units");
-assert.ok(COURSE.filter((u) => u.level === "intermediate").length >= 5, "at least 5 intermediate units");
-assert.ok(lessons.length >= 60, "at least 60 lessons");
-assert.ok(steps.length >= 240, "at least 240 lesson steps");
+assert.ok(COURSE.length >= 20, "at least 20 course units");
+assert.ok(COURSE.filter((u) => u.level === "intermediate").length >= 7, "at least 7 intermediate units");
+const advanced = COURSE.filter((u) => u.level === "advanced");
+assert.ok(advanced.length >= 8, "at least 8 advanced units");
+assert.ok(advanced.flatMap((u) => u.lessons).length >= 27, "at least 27 advanced lessons");
+for (const id of ["adv-opening", "adv-joseki", "adv-handicap"]) assert.ok(advanced.some((u) => u.id === id), `advanced unit ${id}`);
+assert.ok(lessons.length >= 90, "at least 90 lessons");
+assert.ok(steps.length >= 310, "at least 310 lesson steps");
 for (const unit of COURSE) assertLocalized(unit, ["title", "summary"], unit.id);
 for (const lesson of lessons) assertLocalized(lesson, ["title"], lesson.id);
 
@@ -64,6 +70,13 @@ for (const file of [
 ]) {
   assert.ok(fs.existsSync(path.join(root, file)), file);
 }
+// The committed network is pinned: KataGo's g170-b6c96-s175395328-d26788732,
+// byte for byte the copy in KataGo's repository (engine/model/README.md says
+// where). A changed model must change this hash on purpose, together with
+// docs/strength.md, whose measurements were taken with it.
+const MODEL_SHA256 = "48d6754de3c4754f95bf6a5ca40957a49e5e915aaaeede133a17b9ccf8fa5fcb";
+const modelSha = crypto.createHash("sha256").update(fs.readFileSync(path.join(root, "engine/model/model.txt.gz"))).digest("hex");
+assert.equal(modelSha, MODEL_SHA256, "engine/model/model.txt.gz is the pinned network");
 const cfg = fs.readFileSync(path.join(root, "engine/model/gtp.cfg"), "utf8");
 // KataGo starts under Japanese rules (the default); every request then sets
 // the game's own ruleset with `kata-set-rules`.
@@ -76,7 +89,8 @@ assert.match(engineZig, /kata-search_analyze/);
 for (const rules of ["japanese", "chinese", "korean"]) {
   assert.match(engineZig, new RegExp(`"kata-set-rules ${rules}"`), `the host sends kata-set-rules ${rules}`);
 }
-assert.match(mainZig, /studio\.katagoAnalyze/);
+assert.match(mainZig, /"studio\.katagoAnalyzeAsync"/);
+assert.doesNotMatch(mainZig, /\.name = "studio\.katago(Analyze|Move)"/, "the v2 synchronous KataGo commands are gone");
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const appZon = fs.readFileSync(path.join(root, "app.zon"), "utf8");
@@ -86,6 +100,9 @@ const buildVersion = (buildZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1];
 assert.equal(packageJson.version, zonVersion, "package.json and app.zon versions agree");
 assert.equal(packageJson.version, buildVersion, "package.json and build.zig.zon versions agree");
 assert.equal(APP_VERSION, packageJson.version, "web APP_VERSION agrees with package.json");
+// The workflows build with .nvmrc's Node, the lowest one "engines" allows.
+const nvmrc = fs.readFileSync(path.join(root, ".nvmrc"), "utf8").trim();
+assert.equal(packageJson.engines?.node, `>=${nvmrc}`, ".nvmrc is the lowest Node package.json's engines allows");
 const indexHtml = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
 assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html version agrees");
 assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");

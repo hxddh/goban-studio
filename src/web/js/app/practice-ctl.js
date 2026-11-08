@@ -7,7 +7,7 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { gradeForRank, nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem } from "../model/player.js";
+import { MEMORY, gradeForRank, nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
@@ -15,6 +15,7 @@ import { state, update, toast, announce } from "./store.js";
 import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember } from "./ctl-core.js";
 import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
 import { continuePlacement, placementAnswer } from "../learn/placement.js";
+import { reviewTransform, transformProblem } from "../learn/transform.js";
 
 export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
@@ -123,7 +124,9 @@ export function problemView(pz) {
 }
 
 function problemState(pz) {
-  return { st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null };
+  // v13: `tok` is this attempt's own: Retry, Show answer and a new problem
+  // make a new one, and the reply timers of the old attempt see it (later).
+  return { tok: {}, st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null, ghost: null, openedAt: Date.now() };
 }
 
 /**
@@ -298,10 +301,22 @@ export function openProblem(id, { daily = null, placement = false } = {}) {
   return withContent("problems", () => showProblem(id, daily, placement));
 }
 
+/**
+ * v13: a problem tried before comes back turned, mirrored and sometimes in
+ * the other colour (learn/transform.js), so a review asks for the idea, not
+ * the remembered picture. The placement quiz and the first showing use the
+ * problem as written. The id stays, so the result is the same problem's.
+ */
+export function shownDef(p, { placement = false } = {}) {
+  if (placement) return p;
+  return transformProblem(p, reviewTransform(p, state.profile.problems?.[p.id]?.tries || 0));
+}
+
 function showProblem(id, daily, placement = false) {
-  const p = PROBLEMS.find((x) => x.id === id);
-  if (!p) return;
+  const written = PROBLEMS.find((x) => x.id === id);
+  if (!written) return;
   if (!isRestoring() && !daily && !placement) remember();
+  const p = shownDef(written, { placement });
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
   update((s) => {
@@ -318,6 +333,20 @@ function browseList(def) {
 }
 
 /* ---------------------------------------------------------- problems */
+
+/**
+ * v13: run `fn` after `ms` only if the attempt that set it is still the one
+ * on screen: the same problem state (not left for another page or problem)
+ * and the same attempt (not retried or answered meanwhile). Before, a
+ * pending reply played into a retried problem, or recorded an attempt of
+ * a problem already left.
+ */
+function later(P, ms, fn) {
+  const tok = P.tok;
+  return setTimeout(() => {
+    if (P.tok === tok && currentProblem() === P) fn();
+  }, ms);
+}
 
 function currentProblem() {
   const v = state.learn.view;
@@ -338,13 +367,23 @@ export function practicePlay(x, y) {
   if (pz.counting && pz.ask === "value") return;
   const moved = S.playMove(pz, P.st, S.indexOf(pz, x, y));
   if (!moved) {
+    P.ghost = null;
     toast(t("error.illegal"), "warn");
     return;
   }
   if (moved.outside) {
+    P.ghost = null;
     toast(t("practice.endgame.settled"), "warn");
     return;
   }
+  // v13: "Confirm moves in problems" — the first click shows the stone, a
+  // second click on the same point plays it (as the two-click stone in Play).
+  if (state.settings.confirmProblemMove && !(P.ghost && P.ghost.x === x && P.ghost.y === y)) {
+    P.ghost = { x, y };
+    update();
+    return;
+  }
+  P.ghost = null;
   const next = moved.next;
   P.history.push(P.st);
   P.st = next;
@@ -354,14 +393,14 @@ export function practicePlay(x, y) {
   P.feedback = null;
   Audio.stone(false);
   update();
-  setTimeout(() => respond(P), 60);
+  later(P, 60, () => respond(P));
 }
 
 function respond(P) {
   const pz = P.pz;
   const r = S.reply(pz, P.st);
   if (r && r.refutes) {
-    setTimeout(() => {
+    later(P, 320, () => {
       if (!r.pass) {
         const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
         if (after) {
@@ -372,7 +411,7 @@ function respond(P) {
         }
       }
       lost(P, { ko: !!r.ko });
-    }, 320);
+    });
     return;
   }
   const settled = S.status(pz, P.st);
@@ -380,7 +419,7 @@ function respond(P) {
     finishProblem(P);
     return;
   }
-  setTimeout(() => {
+  later(P, 320, () => {
     if (!r.pass) {
       const after = S.playMove(pz, P.st, S.indexOf(pz, r.x, r.y))?.next;
       if (after) {
@@ -400,7 +439,7 @@ function respond(P) {
     if (st === "lost") return lost(P);
     P.feedback = "keep";
     update();
-  }, 320);
+  });
 }
 
 /**
@@ -418,7 +457,7 @@ function lost(P, { ko = false } = {}) {
   announce(t("practice.wrong"));
   update();
   const st = P.st;
-  setTimeout(() => {
+  later(P, 1900, () => {
     if (P.st !== st || P.status !== "lost" || P.answer) return;
     let back = P.history.pop();
     while (P.history.length && back.toMove !== P.pz.userColor) back = P.history.pop();
@@ -427,7 +466,7 @@ function lost(P, { ko = false } = {}) {
     P.feedback = "retry";
     P.last = null;
     update();
-  }, 1900);
+  });
 }
 
 /**
@@ -523,8 +562,10 @@ function recordAttempt(P, solved) {
   P.recorded = solved ? "solved" : "miss";
   if (state.learn.view === "problem" && P.def) {
     const now = Date.now();
-    if (first) changeProfile((p) => recordProblem(p, P.def.id, { solved, clean: solved && !P.used }, now));
-    else changeProfile((p) => recordProblem(p, P.def.id, { late: true }, now));
+    // A clean solve this fast counts as easy for the review schedule.
+    const quick = solved && !P.used && now - (P.openedAt || now) < MEMORY.QUICK_MS;
+    if (first) changeProfile((p) => recordProblem(p, P.def.id, { solved, clean: solved && !P.used, used: P.used, quick }, now));
+    else changeProfile((p) => recordProblem(p, P.def.id, { late: true, used: P.used }, now));
     if (solved) itemDone("problem", P.def.id);
     if (first) placementAnswer(P.def.id, solved && !P.used);
   }
@@ -549,9 +590,19 @@ export function undoProblemMove() {
   update();
 }
 
+/** Esc or a click elsewhere: the shown stone of "Confirm moves in problems" goes away. Returns whether there was one. */
+export function clearProblemGhost() {
+  const P = currentProblem();
+  if (!P?.ghost) return false;
+  P.ghost = null;
+  update();
+  return true;
+}
+
 export function problemHint() {
   const P = currentProblem();
   if (!P || P.status !== "open" || P.busy) return;
+  P.ghost = null;
   P.used = true;
   const moves = S.winningMoves(P.pz, P.st);
   P.hintAt = moves[0] || null;

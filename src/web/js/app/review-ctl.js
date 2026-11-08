@@ -1,6 +1,6 @@
 /**
  * Review: a layer over any game, and the post-game review of your own
- * (docs/v9.md, "Two spaces → Play"). Whole-game analysis, the review model
+ * (docs/v9.md, "Two spaces → Play"; Play and the Library since v12). Whole-game analysis, the review model
  * made from it (play/review-model.js: the result, the balance, the three
  * phases, the key moments), live analysis of the position on the board,
  * free variations, the stories of the key mistakes, editing the record
@@ -22,9 +22,8 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
-import { back, canGoBack, changeProfile, remember, isRestoring } from "./ctl-core.js";
+import { back, canGoBack, changeProfile, remember, isRestoring, persistLive, resumeLive } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
-import { freshGameState, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { buildReview, drillOf, judgeTry, keyMovesOf as keyMistakes, reviewFits, tryMoments } from "../play/review-model.js";
 import { analyzeLine, isOwnGame, knownPoints, notePoints, queueAnalysis, storeAnalysis, storedAnalysis, takeOver, visitsFor } from "../play/analysis.js";
 
@@ -122,7 +121,12 @@ function stopReviewWork(r) {
  * ended) turns the board into its review without a history step.
  */
 export function openReview(game, meta = {}) {
-  stopReviewWork(state.review);
+  // v13: the review open before is closed for good first, as leaving it
+  // would: its tried moves dropped (settleLive), its pass handed over, its
+  // edits saved, and the game in play back on its last move. Before, only
+  // its searches stopped, and a live game left one move back took the next
+  // move as a branch.
+  if (state.review) dropReview(state.review, { resume: false });
   stopLive();
   if (!isRestoring() && !meta.inPlace) remember();
   const line = game.mainLine();
@@ -264,8 +268,12 @@ export function closeReview() {
   });
 }
 
-/** Leave a review without touching history (restore, a new game). */
-export function dropReview(r = state.review) {
+/**
+ * Leave a review without touching history (restore, a new game, another
+ * review). `resume: false` (another review opens) leaves the game in play
+ * waiting: the computer does not start its move under the new review.
+ */
+export function dropReview(r = state.review, { resume = true } = {}) {
   if (!r) return;
   settleLive(r);
   saveEdits(r);
@@ -275,8 +283,7 @@ export function dropReview(r = state.review) {
   if (r.source === "current" && state.game && state.game.game === r.game) {
     const line = state.game.game.mainLine();
     state.game.game.goto(line[line.length - 1].id);
-    maybeComputerMove();
-    ponder();
+    if (resume) resumeLive();
   }
   if (state.review === r) state.review = null;
 }
@@ -519,7 +526,7 @@ export function saveEdits(r = state.review) {
     const all = at?.end.children;
     if (at) at.end.children = all.filter((c) => at.kids.includes(c));
     try {
-      persistCurrent();
+      persistLive();
       if (state.game.recordId && Games.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
     } finally {
       if (at) at.end.children = all;
@@ -818,16 +825,20 @@ export function triable(r = state.review) {
 /** Searches per judgement, by board size. */
 const judgeVisits = (size) => (size === 19 ? 160 : size === 13 ? 200 : 240);
 
-/** The position of a node as a game of its own (root stones, then the moves to it). */
-function gameAt(src, node) {
-  const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap });
+/** The position of a node as a game of its own (root stones, then the moves to it; play-ctl playFromHere too). */
+export function gameAt(src, node) {
+  // v13: the root stones are copied, not placed again from the handicap, and
+  // a record's mid-game setup (node.setup) is replayed with its move.
+  const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap, placeHandicap: false });
   const root = src.root.board.signMap;
   const setup = [];
   for (let y = 0; y < src.size; y++) for (let x = 0; x < src.size; x++) if (root[y][x]) setup.push({ x, y, c: root[y][x] });
   if (setup.length) game.setup(setup, src.root.turn);
-  for (const m of moveList(node)) {
-    if (m.pass) game.pass({ color: m.color, force: true });
-    else game.play(m.x, m.y, { color: m.color, force: true });
+  const line = [];
+  for (let n = node; n && n.parent; n = n.parent) line.unshift(n);
+  for (const { move: m, setup: s } of line) {
+    if (m.pass) game.pass({ color: m.color, force: true, setup: s });
+    else game.play(m.x, m.y, { color: m.color, force: true, setup: s });
   }
   game.current.result = null;
   if (game.current.phase !== "playing") game.current.phase = "playing";
@@ -963,35 +974,6 @@ export function closeTrial() {
   startLive();
 }
 
-/* ---------------------------------------------------- play from here */
-
-function moveList(node) {
-  const out = [];
-  for (let n = node; n && n.parent; n = n.parent) out.push(n.move);
-  return out.reverse();
-}
-
-export function playFromHere() {
-  const r = state.review;
-  if (!r) return;
-  // v5: the record's rules and handicap carry over (the handicap is what
-  // the Chinese count compensates); the root stones are set up.
-  const game = gameAt(r.game, r.game.current);
-  dropReview(r);
-  if (state.game) state.game.gen++;
-  remember();
-  const humanColor = game.turn;
-  update((s) => {
-    s.game = freshGameState(game, { opponent: "ai", humanColor });
-    s.review = null;
-    s.space = "play";
-    s.play = { ...s.play, view: "game", explorer: null };
-  });
-  persistCurrent();
-  maybeComputerMove();
-  ponder();
-}
-
 /* ---------------------------------------------------------- export */
 
 /** Save the review as a PNG: the native save dialog, or a download. */
@@ -1007,14 +989,16 @@ export async function exportReviewImage() {
   const filename = `goban-studio-review-${day}.png`;
   const blob = await renderReviewPNG(model, { date, rating: reviewRating(r) });
   if (!blob) return toast(t("report.exportFailed"), "warn");
-  if (hasNative() && hasFileDialogs()) {
+  // v13: in the app a failed write is an error, never a download link (a WebView ignores those).
+  if (hasNative()) {
+    if (!hasFileDialogs()) return toast(t("report.exportFailed"), "error", 6000);
     const path = await saveFileDialog({ title: t("report.exportImage"), defaultName: filename });
     if (path == null || (Array.isArray(path) && path.length === 0)) return;
     const chosen = normalizePaths(path)[0];
     if (chosen && (await writeBinaryFile(chosen, new Uint8Array(await blob.arrayBuffer())))) {
       revealPath(chosen);
       toast(t("report.exported"));
-    } else toast(t("report.exportFailed"), "warn");
+    } else toast(t("report.exportFailed"), "error", 6000);
     return;
   }
   const url = URL.createObjectURL(blob);

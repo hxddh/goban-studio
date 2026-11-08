@@ -1,6 +1,6 @@
 {
   "name": "goban-studio",
-  "version": "12.0.0",
+  "version": "13.0.0",
   "private": true,
   "type": "module",
   "description": "Goban Studio \u2014 learn, play and review Go (\u56f4\u68cb \u00b7 \ubc14\ub451 \u00b7 \u56f2\u7881) on macOS and Windows.",
@@ -9,6 +9,7 @@
     "build": "node scripts/bundle.mjs",
     "sync": "node scripts/sync-dist.mjs",
     "test": "node scripts/test.mjs",
+    "test:native": "zig build test -Dnative-sdk-path=\"$(npm root -g)/@native-sdk/cli\" -Dplatform=null --summary all",
     "verify": "npm test && npm run build && npm run sync",
     "package:macos": "bash scripts/package.sh",
     "release-check": "node scripts/release-check.mjs",

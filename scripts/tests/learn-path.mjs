@@ -26,7 +26,7 @@ export default async function ({ test, assert, root }) {
   const STRONG = { experience: "player", playerRank: 2 };
 
   /** Problems tried at these grades, solved cleanly or not, a day ago, none due. */
-  function record(p, grades, { clean = true, n = 4, theme = null } = {}) {
+  function record(p, grades, { clean = true, n = 5, theme = null } = {}) {
     let out = p;
     for (const g of grades) {
       const list = PROBLEMS.filter((x) => gradeOf(x.id) === g && (!theme || x.theme === theme) && !out.problems[x.id]).slice(0, n);
@@ -114,12 +114,16 @@ export default async function ({ test, assert, root }) {
 
   await test("learn path: a strong player — the advanced course, problems near the top grades, the stretch at the top", () => {
     // Before any problem: their rank sets the level (gradeForRank).
+    // v13: conservative — a rank gets the grade it should solve comfortably.
     assert.equal(P.gradeForRank(30), 1);
-    assert.equal(P.gradeForRank(12), 2);
-    assert.equal(P.gradeForRank(8), 3);
-    assert.equal(P.gradeForRank(2), 4);
+    assert.equal(P.gradeForRank(19), 1);
+    assert.equal(P.gradeForRank(15), 2);
+    assert.equal(P.gradeForRank(12), 3);
+    assert.equal(P.gradeForRank(8), 4);
+    assert.equal(P.gradeForRank(2), 5);
     assert.equal(P.gradeForRank(-1), 5);
     assert.equal(P.gradeForRank(null), null);
+    for (const [g, rank] of Object.entries(P.PLACEMENT_RANK)) assert.ok(P.gradeForRank(rank) >= Number(g) || Number(g) === 1, `placement grade ${g} → ${rank} kyu → grade ${P.gradeForRank(rank)}`);
     const fresh = P.learnPath(P.newProfile({ rank: 2 }), content(STRONG), NOW);
     wellFormed(fresh, "strong, new to the app");
     assert.equal(fresh[0].id, firstOf("advanced"));

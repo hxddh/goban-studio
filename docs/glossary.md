@@ -1,7 +1,8 @@
 # Go terminology glossary (zh / en / ko / ja)
 
-The reference for every Go term used in `src/web/js/messages.js` and
-`src/web/js/content/course.js`. When you add or change a string, use the term
+The reference for every Go term used in `src/web/js/messages.js`, the
+course (`src/web/js/content/course*.js`) and the problem bank
+(`src/web/js/content/problems.js`). When you add or change a string, use the term
 in this table. Usage targets:
 
 - **zh**: mainland Simplified Chinese, as in 中国围棋协会 teaching material.
@@ -27,7 +28,7 @@ in this table. Usage targets:
 | move; to play a stone | 落子 / 下 | move / play | 수 / 두다, 착수 | 手 / 打つ, 着手 | |
 | turn to play | 轮到…下 | … to play | … 차례 | …番 | |
 | X to play (problem) | 黑先 | Black to play | 흑선 | 黒先 | ko/ja problem goals now use 흑선 / 黒先 (v3: `{0} 차례`, `{0}番`) |
-| liberty | 气 | liberty | 활로 | 呼吸点（ダメ） | ja: 呼吸点 is the Nihon Ki-in beginner term; ダメ in races |
+| liberty | 气 | liberty | 활로 | 呼吸点（ダメ） | ja (v13 rule): 呼吸点 for liberties in general, in the course and in the problem bank's hints; ダメ only in capturing races and seki (外ダメ, 内ダメ, ダメを詰める) and in the terms ダメヅマリ and ダメ (neutral point) |
 | atari | 打吃 | atari | 단수 | アタリ | |
 | capture | 提子 / 吃 | capture | 따내기 / 잡기 | 取る | 따내다 = remove from board; 잡다 = win the group |
 | prisoners (captured stones) | 提子 | prisoners / captures | 따낸 돌 / 사석 | アゲハマ | ko 사석 also covers dead stones at counting |
@@ -36,6 +37,10 @@ in this table. Usage targets:
 | ko threat | 劫材 | ko threat | 팻감 | コウダテ | |
 | retake the ko | 提回 | retake | 되따내다 | 取り返す | |
 | connect at the ko | 粘劫 | connect | 패를 잇다 | コウを継ぐ / 解消 | |
+| start a ko | 开劫 | start a ko | 패를 걸다 | コウを仕掛ける | v13 unit `ko-fighting` |
+| end (resolve) a ko | 消劫 | end a ko | 패를 해소하다 | コウを解消する | v13; by connecting (粘劫) or by capturing |
+| count ko threats | 数劫材 | count threats | 팻감을 세다 | コウダテを数える | v13 |
+| approach ko | 缓气劫 | approach ko | 늘어진 패 | ヨセコウ | v13 `ko-count`; see review list |
 | pass | 停一手（虚着） | pass | 패스 | パス | |
 | resign | 认输 / 中盘胜 (result) | resign / by resignation | 기권 / 불계승 | 投了 / 中押し勝ち | |
 | win on time | 超时胜 | wins on time | 시간승 | 時間切れ勝ち | ja v3 used 時間勝ち |
@@ -57,7 +62,7 @@ in this table. Usage targets:
 | squeeze | 挤 / 滚打包收 | squeeze | 조이기 | シボリ | |
 | counter-atari | 反打吃 | counter-atari | 역단수 | 逆アタリ | |
 | capture to escape | 反吃 | capture back | 되잡기 | 取り返す | |
-| capture to save (theme) | 吃子解围 / 提子解围 | capture to save | 따내서 살리기 | 取って助ける | problem theme `capture-to-save`; ko title v3 따내서 구하기 → 따내서 살리기 |
+| capture to save (theme) | 吃子解围 / 提子解围 | capture to save | 따내서 살리기 | 取って助ける | problem theme `capture-to-save`; ko title v3 따내서 구하기 → 따내서 살리기; en problem title v12 "Capture to rescue" → "Capture to save" (v13) |
 | escape (theme) | 逃子 | running away / escape | 도망가기 | 逃げ出し | problem theme `escape` |
 | atari (theme) | 打吃 | atari | 단수 | アタリ | problem theme `atari` |
 | extend | 长 | extend | 뻗기 | 伸び（ノビ） | ko v3 messages used 늘기, course used 뻗기 → unified to 뻗기; ja v3 延び → 伸び |
@@ -71,7 +76,7 @@ in this table. Usage targets:
 | cutting point | 断点 | cutting point | 끊는 점 | 切りの点 / 切れ目 | |
 | connection | 连接 | connection | 연결 / 잇기 | つなぎ（ツギ） | problem theme `connect`: ja v3 ツギ → つなぎ, to match the topic label; ja unit title v3 継ぎと切り vs topic つなぎと切り → both つなぎと切り |
 | solid connection | 实连 | solid connection | 꽉 잇기 | カタツギ | |
-| hanging connection | 虎口 | hanging connection (tiger's mouth) | 호구 | カケツギ（虎の口） | |
+| hanging connection | 虎口 | hanging connection (tiger's mouth) | 호구 | カケツギ（虎の口） | ja (v13 rule): カケツギ is the move, the connection; 虎の口 is the shape, the point enclosed on three sides. A lesson or a step about making the connection says カケツギ; "a stone inside the tiger's mouth" says 虎の口 |
 | bamboo joint | 双 | bamboo joint | 쌍립 | 竹ふし | not used in v3 strings |
 
 ## Life and death
@@ -92,10 +97,9 @@ in this table. Usage targets:
 | bent three | 曲三 | bent three | 곡삼 | 曲がり三 | |
 | T-four / pyramid four | 丁四 | pyramid four | 삿갓 사궁 | 丁四 | see decisions below; en v3 "T-four" → "pyramid four" |
 | bulky five | 刀把五 | bulky five | 뭉친 오궁 | 刀五 | see decisions below; ja v3 かたまった五目 → 刀五 |
-| crossed five | 梅花五 | crossed five | 오궁도화 | 花五 | |
-| flower six (rabbity six) | 梅花六 / 葡萄六 | flower six / rabbity six | 매화육궁 | 花六 | |
+| crossed five | 梅花五 | crossed five | 오궁도화 | 花五 | v13: the problem hint says "crossed five" (v12: "cross-shaped five") |
 | rectangular six | 板六 | rectangular six | 판육궁 | 板六 | |
-| rabbity six (shape name) | 梅花六 | rabbity six | 매화육궁 | 花六 | v4 `shape.rabbity-six`: the same shape as flower six above; the English shape list uses the other common name |
+| rabbity six | 梅花六（葡萄六） | rabbity six | 매화육궁 | 花六 | v4 `shape.rabbity-six`; v13: the problem bank's titles and hints say "rabbity six" too (v12 had "Flower six" there) |
 | seven stones on the second line ("six die, eight live") | 二路七子（六死八活） | seven stones on the second line (six die, eight live) | 2선의 일곱 점 (육사팔활) | 二線の七子（六死八活） | v4 `shape.second-line-seven` |
 | independent life (two eyes, as opposed to seki) | 净活 | independent life | 완생 | 完全な生き | used in docs and code comments; the UI says "live" / "seki" |
 | classic shapes (collection) | 基本死活形 | classic shapes | 사활의 기본형 | 死活の基本形 | v4 `practice.shapes` |
@@ -203,11 +207,13 @@ in this table. Usage targets:
 | value as a swing ("the difference is N points") | 相差 N 目 | the difference is N points | N집 차이 | N目の差 | the course states values as the difference between Black and White playing first (出入り); it does not use miai counting |
 | defensive move inside own territory | 补棋 / 补一手 | defensive move (inside your territory) | 손질 | 手入れ | |
 | filling neutral points | 收单官 / 填单官 | filling neutral points | 공배 메우기 | ダメ詰め | |
-| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app never uses miai counting |
+| counting a move both ways (deiri) | 出入计算 | counting a move | 출입 계산 | 出入り計算 | v6 theme `deiri`: Black first minus White first; the app counts with deiri (v13 mentions miai counting once, as a note) |
 | how many points is a move worth | 这一手值几目 | how many points? | 몇 집짜리일까 | 何目の手か | v6 question title |
 | monkey jump (first-line large knight's slide) | 仙鹤大伸腿 / 大伸腿 | monkey jump | 눈목자 미끄러지기 | サルスベリ | ko is descriptive (large knight's move + slide) |
 | the biggest move / which is bigger | 哪一手最大 / 比较大小 | the biggest move / which is bigger | 가장 큰 수 / 어느 쪽이 큰가 | 一番大きい手 / どちらが大きいか | v6 |
 | capture in sente / atari in sente | 提子是先手 / 先手打吃 | a capture in sente / atari in sente | 선수로 따내기 / 선수 단수 | 先手で取る / 先手のアタリ | v6 problem titles |
+| big / middle / small endgame | 大官子 / 中官子 / 小官子 | big / middle / small endgame | 큰 끝내기 / 중간 크기의 끝내기 / 작은 끝내기 | 大ヨセ / 中くらいのヨセ / 小ヨセ | v13 lesson `endgame-big`; ko and ja middle forms are descriptive (ja 中ヨセ is also seen) |
+| miai counting (gote moves halved) | 见合计算 | miai counting | 미아이 계산 | 見合い計算 | v13: named once in `endgame-counting`; the app still counts every move by deiri |
 
 ## Middle game
 
@@ -296,6 +302,34 @@ vary (which corner White takes, when the side stone comes), so the book does
 not state one line for either; KataGo's own choices still cover the shapes
 it reaches.
 
+## Advanced course (v13): opening, joseki, handicap
+
+| Concept | zh | en | ko | ja | Notes |
+|---|---|---|---|---|---|
+| framework (moyo) | 模样 | framework (moyo) | 모양 | 模様 | unit `adv-opening`; ko 모양 also means "shape" (좋은 모양), so the lessons say 큰 모양 / 모양을 키우다 where it could be misread |
+| territory (as against a framework) | 实地 | territory | 실리 | 実利 | "framework against territory": 模样与实地 / 모양과 실리 / 模様と実利 |
+| direction (of play) | 方向 | direction / which side | 방향 | 方向 | lesson `adv-open-direction` |
+| Kobayashi opening / mini-Chinese | 小林流 / 迷你中国流 | Kobayashi opening / mini-Chinese | 고바야시류 / 미니 중국류 | 小林流 / ミニ中国流 | named only in text; no lesson states a move order for them (see the v7 note above) |
+| one-space low pincer | 一间低夹 | one-space low pincer | 한 칸 낮은 협공 | 一間挟み | as in the explorer table; ja 一間挟み is the low one |
+| two-space low pincer | 二间低夹 | two-space low pincer | 두 칸 낮은 협공 | 二間挟み | |
+| attachment underneath | 托 | attach underneath | 밑붙임 | 下ツケ | lesson `adv-joseki-high-approach` |
+| small knight's enclosure | 小飞守角 | small knight's enclosure | 날일자 굳힘 | 小ゲイマジマリ | as in the enclosure row above |
+| small knight's move in answer to an approach | 小飞应 | answer with a small knight's move | 날일자로 받기 | 小ゲイマに受ける | lesson `adv-joseki-knight`; descriptive |
+| diagonal move (kosumi) | 尖 | diagonal move | 마늘모 | コスミ | |
+| a pincer that is also an extension | 夹击兼拆 | a pincer that is also an extension | 협공이자 벌림 | ハサミであり開き | descriptive, as 拆兼逼 above |
+| second-line hane | 二路扳 | second-line hane | 2선 젖힘 | 二線のハネ | |
+| handicap game / handicap stones | 让子棋 / 让子 | handicap game / handicap stones | 접바둑 / 치석 | 置き碁 / 置き石 | unit `adv-handicap`; N stones: 四子局 / 九子局 (ja), 4점 / 9점 접바둑 (ko), 四子局 / 九子局 (zh 让四子 also used) |
+| overconcentration | 重复 | overconcentration | 중복 | 凝り形 | |
+| light play | 轻灵 | light play / play lightly | 가볍게 두기 | 軽く打つ | as heavy / light above |
+| urgent point (as against a big point) | 急所 | urgent point | 급한 곳 | 急場 | as in the opening table; zh 急所 is also the vital point of an eye shape, so the life steps say 要点 |
+
+The v13 joseki lines follow the opening book's corner tree move by move
+(`star-one-space-low-pincer`, `star-two-space-low-pincer`,
+`komoku-high-approach-attach`, `komoku-low-approach`), and the whole-board
+steps follow its named lines (`chinese`, `sanrensei`);
+`scripts/tests/core-course-v13.mjs` checks every accepted point the book
+knows against it.
+
 ## Decisions on doubtful terms
 
 - **Bulky five** — zh 刀把五, ja **刀五**, ko **뭉친 오궁**, en bulky five.
@@ -357,8 +391,11 @@ The items I am least sure about:
 4. zh **气紧** as the theme name for shortage of liberties. 紧气 is also seen
    used loosely in this sense.
 5. ja: the course keeps 呼吸点 (beginner style) for liberty and uses ダメ
-   inside capturing races; the problem bank uses ダメ throughout. A Japanese
-   reviewer may prefer ダメ everywhere.
+   inside capturing races. v13 brought the problem bank's own hints in line
+   (呼吸点 outside races; 外ダメ / 内ダメ / ダメを詰める in races and seki).
+   One endgame hint in messages.js (`problem.endgame.atari.hint`) still says
+   ダメ. A Japanese reviewer may prefer ダメ everywhere; if so, change both
+   together.
 6. ko 오궁도화 (crossed five) and 판육궁 (rectangular six) in the problem
    bank. I kept them as the author wrote them, but I have not confirmed them.
 7. v5 intermediate course (all model-written, none reviewed by a native
@@ -397,3 +434,14 @@ The items I am least sure about:
    what both lessons show; ko **어깨짚기** / ja **カタツキ** for the shoulder
    hit; ja **大局観** and ko **전체 판단** for whole-board judgement; zh
    **拆兼逼**; ko **고급** / ja **上級** as the level name.
+12. v13 advanced units (model-written, not reviewed by a native speaker):
+   ko **모양** for moyo (세력권 is also used); ko **밑붙임** and
+   **날일자로 받기**; ko **2선 젖힘**; ko **가볍게 두기**; zh **夹击兼拆**; ja
+   **小ゲイマに受ける** (the answer to the knight's approach at the 3-4 point
+   may have a set name); ko **임해봉** (Rin Kaiho) and **후지사와 슈코**
+   (Fujisawa Shuko) in the classic games, which v12 wrote 린카이호 and
+   후지사와 히데유키.
+13. v13 (ko, judgement, endgame): ko **늘어진 패** for the approach ko and
+   ja **ヨセコウ**; ko **중간 크기의 끝내기** / ja **中くらいのヨセ** for the
+   middle endgame (descriptive); ko **미아이 계산** / zh **见合计算** for miai
+   counting; ko **패를 해소하다** for ending a ko.

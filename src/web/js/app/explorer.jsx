@@ -6,7 +6,7 @@
  * letters head the rows in the panel. "Play from here" is the one primary
  * action.
  */
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { BLACK, formatPoints } from "../rules.js";
 import { state } from "./store.js";
 import * as X from "./explorer-ctl.js";
@@ -207,7 +207,7 @@ export function BookExitNote({ game, onGoto, inline = false }) {
   if (!n) return null;
   const Tag = inline ? "span" : "p";
   const total = game.mainLine().length - 1;
-  if (n >= total) return <Tag class="fine book-exit">{t("explorer.inBookAll", [n])}</Tag>;
+  if (n >= total) return <Tag class="fine book-exit">{tn("explorer.inBookAll", n)}</Tag>;
   return (
     <Tag class="fine book-exit">
       <button type="button" class="link" onClick={() => onGoto(n + 1)}>

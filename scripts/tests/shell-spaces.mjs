@@ -30,15 +30,14 @@ try {
     await C.boot();
     assert.equal(state.ready, true);
     assert.equal(state.space, "today");
-    assert.equal(state.play.view, "game", "v12: the empty board is Play's page");
+    // v13: no game in progress, so Play opens on its home (the suggested
+    // game with its handicap, and New game), not a blank board against opponentRank.
+    assert.equal(state.play.view, "home", "v13: Play's home, not an empty board");
     assert.equal(state.sheet?.kind, "onboarding");
-    assert.equal(state.profile.v, 9, "an empty v9 profile");
+    assert.equal(state.profile.v, 13, "an empty profile (v13: the player model's own version)");
     assert.equal(state.profile.games.length, 0);
-    assert.ok(state.game && state.game.game.moveNumber === 0, "an empty board waits");
-    // v12: Play shows that board as the game to play, so it is rated like one from New game.
-    assert.equal(state.game.rated, true);
-    assert.equal(state.game.opponent, "ai");
-    assert.ok(Number.isFinite(state.game.rank), "against a rank of the ladder");
+    assert.equal(state.game, null, "no blank game is made up");
+    assert.equal(C.playShowsBoard(), false);
     assert.ok(!("progress" in state), "no old progress object");
     // The source: boot awaits store.open() before it reads anything, and start() awaits boot before the first render.
     const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
@@ -90,7 +89,7 @@ try {
     // The settings and the player model are in the store.
     assert.equal(await store.flush(), true);
     assert.equal(store.get("settings.json").onboarded, true);
-    assert.equal(store.get("profile.json").v, 9);
+    assert.equal(store.get("profile.json").v, 13);
     assert.ok(store.get("current.json")?.sgf, "the game on the board is saved");
   });
 

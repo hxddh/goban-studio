@@ -138,6 +138,93 @@ await test("a wall that does not separate the board earns no territory", () => {
   assert.equal(t.flat().every((v) => v === 0), true);
 });
 
+// v13: a region that reaches all four sides is territory once the other
+// colour has stones in the game (they lie in a region of their own).
+const CORNER_LIFE = [
+  "..OX.....",
+  "..OX.....",
+  "OOOX.....",
+  "XXXX.....",
+  ".........",
+  ".........",
+  ".........",
+  ".........",
+  ".........",
+];
+
+await test("v13 scoring: a corner group alive and the rest owned by one side, under all three rulesets", () => {
+  const counts = territoryMap(fromRows(CORNER_LIFE).board).flat();
+  assert.equal(counts.filter((v) => v === BLACK).length, 65);
+  assert.equal(counts.filter((v) => v === WHITE).length, 4);
+  const jp = fromRows(CORNER_LIFE).score();
+  assert.equal(jp.blackTerritory, 65);
+  assert.equal(jp.whiteTerritory, 4);
+  assert.equal(jp.neutral, 0);
+  assert.equal(jp.black, 65);
+  assert.equal(jp.white, 10.5);
+  assert.equal(jp.result, "B+54.5");
+  const kr = fromRows(CORNER_LIFE, { rules: "korean" }).score();
+  assert.equal(kr.result, "B+54.5");
+  // Area: the same territory plus the stones on the board.
+  const cn = fromRows(CORNER_LIFE, { rules: "chinese" }).score();
+  assert.equal(cn.blackTerritory, 65);
+  assert.equal(cn.blackStones, 7);
+  assert.equal(cn.whiteStones, 5);
+  assert.equal(cn.black, 72);
+  assert.equal(cn.white, 16.5);
+  assert.equal(cn.result, "B+55.5");
+  assert.equal(cn.black + cn.white - cn.komi, 81);
+});
+
+await test("v13 scoring: a side group alive and the rest owned; colours swapped", () => {
+  const side = [
+    ".XO...OX.",
+    ".XO...OX.",
+    ".XOOOOOX.",
+    ".XXXXXXX.",
+    ".........",
+    ".........",
+    ".........",
+    ".........",
+    ".........",
+  ];
+  const s = fromRows(side).score();
+  assert.equal(s.blackTerritory, 53);
+  assert.equal(s.whiteTerritory, 6);
+  assert.equal(s.neutral, 0);
+  // The same with the colours swapped: White owns the open board.
+  const swap = (rows) => rows.map((r) => r.replace(/X/g, "o").replace(/O/g, "X").replace(/o/g, "O"));
+  const w = fromRows(swap(CORNER_LIFE), { rules: "chinese" }).score();
+  assert.equal(w.whiteTerritory, 65);
+  assert.equal(w.blackTerritory, 4);
+  assert.equal(w.result, "W+" + (65 + 7 + 7.5 - 9));
+});
+
+await test("v13 scoring: open regions stay dame until living stones of both colours divide the board", () => {
+  // Both colours touch the open region: dame.
+  const early = fromRows([".........", ".........", "..X......", ".........", ".........", ".........", "......O..", ".........", "........."]);
+  assert.equal(territoryMap(early.board).flat().every((v) => v === 0), true);
+  // One colour only (a lone stone, an open wall): dame, as before.
+  const lone = fromRows([".........", ".........", ".........", ".........", "....X....", ".........", ".........", ".........", "........."]);
+  assert.equal(lone.score().blackTerritory, 0);
+  // A gap in the wall joins White's corner to the open board: dame.
+  const gap = CORNER_LIFE.map((r, y) => (y === 3 ? "XX.X....." : r));
+  const g = fromRows(gap).score();
+  assert.equal(g.blackTerritory, 0);
+  // White's invasion in the open board is marked dead: the board was
+  // separated, so Black owns everything but White's living corner.
+  const invaded = CORNER_LIFE.map((r, y) => (y === 6 ? "......O.." : r));
+  const d = fromRows(invaded).score([{ x: 6, y: 6 }]);
+  assert.equal(d.blackTerritory, 65);
+  assert.equal(d.blackPrisoners, 1);
+  // Every white stone dead: no living white stone divides the board, so the
+  // open board stays dame (the guard for a board passed out almost empty).
+  const allDead = fromRows(["X........", "X..O.....", "XXXX.....", ".........", ".........", ".........", ".........", ".........", "........."]);
+  const dd = allDead.score([{ x: 3, y: 1 }]);
+  assert.equal(dd.blackTerritory, 0);
+  assert.equal(dd.blackPrisoners, 1);
+});
+
 await test("rules: rulesets, defaults and handicap compensation", () => {
   assert.deepEqual(RULESETS.map((r) => r.id), ["japanese", "chinese", "korean"]);
   assert.deepEqual(RULESETS.map((r) => r.method), ["territory", "area", "territory"]);

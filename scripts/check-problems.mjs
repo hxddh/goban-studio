@@ -14,7 +14,8 @@
  * life from the start, the answer ends in a position sekiInfo() calls seki)
  * and carry the "seki" theme; every "seki" theme problem has that goal. A
  * `shape` must name an entry of SHAPES (a classic textbook shape) with a
- * four-language name. The stored grade in problem-grades.json must match a fresh
+ * four-language name. The stored grade in problem-grades.json (v13: the human
+ * difficulty score of grade-problems.mjs and its features) must match a fresh
  * measurement. Across problems: no two share a position under the 8 board
  * symmetries (and colour swap); no theme makes up more than 40% of any grade;
  * the whole check stays within its time budget and no single problem is slow.

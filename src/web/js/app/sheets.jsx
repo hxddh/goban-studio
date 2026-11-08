@@ -359,6 +359,8 @@ function SettingsSheet({ pane: open }) {
                 <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
                 <p class="fine">{t("settings.teachingHelp")}</p>
                 <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
+                <Switch label={t("settings.confirmProblemMove")} checked={!!s.confirmProblemMove} onChange={(v) => set("confirmProblemMove", v)} />
+                <p class="fine">{t("settings.confirmProblemMoveHelp")}</p>
                 <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
                 <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
                 <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
@@ -402,6 +404,7 @@ function SettingsSheet({ pane: open }) {
                     {t("backup.import")}
                   </Button>
                 </div>
+                <UndoRestoreRow />
                 <div class="actions">
                   <Button kind="danger" onClick={C.clearData}>
                     {t("settings.clearData")}
@@ -420,7 +423,7 @@ function SettingsSheet({ pane: open }) {
                     {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
                   </span>
                   <span class="fine">{t("settings.offline")}</span>
-                  <span class="fine">{t("settings.licenses")}: Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)</span>
+                  <span class="fine">{t("v13ui.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
                 </p>
                 <UpdateRow />
                 <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />
@@ -677,21 +680,43 @@ function ShortcutsSheet() {
   );
 }
 
+/** v13: the last backup restore can be undone from its snapshot (data/backup.js). */
+function UndoRestoreRow() {
+  const snap = C.restoreSnapshot();
+  if (!snap) return null;
+  let when = "";
+  try {
+    const lang = state.settings.lang;
+    when = new Date(snap.at).toLocaleString(lang === "zh" ? "zh-CN" : lang, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch (_) {}
+  return (
+    <div class="actions">
+      <Button kind="ghost" icon="undo" data-undo-restore onClick={C.undoRestore}>
+        {t("v13.undoRestore.row", [when])}
+      </Button>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- confirm */
 
+/**
+ * A question before an action. A dangerous one (delete, replace) starts
+ * with Cancel focused (v13), so Enter or Space alone never confirms it.
+ */
 function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   return (
     <Modal
       title={title}
       footer={
         <>
-          <Button kind="ghost" onClick={C.closeSheet}>
+          <Button kind="ghost" data-autofocus={danger ? true : undefined} data-confirm-cancel onClick={C.closeSheet}>
             {t("common.cancel")}
           </Button>
           <Button
             kind={danger ? "danger-solid" : "primary"}
             class="primary"
-            data-autofocus
+            data-autofocus={danger ? undefined : true}
             onClick={() => {
               update({ sheet: null });
               onConfirm?.();

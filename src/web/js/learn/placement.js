@@ -1,15 +1,19 @@
 /**
  * v10: the placement quiz (model/player.js placementNext, placementGrade).
  * Someone who knows the rules is offered it on Learn's home before the
- * first path: six problems, one grade up after each one solved and one down
- * after each one missed. The first answer to each counts, as everywhere in
- * Learn; a hint or the answer counts as missed. The grade it ends on sets
- * where the course starts and which problems come first, until the
- * player's own results measure a solving level. Skipping is remembered too.
+ * first path. v13: 10–12 problems drawn per player (a seed), themes mixed,
+ * at least three of them life and death; one grade up after each one
+ * solved and one down after each one missed, ending early once the grade
+ * is stable. A grade counts as passed with two solves and no more misses
+ * than solves there. The first answer to each counts, as everywhere in
+ * Learn; a hint or the answer counts as missed. The grade it ends on (never
+ * above the grade of about 10 kyu) sets where the course starts and which
+ * problems come first, until the player's own results measure a solving
+ * level. Skipping is remembered too.
  *
- * state.learn.placement: { results: [{ id, grade, solved }], current } while
- * the quiz runs, else null. Leaving it for anything else ends it unfinished;
- * Learn's home offers it again.
+ * state.learn.placement: { results: [{ id, grade, solved }], current, seed }
+ * while the quiz runs, else null. Leaving it for anything else ends it
+ * unfinished; Learn's home offers it again (with a new draw).
  */
 import { t } from "../i18n.js";
 import { state, toast, update } from "../app/store.js";
@@ -24,15 +28,22 @@ export function placementOffered() {
   return offered(state.profile, state.settings);
 }
 
-/** Where the quiz is: { n, total } while it runs, else null. */
+/**
+ * Where the quiz is: { n, total } while it runs, else null. The total is
+ * the shortest quiz (MIN) until the quiz goes past it, then the longest.
+ */
 export function placementPlace() {
   const pl = state.learn.placement;
-  return pl ? { n: pl.results.length + (pl.results.some((r) => r.id === pl.current) ? 0 : 1), total: PLACEMENT.LENGTH } : null;
+  if (!pl) return null;
+  const n = pl.results.length + (pl.results.some((r) => r.id === pl.current) ? 0 : 1);
+  return { n, total: n > PLACEMENT.MIN ? PLACEMENT.MAX : PLACEMENT.MIN };
 }
 
-export function startPlacement() {
+/** Start the quiz; `seed` draws its problems (a fresh one each time unless a test gives it). */
+export function startPlacement({ seed = null } = {}) {
+  const s0 = Number.isFinite(seed) ? seed : Math.floor(Math.random() * 0x7fffffff) + 1;
   return withContent("problems", () => {
-    update((s) => (s.learn = { ...s.learn, placement: { results: [], current: null } }));
+    update((s) => (s.learn = { ...s.learn, placement: { results: [], current: null, seed: s0 } }));
     nextOne();
   });
 }
@@ -54,7 +65,7 @@ export function continuePlacement() {
 
 function nextOne() {
   const pl = state.learn.placement;
-  const id = placementNext(pl.results, PROBLEMS, GRADES);
+  const id = placementNext(pl.results, PROBLEMS, GRADES, { seed: pl.seed ?? 1 });
   if (!id) return finish();
   pl.current = id;
   openProblem(id, { placement: true });

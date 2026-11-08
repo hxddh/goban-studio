@@ -6,11 +6,12 @@
  * strength estimate's own store. Stored as `profile.json`:
  *
  *   profile = {
- *     v: 9,
+ *     v: 13,                                         // v9–v12 files say 9
  *     rating: { [size]: { mu, sigma, games, at } },  // Glicko, measured ladder
  *     history: [{ at, size, rank, pm }],             // after each rated game
  *     games: [{ id, at, size, result, won, ... }],    // own games, newest 30
- *     problems: { [id]: { tries, solved, clean, last, due, streak, solvedAt? } },
+ *     problems: { [id]: { tries, solved, clean, last, due, streak, solvedAt?,
+ *                         s, d, reps, lapses, rating, retired? } },  // v13: FSRS-style
  *     mistakes: [{ id, gameId, index, theme, loss, due, ... }],  // own games only
  *     lessons: { [id]: { done, step, at } },
  *     classics: { [id]: { done, at } },             // classic games played through
@@ -26,7 +27,8 @@
  *     v7/v8 calibration; the tables are in model/ladder.js). Each board
  *     size keeps its own estimate, all on the 19×19 θ scale the ranks live on;
  *   - spaced review: persist.js markProblem, markSolvedLate, addMistake,
- *     markMistake and the 1-3-7-21 day ladder;
+ *     markMistake; v13 replaced the 1-3-7-21 day ladder with an FSRS-style
+ *     memory model (stability and difficulty per item, graded recall);
  *   - the focus: app/plan.js playerModel, weeklyModel with the v8 rule that
  *     the first focus shown in a week is kept for that week, planDaily;
  *   - the next lesson: app/course-path.js pickNextLesson, and the taught
@@ -35,10 +37,19 @@
  *   - game records: persist.normalizeGameRecord, with themes and themeLoss.
  */
 import { LEVELS, SIZES, fromBoard, gorToTheta, isLevel, levelTheta, measuredRank, onBoard, rankToRating, ratingToRank, sizeOf, thetaToGoR } from "./ladder.js";
+import { normalizeMoveRank } from "./move-rank.js";
 
 export * from "./ladder.js";
 
-export const PROFILE_V = 9;
+/**
+ * v13: the profile's own version. Files written by v9–v12 say 9 and are
+ * migrated by normalizeProfile (problem and drill records to the memory
+ * model, placements capped); anything older than v9 or newer than this
+ * starts empty, as before (the data layer refuses to overwrite a newer file).
+ */
+export const PROFILE_V = 13;
+/** The oldest profile version normalizeProfile reads. */
+export const PROFILE_MIN_V = 9;
 export const DAY = 86400000;
 
 /* =========================================================== the rating */
@@ -133,7 +144,11 @@ function bestRated(profile) {
 
 export const MAX_GAMES = 30;
 export const MAX_MISTAKES = 200;
-/** Spaced review: 1, 3, 7, 21 days after consecutive clean solves. */
+/**
+ * The v9–v12 spaced-review ladder (1, 3, 7, 21 days after consecutive clean
+ * solves). v13 schedules with the memory model below; the ladder is kept
+ * only to read records written before it (migrateProblemRecord).
+ */
 export const LADDER = [1, 3, 7, 21];
 export const PHASES = ["opening", "middle", "endgame"];
 
@@ -167,6 +182,7 @@ export function setPriorRank(profile, rank, at = 0) {
  *     moves, confidence: "high" | "low" | null,
  *     phases: { opening|middle|endgame: { loss, mistakes, blunders, moves, accuracy } } | null,
  *     themes: { theme: count }, themeLoss?: { theme: points },
+ *     moveRank?: { rank, lo, hi, n }, moveRankUsed?,  // v13: model/move-rank.js
  *     rating: { before, after, delta } | null }   // GoR around this game's rating step
  */
 export function normalizeGame(r) {
@@ -190,6 +206,7 @@ export function normalizeGame(r) {
     for (const [k, v] of Object.entries(r.themeLoss)) if (num(v, -1) >= 0) themeLoss[k] = num(v);
   }
   const rt = obj(r.rating) && num(r.rating.after) != null ? { before: num(r.rating.before), after: num(r.rating.after), delta: num(r.rating.delta, 0) } : null;
+  const moveRank = normalizeMoveRank(r.moveRank);
   return {
     id: String(r.id ?? at),
     at,
@@ -206,8 +223,32 @@ export function normalizeGame(r) {
     phases,
     themes,
     ...(themeLoss ? { themeLoss } : {}),
+    ...(moveRank ? { moveRank } : {}),
+    ...(r.moveRankUsed === true ? { moveRankUsed: true } : {}),
     rating: rt,
   };
+}
+
+/**
+ * v13: the reading from the player's own moves (model/move-rank.js) as a
+ * weak prior. Only while a board's estimate rests on fewer than
+ * MOVE_RANK.MAX_GAMES rated games, and as a measurement of at least
+ * MOVE_RANK.SIGMA nats (about six ranks around 15 kyu): it moves a fresh
+ * estimate part of the way and narrows it a little; results against the
+ * measured levels soon outweigh it (docs/strength.md, "v13: your moves").
+ */
+export const MOVE_RANK = { SIGMA: 4, MAX_GAMES: 5 };
+
+export function applyMoveRank(entry, moveRank) {
+  const mr = normalizeMoveRank(moveRank);
+  if (!entry || !mr || !finite(entry.mu) || (entry.games || 0) >= MOVE_RANK.MAX_GAMES) return entry;
+  const at = (rank) => gorToTheta(rankToRating(rank));
+  const m = at(mr.rank);
+  const sm = Math.max(MOVE_RANK.SIGMA, Math.abs(at(mr.hi) - at(mr.lo)) / 2);
+  const s2 = entry.sigma * entry.sigma;
+  const v = 1 / (1 / s2 + 1 / (sm * sm));
+  const mu = v * (entry.mu / s2 + m / (sm * sm));
+  return { ...entry, mu: round(Math.min(MU_MAX, Math.max(MU_MIN, mu))), sigma: round(Math.sqrt(v)) };
 }
 
 /** Records as stored → a clean list, newest first, at most MAX_GAMES. */
@@ -230,21 +271,22 @@ function normalizeRatingEntry(e) {
 }
 
 function normalizeProblem(e) {
-  if (!obj(e)) return null;
-  return { tries: Math.max(0, Math.floor(num(e.tries, 0))), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0), due: num(e.due, 0), streak: Math.max(0, Math.floor(num(e.streak, 0))), ...(Number.isFinite(e.solvedAt) ? { solvedAt: e.solvedAt } : {}) };
+  return migrateProblemRecord(e);
 }
 
 function normalizeMistake(m) {
   if (!obj(m) || typeof m.id !== "string" || !m.id || m.own === false) return null;
-  return { ...m, tries: Math.max(0, Math.floor(num(m.tries, 0))), streak: Math.max(0, Math.floor(num(m.streak, 0))), due: num(m.due, 0), added: num(m.added, 0), last: num(m.last), solved: m.solved === true };
+  return { ...m, ...migrateReview(m), added: num(m.added, 0), last: num(m.last), solved: m.solved === true };
 }
 
 /**
- * Any stored value → a valid v9 profile. Anything that is not a v9
- * profile starts empty (v9 reads no earlier data); bad parts are dropped.
+ * Any stored value → a valid current profile. A v9–v12 profile (v: 9) is
+ * migrated field by field (migrateProblemRecord, migrateReview, the
+ * placement cap); anything else starts empty (v9 reads no earlier data);
+ * bad parts are dropped. Idempotent.
  */
 export function normalizeProfile(raw) {
-  if (!obj(raw) || raw.v !== PROFILE_V) return newProfile();
+  if (!obj(raw) || !Number.isInteger(raw.v) || raw.v < PROFILE_MIN_V || raw.v > PROFILE_V) return newProfile();
   const base = newProfile();
   const rating = {};
   for (const size of SIZES) rating[size] = normalizeRatingEntry(raw.rating?.[size]) || base.rating[size];
@@ -282,8 +324,167 @@ export function normalizeProfile(raw) {
   const pl = obj(raw.placement);
   let placement = null;
   if (pl && pl.skipped === true) placement = { skipped: true, at: num(pl.at, 0) };
-  else if (pl && finite(pl.grade) && pl.grade >= 1 && pl.grade <= 5) placement = { grade: Math.round(pl.grade), at: num(pl.at, 0) };
+  // v13: a placement is never above PLACEMENT.MAX_GRADE (v10–v12 stored up to 5).
+  else if (pl && finite(pl.grade) && pl.grade >= 1 && pl.grade <= 5) placement = { grade: Math.min(PLACEMENT.MAX_GRADE, Math.round(pl.grade)), at: num(pl.at, 0) };
   return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week, placement };
+}
+
+/* ======================================================= the memory model */
+
+/*
+ * v13: spaced review after FSRS (the free spaced-repetition scheduler's
+ * memory model, v4.5 formulas, its published default weights rounded).
+ * Every reviewed item (a problem, a drill from your games) keeps
+ *
+ *   s  stability: days until the chance of still solving it falls to 90 %
+ *   d  difficulty: 1 (easy for you) … 10 (hard for you)
+ *
+ * and each attempt is graded: 1 again (a miss, a hint or the answer),
+ * 2 hard (solved in the same visit after a miss), 3 good (a clean solve),
+ * 4 easy (a clean solve, quickly). The next review comes when the chance of
+ * solving it (retrievability) has fallen to 90 %, which is about `s` days
+ * after the attempt, so intervals grow past 21 days. A miss shrinks the
+ * stability instead of resetting it to a day: an item known for months
+ * comes back in a few days, not tomorrow. An item whose stability passes
+ * RETIRE_DAYS is retired: it is known and leaves review. Overdue items are
+ * taken lowest retrievability first, at most REVIEW_CAP a day
+ * (docs/plan.md, "Review").
+ */
+export const MEMORY = {
+  RETENTION: 0.9, // review when the chance of solving falls to this
+  S0: [0.5, 1.4, 3.7, 13.8], // w0–w3: first stability by grade (days)
+  D0: 5, // difficulty of a first "good"
+  DSTEP: 0.9, // w6: difficulty change per grade step
+  DREVERT: 0.03, // w7: pull towards D0 on each review
+  SUCCESS: 5.2, // e^w8: growth of stability on a success
+  SDECAY: 0.14, // w9: big stabilities grow more slowly
+  RGAIN: 1.05, // w10: a review at lower retrievability grows it more
+  HARD: 0.23, // w15: growth factor on "hard"
+  EASY: 2.88, // w16: growth factor on "easy"
+  LAPSE: 2.1, // w11: stability after a miss…
+  LAPSE_D: 0.08, // w12
+  LAPSE_S: 0.32, // w13
+  LAPSE_R: 1.59, // w14
+  MAX_DAYS: 365, // the longest interval
+  RETIRE_DAYS: 180, // stability past this: known, out of review
+  REVIEW_CAP: 12, // overdue items taken in one day, at most
+  QUICK_MS: 10000, // a clean solve faster than this counts as easy
+};
+export const RATING = { AGAIN: 1, HARD: 2, GOOD: 3, EASY: 4 };
+
+const FACTOR = 19 / 81;
+const DECAY = -0.5;
+const clampD = (d) => Math.max(1, Math.min(10, d));
+
+/** The chance of still solving an item of stability `s`, `days` after its last attempt. */
+export function retrievabilityAfter(days, s) {
+  if (!(s > 0)) return 0;
+  return Math.pow(1 + (FACTOR * Math.max(0, days)) / s, DECAY);
+}
+
+/** Retrievability of a stored item at `now` (0 for one never scheduled, 1 for a retired one). */
+export function retrievability(e, now) {
+  if (!e) return 0;
+  if (e.retired) return 1;
+  if (!(e.s > 0)) return 0;
+  return retrievabilityAfter((now - (e.last || 0)) / DAY, e.s);
+}
+
+/** Days until retrievability falls to MEMORY.RETENTION for stability `s` (at least 1). */
+export function intervalFor(s) {
+  const days = (s / FACTOR) * (Math.pow(MEMORY.RETENTION, 1 / DECAY) - 1);
+  return Math.max(1, Math.min(MEMORY.MAX_DAYS, Math.round(days)));
+}
+
+/**
+ * One graded attempt on an item's memory state { s, d, reps, lapses }
+ * (s 0: never scheduled), `last` the time of the attempt before.
+ * Returns the next { s, d, reps, lapses }.
+ */
+export function nextMemory(mem, rating, now, last = null) {
+  const M = MEMORY;
+  const g = Math.max(1, Math.min(4, Math.round(rating)));
+  const reps = (mem?.reps || 0) + 1;
+  const lapses = (mem?.lapses || 0) + (g === 1 && mem?.s > 0 ? 1 : 0);
+  if (!(mem?.s > 0)) {
+    return { s: M.S0[g - 1], d: round(clampD(M.D0 - M.DSTEP * (g - 3)), 2), reps, lapses };
+  }
+  const days = last != null ? Math.max(0, (now - last) / DAY) : 0;
+  const r = retrievabilityAfter(days, mem.s);
+  const d0 = mem.d > 0 ? mem.d : M.D0;
+  const d = clampD((1 - M.DREVERT) * (d0 - M.DSTEP * (g - 3)) + M.DREVERT * M.D0);
+  let s;
+  if (g === 1) {
+    s = M.LAPSE * Math.pow(d0, -M.LAPSE_D) * (Math.pow(mem.s + 1, M.LAPSE_S) - 1) * Math.exp(M.LAPSE_R * (1 - r));
+    s = Math.max(0.2, Math.min(mem.s, s));
+  } else {
+    const bonus = g === 2 ? M.HARD : g === 4 ? M.EASY : 1;
+    s = mem.s * (1 + M.SUCCESS * (11 - d0) * Math.pow(mem.s, -M.SDECAY) * (Math.exp(M.RGAIN * (1 - r)) - 1) * bonus);
+    // A review on the day of the last one (r ≈ 1) still counts a little.
+    s = Math.max(s, mem.s * (g === 2 ? 1 : 1.2));
+  }
+  return { s: round(s, 2), d: round(d, 2), reps, lapses };
+}
+
+/** The schedule fields after an attempt: memory, due date, retirement. */
+function scheduled(mem, now) {
+  if (mem.s > MEMORY.RETIRE_DAYS) return { ...mem, due: 0, retired: true };
+  return { ...mem, due: now + intervalFor(mem.s) * DAY, retired: false };
+}
+
+/**
+ * The memory fields of a stored item, whichever version wrote it: v13
+ * records have them; a v9–v12 record (the 1-3-7-21 ladder: tries, streak,
+ * due, last) gets a stability from where it stood on the ladder and keeps
+ * its due date, so no review moves on upgrade.
+ */
+export function migrateReview(e) {
+  const tries = Math.max(0, Math.floor(num(e?.tries, 0)));
+  const streak = Math.max(0, Math.floor(num(e?.streak, 0)));
+  const due = num(e?.due, 0);
+  const base = { tries, streak, due };
+  if (finite(e?.s) && e.s >= 0) {
+    const retired = e.retired === true;
+    return {
+      ...base,
+      due: retired ? 0 : due,
+      s: e.s,
+      d: finite(e.d) ? clampD(e.d) : MEMORY.D0,
+      reps: Math.max(0, Math.floor(num(e.reps, tries))),
+      lapses: Math.max(0, Math.floor(num(e.lapses, 0))),
+      rating: finite(e.rating) ? Math.max(1, Math.min(4, Math.round(e.rating))) : null,
+      ...(retired ? { retired: true } : {}),
+    };
+  }
+  if (!tries) return { ...base, s: 0, d: MEMORY.D0, reps: 0, lapses: 0, rating: null };
+  // On the ladder, the interval last given is about the stability reached.
+  const s = streak > 0 ? LADDER[Math.min(LADDER.length - 1, streak - 1)] : MEMORY.S0[0];
+  const d = clampD(MEMORY.D0 + (streak > 0 ? -0.5 * Math.min(streak, 3) : 1.5));
+  return { ...base, s, d, reps: tries, lapses: streak > 0 ? 0 : 1, rating: streak > 0 ? RATING.GOOD : RATING.AGAIN };
+}
+
+/**
+ * A stored problem record, v9–v13 shape → the v13 shape (null when
+ * unusable). Pure; normalizeProfile applies it to every record, and the
+ * data layer's migration framework can call it directly.
+ *   { tries, solved, clean, last, due, streak, solvedAt?,
+ *     s, d, reps, lapses, rating, retired?, before? }
+ * `before` is the memory state before today's miss (see recordProblem).
+ */
+export function migrateProblemRecord(e) {
+  if (!obj(e)) return null;
+  const out = { ...migrateReview(e), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0) };
+  if (Number.isFinite(e.solvedAt)) out.solvedAt = e.solvedAt;
+  const b = obj(e.before);
+  if (b) out.before = { s: num(b.s, 0), d: num(b.d, MEMORY.D0), reps: num(b.reps, 0), lapses: num(b.lapses, 0), streak: num(b.streak, 0), last: num(b.last), day: num(b.day, 0) };
+  return out;
+}
+
+/** The grade of one attempt (see MEMORY): `solved`, `clean`, `late` (after a miss), `used` (hint/answer), `quick`. */
+export function ratingOf({ solved = false, clean = solved, late = false, used = false, quick = false } = {}) {
+  if (!solved || used) return RATING.AGAIN;
+  if (late || !clean) return RATING.HARD;
+  return quick ? RATING.EASY : RATING.GOOD;
 }
 
 /* ============================================================= mutations */
@@ -323,34 +524,49 @@ export function recordGame(profile, game) {
     merged.rated = true;
     merged.rating = { before: b, after: read.r, delta: read.r - b };
   }
+  // v13: a reading from the player's moves, once per game, as a weak prior.
+  if (merged.moveRank && !merged.moveRankUsed && !existing?.moveRankUsed) {
+    const before = rating[merged.size];
+    const after = applyMoveRank(before, merged.moveRank);
+    if (after !== before) rating = { ...rating, [merged.size]: after };
+    merged.moveRankUsed = true;
+  }
   const games = normalizeGames([merged, ...p.games.filter((g) => g.id !== merged.id)]);
   return { ...p, rating, history, games };
 }
 
 /**
- * One attempt at a problem. `clean` is a first-try solve without hint or
- * answer; anything else resets the ladder so the problem comes back
- * tomorrow. `late`: solved later in the same visit after a miss already
- * counted — the problem is solved (not clean) and the miss's schedule stays.
+ * One attempt at a problem, the first answer of a visit, graded (ratingOf)
+ * and scheduled by the memory model. `clean` is a first-try solve without
+ * hint or answer; `used`: a hint or the answer was shown (again); `quick`:
+ * a clean solve fast enough to count as easy. `late`: solved later in the
+ * same visit after a miss already counted — the problem is solved (not
+ * clean) and, without hint or answer, the miss is re-graded "hard" from
+ * the state before it, so a slip put right at once is not a full lapse.
  */
-export function recordProblem(profile, id, { solved = false, clean = solved, late = false } = {}, now = 0) {
+export function recordProblem(profile, id, { solved = false, clean = solved, late = false, used = false, quick = false } = {}, now = 0) {
   const p = normalizeProfile(profile);
   const prev = p.problems[id];
-  if (late && prev) return { ...p, problems: { ...p.problems, [id]: { ...prev, solved: true, clean: false, last: now, solvedAt: now } } };
+  if (late && prev) {
+    const next = { ...prev, solved: true, clean: false, last: now, solvedAt: now };
+    const b = prev.before;
+    if (!used && b && b.day === dayKey(now)) Object.assign(next, scheduled(nextMemory(b, RATING.HARD, now, b.last), now), { rating: RATING.HARD });
+    delete next.before;
+    return { ...p, problems: { ...p.problems, [id]: next } };
+  }
   if (late) return recordProblem(p, id, { solved: true, clean: false }, now);
-  const base = prev || { tries: 0, solved: false, clean: false, last: 0, due: 0, streak: 0 };
-  const next = { ...base, tries: base.tries + 1, last: now, clean: !!(solved && clean) };
+  const base = prev || migrateProblemRecord({});
+  const rating = ratingOf({ solved, clean, used, quick });
+  const mem = nextMemory(base, rating, now, prev?.tries > 0 ? base.last : null);
+  const next = { ...base, ...scheduled(mem, now), tries: base.tries + 1, last: now, clean: !!(solved && clean), rating };
+  delete next.before;
+  // A miss keeps the state before it for the day, so a late solve can re-grade it.
+  if (rating === RATING.AGAIN) next.before = { s: base.s, d: base.d, reps: base.reps, lapses: base.lapses, streak: base.streak, last: prev?.tries > 0 ? base.last : null, day: dayKey(now) };
   if (solved) {
     next.solved = true;
     next.solvedAt = now; // v12: when it was last solved (Today's week counts solves, not attempts)
   }
-  if (solved && clean) {
-    next.streak = (base.streak || 0) + 1;
-    next.due = now + LADDER[Math.min(LADDER.length - 1, next.streak - 1)] * DAY;
-  } else {
-    next.streak = 0;
-    next.due = now + DAY;
-  }
+  next.streak = solved && clean ? (base.streak || 0) + 1 : 0;
   return { ...p, problems: { ...p.problems, [id]: next } };
 }
 
@@ -383,18 +599,20 @@ export function addMistake(profile, m, now = 0) {
   const id = m.id ? String(m.id) : m.gameId != null && m.index != null ? `${m.gameId}-${m.index}` : null;
   if (!id) return p;
   if (p.mistakes.some((x) => x.id === id || (m.gameId != null && x.gameId === m.gameId && x.index === m.index))) return p;
-  const drill = { ...m, id, added: now, due: now, tries: 0, streak: 0, last: null, solved: false };
+  const drill = { ...m, id, added: now, due: now, tries: 0, streak: 0, s: 0, d: MEMORY.D0, reps: 0, lapses: 0, rating: null, last: null, solved: false };
   return { ...p, mistakes: [drill, ...p.mistakes].slice(0, MAX_MISTAKES) };
 }
 
-/** One attempt at a drill, on the same ladder as problems. */
+/** One attempt at a drill, scheduled by the same memory model as problems (found: good, else again). */
 export function recordMistake(profile, id, { solved = false } = {}, now = 0) {
   const p = normalizeProfile(profile);
   const i = p.mistakes.findIndex((x) => x.id === id);
   if (i < 0) return p;
   const m = p.mistakes[i];
+  const rating = solved ? RATING.GOOD : RATING.AGAIN;
+  const mem = nextMemory(m, rating, now, finite(m.last) ? m.last : null);
   const streak = solved ? (m.streak || 0) + 1 : 0;
-  const next = { ...m, tries: (m.tries || 0) + 1, streak, last: now, due: now + (solved ? LADDER[Math.min(LADDER.length - 1, streak - 1)] : 1) * DAY, solved: m.solved || !!solved };
+  const next = { ...m, ...scheduled(mem, now), rating, tries: (m.tries || 0) + 1, streak, last: now, solved: m.solved || !!solved };
   const mistakes = p.mistakes.slice();
   mistakes[i] = next;
   return { ...p, mistakes };
@@ -505,8 +723,12 @@ export const RULES = {
   MISS_RATE: 0.5, // missed at least half of them (recency-weighted)…
   MISS_MARGIN: 0.15, // …and clearly more than usual (once 10+ problems are tried)
   MISS_POINTS: 3, // a missed problem ranks like a three-point mistake
-  LEVEL_MIN: 3, // problems tried at a grade before it can set the level
-  LEVEL_CLEAN: 0.6, // clean-solve rate that counts as "solves this grade"
+  LEVEL_MIN: 5, // problems tried at a grade before it can set the level
+  LEVEL_CLEAN: 0.6, // smoothed clean-solve rate that counts as "solves this grade"…
+  LEVEL_FLOOR: 0.5, // …with every lower grade that has results at least this
+  LEVEL_PRIOR_WEIGHT: 2, // pseudo-results pulling a grade's rate towards the prior level
+  PRIOR_AT: 0.75, // expected clean rate at or below the prior level…
+  PRIOR_ABOVE: 0.35, // …and above it
   MAX_FOCUS: 2,
   MAX_REVIEWS: 3, // with a focus, reviews take at most three of the five
 };
@@ -559,13 +781,13 @@ export const FOCUS_LESSONS = {
   "eye-space": ["life-space", "life-corner"],
   "capture-eye": ["life-eye"],
   "false-eye": ["life-false-eye"],
-  ko: ["stones-ko", "adv-life-ko"],
+  ko: ["stones-ko", "ko-threat", "ko-count", "ko-resolve", "adv-life-ko"],
   seki: ["adv-life-seki"],
   race: ["race-count", "race-read", "race-practice"],
   "race-outside": ["race-outside"],
   "race-eye": ["race-read"],
   "race-big-eye": ["race-read"],
-  endgame: ["endgame-sente-gote", "endgame-first-line", "endgame-double-sente", "endgame-reverse-sente", "endgame-order"],
+  endgame: ["endgame-sente-gote", "endgame-first-line", "endgame-reverse-sente", "endgame-double-sente", "endgame-counting", "endgame-big", "endgame-japanese-counting", "endgame-order"],
 };
 
 /** The lesson to offer for a focus: the first not done, else the first. */
@@ -611,18 +833,41 @@ function area(map, key) {
 }
 
 /**
- * The player's solving level: the highest grade (1–5) where at least
- * LEVEL_MIN problems were tried and LEVEL_CLEAN of them are cleanly solved
- * now; grade 1 when none qualifies yet but enough were tried; null with
- * too few results to say.
+ * The clean-solve rate expected at `grade` from a prior level (the
+ * placement, the level before): likely at and below it, unlikely above.
  */
-export function solvingLevel(results, { fallback = true } = {}) {
+export function priorRate(grade, prior) {
+  if (!finite(prior)) return 0.5;
+  return grade <= prior ? RULES.PRIOR_AT : RULES.PRIOR_ABOVE;
+}
+
+/** The clean rate at one grade, smoothed towards the prior: (clean + k·prior) / (tried + k). */
+export function smoothedRate(clean, tried, grade, prior = null) {
+  const k = RULES.LEVEL_PRIOR_WEIGHT;
+  return (clean + k * priorRate(grade, prior)) / (tried + k);
+}
+
+/**
+ * The player's solving level (v13: it must be consistent). The highest
+ * grade (1–5) where at least LEVEL_MIN problems were tried and the clean
+ * rate, smoothed towards the prior level (`prior`: the placement or the
+ * level before; LEVEL_PRIOR_WEIGHT pseudo-results), is at least
+ * LEVEL_CLEAN — and every lower grade with results is at least
+ * LEVEL_FLOOR, so a lucky run at grade 4 over misses at grade 2 is not a
+ * level 4. Grade 1 when none qualifies yet but enough were tried; null
+ * with too few results to say.
+ */
+export function solvingLevel(results, { fallback = true, prior = null } = {}) {
   let level = null;
   let tried = 0;
+  let floorOk = true;
   for (let g = 1; g <= 5; g++) {
     const at = results.filter((r) => r.grade === g);
     tried += at.length;
-    if (at.length >= RULES.LEVEL_MIN && at.filter((r) => !r.miss).length / at.length >= RULES.LEVEL_CLEAN) level = g;
+    const clean = at.filter((r) => !r.miss).length;
+    const rate = smoothedRate(clean, at.length, g, prior);
+    if (floorOk && at.length >= RULES.LEVEL_MIN && rate >= RULES.LEVEL_CLEAN) level = g;
+    if (at.length && rate < RULES.LEVEL_FLOOR) floorOk = false;
   }
   if (fallback && level == null && tried >= RULES.LEVEL_MIN) level = 1;
   return level;
@@ -731,6 +976,10 @@ export function evidence(profile, { problems = [], grades = {}, now = 0 } = {}) 
     };
   }
 
+  // The level is smoothed towards the placement, the only prior a level has.
+  const recentProblems = results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY);
+  const prior = p.placement?.grade ?? null;
+
   /* Ranking: only claimed evidence counts towards the score. */
   for (const a of Object.values(map)) {
     a.claim = !!(a.games?.claim || a.problems?.claim || a.endgame?.claim);
@@ -742,7 +991,7 @@ export function evidence(profile, { problems = [], grades = {}, now = 0 } = {}) 
   return {
     status: focusAreas.length ? "focus" : anything ? "notEnough" : "none",
     games: { analysed: recent.length, high: high.length, needed: Math.max(0, R.MIN_GAMES - recent.length) },
-    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY)), levelOnGrade: solvingLevel(results.filter((r) => !r.drill && now - r.last <= R.PROBLEM_WINDOW_DAYS * DAY), { fallback: false }) != null },
+    problems: { tried: live.filter((r) => !r.drill).length, missed: live.filter((r) => !r.drill && r.miss).length, missRate: overall == null ? null : Math.round(overall * 100) / 100, level: solvingLevel(recentProblems, { prior }), levelOnGrade: solvingLevel(recentProblems, { fallback: false, prior }) != null },
     areas,
     focus: focusAreas,
   };
@@ -813,15 +1062,27 @@ export function focus(profile, now = 0, content = {}) {
 /* ============================================================ due reviews */
 
 /**
+ * Overdue first: the item least likely to be solved now (lowest
+ * retrievability) comes first; a new drill (never tried) before any.
+ */
+export function byRetrievability(now) {
+  return (a, b) => retrievability(a, now) - retrievability(b, now) || (a.due || 0) - (b.due || 0);
+}
+
+/**
  * What is due for review at `now`: { mistakes: [drill…], problems: [id…] },
- * each soonest first.
+ * each lowest retrievability first, at most MEMORY.REVIEW_CAP problems (an
+ * overdue backlog after time away comes back over several days, the
+ * most-forgotten first). Retired items are never due.
  */
 export function due(profile, now = 0) {
   const p = normalizeProfile(profile);
-  const mistakes = p.mistakes.filter((m) => (m.due || 0) <= now).sort((a, b) => (a.due || 0) - (b.due || 0));
+  const order = byRetrievability(now);
+  const mistakes = p.mistakes.filter((m) => !m.retired && (m.due || 0) <= now).sort(order);
   const problems = Object.entries(p.problems)
-    .filter(([, e]) => e.due && e.due <= now)
-    .sort((a, b) => a[1].due - b[1].due)
+    .filter(([, e]) => !e.retired && e.due && e.due <= now)
+    .sort((a, b) => order(a[1], b[1]))
+    .slice(0, MEMORY.REVIEW_CAP)
     .map(([id]) => id);
   return { mistakes, problems };
 }
@@ -848,7 +1109,8 @@ function seeded(now, mul = 1, add = 0) {
  */
 export function dailySet(profile, problems, grades, limit = 5, now = 0) {
   const entry = (d) => profile.problems[d.id];
-  const dueNow = problems.filter((d) => entry(d)?.due && entry(d).due <= now).sort((a, b) => entry(a).due - entry(b).due);
+  const order = byRetrievability(now);
+  const dueNow = problems.filter((d) => entry(d)?.due && entry(d).due <= now && !entry(d).retired).sort((a, b) => order(entry(a), entry(b)));
   const out = dueNow.slice(0, limit);
   const unseen = problems.filter((d) => !entry(d));
   const gradeOf = (d) => grades[d.id]?.grade || 1;
@@ -898,9 +1160,10 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
   const keyOf = (d) => focusKey(d.theme || (d.topic === "endgame" ? "endgame" : null));
 
   // 1. Reviews.
-  const dueDrills = (profile.mistakes || []).filter((m) => (m.due || 0) <= now).sort((a, b) => (a.due || 0) - (b.due || 0)).slice(0, 2);
+  const soonest = byRetrievability(now);
+  const dueDrills = (profile.mistakes || []).filter((m) => !m.retired && (m.due || 0) <= now).sort(soonest).slice(0, 2);
   for (const m of dueDrills) add({ kind: "mistake", id: m.id, role: "review", ...(focusKeys.includes(focusKey(m.theme)) ? { why: focusKey(m.theme) } : {}) });
-  const dueProblems = pool.filter((d) => entry(d)?.due && entry(d).due <= now).sort((a, b) => entry(a).due - entry(b).due);
+  const dueProblems = pool.filter((d) => entry(d)?.due && entry(d).due <= now && !entry(d).retired).sort((a, b) => soonest(entry(a), entry(b)));
   for (const d of dueProblems) {
     if (items.length >= Math.min(RULES.MAX_REVIEWS, limit - 2)) break;
     add({ kind: "problem", id: d.id, role: "review" });
@@ -952,7 +1215,7 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
   // 4. New problems at the level, then the rest as dailySet.
   if (known) for (const d of rank(pool.filter((x) => !entry(x) && !taken.has(x.id) && Math.abs(gradeOf(x) - level) <= 1))) add({ kind: "problem", id: d.id, role: "new" });
   const rest = dailySet(profile, pool.filter((d) => !taken.has(d.id)), grades, limit - items.length, now);
-  for (const d of rest) add({ kind: "problem", id: d.id, role: entry(d)?.due && entry(d).due <= now ? "review" : "new" });
+  for (const d of rest) add({ kind: "problem", id: d.id, role: entry(d)?.due && entry(d).due <= now && !entry(d).retired ? "review" : "new" });
   return items.slice(0, limit);
 }
 
@@ -1035,28 +1298,50 @@ export function bridgeAfter(lessonId, profile, { captureWins = 0 } = {}) {
 }
 
 /**
- * A first guess at the problem grade that suits a player of `rank` (kyu
- * positive, 1 dan 0), before their solving level is measured: 20 kyu and
- * weaker grade 1, 12–19 kyu 2, 6–11 kyu 3, 1–5 kyu 4, dan 5.
+ * The weakest rank (kyu positive, 1 dan 0) a grade is offered to before the
+ * player's solving level is measured (v13, conservative: problem grades
+ * are estimated, not measured on people, so a rank gets the grade a player
+ * of that rank should solve comfortably, not the hardest one they might).
+ */
+export const GRADE_RANK = { 1: 30, 2: 18, 3: 13, 4: 10, 5: 6 };
+
+/**
+ * A first guess at the problem grade that suits a player of `rank`, before
+ * their solving level is measured: the highest grade whose GRADE_RANK the
+ * rank reaches — 19 kyu and weaker grade 1, 14–18 kyu 2, 11–13 kyu 3,
+ * 7–10 kyu 4, 6 kyu and stronger 5.
  */
 export function gradeForRank(rank) {
   if (!finite(rank)) return null;
-  return rank >= 20 ? 1 : rank >= 12 ? 2 : rank >= 6 ? 3 : rank >= 1 ? 4 : 5;
+  let grade = 1;
+  for (let g = 2; g <= 5; g++) if (rank <= GRADE_RANK[g]) grade = g;
+  return grade;
 }
 
 /* ============================================================ placement */
 
 /**
- * v10: the placement quiz. Someone who already knows the rules answers a
- * few problems before Learn's first path, and the result sets where the
- * course starts and which problems come first, until their own results
- * measure a solving level. A staircase: the first problem is grade START,
- * each solved one moves a grade up, each missed one a grade down.
+ * The placement quiz (v10; v13 adaptive and randomised). Someone who
+ * already knows the rules answers 10–12 problems before Learn's first path,
+ * and the result sets where the course starts and which problems come
+ * first, until their own results measure a solving level.
+ *
+ * A staircase: the first problem is grade START, each solved one moves a
+ * grade up, each missed one a grade down (never above MAX_GRADE). Which
+ * problem of that grade is drawn per player (a seed), mixing themes, with
+ * at least LIFE life-and-death problems (kill or live). The quiz ends after
+ * MIN problems when the grade it gives has not changed over the last
+ * STABLE answers, else after MAX.
  */
-export const PLACEMENT = { LENGTH: 6, START: 2, GOALS: ["capture", "save", "kill", "live"] };
+export const PLACEMENT = { MIN: 10, MAX: 12, START: 2, MAX_GRADE: 4, LIFE: 3, STABLE: 3, PASS: 2, GOALS: ["capture", "save", "kill", "live"], LIFE_GOALS: ["kill", "live"] };
 
-/** The rank a placement grade stands for (the course start, the first problems). */
-export const PLACEMENT_RANK = { 1: 30, 2: 20, 3: 14, 4: 8, 5: 4 };
+/**
+ * The rank a placement grade stands for (the course start, the first
+ * problems). Never stronger than about 10 kyu: until the player's own
+ * results confirm it, a quiz of a dozen problems cannot place higher
+ * (PLACEMENT.MAX_GRADE is the grade of 10 kyu, gradeForRank).
+ */
+export const PLACEMENT_RANK = { 1: 30, 2: 18, 3: 13, 4: 10 };
 
 const clampGrade = (g) => Math.max(1, Math.min(5, g));
 
@@ -1064,39 +1349,78 @@ const clampGrade = (g) => Math.max(1, Math.min(5, g));
 export function placementTarget(results) {
   if (!results.length) return PLACEMENT.START;
   const last = results[results.length - 1];
-  return clampGrade(last.grade + (last.solved ? 1 : -1));
+  return Math.max(1, Math.min(PLACEMENT.MAX_GRADE, last.grade + (last.solved ? 1 : -1)));
+}
+
+/** Whether the quiz is over after `results`: MAX answers, or MIN with a stable grade. */
+export function placementDone(results) {
+  if (results.length >= PLACEMENT.MAX) return true;
+  if (results.length < PLACEMENT.MIN) return false;
+  const grades = [];
+  for (let k = results.length - PLACEMENT.STABLE + 1; k <= results.length; k++) grades.push(placementGrade(results.slice(0, k)));
+  return grades.every((g) => g === grades[0]);
 }
 
 /**
  * The next placement problem's id, or null when the quiz is over. Only
  * capturing, escaping, killing and living (no endgame or opening points),
- * nearest the target grade, each problem once, in the bank's order.
+ * each problem once, at the target grade (else the nearest). Among those it
+ * prefers a theme and then a topic not asked yet, then draws by the seed
+ * (`seed`: per player, so two players get different quizzes and a test
+ * gets the same one). Life and death is required once the problems left
+ * before MIN would otherwise not reach LIFE of them.
  */
-export function placementNext(results, problems = [], grades = {}) {
-  if (results.length >= PLACEMENT.LENGTH) return null;
+export function placementNext(results, problems = [], grades = {}, { seed = 1 } = {}) {
+  if (placementDone(results)) return null;
   const used = new Set(results.map((r) => r.id));
+  const byId = new Map(problems.map((d) => [d.id, d]));
   const target = placementTarget(results);
   const gradeOf = (d) => grades[d.id]?.grade ?? null;
-  const pool = problems.filter((d) => PLACEMENT.GOALS.includes(d.goal) && gradeOf(d) != null && !used.has(d.id));
+  let pool = problems.filter((d) => PLACEMENT.GOALS.includes(d.goal) && gradeOf(d) != null && !used.has(d.id));
   if (!pool.length) return null;
-  let best = null;
-  for (const d of pool) if (!best || Math.abs(gradeOf(d) - target) < Math.abs(gradeOf(best) - target)) best = d;
-  return best.id;
+  const asked = results.map((r) => byId.get(r.id)).filter(Boolean);
+  const life = asked.filter((d) => PLACEMENT.LIFE_GOALS.includes(d.goal)).length;
+  const left = Math.max(0, PLACEMENT.MIN - results.length);
+  if (life < PLACEMENT.LIFE && left <= PLACEMENT.LIFE - life) {
+    const lifePool = pool.filter((d) => PLACEMENT.LIFE_GOALS.includes(d.goal));
+    if (lifePool.length) pool = lifePool;
+  }
+  const near = Math.min(...pool.map((d) => Math.abs(gradeOf(d) - target)));
+  const atGrade = pool.filter((d) => Math.abs(gradeOf(d) - target) === near);
+  const themes = new Set(asked.map((d) => d.theme));
+  const topics = asked.reduce((m, d) => m.set(d.topic, (m.get(d.topic) || 0) + 1), new Map());
+  const draw = (d) => mix(`${seed}:${results.length}:${d.id}`);
+  const ranked = atGrade.slice().sort((a, b) => (themes.has(a.theme) ? 1 : 0) - (themes.has(b.theme) ? 1 : 0) || (topics.get(a.topic) || 0) - (topics.get(b.topic) || 0) || draw(a) - draw(b));
+  return ranked[0].id;
+}
+
+/** A reproducible pseudo-random number in [0, 1) from a string. */
+function mix(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d) >>> 0;
+  h ^= h >>> 12;
+  return (h >>> 0) / 0x100000000;
 }
 
 /**
- * The placement's grade: the highest grade solved at least once and missed
- * no more often than solved there; grade 1 when nothing was solved. Every
- * answer right ends at 5, every answer wrong at 1, and someone who solves
- * grade 3 but misses grade 4 is placed at 3.
+ * The placement's grade: the highest grade passed — solved at least PASS
+ * (two) times there and missed no more often than solved; grade 1 when no
+ * grade is passed. Never above MAX_GRADE. Every answer right ends at
+ * MAX_GRADE, every answer wrong at 1, and someone who solves grade 3 twice
+ * but misses grade 4 is placed at 3.
  */
 export function placementGrade(results) {
   if (!results.length) return null;
   let grade = 1;
-  for (let g = 1; g <= 5; g++) {
+  for (let g = 1; g <= PLACEMENT.MAX_GRADE; g++) {
     const at = results.filter((r) => r.grade === g);
     const solved = at.filter((r) => r.solved).length;
-    if (solved > 0 && solved >= at.length - solved) grade = g;
+    if (solved >= PLACEMENT.PASS && solved >= at.length - solved) grade = g;
   }
   return grade;
 }
@@ -1104,7 +1428,7 @@ export function placementGrade(results) {
 /** Store the placement's outcome: { grade } or { skipped: true }. */
 export function setPlacement(profile, outcome, now = 0) {
   const p = normalizeProfile(profile);
-  const placement = outcome?.skipped ? { skipped: true, at: now } : { grade: clampGrade(Math.round(outcome.grade)), at: now };
+  const placement = outcome?.skipped ? { skipped: true, at: now } : { grade: Math.min(PLACEMENT.MAX_GRADE, clampGrade(Math.round(outcome.grade))), at: now };
   return { ...p, placement };
 }
 

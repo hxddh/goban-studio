@@ -197,3 +197,143 @@ Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago.exe .\GobanStud
 ```
 
 Or right-click the exe → Properties → Digital Signatures.
+
+## CI: how the workflows handle secrets and update signing (v13)
+
+This section is about the workflows; how to create the update signing key
+itself is described in its own section.
+
+**Where secrets reach.** No secret is set at workflow or job level. In
+`build-macos.yml` the five macOS secrets are given only to the steps that
+read them: *signing mode* (which checks that all five exist), *import
+Developer ID certificate*, and the two notarization steps (the Apple ID
+trio). Signing with the imported identity needs no secret. In
+`build-windows.yml` the two Windows secrets reach only *signing mode* and
+the Authenticode step. The build jobs run with a read-only `GITHUB_TOKEN`;
+a manual run with `release_tag` uploads from a separate `upload` job that
+has write access and no secrets. `release.yml` grants `contents: write` to
+the publish job (and to the calls of the two build workflows, only so their
+`upload` job may exist; the build jobs stay read-only).
+`scripts/tests/shell-ci.mjs` fails if any of this changes.
+
+**Update signing.**
+
+| Name | Kind | What it is |
+| --- | --- | --- |
+| `UPDATE_SIGNING_KEY` | repository **secret** | The private key `scripts/sign-sums.mjs` signs `SHA256SUMS` with |
+| `UPDATE_PUBKEY` | repository **variable** (Settings → Secrets and variables → Actions → Variables) | The matching public key; not secret |
+
+- Both platform builds pass `-Dupdate-pubkey="$UPDATE_PUBKEY"` to
+  `native test` and `native build` (an empty value when the variable is not
+  set, which builds an app that does not require a signature).
+- The publish job writes `SHA256SUMS`, then, if `UPDATE_SIGNING_KEY` is
+  set, runs `node scripts/sign-sums.mjs` (the key is in that step's
+  environment only), checks that `SHA256SUMS.sig` was written, and uploads
+  it with the packages.
+- If `UPDATE_PUBKEY` is set but `UPDATE_SIGNING_KEY` is not, the release
+  fails — in the preflight, before any build, and again before publishing —
+  because those apps would refuse every update from that release. The
+  preflight sees only whether the secret exists
+  (`secrets.UPDATE_SIGNING_KEY != ''`), never its value.
+- Neither set: the release ships an unsigned `SHA256SUMS`, as before, with
+  a notice in the run.
+
+Roll-out order: add the secret first (releases start carrying
+`SHA256SUMS.sig`), then the variable (later builds start requiring it).
+Rotating the key means a release whose apps carry the new public key,
+signed with the old private key, so the installed apps accept it.
+
+**Release guards.** `release.yml` runs only when dispatched from `main`
+(`rehearse=true` runs from any branch and publishes nothing), stops unless
+the tag is `v` + `package.json`'s version (a warning in a rehearsal), and
+creates the tag with `gh release create --target "$GITHUB_SHA"` — the commit
+every package was built from. A tag that already exists at another commit
+stops the release.
+
+## Signed updates (v13)
+
+Code signing tells the operating system who built the app. The in-app
+updater needs a second, independent answer: is this release's
+`SHA256SUMS` the one the maintainer published? Without it the updater can
+only check that the downloaded zip matches `SHA256SUMS` from the same
+GitHub release — anyone who can publish a release (a leaked token, a
+compromised workflow) can publish matching sums. So the updater can also
+require an **Ed25519 signature over `SHA256SUMS`**, made with a key that
+never lives in the release itself.
+
+| Name | Kind | What it is |
+| --- | --- | --- |
+| `UPDATE_PUBKEY` | repository **variable** | Base64 of the 32-byte Ed25519 public key. The build passes it as `-Dupdate-pubkey=…`; it is compiled into the app. |
+| `UPDATE_SIGNING_KEY` | repository **secret** | The private key (PKCS#8 PEM, or base64 of the 32-byte seed). Only `scripts/sign-sums.mjs` in the release job reads it. |
+
+**Create the pair** on a trusted machine (nothing is written to disk):
+
+```sh
+node scripts/gen-update-key.mjs
+# UPDATE_PUBKEY (repository variable; build option -Dupdate-pubkey):
+# 6kps…0iw=
+# UPDATE_SIGNING_KEY (repository secret; never commit it):
+# -----BEGIN PRIVATE KEY----- …
+```
+
+Store the first value as the variable `UPDATE_PUBKEY` and the PEM as the
+secret `UPDATE_SIGNING_KEY` (Settings → Secrets and variables → Actions),
+then clear the terminal. Never commit either; no key is in this repository.
+
+**What the workflows do with them.**
+
+- `build-macos.yml` and `build-windows.yml` add
+  `-Dupdate-pubkey="${{ vars.UPDATE_PUBKEY }}"` to the native build. Empty
+  (the variable is not set) means an unsigned-updates build, exactly as
+  before v13.
+- `release.yml`, right after it writes `SHA256SUMS`, runs
+  `node scripts/sign-sums.mjs SHA256SUMS` with `UPDATE_SIGNING_KEY` (and
+  `UPDATE_PUBKEY`, so a key that does not match the shipped public key fails
+  the release instead of publishing updates nobody can install) in that
+  step's environment only, and publishes `SHA256SUMS.sig` next to
+  `SHA256SUMS`.
+
+**What the app does** (`src/install.zig`). Built with a key, it downloads
+`SHA256SUMS`, then `SHA256SUMS.sig` (one line: the base64 of the 64-byte
+detached signature over the exact bytes of `SHA256SUMS`), and verifies it
+with `std.crypto.sign.Ed25519` **before** it reads any checksum or starts
+the large download. A missing signature is `NoSignature`, a wrong one
+`BadSignature`; either way nothing is installed and the page offers the
+download page instead. Built without a key, the updater checks checksums
+only and does not look for a signature. A malformed `-Dupdate-pubkey`
+fails the build.
+
+**Rolling it out.** Installed apps verify with the key they were built
+with. The first release built with `UPDATE_PUBKEY` set must itself carry
+`SHA256SUMS.sig`, and every later release too — a signed app refuses an
+unsigned update. Older (unsigned-updates) apps keep updating as before, and
+the first signed release they install turns the check on.
+
+**Rotating or losing the key.** A new key pair needs a release built with
+the new public key; apps built with the old key will refuse it (its
+signature is by the new key), so those users update once by hand from the
+releases page. Keep an offline copy of `UPDATE_SIGNING_KEY`.
+
+**Check a release by hand:**
+
+```sh
+node -e '
+const fs = require("fs");
+import("./scripts/sign-sums.mjs").then(({ publicKeyFrom, verifySums }) =>
+  console.log(verifySums(fs.readFileSync("SHA256SUMS"), fs.readFileSync("SHA256SUMS.sig", "utf8"), publicKeyFrom(process.env.UPDATE_PUBKEY)) ? "signature OK" : "BAD signature"));'
+```
+
+### Other update safeguards (v13)
+
+- **No downgrades, no unchecked tags.** The app remembers the tag its own
+  last successful update check returned; `studio.updateDownload` and
+  `studio.updateApply` accept only that tag, and only when it is
+  semver-newer than the running version (`NotChecked`, `NotNewer`). The
+  updater CI probe (`GOBAN_UPDATE_PROBE_TAG`) may download one named tag to
+  verify and discard it, never to install it.
+- **The app quits only for a helper that runs.** The embedded helper takes
+  an exclusive lock for the installation (`.<name>.goban-lock` beside it; a
+  second helper refuses) and then creates a "started" marker in the staging
+  directory. The app waits up to 5 s for it; otherwise it claims the marker
+  itself (a late helper then gives up), stays open and reports
+  `HelperNotStarted`.

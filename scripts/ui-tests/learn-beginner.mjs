@@ -286,10 +286,17 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
         { timeout: 15000, polling: 100 },
       ).catch(async (e) => {
         // Say where the game stood, so a stall names its cause.
-        const at = await page.evaluate(() => {
+        const at = await page.evaluate((pt) => {
           const s = window.__state.game;
-          return { moves: s.game.moveNumber, turn: s.game.turn, thinking: s.thinking, pending: !!s.pending, proposal: !!s.proposal, phase: s.game.phase, result: s.game.current.result || null, sheet: window.__state.sheet?.kind || null, toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent) };
-        });
+          const G = s.game;
+          const rows = [];
+          for (let y = 0; y < 9; y++) {
+            let r = "";
+            for (let x = 0; x < 9; x++) r += { 1: "X", "-1": "O", 0: "." }[G.board.get([x, y])];
+            rows.push(r);
+          }
+          return { rows: rows.join("/"), can: G.canPlay(pt.x, pt.y), human: s.humanColor, ghost: window.__board?.model?.ghost ?? null, moves: s.game.moveNumber, turn: s.game.turn, thinking: s.thinking, pending: !!s.pending, proposal: !!s.proposal, phase: s.game.phase, result: s.game.current.result || null, sheet: window.__state.sheet?.kind || null, toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent) };
+        }, pt);
         throw new Error(`${e.message} — after clicking ${pt.x},${pt.y} at move ${n}: ${JSON.stringify(at)}`);
       });
     }

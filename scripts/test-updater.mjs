@@ -23,6 +23,10 @@
  *              app (and, on Windows, the profile) and start it again.
  *   no exit    The "app" never exits: the helper must give up and change
  *              nothing.
+ *   lock       (v13) While one helper waits for the app, a second helper for
+ *              the same installation must refuse (exit 2) without creating
+ *              its "started" marker; the first one's marker exists, and its
+ *              lock is gone once it exits.
  *   read-only  The real app, launched from a folder this user cannot write
  *              (GOBAN_UPDATE_PROBE_OUT), must report canInstall:false,
  *              blocked:"ReadOnlyLocation"; launched from a writable copy,
@@ -139,12 +143,12 @@ function fakeApp(ms) {
   return child;
 }
 
-function runHelper({ pid, target, staged, ack, log, ackTimeout = 60, exitTimeout = 120, cleanup = "" }) {
+function runHelper({ pid, target, staged, ack, log, ackTimeout = 60, exitTimeout = 120, cleanup = "", started = "" }) {
   const env = { ...process.env };
   // The real app keeps its WebView2 profile in the install folder by default.
   delete env.WEBVIEW2_USER_DATA_FOLDER;
   const argv = isMac
-    ? ["/bin/sh", [helper, String(pid), target, staged, ack, log, String(ackTimeout), cleanup]]
+    ? ["/bin/sh", [helper, String(pid), target, staged, ack, log, String(ackTimeout), cleanup, ...(started ? [started] : [])]]
     : [
         powershell,
         [
@@ -171,6 +175,7 @@ function runHelper({ pid, target, staged, ack, log, ackTimeout = 60, exitTimeout
           "-LockRetries",
           "30",
           ...(cleanup ? ["-CleanupDir", cleanup] : []),
+          ...(started ? ["-StartedFile", started] : []),
         ],
       ];
   if (isMac) env.GOBAN_UPDATE_EXIT_TIMEOUT = String(exitTimeout);
@@ -387,6 +392,34 @@ if (!liveTag) {
       assert.equal(fs.existsSync(path.join(target, markerRel)), false);
       assert.deepEqual(leftovers(apps), []);
       assert.match(fs.readFileSync(log, "utf8"), /did not exit/);
+    } finally {
+      app.kill();
+    }
+  });
+
+  await test("lock: a second helper for the same installation changes nothing", async () => {
+    const dir = tempDir("lock2");
+    const target = install(dir);
+    const staged = stage(dir);
+    const root = path.dirname(path.dirname(path.dirname(staged)));
+    const log = path.join(dir, "update.log");
+    const app = fakeApp(120000);
+    const startedA = path.join(root, "goban-update-started-aa01.txt");
+    const startedB = path.join(root, "goban-update-started-bb02.txt");
+    try {
+      const first = runHelper({ pid: app.pid, target, staged, ack: path.join(root, "goban-update-ack-aa01.txt"), log, exitTimeout: 30, started: startedA });
+      await waitFor(() => fs.existsSync(startedA), 60000, "the first helper's started marker");
+      const second = await runHelper({ pid: app.pid, target, staged, ack: path.join(root, "goban-update-ack-bb02.txt"), log, exitTimeout: 10, started: startedB });
+      assert.equal(second, 2, "the second helper refuses");
+      assert.equal(fs.existsSync(startedB), false);
+      assert.match(fs.readFileSync(log, "utf8"), /another update helper/);
+      // The app never exits here: the first helper gives up, changing nothing.
+      assert.equal(await first, 2);
+      assert.equal(fs.existsSync(path.join(target, markerRel)), false);
+      assert.deepEqual(leftovers(dir), [], "the lock is gone");
+    } catch (e) {
+      showLog(log);
+      throw e;
     } finally {
       app.kill();
     }

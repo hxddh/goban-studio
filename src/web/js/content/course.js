@@ -15,7 +15,8 @@
  *
  * Diagram notation is the solver's: X/O black/white, x/o key stones, '.'
  * empty (inside the problem region), ',' empty outside the region.
- * Rules are Japanese with 6.5 komi. `scripts/check-course.mjs` proves every
+ * Rules are Japanese with 6.5 komi (v13: game-area-scoring teaches Chinese
+ * area scoring). `scripts/check-course.mjs` proves every
  * problem with the solver and checks every place step.
  *
  * Schema. A unit is { id, title, summary, lessons, level? }; `level:
@@ -1162,7 +1163,7 @@ const BEGINNER = [
       },
       {
         id: "connect-hanging",
-        title: L("虎口", "Hanging connection", "호구", "虎の口"),
+        title: L("虎口", "Hanging connection", "호구", "カケツギ"),
         steps: [
           {
             kind: "read",
@@ -2101,10 +2102,10 @@ const BEGINNER = [
     id: "game",
     title: L("围地、计算与对局", "Territory, scoring and playing a game", "집, 계가, 그리고 대국", "地、計算、対局"),
     summary: L(
-      "日本规则下怎样算胜负：地、提子、贴目；布局的顺序；怎样结束一盘棋。",
-      "How a game is won under Japanese rules: territory, prisoners and komi; the order of the opening; and how a game ends.",
-      "일본 규칙의 승패: 집, 따낸 돌, 덤. 포석의 순서와 대국을 끝내는 법.",
-      "日本ルールでの勝ち負け：地、アゲハマ、コミ。布石の順序と、対局の終え方。",
+      "怎样算胜负：日本规则数目（地、提子、贴目），中国规则数子；布局的顺序；怎样结束一盘棋。",
+      "How a game is won: territory scoring under Japanese rules (territory, prisoners and komi) and area scoring under Chinese rules; the order of the opening; and how a game ends.",
+      "승패를 가리는 법: 일본 규칙의 계지(집, 따낸 돌, 덤)와 중국 규칙의 계자. 포석의 순서와 대국을 끝내는 법.",
+      "勝ち負けの決め方：日本ルールの計地（地、アゲハマ、コミ）と中国ルールの計子。布石の順序と、対局の終え方。",
     ),
     lessons: [
       {
@@ -2168,10 +2169,10 @@ const BEGINNER = [
           {
             kind: "read",
             text: L(
-              "日本规则：地加上提掉的子就是你的得分。黑棋先下占便宜，所以白棋另得6目半贴目。这盘棋黑31目，白28目加6目半是34目半，白胜3目半。",
-              "Under Japanese rules your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 31 points and White 28 + 6.5 = 34.5: White wins by 3.5.",
-              "일본 규칙에서는 집에 따낸 돌을 더한 것이 점수입니다. 흑이 먼저 두는 이점이 있어 백은 덤 6집 반을 받습니다. 이 판은 흑 31집, 백 28집에 덤을 더해 34집 반, 백이 3집 반 이깁니다.",
-              "日本ルールでは、地とアゲハマの合計が得点です。黒は先に打てる分有利なので、白はコミ6目半をもらいます。この碁は黒31目、白28目＋6目半で34目半、白の3目半勝ちです。",
+              "日本规则数目：地加上提掉的子就是你的得分。黑棋先下占便宜，所以白棋另得6目半贴目。这盘棋黑31目，白28目加6目半是34目半，白胜3目半。本应用的新对局默认用日本规则，可以在“设置 › 对局 › 新对局的规则”里改成中国规则（数子，下一课讲）或韩国规则。",
+              "Under Japanese rules (territory scoring) your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 31 points and White 28 + 6.5 = 34.5: White wins by 3.5. New games in this app use Japanese rules unless you change it in Settings › Playing › Rules for new games, where you can choose Chinese rules (area scoring, the next lesson) or Korean rules.",
+              "일본 규칙(계지)에서는 집에 따낸 돌을 더한 것이 점수입니다. 흑이 먼저 두는 이점이 있어 백은 덤 6집 반을 받습니다. 이 판은 흑 31집, 백 28집에 덤을 더해 34집 반, 백이 3집 반 이깁니다. 이 앱의 새 대국은 기본이 일본 규칙이며, '설정 › 대국 › 새 대국의 규칙'에서 중국 규칙(계자, 다음 강의)이나 한국 규칙으로 바꿀 수 있습니다.",
+              "日本ルール（計地）では、地とアゲハマの合計が得点です。黒は先に打てる分有利なので、白はコミ6目半をもらいます。この碁は黒31目、白28目＋6目半で34目半、白の3目半勝ちです。このアプリの新しい対局は日本ルールが基本で、「設定 › 対局 › 新しい対局のルール」で中国ルール（計子、次の課）や韓国ルールに変えられます。",
             ),
             board: END,
           },
@@ -2211,6 +2212,63 @@ const BEGINNER = [
               "Follow the black wall upward and find the hole.",
               "흑 벽을 따라 위로 올라가 구멍을 찾으세요.",
               "黒の壁を上へたどって、穴を見つけましょう。",
+            ),
+          },
+        ],
+      },
+      {
+        id: "game-area-scoring",
+        title: L("数子法（中国规则）", "Area scoring (Chinese rules)", "계자 (중국 규칙)", "計子（中国ルール）"),
+        steps: [
+          {
+            kind: "read",
+            text: L(
+              "中国规则用数子法：终局拿掉死子以后，数一方盘上的活子加上它围住的空点，提子不算。这盘棋黑棋11个子加31目是42子，白棋11个子加28目是39子。黑先占便宜，贴3又3/4子，也就是7目半：白棋39加7.5是46.5，白胜4目半。数子和数目的结果通常只差1目左右。数子时单官也算：填一个单官就多一个子，所以单官一定要填完；在自己地里补一手也不亏，因为棋子本身也算数。",
+              "Chinese rules use area scoring: once dead stones are removed, each side counts its stones on the board plus the empty points they surround; prisoners do not count. In this game Black has 11 stones and 31 points of territory, 42 in all; White has 11 stones and 28 points, 39. Black moved first, so White gets 7.5 points of komi: 39 + 7.5 = 46.5, and White wins by 4.5. Area and territory scoring usually differ by about a point. Under area scoring neutral points count too: each one you fill is a stone on the board, so fill them all; and a defensive move inside your own territory costs nothing, because the stone itself counts.",
+              "중국 규칙은 계자로 셉니다. 사석을 들어낸 뒤, 판 위에 살아 있는 자기 돌과 그 돌이 둘러싼 빈 점을 더합니다. 따낸 돌은 세지 않습니다. 이 판에서 흑은 돌 11개와 집 31집으로 42, 백은 돌 11개와 28집으로 39입니다. 흑이 먼저 두었으므로 백은 덤 7집 반을 받아 46.5가 되고, 백이 4집 반 이깁니다. 계자와 계지의 결과는 보통 1집 정도만 다릅니다. 계자에서는 공배도 셈에 들어갑니다. 공배를 메우면 돌 하나가 늘어나니 모두 메우세요. 자기 집 안에 손질해도 손해가 없습니다. 돌 자체가 한 점이기 때문입니다.",
+              "中国ルールは計子で数えます。死に石を取り除いた後、盤上の生きている自分の石と、それが囲んだ空点を合わせて数えます。アゲハマは数えません。この碁では黒は石11と地31で42、白は石11と地28で39です。黒が先に打ったので白はコミ7目半をもらって46.5、白の4目半勝ちです。計子と計地の結果はふつう1目くらいしか違いません。計子ではダメも数に入ります。ダメを詰めれば石が一つ増えるので、すべて詰めましょう。自分の地の中に手入れしても損はありません。石そのものが一つと数えられるからです。",
+            ),
+            board: END,
+          },
+          {
+            kind: "place",
+            text: L(
+              "数子时每个单官都算一个子。黑白两道墙中间还有一个单官，填上它。",
+              "Under area scoring every neutral point is worth a point. There is still one between the black and white walls: fill it.",
+              "계자에서는 공배 하나하나가 한 점입니다. 흑백 두 벽 사이에 공배가 하나 남아 있습니다. 메우세요.",
+              "計子ではダメも一つ一目です。黒と白の壁の間にダメが一つ残っています。詰めましょう。",
+            ),
+            board: b9({ ...END_ROWS, 5: ". . . X . O . . ." }),
+            toMove: 1,
+            accept: [{ x: 4, y: 5 }],
+            success: L("多了一个子：数子时这就是一目。", "One more stone on the board: under area scoring that is a point.", "돌이 하나 늘었습니다. 계자에서는 그것이 한 점입니다.", "石が一つ増えました。計子ではそれが一目です。"),
+            wrong: L(
+              "找那个同时挨着黑子和白子的空点。",
+              "Find the empty point that touches both black and white stones.",
+              "흑돌과 백돌에 함께 닿은 빈 점을 찾으세요.",
+              "黒石と白石の両方に接する空点を探しましょう。",
+            ),
+          },
+          {
+            kind: "place",
+            text: L(
+              "还剩两个单官，上下各一个。先填一个；按中国规则，两个都要填完才停一手。",
+              "Two neutral points are left, one higher and one lower. Fill one of them; under Chinese rules you fill both before passing.",
+              "공배가 위아래에 하나씩 둘 남았습니다. 하나를 메우세요. 중국 규칙에서는 둘 다 메운 뒤에 패스합니다.",
+              "ダメが上と下に一つずつ、二つ残っています。一つ詰めましょう。中国ルールでは両方詰めてからパスします。",
+            ),
+            board: b9({ ...END_ROWS, 3: ". . . X . O . . .", 6: ". . . X . O . . ." }),
+            toMove: 1,
+            accept: [
+              { x: 4, y: 3 },
+              { x: 4, y: 6 },
+            ],
+            success: L("白棋会填另一个，双方各得一子，胜负不变。", "White will fill the other; one each, and the result stays the same.", "백이 다른 하나를 메우면 한 점씩이라 승패는 그대로입니다.", "白がもう一つを詰めれば一つずつで、勝負は変わりません。"),
+            wrong: L(
+              "单官是夹在黑墙和白墙之间、谁也没围住的空点。",
+              "A neutral point is an empty point between the black and white walls that neither side surrounds.",
+              "공배는 흑 벽과 백 벽 사이에 끼어 어느 쪽도 둘러싸지 못한 빈 점입니다.",
+              "ダメは黒の壁と白の壁の間にあって、どちらも囲んでいない空点です。",
             ),
           },
         ],
@@ -2369,7 +2427,7 @@ const BEGINNER = [
               "백이 흑돌에 붙어 끊는 점을 노립니다. 꽉 잇기나 호구로 지키세요.",
               "白が黒石に接して切りの点を狙っています。カタツギかカケツギで守りましょう。",
             ),
-            board: b9({ 3: ". . . X O . . . .", 4: ". . . . X . . . .", 6: ". . . . . . O . ." }),
+            board: b9({ 3: ". . . X O O . . .", 4: ". . . . X . . . .", 6: ". . . . . . O . ." }),
             toMove: 1,
             accept: [
               { x: 3, y: 4 },

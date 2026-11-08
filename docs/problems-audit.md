@@ -542,3 +542,165 @@ steps.
   were checked against the fully playable version, the sums were not (too
   slow to read with every point playable).
 - The review was done by a language model, not a strong human player.
+
+# v13 grading: difficulty for a person, not for the solver
+
+Until v12 a problem's grade was the quintile of the solver's difficulty
+score, which is mostly search effort (`log2` of the nodes of the
+first-move proof, plus the answer's length). Search effort is not human
+difficulty: a plain seven-move ladder has a huge proof (every extension
+can be read out to the edge) and one obvious move after another, so
+`capture-ladder-00` was grade 5; `capture-basic-01` (take one stone) was
+grade 3 while its twin `capture-basic-02` was grade 1, only because the
+first sits in a wider diagram. The placement quiz then mapped grade 5 to
+about 4 kyu, so a 20-kyu player who can read a ladder could be placed in
+the 5k–1d course (review §2.2).
+
+## The score
+
+`scripts/grade-problems.mjs` computes, from the solver's proof and answer
+line (no hand grading):
+
+    score = base(theme)
+          + reading
+          + 0.45 · log2(1 + plausible wrong first moves)
+          − 0.35 · (correct first moves − 1)
+          + 0.05 · log2(1 + solver nodes)
+
+- **base(theme)**: how hard the idea is before any reading
+  (`THEME_BASE`): atari 0, capture-to-save and ladder 0.2, escape and
+  connect 0.4, double atari 0.5, cut and net 0.6, snapback 0.9, throw-in
+  and connect-and-die 1.1, shortage 1.2, capture for an eye 1.4, eye space
+  1.5, vital point 1.6, false eye, placement and outside liberties 1.8,
+  race 2.0, eye versus no eye 2.2, big eye 2.6, ko 2.7, seki 2.8; the
+  endgame themes 0.5 (hane-connect) to 2.4 (comparing sums).
+- **reading**: reading that actually branches. For every defender reply
+  in the answer line, b is the number of defences a person has to
+  consider there that still need an answer: legal moves among the
+  plausible points (the whole region of a life-and-death problem; on the
+  open board the key stones' liberties and the liberties of the attacking
+  chains next to them that are short of liberties), not met by an
+  immediate capture, and not already settled for the learner (the solver's
+  `status`). Each reply adds w(b): w(0) = 0.1, w(b) = min(1, 0.15 +
+  0.2·(b − 1)). A forced reply (a ladder's single extension) adds 0.15;
+  a node with four or five real defences adds most of a point. On the open
+  board (capture and save problems) w is halved: each push meets the
+  obvious block, where in an eye-space fight each defence needs its own
+  answer.
+- **plausible wrong first moves**: legal first moves among the same
+  plausible points that fail, the size of the space a person searches
+  (region size and stone count enter here, not separately).
+- **correct first moves**: alternatives make a problem easier.
+- **solver nodes**: a trace of the old measure, so that among otherwise
+  equal problems the one with the larger proof ranks higher.
+
+Endgame problems are counted, not read: base(theme) + 0.35 · max(0,
+counting score − 4), where the counting score is the solver's (moves to
+find, regions, margin to the next best move).
+
+The grade buckets the score by `GRADE_CUTS` in problems.js, fixed at
+1.85 / 2.6 / 3.3 / 4.2: near this bank's quintiles, so the grades stay
+balanced (113 / 108 / 107 / 115 / 100 of 543), but chosen by the spot checks
+below rather than forced. `problem-grades.json` stores the score and its two
+features (`reading`, `wrong`) with the grade; `check-problems.mjs` recomputes
+every entry and fails on any difference, and still keeps every theme under
+40 % of every grade. Grading the bank takes about 21 s. Problems added
+later need `node scripts/grade-problems.mjs` like before.
+
+## Spot checks
+
+| Problem | Theme | v12 grade | v13 score | v13 grade |
+| --- | --- | ---: | ---: | ---: |
+| capture-basic-01 | atari | 3 | 1.56 | 1 |
+| capture-basic-02 | atari | 1 | 1.2 | 1 |
+| capture-ladder-00 | ladder | 5 | 1.49 | 1 |
+| capture-ladder-01 | ladder | 5 | 1.79 | 1 |
+| capture-net-01 | net | 5 | 3.11 | 3 |
+| capture-net-02 | net | 5 | 2.57 | 2 |
+| snapback-01 | snapback | 1 | 1.55 | 1 |
+| shape-straight-three-01 | placement | 1 | 2.83 | 3 |
+| shape-bent-three-01 | placement | 1 | 2.83 | 3 |
+| shape-pyramid-four-01 | placement | 2 | 3.13 | 3 |
+| shape-bulky-five-01 | placement | 2 | 3.56 | 4 |
+| shape-rabbity-six-01 | placement | 4 | 3.89 | 4 |
+| shape-crossed-five-01 | placement | 2 | 3.32 | 4 |
+| race-01 | race | 2 | 2.85 | 3 |
+| seki-01 | seki | 5 | 6.36 | 5 |
+| kill-ko-01 | ko | 4 | 5.41 | 5 |
+| life-ko-02 | ko | 5 | 6.89 | 5 |
+
+| Theme | Problems | v12 mean | v13 mean | v13 grades 1–5 |
+| --- | ---: | ---: | ---: | --- |
+| atari | 17 | 1.7 | 1.0 | 17 / 0 / 0 / 0 / 0 |
+| capture-to-save | 15 | 2.3 | 1.0 | 15 / 0 / 0 / 0 / 0 |
+| double-atari | 15 | 3.0 | 1.2 | 13 / 1 / 1 / 0 / 0 |
+| ladder | 22 | 4.8 | 1.2 | 17 / 5 / 0 / 0 / 0 |
+| escape | 21 | 2.6 | 1.2 | 16 / 5 / 0 / 0 / 0 |
+| connect | 16 | 2.7 | 1.4 | 10 / 5 / 1 / 0 / 0 |
+| cut | 18 | 3.1 | 1.6 | 8 / 10 / 0 / 0 / 0 |
+| snapback | 14 | 1.7 | 1.6 | 5 / 9 / 0 / 0 / 0 |
+| net | 23 | 3.9 | 1.7 | 7 / 15 / 1 / 0 / 0 |
+| connect-and-die | 18 | 2.8 | 2.0 | 2 / 14 / 2 / 0 / 0 |
+| hane-connect | 3 | 2.0 | 1.0 | 3 / 0 / 0 / 0 / 0 |
+| throw-in | 15 | 4.3 | 2.5 | 0 / 8 / 7 / 0 / 0 |
+| capture-eye | 21 | 1.6 | 2.5 | 0 / 14 / 4 / 3 / 0 |
+| sente-gote | 7 | 2.6 | 2.9 | 0 / 4 / 0 / 3 / 0 |
+| reverse-sente | 4 | 1.8 | 3.0 | 0 / 0 / 4 / 0 / 0 |
+| false-eye | 19 | 1.5 | 3.1 | 0 / 3 / 12 / 4 / 0 |
+| shortage | 6 | 4.5 | 3.2 | 0 / 0 / 5 / 1 / 0 |
+| race-outside | 12 | 3.0 | 3.4 | 0 / 0 / 9 / 1 / 2 |
+| race | 22 | 2.7 | 3.6 | 0 / 1 / 7 / 14 / 0 |
+| eye-space | 23 | 3.1 | 3.7 | 0 / 3 / 4 / 13 / 3 |
+| deiri | 10 | 2.7 | 3.7 | 0 / 0 / 6 / 1 / 3 |
+| double-sente | 4 | 3.5 | 3.8 | 0 / 1 / 0 / 2 / 1 |
+| placement | 54 | 2.7 | 3.8 | 0 / 1 / 17 / 28 / 8 |
+| vital-point | 93 | 3.2 | 3.8 | 0 / 9 / 24 / 32 / 28 |
+| race-eye | 7 | 3.3 | 4.0 | 0 / 0 / 3 / 1 / 3 |
+| monkey-jump | 2 | 3.0 | 4.0 | 0 / 0 / 0 / 2 / 0 |
+| endgame-compare | 4 | 4.5 | 4.8 | 0 / 0 / 0 / 1 / 3 |
+| ko | 19 | 3.5 | 4.8 | 0 / 0 / 0 / 4 / 15 |
+| seki | 23 | 3.6 | 4.8 | 0 / 0 / 0 / 4 / 19 |
+| race-big-eye | 16 | 4.4 | 4.9 | 0 / 0 / 0 / 1 / 15 |
+
+Wanted: ladders and nets at 1–2, basic captures at 1, the classic eye
+shapes at 2–4, ko, seki and races at 3–5. Met, with three exceptions:
+`capture-net-01` (three real defences at each of three replies) and
+`capture-double-atari-02` (score 2.60, on the cut) are grade 3, and
+`race-45` (three correct first moves) is grade 2. All 17 atari and 15
+capture-to-save problems are grade 1; 44 of 45 ladders and nets are grade
+1–2; all 28 classic-shape problems are grade 2–4. Grade 5 is now ko, seki,
+big-eye races and the vital points of the larger shapes.
+
+## What it still is not
+
+The score is a model with hand-set weights, checked against Go teaching
+conventions, not against people: no player has solved these problems for
+the grades. Two things would calibrate it: a strong player ordering a
+sample by difficulty, or (opt-in, anonymous) solve rates from players,
+fitted as an Elo per problem and per player. Until then the placement
+quiz and the rank-to-grade mapping stay conservative (docs/plan.md,
+"Placement").
+
+## Review transforms (v13)
+
+A problem shown again in review is turned or mirrored (one of the eight
+board symmetries) and, except endgame problems, often recoloured, so that
+White plays (`src/web/js/learn/transform.js`; docs/plan.md, "Review").
+`node scripts/check-transforms.mjs` proves the whole bank under a
+transform each (543 problems in about 22 s, locally): the solver's
+`validate()` passes, the correct first moves are exactly the stored ones
+mapped, ko and seki results are kept, and a recoloured problem is played by
+the other colour. The unit tests run a sample of 60. `--all-syms` checks all
+eight symmetries of every problem (about 3 minutes); it found two problems
+the solver did not treat alike in every orientation:
+
+- `life-vital-20`: in every orientation but the written one the solver
+  proved a second correct first move, (1,1) besides (0,1). The cause was the
+  transposition table storing results that rested on a repetition found at
+  the storing ply; with the table off, every orientation proves both moves.
+  v13 stores only repetition-free results, and a search started on a real
+  line (a solution line, a learner's attempt) now counts that line's earlier
+  positions for superko (which also fixed seki-01's answer line). The
+  problem now has two correct first moves, in every orientation.
+- `capture-ladder-01`: in two orientations the first-move search exceeds
+  its node budget (inexact). Those two are not used.

@@ -24,8 +24,12 @@ import { store } from "../data/store.js";
 import { loadSGF } from "../sgf.js";
 import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
-import { learnFromGame } from "../app/play-ctl.js";
+import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
+import { humanMoveProbabilities } from "../katago.js";
+import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
+import { recordGame } from "../model/player.js";
+import { changeProfile } from "../app/ctl-core.js";
 
 /* ---------------------------------------------------------- one pass */
 
@@ -146,7 +150,38 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
   if (humanColor != null && resultOf(game) && !now.rec.learned && points.every((p) => p.source === "katago")) {
     learnFromGame({ game, points, humanColor, recordId });
   }
+  // v13: the second reading of the player's strength, from their own moves.
+  // Finished games only: an unfinished game in the library is never read for strength.
+  if (humanColor != null && resultOf(game) && !now.rec.unfinished && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
   return model;
+}
+
+/* -------------------------------------- v13: your moves, read by rank */
+
+/**
+ * After a finished game's analysis, with the human-style model installed
+ * and a host that can read its policy (katago.js humanMoveProbabilities):
+ * how likely the player's moves were for each rank profile, read as a rank
+ * with its range (model/move-rank.js). Stored with the game (`moveRank`)
+ * and in the player model, where it is only a weak prior (player.js
+ * applyMoveRank). Resolves the reading, or null when it cannot be made.
+ */
+export async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
+  if (!recordId || !Engine.installed().human) return null;
+  const rows = await humanMoveProbabilities(game, humanColor, PROFILES.map((p) => p.id), { signal });
+  const reading = rows && rankFromLikelihoods(rows);
+  if (!reading || signal?.aborted || !Games.getGame(recordId)) return null;
+  const moveRank = { rank: reading.rank, lo: reading.lo, hi: reading.hi, n: reading.n, at: Date.now() };
+  Games.patchGame(recordId, { moveRank });
+  changeProfile((p) => recordGame(p, { id: String(recordId), moveRank }));
+  update();
+  return moveRank;
+}
+
+/** The stored reading of the game a review shows, or null (no human model, no capable host, too short). */
+export function moveRankOf(review = state.review) {
+  const id = review?.meta?.recordId || (review?.source === "current" ? state.game?.recordId : null);
+  return id ? normalizeMoveRank(Games.getGame(id)?.moveRank) : null;
 }
 
 /* ------------------------------------------------ background passes */
@@ -166,11 +201,18 @@ export function takeOver(recordId) {
   jobs.delete(recordId);
 }
 
-/** Cheap check without parsing the game: an own game whose stored review is missing or old. */
+/**
+ * Cheap check without parsing the game: an own finished game whose stored
+ * review is missing or old. Works on the index's record too (v13: the game
+ * file need not be read; data/games.js reviewV, reviewConfidence,
+ * analyzed). A game left unfinished is not analysed until it is finished.
+ */
 export function wantsAnalysis(rec) {
-  if (!isOwnGame(rec)) return false;
-  const r = rec.report;
-  return !r || r.v !== REVIEW_VERSION || !Array.isArray(rec.analysis) || (r.confidence !== "high" && state.engine.available);
+  if (!isOwnGame(rec) || Games.isUnfinished(rec)) return false;
+  const v = rec.report ? rec.report.v : rec.reviewV;
+  const confidence = rec.report ? rec.report.confidence : rec.reviewConfidence;
+  const analyzed = Array.isArray(rec.analysis) || (rec.analysis == null && rec.loaded === false && !!rec.analyzed);
+  return v == null || v !== REVIEW_VERSION || !analyzed || (confidence !== "high" && state.engine.available);
 }
 
 /** The opponent as a job title names it. */
@@ -191,9 +233,26 @@ function gameTitle(rec) {
 export function queueAnalysis(recordId, { owner = "games", signal = null, hidden = false, any = false } = {}) {
   const have = analysisJob(recordId);
   if (have) return have;
-  const found = recordOf(recordId);
-  if (!found || (!any && !isOwnGame(found.rec)) || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
-  const { rec, game } = found;
+  let run;
+  let rec;
+  if (Games.isLoaded(recordId)) {
+    const found = recordOf(recordId);
+    if (!found || (!any && !isOwnGame(found.rec)) || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
+    rec = found.rec;
+    run = (me) => analyse(recordId, found.game, humanColorOf(rec), me, rec.analysis);
+  } else {
+    // v13: the game's file is not read yet; the index says whether it needs
+    // an analysis, and the job reads the file first.
+    rec = Games.getGame(recordId);
+    if (!rec || (!any && !isOwnGame(rec)) || !wantsAnalysis(rec)) return null;
+    run = async (me) => {
+      await Games.loadGame(recordId);
+      if (me.signal.aborted) return null;
+      const found = recordOf(recordId);
+      if (!found || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
+      return analyse(recordId, found.game, humanColorOf(found.rec), me, found.rec.analysis);
+    };
+  }
   const job = Engine.sched.startJob({
     kind: "analysis",
     owner,
@@ -201,7 +260,7 @@ export function queueAnalysis(recordId, { owner = "games", signal = null, hidden
     hidden,
     title: () => gameTitle(rec),
     meta: { recordId },
-    run: (me) => analyse(recordId, game, humanColorOf(rec), me, rec.analysis),
+    run,
   });
   jobs.set(recordId, job);
   job.promise.then(() => {

@@ -11,160 +11,242 @@
  * v5: comments (C) and markup (TR, SQ, CR, MA, LB) are read on every node,
  * and properties the app does not interpret are kept on node.extra (root
  * and moves) so that toSGF() writes them back.
+ *
+ * v13: real-world records.
+ *   - Bytes are decoded by the record's own CA charset (decodeSgfBytes).
+ *   - Setup (AB / AW / AE) in move-less nodes right after the root belongs
+ *     to the starting position; setup later in the game is applied before
+ *     the next move (node.setup in rules.js) and written back on export.
+ *   - A board size the app cannot play is an error, not a 19×19 board.
+ *   - Only an empty value (or `tt` on boards up to 19×19) is a pass; any
+ *     other point that is not on the board is a warning.
+ *   - HA without AB places no stones: the record places them itself.
+ *   - Parsing and building the game use explicit stacks, so a record of any
+ *     length or depth loads in linear time without overflowing the stack.
+ *
+ * Warnings are user-facing strings in the current language (i18n.js).
  */
-import { BLACK, WHITE, Game, EMPTY, defaultKomi, rulesFromSgf } from "./rules.js";
+import { BLACK, WHITE, EMPTY, Game, defaultKomi, rulesFromSgf, emptySignMap } from "./rules.js";
+import { t } from "./i18n.js";
+
+/** Board sizes the app (its board, its engines and its content) can play. */
+export const SGF_SIZES = Object.freeze([9, 13, 19]);
 
 let nodeSeq = 1;
 
+/* ------------------------------------------------------------ charsets */
+
+// CA values seen in the wild, by the TextDecoder label that reads them.
+// GB2312 and GBK are subsets of GB18030, so all three use the superset.
+const CHARSETS = [
+  [/^utf-?8$/, "utf-8"],
+  [/^(gb2312|gbk|gb18030|cp936|ms936|windows-936|euc-cn|x-gbk|gb-2312|csgb2312|chinese)$/, "gb18030"],
+  [/^(big5|big5-hkscs|cp950|x-x-big5|csbig5)$/, "big5"],
+  [/^(shift[-_ ]?jis|sjis|s-jis|x-sjis|ms932|cp932|windows-31j|ms_kanji|csshiftjis)$/, "shift_jis"],
+  [/^(euc-?jp|x-euc-jp)$/, "euc-jp"],
+  [/^(euc-?kr|cp949|uhc|ks_c_5601-1987|ks_c_5601|ksc5601|windows-949|korean|cseuckr)$/, "euc-kr"],
+  [/^(iso-?8859-1|iso_8859-1|latin-?1|l1|cp1252|windows-1252|us-ascii|ascii)$/, "windows-1252"],
+];
+
+/** The TextDecoder label for an SGF CA value, or null when unknown. */
+export function sgfCharset(name) {
+  const v = String(name || "").trim().toLowerCase();
+  for (const [re, label] of CHARSETS) if (re.test(v)) return label;
+  return null;
+}
+
+function decodeWith(label, bytes, fatal) {
+  return new TextDecoder(label, { fatal }).decode(bytes);
+}
+
+/**
+ * The text of an SGF file from its raw bytes (a Uint8Array or ArrayBuffer).
+ *
+ * A byte-order mark wins. Bytes that are valid UTF-8 are read as UTF-8,
+ * whatever CA says: text in a legacy CJK charset is practically never valid
+ * UTF-8, while editors that re-save a record as UTF-8 often keep its old CA.
+ * Otherwise the CA property names the charset (GB2312 / GBK / GB18030,
+ * Big5, Shift_JIS, EUC-JP, EUC-KR, ISO-8859-1 …); its value is plain ASCII
+ * in all of them, so it is read from a Latin-1 view of the file's head.
+ * Without a known CA the FF[4] default, ISO-8859-1, applies.
+ */
+export function decodeSgfBytes(input) {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input || []);
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return decodeWith("utf-8", bytes.subarray(3), false);
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return decodeWith("utf-16le", bytes.subarray(2), false);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return decodeWith("utf-16be", bytes.subarray(2), false);
+  try {
+    return decodeWith("utf-8", bytes, true);
+  } catch (_) {
+    // Not UTF-8: the record's own charset.
+  }
+  const head = decodeWith("windows-1252", bytes.subarray(0, 65536), false);
+  const ca = /(?:^|[^A-Za-z])CA\s*\[([^\]]*)\]/.exec(head);
+  const label = (ca && sgfCharset(ca[1])) || "windows-1252";
+  // A record that says UTF-8 but is not keeps what can be read of it.
+  return decodeWith(label, bytes, false);
+}
+
+/* -------------------------------------------------------------- parser */
+
+/**
+ * The collection's game trees: [{ id, data: { KEY: [values] }, parent,
+ * children }]. One pass over the text with an explicit stack of open
+ * parentheses, so nesting depth costs no call stack.
+ */
 function parseTree(text) {
   let i = 0;
   const n = text.length;
-
-  function ws() {
-    while (i < n && /\s/.test(text[i])) i++;
-  }
+  const isSpace = (c) => c === " " || c === "\n" || c === "\r" || c === "\t" || c === "\f" || c === "\v";
+  const isLetter = (c) => (c >= "A" && c <= "Z") || (c >= "a" && c <= "z");
 
   function parseValue() {
-    if (text[i] !== "[") return null;
-    i++;
+    i++; // "["
     let out = "";
+    let start = i;
     while (i < n && text[i] !== "]") {
       if (text[i] === "\\") {
+        out += text.slice(start, i);
         i++;
         if (i >= n) break;
         if (text[i] === "\r") {
           i++;
           if (text[i] === "\n") i++;
-          continue;
-        }
-        if (text[i] === "\n") {
+        } else if (text[i] === "\n") {
           i++;
-          continue;
+        } else {
+          out += text[i];
+          i++;
         }
-        out += text[i];
-        i++;
+        start = i;
       } else {
-        out += text[i];
         i++;
       }
     }
+    out += text.slice(start, Math.min(i, n));
     if (text[i] === "]") i++;
     return out;
   }
 
-  function parseNode(parent) {
-    const node = { id: nodeSeq++, data: {}, parent, children: [] };
-    ws();
+  /** Properties up to the next ";", "(" or ")", into `data`. */
+  function parseProps(data, replace) {
     while (i < n && text[i] !== ";" && text[i] !== ")" && text[i] !== "(") {
-      if (!/[A-Za-z]/.test(text[i])) {
+      if (!isLetter(text[i])) {
         i++;
         continue;
       }
-      let key = "";
-      while (i < n && /[A-Za-z]/.test(text[i])) key += text[i++];
+      const start = i;
+      while (i < n && isLetter(text[i])) i++;
+      const key = text.slice(start, i);
       const values = [];
-      ws();
+      while (i < n && isSpace(text[i])) i++;
       while (i < n && text[i] === "[") {
-        const v = parseValue();
-        if (v !== null) values.push(v);
-        ws();
+        values.push(parseValue());
+        while (i < n && isSpace(text[i])) i++;
       }
-      if (key) {
-        if (!node.data[key]) node.data[key] = [];
-        node.data[key].push(...values);
-      }
+      if (replace) data[key] = values;
+      else (data[key] ||= []).push(...values);
     }
-    return node;
   }
 
-  function parseGame(parent) {
-    ws();
-    if (text[i] !== "(") return null;
-    i++;
-    ws();
-    let anchor = null;
-    let current = null;
-    while (i < n) {
-      ws();
-      if (i >= n) break;
-      if (text[i] === ")") {
+  const roots = [];
+  const stack = []; // open game trees: { parent, anchor, current }
+  const close = () => {
+    const f = stack.pop();
+    if (!f.anchor) return;
+    f.anchor.parent = f.parent;
+    const up = stack[stack.length - 1];
+    if (!up) roots.push(f.anchor);
+    else if (up.current) up.current.children.push(f.anchor);
+    else if (!up.anchor) up.anchor = up.current = f.anchor;
+  };
+  // Anything before the first "(" (a mail header, a stray BOM) is skipped.
+  while (i < n && text[i] !== "(") i++;
+  while (i < n) {
+    const c = text[i];
+    if (!stack.length) {
+      if (c === "(") {
+        stack.push({ parent: null, anchor: null, current: null });
         i++;
-        break;
-      }
-      if (text[i] === ";") {
-        i++;
-        const node = parseNode(current);
-        if (!anchor) anchor = node;
-        if (current) current.children.push(node);
-        current = node;
-        continue;
-      }
-      if (text[i] === "(") {
-        const branch = parseGame(current);
-        if (branch && current) current.children.push(branch);
-        continue;
-      }
+      } else if (isSpace(c)) i++;
+      else break;
+      continue;
+    }
+    const f = stack[stack.length - 1];
+    if (isSpace(c)) {
+      i++;
+    } else if (c === ")") {
+      i++;
+      close();
+    } else if (c === "(") {
+      i++;
+      stack.push({ parent: f.current, anchor: null, current: null });
+    } else if (c === ";") {
+      i++;
+      const node = { id: nodeSeq++, data: {}, parent: f.current, children: [] };
+      parseProps(node.data, false);
+      if (!f.anchor) f.anchor = node;
+      if (f.current) f.current.children.push(node);
+      f.current = node;
+    } else if (isLetter(c)) {
       // Stray property before a node: attach it to the anchor.
-      if (!anchor) {
-        anchor = { id: nodeSeq++, data: {}, parent, children: [] };
-        current = anchor;
-      }
-      if (/[A-Za-z]/.test(text[i])) {
-        const extra = parseNode(current);
-        Object.assign(anchor.data, extra.data);
-        continue;
-      }
+      if (!f.anchor) f.anchor = f.current = { id: nodeSeq++, data: {}, parent: f.parent, children: [] };
+      parseProps(f.anchor.data, true);
+    } else {
       i++;
     }
-    if (anchor) anchor.parent = parent;
-    return anchor;
   }
-
-  ws();
-  const roots = [];
-  while (i < n) {
-    ws();
-    if (text[i] !== "(") break;
-    const root = parseGame(null);
-    if (root) roots.push(root);
-    else break;
-  }
+  // An unterminated record keeps what was read.
+  while (stack.length) close();
   return roots;
 }
+
+/* -------------------------------------------------------------- values */
 
 function first(data, key) {
   const v = data?.[key];
   return Array.isArray(v) && v.length ? String(v[0]) : "";
 }
 
+/** SZ as a supported size; anything else throws (code "unsupported-size"). */
 function parseSize(raw) {
-  const n = parseInt(String(raw || "19").split(":")[0], 10);
-  return n === 9 || n === 13 || n === 19 ? n : 19;
+  const text = String(raw || "").trim();
+  if (!text) return 19;
+  const [a, b] = text.split(":").map((s) => s.trim());
+  const w = /^\d+$/.test(a) ? Number(a) : NaN;
+  const h = b === undefined ? w : /^\d+$/.test(b) ? Number(b) : NaN;
+  if (w === h && SGF_SIZES.includes(w)) return w;
+  const error = new Error(`Unsupported board size in SGF: ${text}`);
+  error.code = "unsupported-size";
+  error.size = text.slice(0, 12);
+  throw error;
 }
 
 /**
  * SGF columns are a, b, c … in order, the letter i included (FF[4]); only
- * the board's labels skip I.
+ * the board's labels skip I. A point is exactly two lowercase letters on the
+ * board; anything else is null.
  */
-function sgfColumn(code) {
-  if (code < 97) return -1;
-  return code - 97;
-}
-
 function sgfVertex(raw, size) {
-  const s = String(raw || "");
-  if (!s) return null;
-  if (s.length < 2) return null;
-  const x = sgfColumn(s.charCodeAt(0));
+  const s = String(raw ?? "");
+  if (s.length !== 2) return null;
+  const x = s.charCodeAt(0) - 97;
   const y = s.charCodeAt(1) - 97;
   if (x < 0 || y < 0 || x >= size || y >= size) return null;
   return { x, y };
 }
 
-function expandPoints(values, size) {
+/** A move value: { pass: true }, { x, y }, or null when it is not valid. */
+function moveVertex(raw, size) {
+  const s = String(raw ?? "").trim();
+  if (s === "" || (s === "tt" && size <= 19)) return { pass: true };
+  return sgfVertex(s, size);
+}
+
+function expandPoints(values, size, bad) {
   const out = [];
   for (const raw of values || []) {
-    const s = String(raw);
+    const s = String(raw).trim();
     if (s.includes(":")) {
       const [a, b] = s.split(":");
       const p = sgfVertex(a, size);
@@ -175,19 +257,20 @@ function expandPoints(values, size) {
         const y0 = Math.min(p.y, q.y);
         const y1 = Math.max(p.y, q.y);
         for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out.push({ x, y });
-      }
+      } else bad?.(s);
     } else {
       const p = sgfVertex(s, size);
       if (p) out.push(p);
+      else if (s !== "") bad?.(s);
     }
   }
   return out;
 }
 
-function marksOf(data, size) {
+function marksOf(data, size, bad) {
   const marks = [];
   const add = (key, type) => {
-    for (const p of expandPoints(data[key], size)) marks.push({ ...p, type });
+    for (const p of expandPoints(data[key], size, bad)) marks.push({ ...p, type });
   };
   add("TR", "triangle");
   add("SQ", "square");
@@ -197,16 +280,46 @@ function marksOf(data, size) {
     const s = String(raw);
     const at = s.indexOf(":");
     if (at < 2) continue;
-    const p = sgfVertex(s.slice(0, 2), size);
+    const p = sgfVertex(s.slice(0, at), size);
     if (p) marks.push({ ...p, type: "label", text: s.slice(at + 1) });
+    else bad?.(s.slice(0, at));
   }
   return marks;
 }
 
+/** A node's AB / AW / AE as a setup ({ black, white, empty }), or null. */
+function setupOf(data, size, bad) {
+  if (!data.AB && !data.AW && !data.AE) return null;
+  const setup = {
+    black: expandPoints(data.AB, size, bad),
+    white: expandPoints(data.AW, size, bad),
+    empty: expandPoints(data.AE, size, bad),
+  };
+  return setup.black.length || setup.white.length || setup.empty.length ? setup : null;
+}
+
+/** Two setups in a row as one: the later one wins on a shared point. */
+function mergeSetup(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const signs = new Map();
+  for (const s of [a, b]) {
+    for (const p of s.empty) signs.set(p.y * 64 + p.x, [p, EMPTY]);
+    for (const p of s.black) signs.set(p.y * 64 + p.x, [p, BLACK]);
+    for (const p of s.white) signs.set(p.y * 64 + p.x, [p, WHITE]);
+  }
+  const out = { black: [], white: [], empty: [] };
+  for (const [p, v] of signs.values()) (v === BLACK ? out.black : v === WHITE ? out.white : out.empty).push({ x: p.x, y: p.y });
+  return out;
+}
+
 /** Root properties toSGF() regenerates from the Game itself. */
-const ROOT_KNOWN = new Set(["GM", "FF", "CA", "AP", "SZ", "KM", "RU", "HA", "PB", "PW", "DT", "RE", "EV", "C", "AB", "AW", "PL", "TR", "SQ", "CR", "MA", "LB"]);
-/** Node properties toSGF() regenerates from the node. */
-const NODE_KNOWN = new Set(["B", "W", "C", "TR", "SQ", "CR", "MA", "LB"]);
+const ROOT_KNOWN = new Set(["GM", "FF", "CA", "AP", "SZ", "KM", "RU", "HA", "PB", "PW", "DT", "RE", "EV", "C", "AB", "AW", "AE", "PL", "TR", "SQ", "CR", "MA", "LB"]);
+/**
+ * Node properties toSGF() regenerates from the node. PL in the middle of a
+ * game is implied by the next move's colour.
+ */
+const NODE_KNOWN = new Set(["B", "W", "C", "TR", "SQ", "CR", "MA", "LB", "AB", "AW", "AE", "PL"]);
 
 /** Properties not in `known`, as { KEY: [raw values] }, or null. */
 function extraOf(data, known) {
@@ -232,6 +345,8 @@ function mergeMarks(a, b) {
   return [...rest, ...b];
 }
 
+const hasMove = (data) => "B" in data || "W" in data;
+
 /**
  * @param {string} text
  * @returns {{game: Game, warnings: string[]}}
@@ -244,7 +359,7 @@ export function loadSGF(text) {
   const data = (root.data ||= {});
   // v8: a move written in the root node (some programs do) is the first
   // move, not an unknown root property.
-  if ("B" in data || "W" in data) {
+  if (hasMove(data)) {
     const move = {};
     for (const k of ["B", "W"]) {
       if (k in data) move[k] = data[k];
@@ -266,14 +381,55 @@ export function loadSGF(text) {
     throw error;
   }
   const size = parseSize(first(data, "SZ"));
-  const ab = expandPoints(data.AB, size);
-  const aw = expandPoints(data.AW, size);
+
+  const warnings = [];
+  const warned = new Set();
+  const warn = (key, args) => {
+    const s = t(key, args);
+    if (warned.has(s)) return;
+    warned.add(s);
+    warnings.push(s);
+  };
+  const bad = (raw) => warn("sgf.warn.badPoint", [String(raw).slice(0, 12)]);
+
+  // v13: the starting position is the root's setup plus that of the
+  // move-less nodes that follow it on their own (several editors write a
+  // problem's stones, or a handicap, in the second node).
+  const signs = emptySignMap(size);
+  const placeOn = (d) => {
+    const s = setupOf(d, size, bad);
+    if (!s) return;
+    for (const p of s.empty) signs[p.y][p.x] = EMPTY;
+    for (const p of s.black) signs[p.y][p.x] = BLACK;
+    for (const p of s.white) signs[p.y][p.x] = WHITE;
+  };
+  placeOn(data);
+  let pl = first(data, "PL").toUpperCase();
+  const rootChain = new Set();
+  for (let n = root; n.children.length === 1 && !hasMove(n.children[0].data); ) {
+    n = n.children[0];
+    rootChain.add(n);
+    placeOn(n.data);
+    if (first(n.data, "PL")) pl = first(n.data, "PL").toUpperCase();
+  }
+  const ab = [];
+  const aw = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (signs[y][x] === BLACK) ab.push({ x, y });
+      else if (signs[y][x] === WHITE) aw.push({ x, y });
+    }
+  }
+
+  // HA[0] (or none) is an even game. HA without AB places nothing: the
+  // record's own moves (or AB) put the stones down, and placing them here
+  // as well would put them on the board twice.
   const ha = Math.max(0, Math.min(9, parseInt(first(data, "HA") || "0", 10) || 0));
-  // Black setup stones alone are handicap stones. A setup with White stones
-  // too is a position, not a handicap game, unless HA says otherwise; this
-  // matters for the Chinese handicap compensation (and matches how KataGo
-  // reads the same root: see setupStones in katago.js).
-  const handicap = aw.length ? ha : ab.length ? Math.min(9, ab.length) : ha;
+  // Black setup stones alone are handicap stones (two or more). A setup
+  // with White stones too is a position, not a handicap game, unless HA
+  // says otherwise; this matters for the Chinese handicap compensation (and
+  // matches how KataGo reads the same root: see setupStones in katago.js).
+  const handicap = aw.length ? ha : ab.length >= 2 ? Math.min(9, ab.length) : ha;
   const komiRaw = first(data, "KM");
   // A missing KM takes the ruleset's komi (6.5 before v5); v8: the komi of
   // a handicap game (0.5) when there are handicap stones.
@@ -289,6 +445,7 @@ export function loadSGF(text) {
     rules,
     komi: Number.isFinite(komi) ? komi : fallbackKomi,
     handicap,
+    placeHandicap: false,
     date,
     playerBlack: first(data, "PB") || "Black",
     playerWhite: first(data, "PW") || "White",
@@ -300,74 +457,84 @@ export function loadSGF(text) {
       ...ab.map((p) => ({ ...p, color: BLACK })),
       ...aw.map((p) => ({ ...p, color: WHITE })),
     ];
-    const pl = first(data, "PL").toUpperCase();
-    const turn = pl === "W" ? WHITE : pl === "B" ? BLACK : handicap > 0 || ab.length > 0 ? WHITE : BLACK;
+    // Who moves first: PL, else the colour of the record's first move, else
+    // White after handicap or black setup stones.
+    let firstMove = root;
+    while (firstMove && !hasMove(firstMove.data || {})) firstMove = firstMove.children[0];
+    const fm = firstMove ? ("B" in firstMove.data ? "B" : "W") : "";
+    const say = pl === "W" || pl === "B" ? pl : fm;
+    const turn = say === "W" ? WHITE : say === "B" ? BLACK : handicap > 0 || ab.length > 0 ? WHITE : BLACK;
     game.setup(stones, turn);
+  } else if (pl === "W") {
+    game.root.turn = WHITE;
   }
   game.setRootComment(first(data, "C"));
-  game.root.marks = marksOf(data, size);
+  game.root.marks = marksOf(data, size, bad);
   game.root.extra = extraOf(data, ROOT_KNOWN);
 
-  const warnings = [];
-  const map = new Map();
-  map.set(root.id, game.root.id);
-
-  function walk(node) {
-    const parentId = map.get(node.id);
-    if (parentId === undefined) return;
-    for (const child of node.children || []) {
-      game.goto(parentId);
-      const d = child.data || {};
-      let played = false;
-      for (const [key, color] of [["B", BLACK], ["W", WHITE]]) {
-        if (!(key in d)) continue;
-        const raw = first(d, key);
-        const v = sgfVertex(raw, size);
-        const pass = !v;
-        const res = pass ? game.pass({ color, force: true }) : game.play(v.x, v.y, { color, force: true });
-        if (!res.ok) {
-          warnings.push(`Illegal ${key} move in SGF (${raw || "pass"})`);
-          game.pass({ color, force: true });
-        }
-        played = true;
-        break;
-      }
-      if (!played) {
-        // A node without a move (setup or comment only) folds into the
-        // node it follows. Mid-game setup stones are not applied; they are
-        // kept, like any unknown property, for the round trip.
-        const into = game.current;
-        if (first(d, "C")) into.comment = into.comment ? into.comment + "\n\n" + first(d, "C") : first(d, "C");
-        into.marks = mergeMarks(into.marks, marksOf(d, size));
-        into.extra = mergeExtra(into.extra, extraOf(d, into === game.root ? ROOT_KNOWN : NODE_KNOWN));
-        map.set(child.id, game.current.id);
-        walk(child);
-        continue;
-      }
-      const made = game.current;
-      if (first(d, "C")) made.comment = first(d, "C");
-      const marks = marksOf(d, size);
-      if (marks.length) made.marks = marks;
-      const extra = extraOf(d, NODE_KNOWN);
-      if (extra) made.extra = extra;
-      map.set(child.id, made.id);
-      walk(child);
+  // Build the tree depth first with an explicit stack; children are pushed
+  // in reverse so each node's variations keep their order. `into` is the
+  // game node an SGF node's move is played from (a move-less node folds into
+  // it), `pending` the setup of move-less nodes waiting for the next move,
+  // `depth` the move number of `into`.
+  const stack = [];
+  const pushChildren = (node, into, pending, depth) => {
+    for (let k = node.children.length - 1; k >= 0; k--) stack.push({ node: node.children[k], into, pending, depth });
+  };
+  pushChildren(root, game.root, null, 0);
+  while (stack.length) {
+    const { node: child, into, pending, depth } = stack.pop();
+    const d = child.data || {};
+    const own = rootChain.has(child) ? null : setupOf(d, size, bad);
+    const key = "B" in d ? "B" : "W" in d ? "W" : null;
+    if (!key) {
+      // A node without a move (setup or comment only): its comment and
+      // marks fold into the node it follows; its setup waits for the next
+      // move on this line (or is already part of the root position).
+      if (first(d, "C")) into.comment = into.comment ? into.comment + "\n\n" + first(d, "C") : first(d, "C");
+      into.marks = mergeMarks(into.marks, marksOf(d, size, bad));
+      into.extra = mergeExtra(into.extra, extraOf(d, into === game.root ? ROOT_KNOWN : NODE_KNOWN));
+      const next = mergeSetup(pending, own);
+      if (next && !child.children.length) warn("sgf.warn.trailingSetup");
+      pushChildren(child, into, next, depth);
+      continue;
     }
+    const color = key === "B" ? BLACK : WHITE;
+    const setup = mergeSetup(pending, own);
+    const raw = first(d, key);
+    const v = moveVertex(raw, size);
+    game.current = into;
+    let res;
+    if (!v) {
+      warn("sgf.warn.badMove", [depth + 1, String(raw).slice(0, 12)]);
+      res = game.pass({ color, force: true, setup });
+    } else if (v.pass) {
+      res = game.pass({ color, force: true, setup });
+    } else {
+      res = game.play(v.x, v.y, { color, force: true, setup });
+      if (!res.ok) {
+        warn("sgf.warn.illegalMove", [depth + 1, raw]);
+        res = game.pass({ color, force: true, setup });
+      }
+    }
+    const made = res.node;
+    if (first(d, "C")) made.comment = first(d, "C");
+    const marks = marksOf(d, size, bad);
+    if (marks.length) made.marks = marks;
+    const extra = extraOf(d, NODE_KNOWN);
+    if (extra) made.extra = extra;
+    pushChildren(child, made, null, depth + 1);
   }
-
-  walk(root);
   // Open at the end of the main line: a library game should show its final
   // position, and Review must see the moves that were just walked.
-  const main = game.mainLine();
-  game.goto(main[main.length - 1].id);
+  let end = game.root;
+  while (end.children.length) end = end.children[0];
+  game.current = end;
 
   const re = first(data, "RE");
   if (re) {
-    let n = game.root;
-    while (n.children.length) n = n.children[0];
-    n.result = re;
-    n.phase = "ended";
+    end.result = re;
+    end.phase = "ended";
   }
   return { game, warnings };
 }
-

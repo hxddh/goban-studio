@@ -44,7 +44,12 @@ pub fn build(b: *std.Build) void {
     // apply. An explicit -Doptimize (or --release) pins both roles.
     const optimize_request = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size");
     const optimize = optimizeMode(b, optimize_request, .Debug);
-    const package_optimize = optimizeMode(b, optimize_request, .ReleaseFast);
+    // v13: packages are ReleaseSafe. The shell parses untrusted input (the
+    // page's JSON, KataGo's output, zip files) with plenty of slicing and
+    // integer casts; in ReleaseFast an out-of-bounds index is silent memory
+    // corruption, in ReleaseSafe a clean panic. The cost is negligible
+    // here: the hot loops are inside KataGo, a separate program.
+    const package_optimize = optimizeMode(b, optimize_request, .ReleaseSafe);
     const platform_option = b.option(PlatformOption, "platform", "Desktop backend: auto, null, macos, linux, windows") orelse .auto;
     const trace_option = b.option(TraceOption, "trace", "Trace output: off, events, runtime, all") orelse .events;
     const debug_overlay = b.option(bool, "debug-overlay", "Enable debug overlay output") orelse false;
@@ -56,6 +61,13 @@ pub fn build(b: *std.Build) void {
     const cef_auto_install_override = b.option(bool, "cef-auto-install", "Override app.zon CEF auto-install setting");
     const package_target = b.option(PackageTarget, "package-target", "Package target: macos, windows, linux") orelse .macos;
     const native_sdk_path = b.option([]const u8, "native-sdk-path", "Path to the Native SDK framework checkout") orelse default_native_sdk_path;
+    // v13 (docs/signing.md): the Ed25519 public key that must have signed a
+    // release's SHA256SUMS before the in-app updater installs it, as base64
+    // of its 32 bytes. Empty (the default): checksums only, as before.
+    const update_pubkey = b.option([]const u8, "update-pubkey", "Base64 Ed25519 public key that signs SHA256SUMS (empty: no signature check)") orelse "";
+    // v13: may the Vite dev server (http://127.0.0.1:5173) call the bridge?
+    // Default: only in Debug builds of each exe (see appOptionsModule).
+    const dev_origin_option = b.option(bool, "dev-origin", "Allow the dev server origin http://127.0.0.1:5173 (default: Debug builds only)");
     const package_optimize_name = @tagName(package_optimize);
     const selected_platform: PlatformOption = switch (platform_option) {
         .auto => if (target.result.os.tag == .macos) .macos else if (target.result.os.tag == .linux) .linux else if (target.result.os.tag == .windows) .windows else .@"null",
@@ -104,6 +116,7 @@ pub fn build(b: *std.Build) void {
     const app_mod = localModule(b, target, optimize, "src/main.zig");
     app_mod.addImport("native_sdk", native_sdk_mod);
     app_mod.addImport("runner", runner_mod);
+    app_mod.addImport("app_options", appOptionsModule(b, update_pubkey, dev_origin_option orelse (optimize == .Debug)));
     const exe = b.addExecutable(.{
         .name = app_exe_name,
         .root_module = app_mod,
@@ -144,7 +157,7 @@ pub fn build(b: *std.Build) void {
     dev_step.dependOn(&dev.step);
 
     // `zig build package` wraps its own exe: release-shaped by default
-    // (ReleaseFast, GUI subsystem on Windows) so the packaged artifact
+    // (ReleaseSafe, GUI subsystem on Windows) so the packaged artifact
     // is never a Debug console binary just because the dev loop
     // defaults to Debug. When -Doptimize/--release pinned one mode for
     // everything, the roles agree and the dev exe is reused as-is.
@@ -157,6 +170,7 @@ pub fn build(b: *std.Build) void {
         const package_app_mod = localModule(b, target, package_optimize, "src/main.zig");
         package_app_mod.addImport("native_sdk", package_sdk_mod);
         package_app_mod.addImport("runner", package_runner_mod);
+        package_app_mod.addImport("app_options", appOptionsModule(b, update_pubkey, dev_origin_option orelse (package_optimize == .Debug)));
         const built = b.addExecutable(.{
             .name = app_exe_name,
             .root_module = package_app_mod,
@@ -213,7 +227,7 @@ pub fn build(b: *std.Build) void {
 // build graph): an explicit -Doptimize wins for every role, --release
 // resolves through zig's release_mode, and only when neither was
 // passed does the role keep its own default — Debug for the dev loop,
-// ReleaseFast for the exe `zig build package` wraps.
+// ReleaseSafe for the exe `zig build package` wraps.
 fn optimizeMode(b: *std.Build, requested: ?std.builtin.OptimizeMode, default_mode: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
     if (requested) |mode| return mode;
     return switch (b.release_mode) {
@@ -254,6 +268,16 @@ fn macosSdkPath(b: *std.Build) ?[]const u8 {
         return null;
     }
     return std.mem.trimEnd(u8, result.stdout, "\r\n");
+}
+
+/// The app's own build options (main.zig `@import("app_options")`), one
+/// module per exe so the dev exe and the package exe each get the
+/// dev-origin default of their own optimize mode.
+fn appOptionsModule(b: *std.Build, update_pubkey: []const u8, dev_origin: bool) *std.Build.Module {
+    const options = b.addOptions();
+    options.addOption([]const u8, "update_pubkey", update_pubkey);
+    options.addOption(bool, "dev_origin", dev_origin);
+    return options.createModule();
 }
 
 fn localModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, path: []const u8) *std.Build.Module {

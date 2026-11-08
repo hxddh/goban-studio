@@ -8,7 +8,7 @@
 //   img       a canvas or svg image without a name (or aria-hidden)
 //   landmark  no <main>, or a place without a level-one heading
 //   expanded  a disclosure button (aria-controls) without aria-expanded
-function a11yAudit({ minContrast = 3 } = {}) {
+function a11yAudit({ minContrast = 4.5, largeContrast = 3 } = {}) {
   const out = [];
   const shown = (el) => {
     if (!el.isConnected) return false;
@@ -77,8 +77,9 @@ function a11yAudit({ minContrast = 3 } = {}) {
     if (el.tagName === "svg" && el.closest(INTERACTIVE)) continue;
     if (!nameOf(el) && !el.getAttribute("aria-label")) out.push({ kind: "img", el: describe(el) });
   }
-  // Contrast (docs/design.md §10): no text below 3:1 against what is behind
-  // it (tertiary text is the floor; body and secondary text sit well above).
+  // Contrast (docs/design.md §10): WCAG AA against what is behind the text:
+  // 4.5:1 for normal text, 3:1 for large text (24 px, or 18.66 px bold).
+  // v13: tertiary text (--text-3) meets 4.5:1 too; v12 allowed 3:1 for all.
   // Computed colours come as rgb()/rgba(), or as color(srgb r g b / a) with
   // 0–1 channels when the stylesheet mixes them (color-mix, e.g. hover).
   const rgba = (s) => {
@@ -134,7 +135,9 @@ function a11yAudit({ minContrast = 3 } = {}) {
     const L1 = lum(c);
     const L2 = lum(bg);
     const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
-    if (ratio < minContrast) out.push({ kind: "contrast", el: `${describe(el)} ${ratio.toFixed(2)}:1` });
+    const size = parseFloat(cs.fontSize);
+    const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+    if (ratio < (large ? largeContrast : minContrast)) out.push({ kind: "contrast", el: `${describe(el)} ${ratio.toFixed(2)}:1` });
   }
   if (!document.querySelector("main")) out.push({ kind: "landmark", el: "no <main>" });
   if (scope === document && !document.querySelector(".place h1, main h1")) out.push({ kind: "landmark", el: "no h1 in the place" });

@@ -88,7 +88,12 @@ export default async function ({ test, assert, root }) {
   });
 
   test("core calibration: handicap stones reach KataGo where the app puts them (v11)", () => {
-    for (const n of [1, 2, 3, 4]) {
+    // v13: a handicap of one is no stone: Black plays first, at the handicap komi.
+    const one = new Game({ size: 13, komi: handicapKomi(1), handicap: 1 });
+    assert.deepEqual(rootStones(one), []);
+    assert.equal(one.turn, 1);
+    assert.equal(one.komi, 0.5);
+    for (const n of [2, 3, 4]) {
       const game = new Game({ size: 13, komi: handicapKomi(n), handicap: n });
       const stones = rootStones(game);
       assert.equal(stones.length, n);

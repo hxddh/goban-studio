@@ -2,25 +2,26 @@
  * Everything the app does, as plain functions over the state.
  *
  * This file is the hub the views import: it boots the app (the store
- * first), owns the two spaces (Play and Learn) and history restore, the
- * games' history, backups and onboarding, and re-exports the play, review
- * and learn controllers. None of it touches the DOM.
+ * first), owns the four spaces (Today, Play, Practice and Library; v12)
+ * and history restore, the games' history, backups and onboarding, and
+ * re-exports the play, review and learn controllers. None of it touches the DOM.
  */
 import { BLACK, formatPoints } from "../rules.js";
-import { loadSGF } from "../sgf.js";
+import { decodeSgfBytes, loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
-import { loadSettings } from "../data/settings.js";
-import { exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, parseBackup } from "../data/backup.js";
+import { SETTINGS_KEY, loadSettings } from "../data/settings.js";
+import { CURRENT_KEY, GAMES_PREFIX, migrateFile } from "../data/migrate.js";
+import { BACKUPS_PREFIX, exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, latestSnapshot, parseBackup, undoRestore as undoRestoreDoc } from "../data/backup.js";
 import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.js";
-import { detectLang, setLang, t } from "../i18n.js";
+import { detectLang, setLang, t, tn } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readTextFile } from "../host.js";
+import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, readFileBytes, readTextFile } from "../host.js";
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { boardShown, maybeComputerMove, newGame, ponder, restoreCurrent, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
+import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, ponder, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
@@ -54,30 +55,117 @@ function storeError(e) {
 }
 
 /**
- * Start the app: open the store (every file into memory) before the first
- * render; settings, the player model and the game on the board come from
- * it. v9 reads nothing saved by earlier versions.
+ * The files without which the app would take you for a new player. If one
+ * of them cannot be read, the app does not start over on top of it: see
+ * storeProblemOf and docs/storage.md, "Safe state".
+ */
+export const CORE_KEYS = [SETTINGS_KEY, PROFILE_KEY, CURRENT_KEY];
+/** Read when needed, not at boot: the game files and the restore snapshots. */
+export const LAZY_PREFIXES = [GAMES_PREFIX, BACKUPS_PREFIX];
+
+/**
+ * What the store's open found that the player must hear about before
+ * anything is written, or null:
+ *   { kind: "list" }     nothing could be listed
+ *   { kind: "files", failed, resettable, newer }
+ *                        a core file could not be read (failed: [{ key,
+ *                        kind, error, preserved }]); resettable when each
+ *                        was only damaged and a copy of it is kept (bad/…);
+ *                        newer when one was saved by a newer version.
+ */
+export function storeProblemOf(report) {
+  if (!report) return null;
+  if (report.listFailed) return { kind: "list", failed: [], resettable: false, newer: false };
+  const failed = report.failed.filter((f) => CORE_KEYS.includes(f.key));
+  if (!failed.length) return null;
+  return { kind: "files", failed, resettable: failed.every((f) => f.kind === "parse" && !!f.preserved), newer: failed.some((f) => f.kind === "newer") };
+}
+
+/** How the page reloads (tests replace it). */
+let reloader = () => location.reload();
+export function setReloader(fn) {
+  reloader = typeof fn === "function" ? fn : () => location.reload();
+}
+export function reloadApp() {
+  reloader();
+}
+
+/** A word for after the reload (a restore): kept for the session only. */
+const NOTE_KEY = "goban13:note";
+function noteForReload(note) {
+  try {
+    sessionStorage.setItem(NOTE_KEY, note);
+  } catch (_) {
+    /* no session storage: the reload says nothing */
+  }
+}
+function takeNote() {
+  try {
+    const n = sessionStorage.getItem(NOTE_KEY);
+    sessionStorage.removeItem(NOTE_KEY);
+    return n;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** The packaged app's bridge appears with the page; give it a moment before calling it missing. */
+async function waitForBridge(ms = 1500) {
+  const end = Date.now() + ms;
+  while (!hasNative() && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
+  return hasNative();
+}
+
+/**
+ * Start the app: open the store before the first render (settings, the
+ * player model, the game on the board and the games index; the game files
+ * themselves are read when a view needs one), bring what it read to the
+ * current format (data/migrate.js), and only then decide what to show.
+ *
+ * v13 safety: in the packaged app a missing bridge is an error screen,
+ * never a fresh start in the WebView's own storage; a core file that could
+ * not be read puts the app in its safe state (read-only, no onboarding,
+ * app/safety.jsx) instead of taking the player for a new one.
  */
 export async function boot() {
   store.setErrorHandler(storeError);
-  await store.open();
+  if (isPackaged() && !hasNative() && !(await waitForBridge())) {
+    const lang = detectLang();
+    setLang(lang);
+    update({ bootError: { kind: "bridge" }, settings: { ...loadSettings({ get: () => null }), lang } });
+    return;
+  }
+  store.setMigrator(migrateFile);
+  await store.open({ lazy: LAZY_PREFIXES, keepDamaged: CORE_KEYS });
+  const problem = storeProblemOf(store.openReport);
+  // Nothing is written while the player has not chosen what to do.
+  if (problem) store.setReadOnly(true);
+  // The games index (rebuilt from the files when it is missing or behind).
+  const read = await Games.initIndex();
+  if (read) store.evict(GAMES_PREFIX);
   const settings = loadSettings(store);
   if (!settings.lang) settings.lang = detectLang();
+  // Games or a player model without settings are not a new player's (a
+  // settings file lost, or reset in the safe state): no onboarding.
+  if (!settings.onboarded && (problem || (!store.has(SETTINGS_KEY) && (store.has(PROFILE_KEY) || Games.listGames().length > 0)))) settings.onboarded = true;
   state.settings = settings;
   state.profile = normalizeProfile(store.get(PROFILE_KEY));
+  state.storeProblem = problem ? { ...problem, continued: false } : null;
   setLang(settings.lang);
   Audio.setSound(settings.sound);
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
-  // Play opens on the board when a game is in progress, else on its home.
-  const g = state.game?.game;
+  // Play opens on the board when a game is in progress (v13: one with a
+  // move of the player's, play-ctl unfinishedGame), else on its home.
   state.space = "today";
-  state.play = { ...state.play, view: g && !g.current.result ? "game" : "home" };
+  state.play = { ...state.play, view: unfinishedGame() ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
   update();
+  const note = takeNote();
+  if (note) toast(t("v13.note." + note), note === "restorePartial" ? "warn" : "info", 7000);
   // Lesson steps, problem bodies and classic records follow on idle
   // (content.js). Nothing on screen reads them before it is opened, and
   // what opens them waits for them, so their arrival renders nothing.
@@ -97,6 +185,41 @@ export async function boot() {
   if (hasNative()) setTimeout(() => restoreUpdateState().catch(() => {}), 600);
 }
 
+/* ------------------------------------------------------ the safe state */
+
+/** Try again: the page reloads and the store is opened afresh. */
+export function retryStore() {
+  reloadApp();
+}
+
+/** Use the app as it is, writing nothing (a banner says so and offers Retry). */
+export function continueReadOnly() {
+  update((s) => {
+    if (s.storeProblem) s.storeProblem = { ...s.storeProblem, continued: true };
+  });
+}
+
+/**
+ * Start the damaged core files over (only when each was merely damaged and
+ * its copy is kept under bad/): nothing held in memory is written, the
+ * damaged files are removed, and the app reloads.
+ */
+export async function resetDamaged() {
+  const p = state.storeProblem;
+  if (!p?.resettable) return false;
+  store.discardHeld();
+  for (const f of p.failed) store.block(f.key, false);
+  store.setReadOnly(false);
+  for (const f of p.failed) store.remove(f.key);
+  const ok = await store.flush();
+  if (!ok) {
+    store.setReadOnly(true);
+    return false;
+  }
+  reloadApp();
+  return true;
+}
+
 /* --------------------------------------------------------------- spaces */
 
 /** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
@@ -107,7 +230,7 @@ export const SPACES = ["today", "play", "learn", "library"];
  * what to play next. Any review open in Play closes.
  */
 export function playHome() {
-  const live = !!state.game && !state.game.game.current.result;
+  const live = playShowsBoard() && !state.game.game.current.result;
   const view = live ? "game" : "home";
   if (state.space === "play" && state.play.view === view && !state.review) return;
   remember();
@@ -160,14 +283,16 @@ export function goSpace(space) {
       return;
     }
     if (space === "today") return;
-    return state.game && !playReviewingNow() ? playBoard() : playHome();
+    return playShowsBoard() && !playReviewingNow() ? playBoard() : playHome();
   }
   remember();
   // v12: a record or classic is read in the Library; leaving the Library
   // closes it (its edits are kept), so no other space carries it along.
   if (state.review?.meta.space === "library") dropReview();
-  // Play is the board while a game is not over (v12, as before v9).
-  const board = space === "play" && state.game && !state.game.game.current.result && !playReviewingNow();
+  // Play is the board while a game is not over (v12, as before v9); v13:
+  // a game restored at launch with no move of the player's leaves Play on
+  // its home (play-ctl playShowsBoard).
+  const board = space === "play" && playShowsBoard() && !state.game.game.current.result && !playReviewingNow();
   update((s) => {
     s.space = space;
     s.menu = null;
@@ -229,8 +354,16 @@ export function restore(loc) {
 /* ---------------------------------------------------- the games' history */
 
 export function openRecord(id) {
+  // v13: a game's file is read when it is opened.
+  if (!Games.isLoaded(id)) {
+    return Games.loadGame(id).then((rec) => {
+      if (rec) openRecord(id);
+    });
+  }
   const rec = Games.getGame(id);
   if (!rec) return;
+  // A game left unfinished continues where it stopped (play-ctl resumeRecord).
+  if (Games.isUnfinished(rec)) return resumeRecord(id);
   try {
     const { game } = loadSGF(rec.sgf);
     // The same review as after a game: its stored analysis opens at once.
@@ -275,11 +408,10 @@ export function renameRecord(id, name) {
 }
 
 export async function exportRecord(id) {
-  const rec = Games.getGame(id);
+  const rec = Games.isLoaded(id) ? Games.getGame(id) : await Games.loadGame(id);
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    const { exportSGF } = await import("./play-ctl.js");
     exportSGF(game, rec.name || "goban-studio");
   } catch (_) {
     toast(t("library.importError"), "error");
@@ -299,6 +431,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
 
 /** A record under rules the app cannot score names those rules. */
 function importErrorText(e) {
+  if (e?.code === "unsupported-size") return t("sgf.unsupportedSize", [String(e.size || "?")]);
   if (e?.code !== "unsupported-rules") return t("library.importError");
   const name = String(e.rules || "").replace(/\s+/g, " ").trim().slice(0, 40) || "?";
   return t("rules.unsupported", [name]);
@@ -307,7 +440,7 @@ function importErrorText(e) {
 export async function importFromFile(file) {
   if (!file) return;
   try {
-    await importSGFText(await file.text(), file.name);
+    await importSGFText(decodeSgfBytes(new Uint8Array(await file.arrayBuffer())), file.name);
   } catch (e) {
     toast(importErrorText(e), "error");
   }
@@ -315,9 +448,9 @@ export async function importFromFile(file) {
 
 export async function importFromPath(path) {
   try {
-    const text = await readTextFile(path);
-    if (text == null) throw new Error("read failed");
-    await importSGFText(text, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
+    const bytes = await readFileBytes(path);
+    if (bytes == null) throw new Error("read failed");
+    await importSGFText(decodeSgfBytes(bytes), String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
     toast(importErrorText(e), "error");
@@ -339,15 +472,30 @@ export async function pickImport() {
 
 /** Every stored file as one JSON document (data/backup.js). */
 export async function exportBackup() {
-  const { saveText } = await import("./play-ctl.js");
   await store.flush();
-  const doc = backupDoc(store);
+  const doc = await backupDoc(store);
   const day = new Date().toISOString().slice(0, 10);
-  await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json");
+  await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json", { done: t("v13.backupSaved") });
+}
+
+/** What a restore says when it cannot go ahead. */
+function restoreError(error) {
+  return t(error === "snapshot" ? "v13.restore.snapshotFailed" : error === "tooLarge" ? "v13.backup.tooLarge" : error === "noSnapshot" ? "v13.undoRestore.none" : "backup.error." + error);
+}
+
+/**
+ * After a restore (or its undo), whatever happened: nothing in memory may
+ * be written over what is on disk now, and the app reads it all again.
+ */
+function reloadAfterRestore(note) {
+  store.setReadOnly(true);
+  noteForReload(note);
+  reloadApp();
 }
 
 /** Pick a backup file, say what it holds, and replace everything on confirm. */
 export async function importBackup() {
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
   let text = null;
   if (hasNative() && hasFileDialogs()) {
     const files = await openFileDialog({ title: t("backup.import"), allowMultiple: false });
@@ -368,24 +516,55 @@ export async function importBackup() {
     });
   }
   if (text == null) return;
-  const doc = parseBackup(text);
+  return offerRestore(parseBackup(text));
+}
+
+/** Check a backup document and, on confirm, restore it (importBackup once the file is read). */
+export function offerRestore(doc) {
   const c = checkBackup(doc);
-  if (!c.ok) return toast(t("backup.error." + c.error), "warn");
+  if (!c.ok) return toast(restoreError(c.error), "warn");
   confirmAction({
     title: t("backup.confirmTitle"),
-    body: t("backup.confirmFiles", [c.summary.games, c.summary.keys]),
+    body: tn("backup.confirmFiles", c.summary.games, [c.summary.games, c.summary.keys]) + " " + t("v13.restore.safety"),
     confirm: t("backup.restore"),
     danger: true,
-    onConfirm: async () => {
-      const r = await restoreDoc(store, doc);
-      if (!r.ok) return toast(t("backup.error." + r.error), "warn");
-      if (!r.written) return; // the store's toast has said so
-      location.reload();
-    },
+    onConfirm: () => restoreNow(doc),
   });
 }
 
+/** Restore `doc` now: a snapshot of what is there first, then the backup, then a reload. */
+export async function restoreNow(doc) {
+  const r = await restoreDoc(store, doc);
+  if (!r.ok) return toast(restoreError(r.error), "warn");
+  reloadAfterRestore(r.written ? "restored" : "restorePartial");
+}
+
+/** The latest restore snapshot ({ at, keys }), for Settings' "Undo restore"; null when there is none. */
+export function restoreSnapshot() {
+  return latestSnapshot(store);
+}
+
+/** Put back what was there before the last restore (Settings). */
+export function undoRestore() {
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
+  if (!latestSnapshot(store)) return toast(restoreError("noSnapshot"), "warn");
+  confirmAction({
+    title: t("v13.undoRestore.title"),
+    body: t("v13.undoRestore.body"),
+    confirm: t("v13.undoRestore.confirm"),
+    danger: true,
+    onConfirm: () => undoRestoreNow(),
+  });
+}
+
+export async function undoRestoreNow() {
+  const r = await undoRestoreDoc(store);
+  if (!r.ok) return toast(restoreError(r.error), "warn");
+  reloadAfterRestore(r.written ? "undone" : "restorePartial");
+}
+
 export function clearData() {
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
   confirmAction({
     title: t("settings.clearConfirm"),
     body: t("settings.clearBody"),
@@ -393,7 +572,7 @@ export function clearData() {
     danger: true,
     onConfirm: async () => {
       for (const key of store.list("")) store.remove(key);
-      if (await store.flush()) location.reload();
+      if (await store.flush()) reloadApp();
     },
   });
 }

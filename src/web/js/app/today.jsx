@@ -7,7 +7,7 @@
  */
 import * as Games from "../data/games.js";
 import { PLACEMENT } from "../model/player.js";
-import { t } from "../i18n.js";
+import { t, tn } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, Thumb } from "./parts.jsx";
@@ -62,7 +62,7 @@ function TodayList() {
         </span>
         <span class="gr-text">
           <strong>{t("placement.title")}</strong>
-          <span>{t("placement.lead", [PLACEMENT.LENGTH])}</span>
+          <span>{t("placement.leadRange", [PLACEMENT.MIN, PLACEMENT.MAX])}</span>
         </span>
         <span class="row-action">{t("placement.start")}</span>
       </button>
@@ -81,7 +81,7 @@ function TodayList() {
         </span>
         <span class="gr-text">
           <strong>{t("today.practice")}</strong>
-          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? `${t("today.next")}: ${nextRow.title}` : ""}</span>
+          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? t("v13ui.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
         </span>
         <span class="row-count">{t("practice.ofN", [done, now.items.length])}</span>
         {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("learn.path.resume") : t("learn.path.start")}</span>}
@@ -100,7 +100,7 @@ function Week() {
   return (
     <section class="section today-week">
       <h2 class="section-title">{t("today.week")}</h2>
-      <p class="muted">{played || solved ? t("today.weekLine", [played, solved]) : t("today.weekNone")}</p>
+      <p class="muted">{played || solved ? t("v13ui.week.line", [tn("v13ui.week.games", played), tn("v13ui.week.problems", solved)]) : t("today.weekNone")}</p>
     </section>
   );
 }
@@ -122,7 +122,7 @@ function Recent() {
                 <span class="gr-text">
                   <strong>{recordTitle(g)}</strong>
                   <span>
-                    {g.size} × {g.size} · {t("play.moveN", [g.moves])}
+                    {g.size} × {g.size} · {tn("play.moveN", g.moves)}
                   </span>
                 </span>
                 <span class={`outcome ${o.cls}`}>{o.label}</span>

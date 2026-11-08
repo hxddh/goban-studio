@@ -16,18 +16,22 @@
  * "intermediate" or "advanced", and the levels come in that order. Advanced
  * problem steps are also run through the solver's validate() (as the
  * problem bank is): the start is not already decided, a `ko: "ok"` step
- * really is a ko and a `goal: "seki"` step really ends in seki. Text must exist in all four languages. Exits non-zero on any
- * failure.
+ * really is a ko and a `goal: "seki"` step really ends in seki; so is a
+ * `ko: "ok"` step at any level. v13: an endgame step (`goal: "endgame"`,
+ * the solver's counting mode) is proved like the bank's endgame problems:
+ * validate() checks the exact count and the stored answer and margin, or
+ * value and choices. Text must exist in all four languages. Exits non-zero
+ * on any failure.
  */
 import { COURSE } from "../src/web/js/content/course.js";
 import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach, validate } from "../src/web/js/solver.js";
 
 const LANGS = ["zh", "en", "ko", "ja"];
-const MIN_UNITS = 18;
-const MIN_LESSONS = 75;
-const MIN_STEPS = 280;
+const MIN_UNITS = 20;
+const MIN_LESSONS = 90;
+const MIN_STEPS = 310;
 const LEVELS = [undefined, "intermediate", "advanced"];
-const MIN_ADVANCED_LESSONS = 15;
+const MIN_ADVANCED_LESSONS = 27;
 const MAX_PROBLEM_MS = 2000;
 const showLines = process.argv.includes("--lines");
 
@@ -225,7 +229,18 @@ for (const unit of COURSE) {
         }
         const first = solveFirstMoves(pz);
         if (!first.exact) fail(sw, "solveFirstMoves is not exact");
-        if (unit.level === "advanced") {
+        if (pz.counting) {
+          // v13: an endgame step is proved like an endgame problem of the
+          // bank: validate() checks the sealed region, the exact count, the
+          // stored answer and margin (or value and choices) and the line.
+          const v = validate(pz, { first });
+          if (!v.ok) fail(sw, `validate: ${v.reasons.join("; ")}`);
+          const ms = performance.now() - t0;
+          if (ms > MAX_PROBLEM_MS) fail(sw, `took ${Math.round(ms)} ms (limit ${MAX_PROBLEM_MS})`);
+          if (ms > slowest.ms) slowest = { ms, where: sw };
+          return;
+        }
+        if (unit.level === "advanced" || prob.ko === "ok") {
           const v = validate(pz, { first });
           if (!v.ok) fail(sw, `validate: ${v.reasons.join("; ")}`);
           if (prob.ko === "ok" && v.result !== "ko") fail(sw, `ko: "ok" but the best result is ${v.result}`);

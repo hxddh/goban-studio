@@ -5,7 +5,9 @@
  * module is what remains when KataGo is not there — the browser preview, or
  * a sidecar that failed to start: Moka's 9×9 net, plus local heuristics and
  * shallow playouts elsewhere. Every returned move is checked against the same
- * legality rules the player uses.
+ * legality rules the player uses, positional superko included (Game.canPlay):
+ * a candidate that would repeat an earlier position is never chosen, so the
+ * computer neither plays an illegal move nor passes because of one.
  *
  * The search is time-sliced with setTimeout, so the board keeps painting while
  * the computer thinks. There is no worker: zero:// only loads the one classic
@@ -124,13 +126,14 @@ function moveHeuristic(board, color, x, y, size, lastMove) {
   return score;
 }
 
-function candidates(board, color, size, lastMove, limit) {
+function candidates(board, color, size, lastMove, limit, legal = null) {
   const list = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board.get([x, y]) !== EMPTY) continue;
       const a = board.analyzeMove(color, [x, y]);
       if (a.overwrite || a.suicide || a.ko) continue;
+      if (legal && !legal(x, y)) continue;
       list.push({ x, y, score: moveHeuristic(board, color, x, y, size, lastMove) });
     }
   }
@@ -204,16 +207,29 @@ async function chooseMoka(game, level) {
   }
 }
 
+/**
+ * Is (x, y) legal for `color` under the game's own rules? For the side to
+ * move that is Game.canPlay (superko included); the board alone cannot know
+ * the history.
+ */
+function legalFor(game, color) {
+  if (color !== game.turn || game.phase !== "playing") return null;
+  return (x, y) => game.canPlay(x, y).ok;
+}
+
 export async function chooseMove(game, { level = 3, color = game.turn } = {}) {
   const size = game.size;
+  const legal = legalFor(game, color);
   const neural = await chooseMoka(game, level);
-  if (neural) return neural;
+  // Moka knows the moves but not the app's superko rule: its pick is
+  // checked like any other, and the heuristic opponent takes over if it fails.
+  if (neural && (neural.pass || !legal || legal(neural.x, neural.y))) return neural;
   const board = game.board.clone();
   const lastMove = game.lastMove;
   const cfg = LEVELS.find((l) => l.id === level) || LEVELS[2];
   const started = performance.now();
   const deadline = started + cfg.budget;
-  const moves = candidates(board, color, size, lastMove, cfg.candidates);
+  const moves = candidates(board, color, size, lastMove, cfg.candidates, legal);
   if (!moves.length) return { pass: true };
 
   // 19x19 playouts are too expensive in a WebView; use the heuristic list and

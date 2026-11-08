@@ -77,7 +77,7 @@ function PlacementOffer() {
       <div class="hero-text">
         <span class="eyebrow">{t("placement.eyebrow")}</span>
         <h2 id="placement-title">{t("placement.title")}</h2>
-        <p class="muted">{t("placement.lead", [PLACEMENT.LENGTH])}</p>
+        <p class="muted">{t("placement.leadRange", [PLACEMENT.MIN, PLACEMENT.MAX])}</p>
       </div>
       <div class="hero-actions">
         <Button kind="primary" onClick={C.startPlacement}>

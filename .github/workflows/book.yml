@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  NPM_CONFIG_ENGINE_STRICT: "true"
   # KataGo's official Linux release, Eigen (CPU) with AVX2.
   KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
   KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
@@ -49,10 +50,10 @@ jobs:
       matrix:
         tree: [whole, corner]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       # The generator replays moves with the app's own rules (@sabaki/go-board).
       - run: npm ci --omit=dev --ignore-scripts
       - name: KataGo and the network
@@ -75,7 +76,7 @@ jobs:
           node scripts/make-book.mjs --phase seed --tree ${{ matrix.tree }}
           --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
           --network-name "$NET_NAME" $BOOK_ARGS --parts book-parts --deadline-min 150
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: seed-${{ matrix.tree }}
           path: book-parts/seed-${{ matrix.tree }}.json
@@ -90,10 +91,10 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       # The generator replays moves with the app's own rules (@sabaki/go-board).
       - run: npm ci --omit=dev --ignore-scripts
       - name: KataGo and the network
@@ -109,7 +110,7 @@ jobs:
           chmod +x katago
           # The release is a self-extracting image; without FUSE it unpacks itself.
           APPIMAGE_EXTRACT_AND_RUN=1 ./katago version
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: seed-*
           path: seeds
@@ -123,7 +124,7 @@ jobs:
           --seed-dir seeds --parts book-parts
           --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
           --network-name "$NET_NAME" $BOOK_ARGS --deadline-min 300
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shard-${{ matrix.shard }}
           path: book-parts/shard-${{ matrix.shard }}.json
@@ -138,20 +139,20 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       # The generator replays moves with the app's own rules (@sabaki/go-board).
       - run: npm ci --omit=dev --ignore-scripts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: seed-*
           path: seeds
           merge-multiple: true
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: shard-*
           path: book-parts
@@ -179,8 +180,7 @@ jobs:
           git add src/web/js/content/book.json
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "v7 book: regenerate with $NET_NAME" -m "Built by the book workflow, run ${{ github.run_id }}." \
-            -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
-          Claude-Session: https://claude.ai/code/session_01Ua4GqDCH9DneaLhvctDyaf"
+            -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
           for i in 1 2 3; do
             git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
             sleep 5

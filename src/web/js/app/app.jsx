@@ -17,7 +17,8 @@ import { store } from "../data/store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
 import { SPACES, Sidebar, isFocus } from "./chrome.jsx";
-import { PlayView, ReviewView } from "./play.jsx";
+import { PlayView } from "./play.jsx";
+import { ReviewView } from "./review.jsx";
 import { PracticeView } from "./practice.jsx";
 import { LibraryHome, PlayStart, gameInProgress } from "../play/home.jsx";
 import { TodayView } from "./today.jsx";
@@ -25,6 +26,7 @@ import { Sheets } from "./sheets.jsx";
 import { ExplorerView } from "./explorer.jsx";
 import { useAnnouncements } from "./announcer.js";
 import { installKeys, textSizeKeys } from "./a11y-keys.js";
+import { BootError, ReadOnlyBanner, StoreProblem } from "./safety.jsx";
 
 function Toasts() {
   return (
@@ -41,8 +43,8 @@ function Toasts() {
 /** What Play shows: a review, the board, or (no game on it) what to play. */
 function PlaySpace() {
   if (C.playReviewing()) return <ReviewView />;
-  // As before v9: a game that is not over (an empty board too) is on screen.
-  return state.game && (state.play.view === "game" || !state.game.game.current.result) ? <PlayView /> : <PlayStart />;
+  // The game view, or a game in progress (v13: play-ctl playShowsBoard); else what to play.
+  return C.playShowsBoard() ? <PlayView /> : <PlayStart />;
 }
 
 /** What the Library shows: a review of a record or classic, the explorer, or its list. */
@@ -59,7 +61,10 @@ function App() {
     document.title = "Goban Studio";
   });
   useAnnouncements(); // v6 a11y: review moves, problems, lessons
+  // v13: no bridge in the packaged app, or the store could not be read (app/safety.jsx).
+  if (s.bootError) return <BootError />;
   if (!s.ready) return null;
+  if (s.storeProblem && !s.storeProblem.continued) return <StoreProblem />;
   const focus = isFocus();
   // The game that ends turns into its review on the same page (no new place).
   const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
@@ -68,6 +73,7 @@ function App() {
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
+        {s.storeProblem && <ReadOnlyBanner />}
         <div class="place" key={s.space + reviewKey + page}>
           {s.space === "today" && <TodayView />}
           {s.space === "play" && <PlaySpace />}
@@ -208,6 +214,7 @@ function onKeyDown(e) {
     if (state.menu) return update({ menu: null });
     if (state.sheet) return C.closeSheet();
     if (state.game?.ghost) return C.clearGhost();
+    if (C.clearProblemGhost()) return;
     if (state.review?.trial) return C.closeTrial();
     if (state.review?.variation) {
       state.review.variation = null;
@@ -351,9 +358,16 @@ export async function start() {
       drainOpenFiles();
       if (++n >= 6) clearInterval(timer);
     }, 1500);
-    setTimeout(() => import("../selftest.js").then((m) => m.runSelfTest({ state })), 900);
-    // v4 release checks: the screenshot tour, only when the host was launched with GOBAN_TOUR_OUT.
-    setTimeout(() => Host.selftestConfig().then((c) => c?.tour && import("../tour.js").then((m) => m.runTour(c))), 1200);
+    // Release checks: the packaged self-test (GOBAN_SELFTEST_OUT, or the
+    // updater's probe) and the screenshot tour (GOBAN_TOUR_OUT). v13: one
+    // look at the host's configuration, and their modules are evaluated
+    // only when it asks for them (never in a normal launch).
+    setTimeout(() => {
+      Host.selftestConfig().then((c) => {
+        if (c?.enabled || c?.updateProbe) import("../selftest.js").then((m) => m.runSelfTest({ state }));
+        if (c?.tour) setTimeout(() => import("../tour.js").then((m) => m.runTour(c)), 300);
+      });
+    }, 900);
   }
   // Whatever the store has not written yet goes out when the page goes (data/store.js).
   window.addEventListener("pagehide", () => {

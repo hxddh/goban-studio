@@ -75,7 +75,7 @@ Neutral greys with a faint warmth, one accent, two signals.
 | `--line` | rgba(29,28,26,.09) | rgba(255,255,255,.08) | hairlines |
 | `--text` | #1D1C1A | #EDEBE6 | primary text, **primary button** |
 | `--text-2` | #5F5D58 | #A9A69F | secondary text |
-| `--text-3` | #8F8C86 | #77746E | tertiary text, disabled |
+| `--text-3` | #6C6964 | #8E8A82 | tertiary text, disabled (v13: ≥ 4.5:1 on every page background) |
 | `--accent` | #34529A | #8EA6E0 | focus ring, selection, progress, board hints |
 | `--good` | #2E7D4F | #6CC08F | correct, won |
 | `--bad` | #B3402C | #E58A74 | wrong, lost, mistake markers |
@@ -157,7 +157,17 @@ group per screen region.
   place before the first path); your level; this week in one line; the
   last three games. Nothing empty is shown as a card.
 * **Play (v12).** The board. With no game on it: the suggested game (the
-  one primary) and *New game* in the toolbar.
+  one primary) and *New game* in the toolbar. v13: "no game on it" is
+  literal — with nothing saved, Play opens on that home (the suggested
+  game with its handicap), not on a blank board against the last chosen
+  rank; a game restored at launch with no move of the player's yet (only
+  the computer moved) also leaves Play on its home, while a game started
+  in this session stays on the board. Today's hero and Play's *Continue*
+  use the same rule as unfinished games below.
+* **The computer's move (v13).** When the engine cannot give one, the
+  offline engine plays it; when that fails too, the panel says so and
+  offers *Retry* (the one primary). The game is never left waiting on the
+  computer with nothing to press.
 * **Practice (v9 Learn; v12 name).** One path chosen for you: a short ordered list of rows
   (5–8: the next lesson, reviews due, the week's focus, one stretch
   problem, the beginner bridges), each saying why it is there in a few
@@ -190,6 +200,30 @@ group per screen region.
   only primary action; size cards (19×19 first and standard; 13×13 and 9×9
   as quicker games); opponent, strength and colour on one row each; time,
   handicap and komi under *More options*.
+
+* **Unfinished games (v13).** Nothing replaces a game in progress
+  silently. A game with at least one move of the player's and no result
+  that New game, *Play from here* (a review, the explorer), onboarding or
+  continuing another game would replace is first saved to the Library,
+  where its row says *Unfinished*, and a toast says so. Opening it there
+  continues it — the same record, opponent, colour, clock and rating
+  setting — instead of opening its review; finishing it fills in that
+  record. An unfinished game is not rated, does not count in the week, and
+  is not analysed in the background until it is finished. This was chosen
+  over a confirmation sheet ("Replace the game in progress?"): saving costs
+  the player nothing and never interrupts, and a game saved by mistake is
+  one Delete away. (Explicitly saved games without a result behave the
+  same way.)
+* **Safe state (v13).** When the app's own files cannot be read it shows
+  one card in place of the app (no onboarding): what could not be read,
+  *Retry* (the one primary, focused), *Continue read-only*, and *Start
+  these files over* when the files were only damaged and a copy is kept;
+  after *Continue read-only*, one quiet line above the page says changes
+  are not saved, with *Retry*. The packaged app without its bridge shows
+  the same card with *Retry*. See `docs/storage.md`.
+* **Dangerous confirmations (v13).** A sheet that deletes or replaces
+  something (delete a game, clear data, restore or undo a restore) opens
+  with *Cancel* focused, so Enter alone never confirms it.
 
 * **Less on screen (v8).** Every element has to serve playing or learning.
   The play panel says nothing before the first move but one quiet line;
@@ -227,7 +261,8 @@ dark, in all four languages, before every release:
 - [ ] No explanatory grey text visible that is not needed right now.
 - [ ] Board lines are crisp at 1× and 2×; star points and stones to spec.
 - [ ] Focus ring visible on every interactive element via keyboard.
-- [ ] Contrast: body text ≥ 4.5:1, secondary ≥ 4.5:1, tertiary ≥ 3:1.
+- [ ] Contrast: body, secondary and tertiary text ≥ 4.5:1 (large text ≥ 3:1; v13, was 3:1 for tertiary).
+- [ ] Windows high contrast (forced colours): focus, buttons and the selected choice stay visible (v13 `@media (forced-colors: active)`).
 - [ ] Nothing truncates or wraps awkwardly in Korean, Japanese or Chinese.
 - [ ] Reduced motion: nothing animates except opacity.
 
@@ -240,3 +275,6 @@ review (every tab), a finished game's post-game review (every tab), every
 Settings pane — in four combinations of language, light/dark and larger text, and
 runs the accessibility audit, the raw-key, clipping, sideways-scroll and
 one-primary checks on each. A new page joins that list in the same change.
+v13 adds `scripts/ui-tests/shell-v13ui.mjs` (Play's home for a new player,
+the confirm-move switches, *Undo restore*, the safe state, *Retry* and a
+problem shown turned, in four languages), and the audit asks 4.5:1 of small text.

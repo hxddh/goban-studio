@@ -190,12 +190,20 @@ export const INSTALL_BLOCKED = ["Unsupported", "NotPackaged", "Translocated", "R
 export const INSTALL_ERRORS = [
   "Busy",
   "BadTag",
+  // v13: the host installs only the tag its own last check found, and only
+  // a newer one than this version.
+  "NotChecked",
+  "NotNewer",
   "Network",
   "BadRedirect",
   "HttpStatus",
   "NoAsset",
   "TooLarge",
   "NoChecksum",
+  // v13, builds with an update key (docs/signing.md): SHA256SUMS.sig is
+  // missing or does not verify.
+  "NoSignature",
+  "BadSignature",
   "ChecksumMismatch",
   "Unpack",
   "BadPackage",
@@ -204,6 +212,10 @@ export const INSTALL_ERRORS = [
   "Cancelled",
   "NotReady",
   "Helper",
+  // v13: another helper is updating this installation; the helper never
+  // proved it started (the app stays open).
+  "HelperBusy",
+  "HelperNotStarted",
   "QuitFailed",
   "OutOfMemory",
   "Unavailable",
@@ -268,7 +280,7 @@ export function installStepOf(phase) {
  * interface falls back to "Open download page".
  */
 export function installFallsBack(code) {
-  return INSTALL_BLOCKED.includes(code) || ["NoAsset", "NoChecksum", "ChecksumMismatch", "BadPackage", "BadTag", "BadRedirect", "Helper"].includes(code);
+  return INSTALL_BLOCKED.includes(code) || ["NoAsset", "NoChecksum", "NoSignature", "BadSignature", "ChecksumMismatch", "BadPackage", "BadTag", "BadRedirect", "Helper", "NotNewer"].includes(code);
 }
 
 /** The message key that explains an install error or block to the player. */
@@ -284,6 +296,8 @@ export function installMessageKey(code) {
       return "update.cannotInstall";
     case "ChecksumMismatch":
     case "NoChecksum":
+    case "NoSignature":
+    case "BadSignature":
     case "BadPackage":
     case "Unpack":
       return "update.verifyError";
@@ -293,6 +307,8 @@ export function installMessageKey(code) {
       return "update.diskError";
     case "NotReady":
     case "Helper":
+    case "HelperBusy":
+    case "HelperNotStarted":
     case "QuitFailed":
       return "update.applyError";
     default:

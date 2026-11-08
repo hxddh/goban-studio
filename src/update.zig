@@ -12,6 +12,12 @@
 //! `std.http.Client` has no socket timeout, so the deadline lives on the
 //! UI side (`timeout_ms`): a check that outlives it is answered with
 //! `Timeout`, and whatever its thread produces later is dropped.
+//!
+//! v13: the checker also remembers the tag its own last successful check
+//! returned (`lastTag`). The installer accepts only that tag, and only if
+//! it is newer than the running version (`isNewer`): the page cannot ask
+//! for an older release (a downgrade to a version with a known bug) or for
+//! a tag nobody checked.
 const std = @import("std");
 
 pub const releases_api_url = "https://api.github.com/repos/hxddh/goban-studio/releases/latest";
@@ -47,6 +53,10 @@ pub const Checker = struct {
     running: u32 = 0,
     wake_context: ?*anyopaque = null,
     wake_fn: ?WakeFn = null,
+    /// The `latest` tag of the last check the UI thread waited for and
+    /// that succeeded; empty until then.
+    last_tag: [64]u8 = undefined,
+    last_tag_len: usize = 0,
 
     pub fn init(self: *Checker, io: std.Io) void {
         self.* = .{};
@@ -85,6 +95,14 @@ pub const Checker = struct {
         }
     }
 
+    /// The tag of the last successful check ("" before one). UI thread.
+    pub fn lastTag(self: *Checker, out: *[64]u8) []const u8 {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        @memcpy(out[0..self.last_tag_len], self.last_tag[0..self.last_tag_len]);
+        return out[0..self.last_tag_len];
+    }
+
     /// The finished reply for `gen`, copied into `out`. UI thread.
     pub fn take(self: *Checker, gen: u64, out: []u8) ?[]const u8 {
         self.lock.lockUncancelable(self.io);
@@ -106,6 +124,10 @@ pub const Checker = struct {
             @memcpy(self.reply[0..reply.len], reply);
             self.reply_len = reply.len;
             self.ready = true;
+            if (replyTag(reply)) |tag| {
+                @memcpy(self.last_tag[0..tag.len], tag);
+                self.last_tag_len = tag.len;
+            }
         }
         const wake_fn = self.wake_fn;
         const wake_context = self.wake_context;
@@ -204,6 +226,107 @@ fn errorReply(out: []u8, name: []const u8) []const u8 {
     return "{\"ok\":false}";
 }
 
+/// The `latest` tag of a successful reply built by `releaseReply` (it
+/// starts with exactly this and the tag needs no escaping), else null.
+pub fn replyTag(reply: []const u8) ?[]const u8 {
+    const head = "{\"ok\":true,\"latest\":\"";
+    if (!std.mem.startsWith(u8, reply, head)) return null;
+    const rest = reply[head.len..];
+    const end = std.mem.indexOfScalar(u8, rest, '"') orelse return null;
+    const tag = rest[0..end];
+    return if (validTag(tag)) tag else null;
+}
+
+/// A version as update.js parses it: "v4.1.0", "4.1", "4.1.0-beta.2",
+/// build metadata ignored.
+pub const Version = struct {
+    major: u64 = 0,
+    minor: u64 = 0,
+    patch: u64 = 0,
+    /// The pre-release, without the dash ("" for a release).
+    pre: []const u8 = "",
+
+    pub fn parse(text: []const u8) ?Version {
+        var t = std.mem.trim(u8, text, " \t");
+        if (t.len > 0 and t[0] == 'v') t = t[1..];
+        if (std.mem.indexOfScalar(u8, t, '+')) |plus| {
+            if (!validIdents(t[plus + 1 ..])) return null;
+            t = t[0..plus];
+        }
+        var v = Version{};
+        if (std.mem.indexOfScalar(u8, t, '-')) |dash| {
+            v.pre = t[dash + 1 ..];
+            if (!validIdents(v.pre)) return null;
+            t = t[0..dash];
+        }
+        var parts = std.mem.splitScalar(u8, t, '.');
+        const fields = [_]*u64{ &v.major, &v.minor, &v.patch };
+        var i: usize = 0;
+        while (parts.next()) |p| : (i += 1) {
+            if (i >= fields.len or p.len == 0) return null;
+            for (p) |c| if (!std.ascii.isDigit(c)) return null;
+            fields[i].* = std.fmt.parseInt(u64, p, 10) catch return null;
+        }
+        if (i == 0) return null;
+        return v;
+    }
+
+    fn validIdents(s: []const u8) bool {
+        if (s.len == 0) return false;
+        for (s) |c| if (!(std.ascii.isAlphanumeric(c) or c == '.' or c == '-')) return false;
+        return true;
+    }
+
+    fn isNumeric(s: []const u8) bool {
+        if (s.len == 0) return false;
+        for (s) |c| if (!std.ascii.isDigit(c)) return false;
+        return true;
+    }
+
+    /// Semver order: a release outranks its pre-releases; pre-release
+    /// identifiers compare numerically when both are numbers, a number
+    /// sorts before a word, words compare as ASCII.
+    pub fn order(a: Version, b: Version) std.math.Order {
+        inline for (.{ "major", "minor", "patch" }) |k| {
+            const o = std.math.order(@field(a, k), @field(b, k));
+            if (o != .eq) return o;
+        }
+        if (a.pre.len == 0 and b.pre.len == 0) return .eq;
+        if (a.pre.len == 0) return .gt;
+        if (b.pre.len == 0) return .lt;
+        var ia = std.mem.splitScalar(u8, a.pre, '.');
+        var ib = std.mem.splitScalar(u8, b.pre, '.');
+        while (true) {
+            const x = ia.next();
+            const y = ib.next();
+            if (x == null and y == null) return .eq;
+            if (x == null) return .lt;
+            if (y == null) return .gt;
+            const nx = isNumeric(x.?);
+            const ny = isNumeric(y.?);
+            if (nx and ny) {
+                const vx = std.fmt.parseInt(u64, x.?, 10) catch return .eq;
+                const vy = std.fmt.parseInt(u64, y.?, 10) catch return .eq;
+                const o = std.math.order(vx, vy);
+                if (o != .eq) return o;
+            } else if (nx != ny) {
+                return if (nx) .lt else .gt;
+            } else {
+                const o = std.mem.order(u8, x.?, y.?);
+                if (o != .eq) return o;
+            }
+        }
+    }
+};
+
+/// Is `latest` a newer version than `current`? False when either does not
+/// parse: an unknown version is never an upgrade.
+pub fn isNewer(latest: []const u8, current: []const u8) bool {
+    const a = Version.parse(latest) orelse return false;
+    const b = Version.parse(current) orelse return false;
+    return a.order(b) == .gt;
+}
+
 pub fn validTag(tag: []const u8) bool {
     if (tag.len == 0 or tag.len > 64) return false;
     for (tag) |c| {
@@ -284,4 +407,49 @@ test "a bad tag or body is an error reply" {
 test "notes are trimmed on a UTF-8 boundary" {
     try std.testing.expectEqualStrings("ab", trimUtf8("ab\xe5\x9b\xb4", 4));
     try std.testing.expectEqualStrings("ab\xe5\x9b\xb4", trimUtf8("ab\xe5\x9b\xb4", 5));
+}
+
+test "the tag of a successful reply is remembered, nothing else" {
+    var out: [4096]u8 = undefined;
+    const reply = releaseReply(std.testing.allocator, "{\"tag_name\":\"v13.1.0\"}", &out);
+    try std.testing.expectEqualStrings("v13.1.0", replyTag(reply).?);
+    try std.testing.expect(replyTag("{\"ok\":false,\"error\":\"Network\"}") == null);
+    try std.testing.expect(replyTag("{\"ok\":true,\"latest\":\"<x>\"}") == null);
+
+    var c: Checker = .{};
+    c.init(std.testing.io);
+    var tag_buf: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("", c.lastTag(&tag_buf));
+    // A reply nobody waits for (abandoned, stale) is not remembered.
+    c.running = 1;
+    c.wanted = 2;
+    c.finish(1, reply);
+    try std.testing.expectEqualStrings("", c.lastTag(&tag_buf));
+    c.running = 1;
+    c.finish(2, reply);
+    try std.testing.expectEqualStrings("v13.1.0", c.lastTag(&tag_buf));
+    // A failed check keeps the last good tag.
+    c.running = 1;
+    c.wanted = 3;
+    c.finish(3, "{\"ok\":false,\"error\":\"Network\"}");
+    try std.testing.expectEqualStrings("v13.1.0", c.lastTag(&tag_buf));
+}
+
+test "versions compare as semver, like update.js" {
+    try std.testing.expect(isNewer("v13.0.0", "12.0.0"));
+    try std.testing.expect(isNewer("v12.0.1", "12.0.0"));
+    try std.testing.expect(isNewer("v12.1", "12.0.9"));
+    try std.testing.expect(!isNewer("v12.0.0", "12.0.0"));
+    try std.testing.expect(!isNewer("v11.9.9", "12.0.0"));
+    try std.testing.expect(!isNewer("v12.0.0-beta.1", "12.0.0"));
+    try std.testing.expect(isNewer("v12.0.0", "12.0.0-rc.1"));
+    try std.testing.expect(isNewer("v12.0.0-rc.2", "12.0.0-rc.1"));
+    try std.testing.expect(isNewer("v12.0.0-rc.10", "12.0.0-rc.9"));
+    try std.testing.expect(isNewer("v12.0.0-rc", "12.0.0-1"));
+    try std.testing.expect(isNewer("v12.0.0-rc.1.1", "12.0.0-rc.1"));
+    try std.testing.expect(!isNewer("v12.0.0+build.5", "12.0.0"));
+    for ([_][]const u8{ "", "v", "latest", "v1..2", "v1.2.3.4", "v1.x", "v1.2.3-", "v-1" }) |bad| {
+        try std.testing.expect(!isNewer(bad, "0.0.1"));
+        try std.testing.expect(Version.parse(bad) == null);
+    }
 }

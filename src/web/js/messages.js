@@ -9,6 +9,10 @@ import { m } from "./messages/m.js";
 import { SHELL } from "./messages/shell.js";
 import { PLAY } from "./messages/play.js";
 import { LEARN } from "./messages/learn.js";
+import { DATA13 } from "./messages/v13-data.js";
+import { CORE13 } from "./messages/v13-core.js";
+import { V13_LEARN } from "./messages/v13-learn.js";
+import { UI13 } from "./messages/v13-ui.js";
 
 export const MESSAGES = {
 
@@ -193,7 +197,7 @@ export const MESSAGES = {
   "library.inProgress": m("进行中的对局", "Game in progress", "진행 중인 대국", "対局中"),
   "library.continueTitle": m("{0} 路 · 第 {1} 手", "{0}×{0} · move {1}", "{0}줄 · {1}수째", "{0}路 · {1}手目"),
   "library.continue": m("继续", "Continue", "계속", "続ける"),
-  "library.vsEngine": m("对电脑 {0}", "vs computer {0}", "컴퓨터 {0}와 대국", "コンピュータ {0} と対局"),
+  "library.vsEngine": m("对电脑 {0}", "vs computer {0}", "컴퓨터 {0:과/와} 대국", "コンピュータ {0} と対局"),
   "library.twoPlayers": m("两人对局", "Two-player game", "두 사람 대국", "二人での対局"),
   "library.mine": m("我的棋局", "My games", "내 대국", "自分の対局"),
   "library.classics": m("名局", "Classic games", "명국", "名局"),
@@ -473,7 +477,7 @@ export const MESSAGES = {
     "初期設定はオフです。オンにすると、Goban Studio が週に一度 GitHub に最新版を問い合わせます。あなたや棋譜についての情報は送りません。",
   ),
   "update.checking": m("正在检查更新…", "Checking for updates…", "업데이트 확인 중…", "アップデートを確認しています…"),
-  "update.available": m("Goban Studio {0} 已发布", "Goban Studio {0} is available", "Goban Studio {0}이(가) 나왔습니다", "Goban Studio {0} が公開されています"),
+  "update.available": m("Goban Studio {0} 已发布", "Goban Studio {0} is available", "Goban Studio {0:이/가} 나왔습니다", "Goban Studio {0} が公開されています"),
   "update.current": m("已是最新版本（{0}）", "You have the latest version ({0})", "최신 버전입니다 ({0})", "最新版です（{0}）"),
   "update.download": m("打开下载页面", "Open download page", "다운로드 페이지 열기", "ダウンロードページを開く"),
   "update.unavailable": m("只有桌面版应用可以检查更新", "Update checks are available in the desktop app only", "업데이트 확인은 데스크톱 앱에서만 할 수 있습니다", "アップデートの確認はデスクトップアプリでのみ行えます"),
@@ -486,7 +490,7 @@ export const MESSAGES = {
   "update.unpacking": m("正在准备更新…", "Preparing the update…", "업데이트를 준비하는 중…", "アップデートを準備しています…"),
   "update.cancel": m("取消", "Cancel", "취소", "キャンセル"),
   "update.cancelled": m("已取消下载", "Download cancelled", "다운로드를 취소했습니다", "ダウンロードをキャンセルしました"),
-  "update.ready": m("Goban Studio {0} 已准备好安装", "Goban Studio {0} is ready to install", "Goban Studio {0}을(를) 설치할 준비가 되었습니다", "Goban Studio {0} をインストールする準備ができました"),
+  "update.ready": m("Goban Studio {0} 已准备好安装", "Goban Studio {0} is ready to install", "Goban Studio {0:을/를} 설치할 준비가 되었습니다", "Goban Studio {0} をインストールする準備ができました"),
   "update.restart": m("重新启动以完成更新", "Restart to update", "다시 시작하여 업데이트", "再起動してアップデート"),
   "update.restartHint": m("你的棋局、进度和设置都会保留。", "Your games, progress and settings are kept.", "기보, 진행 상황, 설정은 그대로 유지됩니다.", "棋譜、進み具合、設定はそのまま残ります。"),
   "update.installing": m(
@@ -495,7 +499,7 @@ export const MESSAGES = {
     "설치 중… Goban Studio가 다시 시작됩니다.",
     "インストールしています… Goban Studio が再起動します。",
   ),
-  "update.installed": m("已更新到 Goban Studio {0}", "Updated to Goban Studio {0}", "Goban Studio {0}(으)로 업데이트했습니다", "Goban Studio {0} にアップデートしました"),
+  "update.installed": m("已更新到 Goban Studio {0}", "Updated to Goban Studio {0}", "Goban Studio {0:으로/로} 업데이트했습니다", "Goban Studio {0} にアップデートしました"),
   "update.rolledBack": m(
     "更新未能安装，已恢复为之前的版本。",
     "The update couldn't be installed. Your previous version was restored.",
@@ -847,7 +851,7 @@ export const MESSAGES = {
     "一路上的白子有两口气。从你这一侧打吃：白棋必须粘，你保有先手。",
     "The white stone on the first line has two liberties. Atari it from your side: White has to connect, and you keep sente.",
     "1선의 백돌은 활로가 둘입니다. 흑 쪽에서 단수 치세요. 백은 이어야 하고 흑은 선수를 유지합니다.",
-    "一線の白石はダメが二つです。黒の側からアタリにしましょう。白は継ぐしかなく、黒は先手を保ちます。",
+    "一線の白石は呼吸点が二つです。黒の側からアタリにしましょう。白は継ぐしかなく、黒は先手を保ちます。",
   ),
   "problem.endgame.capture.title": m("提子是先手", "A capture in sente", "선수로 따내기", "先手で取る"),
   "problem.endgame.capture.hint": m(
@@ -920,4 +924,8 @@ export const MESSAGES = {
   ...SHELL,
   ...PLAY,
   ...LEARN,
+  ...DATA13,
+  ...CORE13,
+  ...V13_LEARN,
+  ...UI13,
 };

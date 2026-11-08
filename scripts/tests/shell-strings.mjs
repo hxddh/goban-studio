@@ -5,7 +5,8 @@ import { test, LANG_IDS, MESSAGES, PROBLEMS, assert, empty, fs, newGame, path, r
 
 await test("shell strings: the area files (shell, play, learn) are merged into the table, in four languages with the same placeholders", async () => {
   // The same placeholders (a language may use one twice: "{0}×{0}").
-  const holes = (v) => [...new Set([...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]))].sort().join();
+  // v13: a Korean placeholder may carry its particle, {0:은/는} (i18n.js josa).
+  const holes = (v) => [...new Set([...v.matchAll(/\{(\d)(?::[^{}]*)?\}/g)].map((m) => m[1]))].sort().join();
   for (const [key, v] of Object.entries(MESSAGES)) for (const lang of LANG_IDS) assert.equal(holes(v[lang]), holes(v.en), `${key} ${lang}`);
   for (const [file, name] of [["shell", "SHELL"], ["play", "PLAY"], ["learn", "LEARN"]]) {
     const mod = await import(`../../src/web/js/messages/${file}.js`);

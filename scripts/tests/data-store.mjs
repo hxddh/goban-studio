@@ -130,7 +130,12 @@ export default async function ({ test, assert, root }) {
     assert.ok(S.validKey("a".repeat(195) + ".json"));
     assert.ok(!S.validKey("a".repeat(196) + ".json"));
     for (const p of ["", "games", "games/"]) assert.ok(S.validPrefix(p), p);
-    for (const p of ["/", "../", "games//", "/games/"]) assert.ok(!S.validPrefix(p), p);
+    for (const p of ["/", "../", "games//", "/games/", "con/", "nul"]) assert.ok(!S.validPrefix(p), p);
+    // v13: Windows device names, as a file or a folder, like store.zig.
+    for (const k of ["con.json", "nul.json", "aux.json", "prn.json", "com1.json", "lpt9.json", "games/con.json", "con/x.json", "games/lpt1.json"]) assert.ok(!S.validKey(k), k);
+    for (const k of ["console.json", "com.json", "com0.json", "com10.json", "lpt.json", "nul-1.json", "auxiliary.json"]) assert.ok(S.validKey(k), k);
+    for (const n of ["con", "CON", "Con", "NUL.txt", "COM9", "LPT9.json", "con.tar.gz", "con ", "aux .json"]) assert.ok(S.isDeviceName(n), n);
+    for (const n of ["", "co", "conn", "com", "com0", "com10", "lpt0", "x.con", "console.json", ".con"]) assert.ok(!S.isDeviceName(n), n);
     // The JS limits are the host's.
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /pub const max_file_bytes: u64 = 8 \* 1024 \* 1024;/);
@@ -143,15 +148,12 @@ export default async function ({ test, assert, root }) {
 
   await test("data store: the host registers the four file commands, with Zig tests", () => {
     const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+    // v13: one command table; the registry and the policies are built from
+    // it (and a Zig test checks every name is unique).
     for (const [name, fn] of [["studio.storeRead", "storeRead"], ["studio.storeWrite", "storeWrite"], ["studio.storeList", "storeList"], ["studio.storeRemove", "storeRemove"]]) {
-      assert.match(main, new RegExp(`\\.name = "${name.replace(".", "\\.")}",\\n\\s+\\.context = self,\\n\\s+\\.invoke_fn = ${fn},`), name);
+      assert.ok(main.includes(`.{ .name = "${name}", .invoke = ${fn} },`), name);
     }
-    // Every handler slot is filled, and each gets a policy.
-    const slots = [...main.matchAll(/self\.handlers\[(\d+)\] = /g)].map((m) => Number(m[1]));
-    const size = Number(main.match(/handlers: \[(\d+)\]native_sdk\.BridgeHandler/)[1]);
-    const asyncSize = Number(main.match(/async_handlers: \[(\d+)\]native_sdk\.bridge\.AsyncHandler/)[1]);
-    assert.deepEqual(slots.sort((a, b) => a - b), Array.from({ length: size }, (_, i) => i));
-    assert.equal(Number(main.match(/policies: \[(\d+)\]native_sdk\.BridgeCommandPolicy/)[1]), size + asyncSize);
+    assert.match(main, /test "every bridge command is registered once, with the same origins"/);
     // The data root: beside models/, with a test override.
     assert.match(main, /fn resolveDataDir\(/);
     assert.match(main, /GOBAN_DATA_DIR/);
@@ -160,8 +162,9 @@ export default async function ({ test, assert, root }) {
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /test "store keys are validated strictly"/);
     assert.match(zig, /test "store writes atomically, reads in chunks, lists and removes in a temp dir"/);
-    // Atomic: a temporary file in the same directory, renamed over the target.
-    assert.match(zig, /dir\.rename\(tmp, dir, sub, self\.io\)/);
+    // Atomic: a temporary file in the same directory, renamed over the
+    // target (retried briefly on Windows, where a scanner may hold it).
+    assert.match(zig, /try renameRetrying\(self\.io, dir, tmp, sub\)/);
     // No huge stack buffers in the handlers: the chunk is allocated.
     assert.match(main, /self\.allocator\.alloc\(u8, store_mod\.chunk_bytes\)/);
   });
@@ -403,13 +406,15 @@ export default async function ({ test, assert, root }) {
     store.put("games/g-1.json", { id: "g-1" });
     store.put("games/g-2.json", { id: "g-2" });
     await store.flush();
-    const doc = JSON.parse(JSON.stringify(B.exportBackup(store, 1730000000000)));
+    const doc = JSON.parse(JSON.stringify(await B.exportBackup(store, 1730000000000)));
     assert.deepEqual(Object.keys(doc).sort(), ["app", "at", "data", "v"]);
     assert.equal(doc.app, "goban-studio");
-    assert.equal(doc.v, 9);
+    assert.equal(doc.v, 13);
     assert.equal(doc.at, 1730000000000);
     assert.deepEqual(Object.keys(doc.data), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual(B.checkBackup(doc), { ok: true, summary: { keys: 4, games: 2, at: 1730000000000 } });
+    const checked = B.checkBackup(doc);
+    assert.deepEqual(checked.summary, { keys: 4, games: 2, at: 1730000000000 });
+    assert.deepEqual(checked.data["games/g-1.json"], { id: "g-1", v: 13 }, "every file in the current format");
     // The export is a copy: later changes do not leak into it.
     store.get("settings.json").lang = "changed";
     assert.equal(doc.data["settings.json"].lang, "ko");
@@ -419,25 +424,27 @@ export default async function ({ test, assert, root }) {
     assert.equal(B.checkBackup({ app: "other", v: 9, data: {} }).error, "notBackup");
     assert.equal(B.checkBackup({ app: "goban-studio", format: 1, data: { settings: {} } }).error, "notBackup", "a v8 backup");
     assert.equal(B.checkBackup({ ...doc, v: 8 }).error, "olderVersion");
-    assert.equal(B.checkBackup({ ...doc, v: 10 }).error, "newerVersion");
+    assert.equal(B.checkBackup({ ...doc, v: 14 }).error, "newerVersion");
     assert.equal(B.checkBackup({ ...doc, data: [] }).error, "damaged");
     assert.deepEqual(B.checkBackup({ ...doc, data: { "../x.json": {} } }), { ok: false, error: "damaged", key: "../x.json" });
     assert.equal(B.checkBackup({ ...doc, data: { "profile.json": "x" } }).error, "damaged");
-    assert.equal(B.parseBackup("\ufeff" + JSON.stringify(doc)).v, 9);
+    assert.equal(B.parseBackup("\ufeff" + JSON.stringify(doc)).v, 13);
     assert.equal(B.parseBackup("{nope"), null);
-    // Import replaces everything: keys not in the backup go.
+    // Import replaces everything: keys not in the backup go (a snapshot of them is kept).
     store.put("current.json", { sgf: "(;)" });
     store.put("games/g-3.json", { id: "g-3" });
     await store.flush();
     const bad = await B.importBackup(store, { ...doc, v: 8 });
     assert.equal(bad.ok, false);
     assert.ok(host.files.has("current.json"), "a refused import changes nothing");
-    const r = await B.importBackup(store, doc);
+    const r = await B.importBackup(store, doc, { now: 1730000000500 });
     assert.equal(r.ok, true);
     assert.equal(r.written, true);
-    assert.deepEqual(store.list(), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual([...host.files.keys()].sort(), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual(store.get("settings.json"), { lang: "ko" });
+    assert.equal(r.snapshot, "backups/pre-restore-1730000000500/");
+    const live = (keys) => keys.filter((k) => !k.startsWith("backups/"));
+    assert.deepEqual(live(store.list()), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
+    assert.deepEqual(live([...host.files.keys()].sort()), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
+    assert.deepEqual(store.get("settings.json"), { lang: "ko", v: 13 });
     // Importing does not alias the document.
     doc.data["settings.json"].lang = "x";
     assert.equal(store.get("settings.json").lang, "ko");
