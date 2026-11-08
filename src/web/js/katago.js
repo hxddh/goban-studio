@@ -355,3 +355,46 @@ export function cancel() {
   if (hasNative()) nativeInvoke("studio.katagoCancel", {}).catch(() => {});
   for (const entry of entries) entry.finish?.(null);
 }
+
+/* ------------------------------------------- v13: human policy of moves */
+
+/**
+ * v13: how likely each of one player's moves was for players of several
+ * ranks, from the human SL model (model/move-rank.js reads a rank from it).
+ *
+ * This needs a host that offers `studio.katagoHumanPolicy`, announced by
+ * `humanPolicy: true` in `studio.katagoStatus`; no released host does yet.
+ * The search requests cannot stand in for it: their report lists only the
+ * moves the search visited, with the main network's prior, so the move
+ * played is often missing. The host call, on the human slot, brings
+ * KataGo to each position of the main line before a move of `color`
+ * (the same position fields as katagoAnalyzeAsync, with `moves` the whole
+ * line), and for each profile sends `kata-set-param humanSLProfile <p>`
+ * and `kata-raw-human-nn 0`, answering
+ *   { ok: true, moves: [{ index, p: { [profile]: probability of the move played } }] }
+ * (index: the move's number in the line, 0-based; passes left out).
+ *
+ * Resolves that list, or null when the host, the human model or the
+ * request is not there (the caller then shows nothing).
+ */
+export async function humanMoveProbabilities(game, color, profiles, { signal = null } = {}) {
+  if (!hasNative() || signal?.aborted) return null;
+  const st = await status();
+  if (!st?.available || !st.humanPolicy || signal?.aborted) return null;
+  const base = positionPayload(game, game.mainLine ? game.mainLine().at(-1) : game.current, 1);
+  try {
+    const reply = await nativeInvoke("studio.katagoHumanPolicy", { size: base.size, komi: base.komi, rules: base.rules, setup: base.setup, moves: base.moves, color: color === BLACK ? "B" : "W", profiles: profiles.slice() });
+    if (signal?.aborted || !reply || reply.ok !== true || !Array.isArray(reply.moves)) return null;
+    return reply.moves.filter((m) => m && Number.isFinite(m.index) && m.p && typeof m.p === "object");
+  } catch (error) {
+    console.warn("KataGo human policy request failed", error);
+    return null;
+  }
+}
+
+/** Whether this host can answer humanMoveProbabilities (and the human model is installed). */
+export async function canReadHumanPolicy() {
+  if (!hasNative()) return false;
+  const st = await status();
+  return !!(st?.available && st.humanPolicy);
+}

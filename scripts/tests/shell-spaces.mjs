@@ -32,7 +32,7 @@ try {
     assert.equal(state.space, "today");
     assert.equal(state.play.view, "game", "v12: the empty board is Play's page");
     assert.equal(state.sheet?.kind, "onboarding");
-    assert.equal(state.profile.v, 9, "an empty v9 profile");
+    assert.equal(state.profile.v, 13, "an empty profile (v13: the player model's own version)");
     assert.equal(state.profile.games.length, 0);
     assert.ok(state.game && state.game.game.moveNumber === 0, "an empty board waits");
     // v12: Play shows that board as the game to play, so it is rated like one from New game.
@@ -90,7 +90,7 @@ try {
     // The settings and the player model are in the store.
     assert.equal(await store.flush(), true);
     assert.equal(store.get("settings.json").onboarded, true);
-    assert.equal(store.get("profile.json").v, 9);
+    assert.equal(store.get("profile.json").v, 13);
     assert.ok(store.get("current.json")?.sgf, "the game on the board is saved");
   });
 

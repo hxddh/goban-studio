@@ -11,6 +11,7 @@ import { PLAY } from "./messages/play.js";
 import { LEARN } from "./messages/learn.js";
 import { DATA13 } from "./messages/v13-data.js";
 import { CORE13 } from "./messages/v13-core.js";
+import { V13_LEARN } from "./messages/v13-learn.js";
 
 export const MESSAGES = {
 
@@ -924,4 +925,5 @@ export const MESSAGES = {
   ...LEARN,
   ...DATA13,
   ...CORE13,
+  ...V13_LEARN,
 };

@@ -62,7 +62,7 @@ function TodayList() {
         </span>
         <span class="gr-text">
           <strong>{t("placement.title")}</strong>
-          <span>{t("placement.lead", [PLACEMENT.LENGTH])}</span>
+          <span>{t("placement.leadRange", [PLACEMENT.MIN, PLACEMENT.MAX])}</span>
         </span>
         <span class="row-action">{t("placement.start")}</span>
       </button>

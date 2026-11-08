@@ -359,6 +359,8 @@ function SettingsSheet({ pane: open }) {
                 <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
                 <p class="fine">{t("settings.teachingHelp")}</p>
                 <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
+                <Switch label={t("settings.confirmProblemMove")} checked={!!s.confirmProblemMove} onChange={(v) => set("confirmProblemMove", v)} />
+                <p class="fine">{t("settings.confirmProblemMoveHelp")}</p>
                 <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
                 <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
                 <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />

@@ -1,8 +1,9 @@
 /**
  * Learn: the placement quiz in the browser (v10, learn/placement.js) —
  * someone who knows the rules finds it on Learn's home before the path,
- * with one primary and a quiet Not now; the quiz shows where it is; at the
- * end the path appears and the offer is gone. The offer and a quiz problem
+ * with one primary and a quiet Not now; the quiz shows where it is (v13:
+ * 10–12 problems, ending early once the grade is stable); at the end the
+ * path appears and the offer is gone. The offer and a quiz problem
  * are checked in four languages, light and dark, with larger text: the
  * accessibility audit, raw keys, clipping, sideways scrolling and one
  * primary. Loaded by scripts/ui-test.mjs; receives its helpers.
@@ -40,19 +41,25 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     return page;
   }
 
-  await check("learn placement: offered before the path with one primary; six problems; then the path, and no offer", async () => {
+  await check("learn placement: offered before the path with one primary; 10–12 problems; then the path, and no offer", async () => {
     const page = await knowsRules();
     assert((await page.locator(".learn-path").count()) === 0, "no path before the placement");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
+    assert((await page.textContent(".placement-offer")).includes("10–12 problems"), "says how long");
     await page.click(".placement-offer .btn.primary");
-    for (let i = 1; i <= 6; i++) {
-      await page.waitForFunction((n) => window.__state.learn.view === "problem" && window.__state.learn.placement?.results.length === n - 1, i, { timeout: 4000 });
+    let asked = 0;
+    for (let i = 1; i <= 12; i++) {
+      await page.waitForFunction((n) => (window.__state.learn.view === "problem" && window.__state.learn.placement?.results.length === n - 1) || !window.__state.learn.placement, i, { timeout: 4000 });
+      if (!(await page.evaluate(() => !!window.__state.learn.placement))) break;
+      asked = i;
       const sub = await page.textContent(".toolbar .tb-sub, .tb-sub");
-      assert(sub.includes(`${i} of 6`), `where it is: ${sub}`);
+      assert(sub.includes(`${i} of ${i > 10 ? 12 : 10}`), `where it is: ${sub}`);
       // Show the answer (a miss), then Continue.
       await page.click('.panel .actions .btn:has-text("Show answer")');
       await page.click(".panel .actions .btn.primary");
     }
+    // Every answer missed: the grade stays at 1, so the quiz ends at the shortest length.
+    assert(asked === 10, `${asked} problems`);
     await page.waitForSelector(".learn-path .path-row");
     assert((await page.locator(".placement-offer").count()) === 0, "the offer is gone");
     const placed = await page.evaluate(() => window.__state.profile.placement);

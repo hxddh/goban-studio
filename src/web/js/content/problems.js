@@ -5,7 +5,8 @@
  * scripts/check-problems.mjs proves each one has between one and three correct
  * first moves, that the solver's answer line wins, and that no two problems
  * are the same position under rotation, reflection or colour swap. Difficulty
- * grades are measured by the solver, not assigned by hand; they are stored in
+ * grades are computed from solver-measured features (reading that branches,
+ * plausible wrong moves, the theme), not assigned by hand; they are stored in
  * problem-grades.json by scripts/grade-problems.mjs.
  *
  * Diagram notation (see solver.js): X/O black/white stones, x/o key stones
@@ -485,15 +486,16 @@ export const SHAPES = [
 
 /**
  * Score thresholds for grades 2, 3, 4 and 5, applied by
- * scripts/grade-problems.mjs to the solver's difficulty score. The solver's
- * built-in thresholds (6 / 9 / 12 / 15) put about 80% of this set in grades
- * 1–2, because most life-and-death problems are decided by one or two moves;
- * these cuts are the quintiles of this set's measured scores (509 problems in
- * v5; v4 used 6.1 / 7.7 / 9.5 / 11.6 for 254), so the grades still rank
- * problems by the solver's measurement. The check script also keeps any one
- * theme under 40% of every grade.
+ * scripts/grade-problems.mjs to each problem's human difficulty score (v13:
+ * the theme's base difficulty, branching reading, plausible wrong first
+ * moves, alternatives; see the script and docs/problems-audit.md, "v13
+ * grading"). Until v12 these were quintiles of the solver's search effort,
+ * which put plain ladders at grade 5. The cuts are fixed values near this
+ * set's quintiles (543 problems), so grades stay roughly balanced without
+ * being forced; the spot checks in the audit decide them. The check script
+ * also keeps any one theme under 40% of every grade.
  */
-export const GRADE_CUTS = [6.1, 7.6, 9.1, 10.8];
+export const GRADE_CUTS = [1.85, 2.6, 3.3, 4.2];
 
 export const PROBLEMS = [
   // ---------------------------------------------------------------- capture

@@ -95,7 +95,7 @@ await test("play review model: up to three moments can be tried again, each a dr
   assert.deepEqual([d.id, d.gameId, d.index, d.sgf, d.color, d.best, d.loss, d.size], ["rec-1-25", "rec-1", 25, sgf, BLACK, { x: 6, y: 6 }, 8, 13]);
   assert.deepEqual(d.played, m.moments[1].played);
   assert.ok(d.accept.some((p) => p.x === 6 && p.y === 6));
-  // In the player model like any drill: once, and each try on the spaced ladder.
+  // In the player model like any drill: once, and each try on the review schedule (v13: the memory model).
   let p = addMistake(newProfile(), d, 0);
   p = addMistake(p, d, 0);
   assert.equal(p.mistakes.length, 1);
@@ -104,7 +104,8 @@ await test("play review model: up to three moments can be tried again, each a dr
   assert.deepEqual(due(p, DAY).mistakes.map((x) => x.id), ["rec-1-25"], "in Learn's due list");
   p = recordMistake(p, d.id, { solved: true }, DAY);
   p = recordMistake(p, d.id, { solved: true }, 2 * DAY);
-  assert.deepEqual([p.mistakes[0].tries, p.mistakes[0].streak, p.mistakes[0].due], [3, 2, 5 * DAY], "found twice: three days later");
+  assert.deepEqual([p.mistakes[0].tries, p.mistakes[0].streak], [3, 2]);
+  assert.ok(p.mistakes[0].due >= 5 * DAY, "found twice: at least three days later");
 });
 
 await test("play review model: a tried move is judged against KataGo's best, within MISTAKE is good", () => {

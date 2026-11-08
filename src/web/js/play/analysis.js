@@ -26,6 +26,10 @@ import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { learnFromGame } from "../app/play-ctl.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
+import { humanMoveProbabilities } from "../katago.js";
+import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
+import { recordGame } from "../model/player.js";
+import { changeProfile } from "../app/ctl-core.js";
 
 /* ---------------------------------------------------------- one pass */
 
@@ -146,7 +150,38 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
   if (humanColor != null && resultOf(game) && !now.rec.learned && points.every((p) => p.source === "katago")) {
     learnFromGame({ game, points, humanColor, recordId });
   }
+  // v13: the second reading of the player's strength, from their own moves.
+  // Finished games only: an unfinished game in the library is never read for strength.
+  if (humanColor != null && resultOf(game) && !now.rec.unfinished && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
   return model;
+}
+
+/* -------------------------------------- v13: your moves, read by rank */
+
+/**
+ * After a finished game's analysis, with the human-style model installed
+ * and a host that can read its policy (katago.js humanMoveProbabilities):
+ * how likely the player's moves were for each rank profile, read as a rank
+ * with its range (model/move-rank.js). Stored with the game (`moveRank`)
+ * and in the player model, where it is only a weak prior (player.js
+ * applyMoveRank). Resolves the reading, or null when it cannot be made.
+ */
+export async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
+  if (!recordId || !Engine.installed().human) return null;
+  const rows = await humanMoveProbabilities(game, humanColor, PROFILES.map((p) => p.id), { signal });
+  const reading = rows && rankFromLikelihoods(rows);
+  if (!reading || signal?.aborted || !Games.getGame(recordId)) return null;
+  const moveRank = { rank: reading.rank, lo: reading.lo, hi: reading.hi, n: reading.n, at: Date.now() };
+  Games.patchGame(recordId, { moveRank });
+  changeProfile((p) => recordGame(p, { id: String(recordId), moveRank }));
+  update();
+  return moveRank;
+}
+
+/** The stored reading of the game a review shows, or null (no human model, no capable host, too short). */
+export function moveRankOf(review = state.review) {
+  const id = review?.meta?.recordId || (review?.source === "current" ? state.game?.recordId : null);
+  return id ? normalizeMoveRank(Games.getGame(id)?.moveRank) : null;
 }
 
 /* ------------------------------------------------ background passes */
