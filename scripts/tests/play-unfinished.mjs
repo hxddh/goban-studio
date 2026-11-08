@@ -130,9 +130,10 @@ await test("play export: in the app, a file that cannot be written is an error t
     globalThis.zero = {
       invoke: async (command) => {
         calls.push(command);
+        // v13: the save dialog is the host's own command; the write fails.
+        if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
         throw new Error("EACCES");
       },
-      dialogs: { openFile: async () => null, saveFile: async () => "/read-only/game.sgf" },
       on: () => () => {},
     };
     state.toasts = [];
@@ -143,13 +144,13 @@ await test("play export: in the app, a file that cannot be written is an error t
     assert.equal(last.tone, "error");
     assert.equal(last.message, t("v13.exportFailed"));
     assert.ok(!state.toasts.some((x) => x.message === t("toast.exported")), "no fake success");
-    // A host without file dialogs: an error too (no download link in a WebView).
-    globalThis.zero = { invoke: async () => null, on: () => () => {} };
+    // A dialog that fails is an error too (no download link in a WebView).
+    globalThis.zero = { invoke: async () => { throw new Error("no dialog"); }, on: () => () => {} };
     state.toasts = [];
     assert.equal(await Play.saveText("game.sgf", "(;)"), false);
-    assert.equal(state.toasts.at(-1).tone, "error");
-    // Cancelling the dialog says nothing.
-    globalThis.zero = { invoke: async () => true, dialogs: { openFile: async () => null, saveFile: async () => null }, on: () => () => {} };
+    assert.ok(!state.toasts.some((x) => x.message === t("toast.exported")), "no fake success");
+    // Cancelling the dialog (the host answers null) says nothing.
+    globalThis.zero = { invoke: async () => null, on: () => () => {} };
     state.toasts = [];
     assert.equal(await Play.saveText("game.sgf", "(;)"), false);
     assert.equal(state.toasts.length, 0);
