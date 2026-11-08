@@ -122,9 +122,15 @@ export async function writeBinaryFile(path, bytes) {
 }
 
 export async function readTextFile(path) {
+  const bytes = await readFileBytes(path);
+  return bytes ? new TextDecoder().decode(bytes) : null;
+}
+
+/** v13: the file's raw bytes (a Uint8Array), or null; SGF import decodes them by CA. */
+export async function readFileBytes(path) {
   if (!hasNative()) return null;
   try {
-    return new TextDecoder().decode(await readFileChunks(invoke, path));
+    return await readFileChunks(invoke, path);
   } catch (_) {
     return null;
   }

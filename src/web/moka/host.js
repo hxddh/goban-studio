@@ -44,8 +44,10 @@ function stateFor(game) {
   if (!game || game.size !== 9 || game.handicap > 0) return null;
   // Setup stones are not part of Moka's move history.
   if (game.root.board.signMap.flat().some((value) => value !== 0)) return null;
+  // v13: nor is a record's mid-game setup (rules.js node.setup).
   let state = createGameState();
   for (const node of game.path.slice(1)) {
+    if (node.setup) return null;
     const move = node.move;
     if (!move) continue;
     const index = move.pass ? 81 : move.y * 9 + move.x;

@@ -820,14 +820,18 @@ const judgeVisits = (size) => (size === 19 ? 160 : size === 13 ? 200 : 240);
 
 /** The position of a node as a game of its own (root stones, then the moves to it). */
 function gameAt(src, node) {
-  const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap });
+  // v13: the root stones are copied, not placed again from the handicap, and
+  // a record's mid-game setup (node.setup) is replayed with its move.
+  const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap, placeHandicap: false });
   const root = src.root.board.signMap;
   const setup = [];
   for (let y = 0; y < src.size; y++) for (let x = 0; x < src.size; x++) if (root[y][x]) setup.push({ x, y, c: root[y][x] });
   if (setup.length) game.setup(setup, src.root.turn);
-  for (const m of moveList(node)) {
-    if (m.pass) game.pass({ color: m.color, force: true });
-    else game.play(m.x, m.y, { color: m.color, force: true });
+  const line = [];
+  for (let n = node; n && n.parent; n = n.parent) line.unshift(n);
+  for (const { move: m, setup: s } of line) {
+    if (m.pass) game.pass({ color: m.color, force: true, setup: s });
+    else game.play(m.x, m.y, { color: m.color, force: true, setup: s });
   }
   game.current.result = null;
   if (game.current.phase !== "playing") game.current.phase = "playing";
@@ -964,12 +968,6 @@ export function closeTrial() {
 }
 
 /* ---------------------------------------------------- play from here */
-
-function moveList(node) {
-  const out = [];
-  for (let n = node; n && n.parent; n = n.parent) out.push(n.move);
-  return out.reverse();
-}
 
 export function playFromHere() {
   const r = state.review;

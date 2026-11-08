@@ -19,6 +19,14 @@ command prints its own exact numbers.
 | Updater end to end | `scripts/test-updater.mjs` | — | each platform, on the real OS |
 | Native screenshot tour | `scripts/tour-app.mjs` | — | each platform |
 
+v13 core checks added: an open region is dame only while no living stone of
+the other colour divides the board (corner or side group, three rulesets);
+SGF setup in the second node and mid-game AB/AW/AE (captures, legality, the
+KataGo position, export); unsupported sizes rejected; invalid points warned;
+HA without AB; CA charsets; 10,000-move and 5,000-deep records without
+recursion; handicap one is no stone; Zobrist superko; inexact solver results
+never cached or reported as proved; offline AI respects superko.
+
 ## Unit and data tests (`npm test`, 316 checks)
 
 Plain `node:test`-style checks in `scripts/tests/`, one file per area, each

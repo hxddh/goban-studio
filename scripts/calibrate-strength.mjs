@@ -51,7 +51,10 @@
  * takes Black, the stones stand on the app's handicap points (rules.js
  * handicapPoints, reaching KataGo as `play B …` before White's first move,
  * as the native host sends them) and komi is the app's handicap komi
- * (0.5 under Japanese rules, also for one stone; play-ctl.js). `fit` then
+ * (0.5 under Japanese rules, also for one stone; play-ctl.js). v13: "@h1"
+ * places no stone, as the app's Game does for a handicap of one: Black
+ * simply moves first at that komi (games measured before v13 had Black's
+ * first stone on a handicap point instead, the same advantage). `fit` then
  * fits Black's advantage at each stone count (γ_N) and the value of a
  * stone in 19×19 ranks as the app counts it (model/ladder.js levelTheta);
  * see `stoneValue` and docs/strength.md, v11.
