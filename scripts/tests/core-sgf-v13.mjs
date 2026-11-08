@@ -220,16 +220,27 @@ function longRecord(n) {
 }
 
 await test("v13 SGF: a 10,000-move record loads and exports without recursion, in linear time", () => {
+  // Near-linear, not a wall-clock budget (shared runners vary several-fold):
+  // four times the moves may take at most about eleven times as long
+  // (locally ≈5×: the superko check still walks the line's hashes); the
+  // O(n²) reader this replaced took sixteen times as long or more.
+  const time = (text) => {
+    const t0 = performance.now();
+    const r = loadSGF(text);
+    return { r, ms: performance.now() - t0 };
+  };
+  const small = longRecord(2500);
+  time(small); // warm up the JIT before measuring
+  const a = time(small);
   const text = longRecord(10000);
-  const t0 = Date.now();
-  const { game, warnings } = loadSGF(text);
-  const ms = Date.now() - t0;
+  const { r, ms } = time(text);
+  const { game, warnings } = r;
   assert.deepEqual(warnings, []);
   assert.equal(game.mainLine().length, 10001);
   const out = game.toSGF();
   assert.equal(out.split(";").length - 1, 10001);
   assert.equal(loadSGF(out).game.mainLine().length, 10001);
-  assert.ok(ms < 5000, `${ms} ms`);
+  assert.ok(ms < Math.max(11 * a.ms, 200), `10,000 moves ${Math.round(ms)} ms vs 2,500 moves ${Math.round(a.ms)} ms`);
 });
 
 await test("v13 SGF: 5,000 nested variations load and export without recursion", () => {
