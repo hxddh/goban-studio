@@ -6,7 +6,7 @@
  * strength estimate's own store. Stored as `profile.json`:
  *
  *   profile = {
- *     v: 9,
+ *     v: 13,                                         // v9–v12 files say 9
  *     rating: { [size]: { mu, sigma, games, at } },  // Glicko, measured ladder
  *     history: [{ at, size, rank, pm }],             // after each rated game
  *     games: [{ id, at, size, result, won, ... }],    // own games, newest 30
@@ -41,7 +41,15 @@ import { normalizeMoveRank } from "./move-rank.js";
 
 export * from "./ladder.js";
 
-export const PROFILE_V = 9;
+/**
+ * v13: the profile's own version. Files written by v9–v12 say 9 and are
+ * migrated by normalizeProfile (problem and drill records to the memory
+ * model, placements capped); anything older than v9 or newer than this
+ * starts empty, as before (the data layer refuses to overwrite a newer file).
+ */
+export const PROFILE_V = 13;
+/** The oldest profile version normalizeProfile reads. */
+export const PROFILE_MIN_V = 9;
 export const DAY = 86400000;
 
 /* =========================================================== the rating */
@@ -272,11 +280,13 @@ function normalizeMistake(m) {
 }
 
 /**
- * Any stored value → a valid v9 profile. Anything that is not a v9
- * profile starts empty (v9 reads no earlier data); bad parts are dropped.
+ * Any stored value → a valid current profile. A v9–v12 profile (v: 9) is
+ * migrated field by field (migrateProblemRecord, migrateReview, the
+ * placement cap); anything else starts empty (v9 reads no earlier data);
+ * bad parts are dropped. Idempotent.
  */
 export function normalizeProfile(raw) {
-  if (!obj(raw) || raw.v !== PROFILE_V) return newProfile();
+  if (!obj(raw) || !Number.isInteger(raw.v) || raw.v < PROFILE_MIN_V || raw.v > PROFILE_V) return newProfile();
   const base = newProfile();
   const rating = {};
   for (const size of SIZES) rating[size] = normalizeRatingEntry(raw.rating?.[size]) || base.rating[size];

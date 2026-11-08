@@ -164,7 +164,7 @@ comes back over several days, the most forgotten first.
 v9–v12 records (`tries`, `streak`, `due`, `last`) are read by
 `migrateProblemRecord` (and drills the same way): the stability is the
 ladder interval reached, the due date is kept, so nothing moves on
-upgrade. `normalizeProfile` reads both shapes.
+upgrade. `normalizeProfile` reads both shapes: the profile file is now version 13 (`PROFILE_V`), and a v9–v12 file (`v: 9`) is migrated, not reset.
 
 **Shown differently.** A problem tried before comes back turned or
 mirrored (one of the eight board symmetries) and, except endgame

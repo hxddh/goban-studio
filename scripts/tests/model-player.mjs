@@ -320,6 +320,34 @@ export default async function ({ test, assert, root }) {
     assert.ok(reviews.length >= 3);
   });
 
+  await test("model profile: a v9–v12 profile file (v: 9) is migrated, not reset; older or newer versions start empty", () => {
+    const old = {
+      v: 9,
+      rating: { 19: { mu: 10, sigma: 1.2, games: 14, at: NOW - DAY } },
+      history: [{ at: NOW - DAY, size: 19, rank: 12, pm: 1 }],
+      games: [],
+      problems: { "capture-basic-01": { tries: 2, solved: true, clean: true, last: NOW - DAY, due: NOW + 2 * DAY, streak: 2 } },
+      mistakes: [{ id: "g-3", theme: "cut", tries: 1, streak: 0, due: NOW, added: NOW - DAY }],
+      lessons: { "stones-capture": { done: true, step: 3, at: 5 } },
+      classics: {},
+      week: null,
+      placement: { grade: 5, at: 3 },
+    };
+    const p = P.normalizeProfile(JSON.parse(JSON.stringify(old)));
+    assert.equal(p.v, P.PROFILE_V);
+    assert.equal(P.PROFILE_V, 13);
+    assert.deepEqual(p.rating[19], old.rating[19], "the estimate survives");
+    assert.equal(p.history.length, 1);
+    assert.deepEqual(p.lessons, old.lessons);
+    assert.deepEqual(p.problems["capture-basic-01"], P.migrateProblemRecord(old.problems["capture-basic-01"]));
+    assert.equal(p.problems["capture-basic-01"].s, 3, "on the memory model");
+    assert.equal(p.mistakes[0].s, P.MEMORY.S0[0]);
+    assert.deepEqual(p.placement, { grade: 4, at: 3 }, "the placement capped");
+    assert.deepEqual(P.normalizeProfile(p), p, "idempotent");
+    assert.deepEqual(P.normalizeProfile(JSON.parse(JSON.stringify(p))), p, "a v13 file reads back the same");
+    for (const v of [8, 14, "9", undefined]) assert.deepEqual(P.normalizeProfile({ ...old, v }), P.newProfile(), `v ${v}`);
+  });
+
   await test("model review: v9–v12 problem records migrate to the memory model (migrateProblemRecord)", () => {
     const old = { tries: 3, solved: true, clean: true, last: NOW - 2 * DAY, due: NOW + 5 * DAY, streak: 3, solvedAt: NOW - 2 * DAY };
     const m = P.migrateProblemRecord(old);
@@ -389,14 +417,14 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------- profile and records */
 
-  await test("model profile: v9 starts empty; anything else is not read; bad parts are dropped", () => {
+  await test("model profile: v9–v13 are read; anything else is not read; bad parts are dropped", () => {
     const empty = P.newProfile();
     assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "placement", "problems", "rating", "v", "week"]);
-    assert.equal(empty.v, 9);
+    assert.equal(empty.v, 13);
     assert.deepEqual(Object.keys(empty.rating), ["9", "13", "19"]);
     // A v8 progress object, or junk, is not migrated.
     const v8 = { v: 5, lessons: { a: { done: true } }, problems: { p: { solved: true, attempts: 1 } }, rating: { v: 6, mu: 10, sigma: 1, r: 1100 }, weakness: { cut: { score: 3 } } };
-    for (const raw of [v8, null, "x", [], { v: 10 }]) assert.deepEqual(P.normalizeProfile(raw), empty, JSON.stringify(raw));
+    for (const raw of [v8, null, "x", [], { v: 14 }, { v: 8 }]) assert.deepEqual(P.normalizeProfile(raw), empty, JSON.stringify(raw));
     // Round trip through JSON.
     let p = P.recordGame(P.newProfile({ rank: 10 }), rated(1, { level: "10k" }));
     p = P.recordProblem(p, PROBLEMS[0].id, { solved: true }, NOW);

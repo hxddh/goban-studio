@@ -151,7 +151,8 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
     learnFromGame({ game, points, humanColor, recordId });
   }
   // v13: the second reading of the player's strength, from their own moves.
-  if (humanColor != null && resultOf(game) && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
+  // Finished games only: an unfinished game in the library is never read for strength.
+  if (humanColor != null && resultOf(game) && !now.rec.unfinished && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
   return model;
 }
 
