@@ -151,7 +151,14 @@ jobs:
           SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
         run: |
           set -euo pipefail
-          npm install -g "@native-sdk/cli@${SDK_VERSION}"
+          # The install script downloads a helper from GitHub releases,
+          # which times out now and then (504): try up to four times.
+          for attempt in 1 2 3 4; do
+            if npm install -g "@native-sdk/cli@${SDK_VERSION}"; then break; fi
+            if [ "$attempt" = 4 ]; then exit 1; fi
+            echo "::warning::Native SDK install failed (attempt $attempt); retrying"
+            sleep $((attempt * 20))
+          done
           echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
           native --version
       - name: patch Native SDK (keep system menus around app menus)
