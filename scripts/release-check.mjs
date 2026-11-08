@@ -8,6 +8,7 @@
  * licences and one version string.
  */
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +65,13 @@ for (const file of [
 ]) {
   assert.ok(fs.existsSync(path.join(root, file)), file);
 }
+// The committed network is pinned: KataGo's g170-b6c96-s175395328-d26788732,
+// byte for byte the copy in KataGo's repository (engine/model/README.md says
+// where). A changed model must change this hash on purpose, together with
+// docs/strength.md, whose measurements were taken with it.
+const MODEL_SHA256 = "48d6754de3c4754f95bf6a5ca40957a49e5e915aaaeede133a17b9ccf8fa5fcb";
+const modelSha = crypto.createHash("sha256").update(fs.readFileSync(path.join(root, "engine/model/model.txt.gz"))).digest("hex");
+assert.equal(modelSha, MODEL_SHA256, "engine/model/model.txt.gz is the pinned network");
 const cfg = fs.readFileSync(path.join(root, "engine/model/gtp.cfg"), "utf8");
 // KataGo starts under Japanese rules (the default); every request then sets
 // the game's own ruleset with `kata-set-rules`.
@@ -86,6 +94,9 @@ const buildVersion = (buildZon.match(/\.version\s*=\s*"([^"]+)"/) || [])[1];
 assert.equal(packageJson.version, zonVersion, "package.json and app.zon versions agree");
 assert.equal(packageJson.version, buildVersion, "package.json and build.zig.zon versions agree");
 assert.equal(APP_VERSION, packageJson.version, "web APP_VERSION agrees with package.json");
+// The workflows build with .nvmrc's Node, the lowest one "engines" allows.
+const nvmrc = fs.readFileSync(path.join(root, ".nvmrc"), "utf8").trim();
+assert.equal(packageJson.engines?.node, `>=${nvmrc}`, ".nvmrc is the lowest Node package.json's engines allows");
 const indexHtml = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
 assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html version agrees");
 assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");
