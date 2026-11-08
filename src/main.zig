@@ -32,7 +32,7 @@ const update_public_key = install_mod.parsePublicKey(app_options.update_pubkey) 
 const OpenCallback = *const fn (context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void;
 extern fn goban_install_open_handler(context: ?*anyopaque, callback: OpenCallback) void;
 /// macOS quit (⌘Q, Dock, AppleScript, SIGTERM): the callback returns 1 to
-/// delay the quit until `goban_reply_quit` (src/macos_open.m).
+/// hold the quit until `goban_reply_quit` or a 3 s backstop (src/macos_open.m).
 const QuitCallback = *const fn (context: ?*anyopaque) callconv(.c) c_int;
 extern fn goban_install_quit_handler(context: ?*anyopaque, callback: QuitCallback) void;
 extern fn goban_reply_quit() void;
@@ -1673,8 +1673,8 @@ fn onWindowClose(context: *anyopaque) bool {
 fn macQuitCallback(context: ?*anyopaque) callconv(.c) c_int {
     const self: *App = @ptrCast(@alignCast(context orelse return 0));
     if (!self.flush_hook_ready or self.runtime == null) return 0;
-    // The reply is always asynchronous (macos_open.m), so even a flush
-    // that ends right here answers after AppKit got NSTerminateLater.
+    // macos_open.m spins the run loop until goban_reply_quit (or its
+    // backstop); a flush that ends right here simply ends the hold at once.
     beginFlush(self, .reply_terminate);
     return 1;
 }

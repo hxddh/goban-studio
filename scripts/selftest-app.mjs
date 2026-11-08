@@ -63,14 +63,31 @@ while (Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 200));
 }
 
+// v13: the app must quit when asked (SIGTERM → [NSApp terminate:] on macOS,
+// where the page first gets a bounded chance to flush its writes). A quit
+// that does not finish within 15 s is a failure, reported as such, and the
+// process is then killed so the step never hangs.
+let quitStuck = false;
 if (!exited) {
   child.kill();
+  const until = Date.now() + 15000;
+  while (!exited && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 100));
+  if (!exited) {
+    quitStuck = true;
+    child.kill("SIGKILL");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
   // Give WebView2 / WKWebView a moment to tear down before the next step.
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
 // The downloaded networks never outlive the test.
 fs.rmSync(modelsDir, { recursive: true, force: true });
+
+if (quitStuck) {
+  console.error("selftest: the packaged app did not quit within 15 s of SIGTERM");
+  process.exit(1);
+}
 
 if (!report) {
   console.error("selftest: no report from the packaged app");
