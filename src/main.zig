@@ -7,14 +7,35 @@ const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
 const models_mod = @import("models.zig");
 const store_mod = @import("store.zig");
+const files_mod = @import("files.zig");
+const win_close = @import("win_close.zig");
+const app_options = @import("app_options");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
-const allowed_origins = [_][]const u8{ "zero://app", "zero://inline", "http://127.0.0.1:5173" };
+/// The Vite dev server's origin. Only development builds let it call the
+/// bridge (`-Ddev-origin`, default: on in Debug, off in every release
+/// mode): in a released app any local process listening on that port
+/// could otherwise serve a page with the app's file and update commands.
+const dev_server_origin = "http://127.0.0.1:5173";
+const allowed_origins = if (app_options.dev_origin)
+    [_][]const u8{ "zero://app", "zero://inline", dev_server_origin }
+else
+    [_][]const u8{ "zero://app", "zero://inline" };
 const max_open_paths = 16;
+
+/// The update key compiled in with `-Dupdate-pubkey` (docs/signing.md), or
+/// null. A malformed key is a compile error, never a silently unsigned app.
+const update_public_key = install_mod.parsePublicKey(app_options.update_pubkey) catch
+    @compileError("-Dupdate-pubkey must be the base64 of a 32-byte Ed25519 public key");
 
 const OpenCallback = *const fn (context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void;
 extern fn goban_install_open_handler(context: ?*anyopaque, callback: OpenCallback) void;
+/// macOS quit (⌘Q, Dock, AppleScript, SIGTERM): the callback returns 1 to
+/// delay the quit until `goban_reply_quit` (src/macos_open.m).
+const QuitCallback = *const fn (context: ?*anyopaque) callconv(.c) c_int;
+extern fn goban_install_quit_handler(context: ?*anyopaque, callback: QuitCallback) void;
+extern fn goban_reply_quit() void;
 
 // Startup menus are empty → host default bar. The page installs its own,
 // localized menus with `studio.setMenus` (macOS); with the SDK patch from
@@ -34,6 +55,16 @@ const update_timer_interval_ns: u64 = 250 * std.time.ns_per_ms;
 /// watchdog) while `studio.updateDownload` is open.
 const install_timer_id: u64 = 0x696e_7374_616c;
 const install_timer_interval_ns: u64 = 500 * std.time.ns_per_ms;
+/// Timer that runs the quit gate (v13): the page's flush before the app
+/// quits or the window closes, and the wait for the update helper's
+/// "started" marker.
+const gate_timer_id: u64 = 0x6761_7465;
+const gate_timer_interval_ns: u64 = 100 * std.time.ns_per_ms;
+/// How long the page gets to write what is pending before a quit (v13).
+const flush_timeout_ms: i64 = 1_500;
+
+/// What happens once the page has flushed (or its time is up).
+const AfterFlush = enum { none, quit_app, reply_terminate, close_window };
 
 /// An async analysis the page is waiting for. UI thread only.
 const Job = struct {
@@ -52,6 +83,10 @@ const Job = struct {
     cancelled: bool = false,
     /// The KataGo process that serves it (echoed as `engine`).
     slot: engine_mod.Slot = .standard,
+    /// Backstop (v13): past this the page is answered `Timeout` whatever
+    /// the worker is doing, so no request can hang. The worker's own
+    /// watchdog (engine.zig) normally fires long before.
+    deadline_ms: i64 = 0,
 
     fn idText(self: *const Job) []const u8 {
         return self.id[0..self.id_len];
@@ -136,17 +171,47 @@ const App = struct {
     models: *models_mod.Manager = undefined,
     /// v9 file storage (store.zig): `<app data>/data`, set up in `main`.
     store: store_mod.Store = undefined,
-    handlers: [22]native_sdk.BridgeHandler = undefined,
-    async_handlers: [4]native_sdk.bridge.AsyncHandler = undefined,
-    policies: [26]native_sdk.BridgeCommandPolicy = undefined,
+    /// v13: the user's files the page may read or write (files.zig).
+    grants: files_mod.Grants = undefined,
+    /// v13 quit gate. The page announces its flush hook
+    /// (`studio.flushHook`); a quit or window close then asks it to write
+    /// what is pending (`app:flush` event) and waits for
+    /// `studio.flushDone` or `flush_timeout_ms`, whichever comes first.
+    flush_hook_ready: bool = false,
+    flush_active: bool = false,
+    flush_id: u64 = 0,
+    flush_deadline_ms: i64 = 0,
+    after_flush: AfterFlush = .none,
+    gate_timer_running: bool = false,
+    win_close_installed: bool = false,
+    /// v13: `studio.updateApply` waits for the helper's "started" marker
+    /// before it answers and quits.
+    apply_active: bool = false,
+    apply_deadline_ms: i64 = 0,
+    apply_responder: native_sdk.bridge.AsyncResponder = undefined,
+    apply_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
+    apply_bridge_id_len: usize = 0,
+    apply_started_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    apply_started_len: usize = 0,
+    /// GOBAN_UPDATE_PROBE_TAG (the updater's CI probe): this one tag may be
+    /// downloaded without a check, to be verified and discarded; it can
+    /// never be installed.
+    probe_tag_buf: [64]u8 = undefined,
+    probe_tag_len: usize = 0,
+    handlers: [sync_commands.len]native_sdk.BridgeHandler = undefined,
+    async_handlers: [async_commands.len]native_sdk.bridge.AsyncHandler = undefined,
+    policies: [sync_commands.len + async_commands.len]native_sdk.BridgeCommandPolicy = undefined,
 
     fn deinit(self: *@This()) void {
         for (self.open_paths.items) |path| self.allocator.free(path);
         self.open_paths.deinit(self.allocator);
+        self.grants.deinit();
     }
 
     fn queueOpenPath(self: *@This(), path: []const u8) void {
         if (path.len == 0 or path.len > 4096) return;
+        // The OS handed it over: the page may read it (files.zig).
+        _ = self.grants.grant(path, .read, false);
         if (self.open_paths.items.len >= max_open_paths) return;
         if (self.open_paths.items.len > 0) {
             const last = self.open_paths.items[self.open_paths.items.len - 1];
@@ -221,142 +286,13 @@ const App = struct {
     }
 
     fn bridge(self: *@This()) native_sdk.BridgeDispatcher {
-        self.handlers[0] = .{
-            .name = "studio.writeTextFile",
-            .context = self,
-            .invoke_fn = writeTextFile,
-        };
-        self.handlers[1] = .{
-            .name = "studio.readTextFile",
-            .context = self,
-            .invoke_fn = readTextFile,
-        };
-        self.handlers[2] = .{
-            .name = "studio.windowDrag",
-            .context = self,
-            .invoke_fn = windowDrag,
-        };
-        self.handlers[3] = .{
-            .name = "studio.windowChrome",
-            .context = self,
-            .invoke_fn = windowChrome,
-        };
-        self.handlers[4] = .{
-            .name = "studio.katagoMove",
-            .context = self,
-            .invoke_fn = katagoMove,
-        };
-        self.handlers[5] = .{
-            .name = "studio.katagoStatus",
-            .context = self,
-            .invoke_fn = katagoStatus,
-        };
-        self.handlers[6] = .{
-            .name = "studio.takeOpenFiles",
-            .context = self,
-            .invoke_fn = takeOpenFiles,
-        };
-        self.handlers[7] = .{
-            .name = "studio.selftest",
-            .context = self,
-            .invoke_fn = selftestConfig,
-        };
-        self.handlers[8] = .{
-            .name = "studio.katagoAnalyze",
-            .context = self,
-            .invoke_fn = katagoAnalyze,
-        };
-        self.handlers[9] = .{
-            .name = "studio.katagoCancel",
-            .context = self,
-            .invoke_fn = katagoCancel,
-        };
-        self.handlers[10] = .{
-            .name = "studio.setMenus",
-            .context = self,
-            .invoke_fn = setMenus,
-        };
-        self.handlers[11] = .{
-            .name = "studio.openReleasePage",
-            .context = self,
-            .invoke_fn = openReleasePage,
-        };
-        self.handlers[12] = .{
-            .name = "studio.modelStatus",
-            .context = self,
-            .invoke_fn = modelStatus,
-        };
-        self.handlers[13] = .{
-            .name = "studio.modelDownload",
-            .context = self,
-            .invoke_fn = modelDownload,
-        };
-        self.handlers[14] = .{
-            .name = "studio.modelCancel",
-            .context = self,
-            .invoke_fn = modelCancel,
-        };
-        self.handlers[15] = .{
-            .name = "studio.modelRemove",
-            .context = self,
-            .invoke_fn = modelRemove,
-        };
-        self.async_handlers[0] = .{
-            .name = "studio.katagoAnalyzeAsync",
-            .context = self,
-            .invoke_fn = katagoAnalyzeAsync,
-        };
-        self.async_handlers[1] = .{
-            .name = "studio.checkUpdate",
-            .context = self,
-            .invoke_fn = checkUpdate,
-        };
-        self.handlers[16] = .{
-            .name = "studio.updateStatus",
-            .context = self,
-            .invoke_fn = updateStatus,
-        };
-        self.handlers[17] = .{
-            .name = "studio.updateCancel",
-            .context = self,
-            .invoke_fn = updateCancel,
-        };
-        self.async_handlers[2] = .{
-            .name = "studio.updateDownload",
-            .context = self,
-            .invoke_fn = updateDownload,
-        };
-        self.async_handlers[3] = .{
-            .name = "studio.updateApply",
-            .context = self,
-            .invoke_fn = updateApply,
-        };
-        // v9 file storage (store.zig).
-        self.handlers[18] = .{
-            .name = "studio.storeRead",
-            .context = self,
-            .invoke_fn = storeRead,
-        };
-        self.handlers[19] = .{
-            .name = "studio.storeWrite",
-            .context = self,
-            .invoke_fn = storeWrite,
-        };
-        self.handlers[20] = .{
-            .name = "studio.storeList",
-            .context = self,
-            .invoke_fn = storeList,
-        };
-        self.handlers[21] = .{
-            .name = "studio.storeRemove",
-            .context = self,
-            .invoke_fn = storeRemove,
-        };
-        for (self.handlers, 0..) |handler, i| {
-            self.policies[i] = .{ .name = handler.name, .origins = &allowed_origins };
+        for (sync_commands, 0..) |command, i| {
+            self.handlers[i] = .{ .name = command.name, .context = self, .invoke_fn = command.invoke };
+            self.policies[i] = .{ .name = command.name, .origins = &allowed_origins };
         }
-        for (self.async_handlers, 0..) |handler, i| {
-            self.policies[self.handlers.len + i] = .{ .name = handler.name, .origins = &allowed_origins };
+        for (async_commands, 0..) |command, i| {
+            self.async_handlers[i] = .{ .name = command.name, .context = self, .invoke_fn = command.invoke };
+            self.policies[sync_commands.len + i] = .{ .name = command.name, .origins = &allowed_origins };
         }
         return .{
             .policy = .{
@@ -369,17 +305,66 @@ const App = struct {
     }
 };
 
+const SyncCommand = struct { name: []const u8, invoke: native_sdk.bridge.HandlerFn };
+const AsyncCommand = struct { name: []const u8, invoke: native_sdk.bridge.AsyncHandlerFn };
+
+/// Every bridge command in one place (v13): the registry and the policy
+/// (which origins may call it) are both built from these two tables, so a
+/// command can never be registered without its policy, or the other way
+/// round, and adding one is a one-line change.
+const sync_commands = [_]SyncCommand{
+    // The user's own files, only those native code handed out (files.zig).
+    .{ .name = "studio.openFileDialog", .invoke = openFileDialog },
+    .{ .name = "studio.saveFileDialog", .invoke = saveFileDialog },
+    .{ .name = "studio.writeTextFile", .invoke = writeTextFile },
+    .{ .name = "studio.readTextFile", .invoke = readTextFile },
+    .{ .name = "studio.takeOpenFiles", .invoke = takeOpenFiles },
+    // Window chrome and menus.
+    .{ .name = "studio.windowDrag", .invoke = windowDrag },
+    .{ .name = "studio.windowChrome", .invoke = windowChrome },
+    .{ .name = "studio.setMenus", .invoke = setMenus },
+    // The quit gate (v13).
+    .{ .name = "studio.flushHook", .invoke = flushHook },
+    .{ .name = "studio.flushDone", .invoke = flushDone },
+    // KataGo (searches are async, below).
+    .{ .name = "studio.katagoStatus", .invoke = katagoStatus },
+    .{ .name = "studio.katagoCancel", .invoke = katagoCancel },
+    // Release self-test and screenshot tour.
+    .{ .name = "studio.selftest", .invoke = selftestConfig },
+    // Updates.
+    .{ .name = "studio.openReleasePage", .invoke = openReleasePage },
+    .{ .name = "studio.updateStatus", .invoke = updateStatus },
+    .{ .name = "studio.updateCancel", .invoke = updateCancel },
+    // Optional networks.
+    .{ .name = "studio.modelStatus", .invoke = modelStatus },
+    .{ .name = "studio.modelDownload", .invoke = modelDownload },
+    .{ .name = "studio.modelCancel", .invoke = modelCancel },
+    .{ .name = "studio.modelRemove", .invoke = modelRemove },
+    // v9 file storage (store.zig).
+    .{ .name = "studio.storeRead", .invoke = storeRead },
+    .{ .name = "studio.storeWrite", .invoke = storeWrite },
+    .{ .name = "studio.storeList", .invoke = storeList },
+    .{ .name = "studio.storeRemove", .invoke = storeRemove },
+};
+
+const async_commands = [_]AsyncCommand{
+    .{ .name = "studio.katagoAnalyzeAsync", .invoke = katagoAnalyzeAsync },
+    .{ .name = "studio.checkUpdate", .invoke = checkUpdate },
+    .{ .name = "studio.updateDownload", .invoke = updateDownload },
+    .{ .name = "studio.updateApply", .invoke = updateApply },
+};
+
 /// OS "open with" / document-open events. The page subscribes to the
 /// window event "open:files" and imports the first .sgf path. The event may
 /// arrive before the page has subscribed; that is a platform limitation, not
 /// a reason to keep a second copy of the file in native state.
 const OPEN_FILE_VARIANTS = [_][]const u8{ "open_files", "open_file", "open_urls", "open_documents" };
 
-fn forwardOpenFiles(runtime: *native_sdk.Runtime, event: native_sdk.Event) void {
+fn forwardOpenFiles(self: *App, runtime: *native_sdk.Runtime, event: native_sdk.Event) void {
     inline for (OPEN_FILE_VARIANTS) |variant| {
         if (comptime @hasField(native_sdk.Event, variant)) {
             if (event == @field(std.meta.Tag(native_sdk.Event), variant)) {
-                emitOpenFiles(runtime, @field(event, variant));
+                emitOpenFiles(self, runtime, @field(event, variant));
             }
         }
     }
@@ -398,7 +383,7 @@ fn openFilePathOf(item: anytype) ?[]const u8 {
     return null;
 }
 
-fn emitOpenFiles(runtime: *native_sdk.Runtime, payload: anytype) void {
+fn emitOpenFiles(self: *App, runtime: *native_sdk.Runtime, payload: anytype) void {
     const P = @TypeOf(payload);
     var detail_buf: [8192]u8 = undefined;
     var n: usize = 0;
@@ -407,25 +392,25 @@ fn emitOpenFiles(runtime: *native_sdk.Runtime, payload: anytype) void {
     if (comptime @typeInfo(P) == .pointer) {
         for (payload) |item| {
             if (openFilePathOf(item)) |path| {
-                if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                if (!appendOpenPath(self, &detail_buf, &n, &count, path)) return;
             }
         }
     } else if (comptime @typeInfo(P) == .@"struct") {
         if (comptime @hasField(P, "paths")) {
             for (payload.paths) |item| {
                 if (openFilePathOf(item)) |path| {
-                    if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                    if (!appendOpenPath(self, &detail_buf, &n, &count, path)) return;
                 }
             }
         } else if (comptime @hasField(P, "files")) {
             for (payload.files) |item| {
                 if (openFilePathOf(item)) |path| {
-                    if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                    if (!appendOpenPath(self, &detail_buf, &n, &count, path)) return;
                 }
             }
         } else if (comptime @hasField(P, "path")) {
             if (openFilePathOf(payload.path)) |path| {
-                if (!appendOpenPath(&detail_buf, &n, &count, path)) return;
+                if (!appendOpenPath(self, &detail_buf, &n, &count, path)) return;
             }
         } else return;
     } else return;
@@ -434,10 +419,18 @@ fn emitOpenFiles(runtime: *native_sdk.Runtime, payload: anytype) void {
     runtime.emitWindowEvent(1, "open:files", detail_buf[0..n]) catch {};
 }
 
-fn appendOpenPath(buf: []u8, n: *usize, count: *usize, path: []const u8) bool {
-    if (path.len == 0 or path.len > 4096) return true;
+/// One opened document into the event detail (and the page may read it).
+/// A path that cannot be sent (empty, too long, not UTF-8) is skipped,
+/// never the whole event.
+fn appendOpenPath(self: *App, buf: []u8, n: *usize, count: *usize, path: []const u8) bool {
+    if (path.len == 0 or path.len > 4096 or !std.unicode.utf8ValidateSlice(path)) return true;
+    const mark = n.*;
     if (count.* > 0 and !jsonAppend(buf, n, ",")) return false;
-    if (!jsonAppendString(buf, n, path)) return false;
+    if (!jsonAppendString(buf, n, path)) {
+        n.* = mark;
+        return false;
+    }
+    _ = self.grants.grant(path, .read, false);
     count.* += 1;
     return true;
 }
@@ -449,6 +442,9 @@ fn jsonAppend(buf: []u8, n: *usize, text: []const u8) bool {
     return true;
 }
 
+/// A JSON string. Control characters become `\u00XX` (v13: they used to
+/// fail the whole reply, so one odd file name blocked every later open).
+/// The caller makes sure `text` is UTF-8 where that matters (paths).
 fn jsonAppendString(buf: []u8, n: *usize, text: []const u8) bool {
     if (!jsonAppend(buf, n, "\"")) return false;
     for (text) |c| {
@@ -459,7 +455,12 @@ fn jsonAppendString(buf: []u8, n: *usize, text: []const u8) bool {
             '\r' => if (!jsonAppend(buf, n, "\\r")) return false,
             '\t' => if (!jsonAppend(buf, n, "\\t")) return false,
             else => {
-                if (c < 0x20) return false;
+                if (c < 0x20 or c == 0x7f) {
+                    var esc: [6]u8 = undefined;
+                    const s = std.fmt.bufPrint(&esc, "\\u{x:0>4}", .{c}) catch return false;
+                    if (!jsonAppend(buf, n, s)) return false;
+                    continue;
+                }
                 if (n.* + 1 > buf.len) return false;
                 buf[n.*] = c;
                 n.* += 1;
@@ -472,9 +473,14 @@ fn jsonAppendString(buf: []u8, n: *usize, text: []const u8) bool {
 fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.Event) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     self.runtime = runtime;
-    forwardOpenFiles(runtime, event);
+    forwardOpenFiles(self, runtime, event);
     switch (event) {
         .command => |cmd| forwardCommand(runtime, cmd.name, cmd.window_id),
+        // Dropped on the window: the user chose these, the page may read
+        // them (the runtime emits `drop:files` to the page right after).
+        .files_dropped => |drop| {
+            for (drop.paths) |path| _ = self.grants.grant(path, .read, false);
+        },
         // A KataGo worker result or partial report is waiting (the worker
         // nudged the loop through PlatformServices.wake), or the fallback
         // collection timer fired.
@@ -487,6 +493,7 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
             if (timer.id == katago_timer_id) drainKatago(self);
             if (timer.id == update_timer_id) drainUpdate(self);
             if (timer.id == install_timer_id) drainInstall(self);
+            if (timer.id == gate_timer_id) runGate(self);
         },
         else => {},
     }
@@ -515,53 +522,6 @@ fn forwardCommand(runtime: *native_sdk.Runtime, name: []const u8, window_id: u64
     runtime.emitWindowEvent(wid, "shortcut", legacy[0..m]) catch {};
 }
 
-fn jsonStringField(payload: []const u8, key: []const u8) ?[]const u8 {
-    var key_buf: [96]u8 = undefined;
-    if (key.len + 2 > key_buf.len) return null;
-    const needle = std.fmt.bufPrint(&key_buf, "\"{s}\"", .{key}) catch return null;
-    const at = std.mem.indexOf(u8, payload, needle) orelse return null;
-    var i = at + needle.len;
-    while (i < payload.len and (payload[i] == ' ' or payload[i] == '\t' or payload[i] == '\n' or payload[i] == '\r' or payload[i] == ':')) : (i += 1) {}
-    if (i >= payload.len or payload[i] != '"') return null;
-    i += 1;
-    const start = i;
-    while (i < payload.len) : (i += 1) {
-        if (payload[i] == '\\') {
-            i += 1;
-            continue;
-        }
-        if (payload[i] == '"') return payload[start..i];
-    }
-    return null;
-}
-
-/// Decode a JSON string slice (contents between quotes) into `out`.
-/// Handles \\ \" \/ \n \r \t — enough for file paths from the bridge.
-fn jsonUnescape(raw: []const u8, out: []u8) ?[]const u8 {
-    var wi: usize = 0;
-    var i: usize = 0;
-    while (i < raw.len) : (i += 1) {
-        if (wi >= out.len) return null;
-        if (raw[i] != '\\') {
-            out[wi] = raw[i];
-            wi += 1;
-            continue;
-        }
-        i += 1;
-        if (i >= raw.len) return null;
-        const c: u8 = switch (raw[i]) {
-            '"', '\\', '/' => raw[i],
-            'n' => '\n',
-            'r' => '\r',
-            't' => '\t',
-            else => return null,
-        };
-        out[wi] = c;
-        wi += 1;
-    }
-    return out[0..wi];
-}
-
 /// The payload of the two user-file commands.
 const FilePayload = struct {
     path: []const u8 = "",
@@ -574,6 +534,8 @@ const FilePayload = struct {
 /// `offset` and `done` it is one write of at most `store.chunk_bytes`
 /// (written beside, then renamed over); a larger file is sent as chunks from
 /// offset 0 in order, the last with `done: true` (as `studio.storeWrite`).
+/// v13: only a path a save dialog returned (or the self-test's report
+/// files) — `AccessDenied` for anything else (files.zig).
 fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = output;
     const self: *App = @ptrCast(@alignCast(context));
@@ -581,6 +543,7 @@ fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
     defer parsed.deinit();
     const v = parsed.value;
     if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
+    if (!self.grants.allows(v.path, .write)) return error.AccessDenied;
     const dec = std.base64.standard.Decoder;
     const n = dec.calcSizeForSlice(v.b64) catch return error.InvalidRequest;
     if (n > store_mod.chunk_bytes) return error.TooLarge;
@@ -593,13 +556,16 @@ fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, 
 
 /// `studio.readTextFile {path, offset?}` → `{size, b64}`: the file's size
 /// and up to `store.chunk_bytes` of it from `offset`, as base64. A larger
-/// file is read in several calls (as `studio.storeRead`).
+/// file is read in several calls (as `studio.storeRead`). v13: only a path
+/// an open dialog returned, a document the OS opened with the app, a file
+/// dropped on the window, or the tour's acknowledgement file.
 fn readTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
     const parsed = std.json.parseFromSlice(FilePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
     defer parsed.deinit();
     const v = parsed.value;
     if (v.path.len == 0 or v.path.len > 4096) return error.InvalidRequest;
+    if (!self.grants.allows(v.path, .read)) return error.AccessDenied;
     const raw = try self.allocator.alloc(u8, store_mod.chunk_bytes);
     defer self.allocator.free(raw);
     const chunk = store_mod.readPath(self.io, v.path, v.offset, raw) catch return error.HandlerFailed;
@@ -610,6 +576,83 @@ fn readTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     _ = enc.encode(output[head.len..][0..b64_len], chunk.bytes);
     @memcpy(output[head.len + b64_len ..][0..2], "\"}");
     return output[0 .. head.len + b64_len + 2];
+}
+
+const DialogPayload = struct {
+    title: []const u8 = "",
+    defaultName: []const u8 = "",
+    defaultPath: []const u8 = "",
+    allowMultiple: bool = false,
+};
+
+/// `studio.openFileDialog {title?, defaultPath?, allowMultiple?}` → the
+/// chosen paths (an array) or null when cancelled. v13: the page's way to
+/// let the user pick a file to import (an SGF, a backup); every path it
+/// returns may then be read through `studio.readTextFile` if it is one of
+/// the app's file types (files.zig); any other pick is returned but stays
+/// unreadable, so the page reports a failed import.
+fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const runtime = self.runtime orelse return error.HandlerFailed;
+    const parsed = std.json.parseFromSlice(DialogPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const p = parsed.value;
+    const buffer = try self.allocator.alloc(u8, native_sdk.platform.max_dialog_paths_bytes);
+    defer self.allocator.free(buffer);
+    const result = try runtime.showOpenDialog(.{
+        .title = p.title,
+        .default_path = p.defaultPath,
+        .allow_multiple = p.allowMultiple,
+    }, buffer);
+    if (result.count == 0) return "null";
+    var n: usize = 0;
+    if (!jsonAppend(output, &n, "[")) return error.HandlerFailed;
+    var count: usize = 0;
+    var it = std.mem.splitScalar(u8, result.paths, '\n');
+    while (it.next()) |path| {
+        if (path.len == 0 or !std.unicode.utf8ValidateSlice(path)) continue;
+        // A file the app does not read (a .txt, say) is still returned, so
+        // the page can say it could not import it; it is just not granted.
+        _ = self.grants.grant(path, .read, false);
+        const mark = n;
+        if (count > 0 and !jsonAppend(output, &n, ",")) break;
+        if (!jsonAppendString(output, &n, path)) {
+            n = mark;
+            break;
+        }
+        count += 1;
+    }
+    if (count == 0) return "null";
+    if (!jsonAppend(output, &n, "]")) return error.HandlerFailed;
+    return output[0..n];
+}
+
+/// `studio.saveFileDialog {title?, defaultName, defaultPath?}` → the chosen
+/// path, or null when cancelled. `defaultName` must end in one of the app's
+/// extensions (.sgf, .json, .png); if the user types a name without one,
+/// that extension is added. The path may then be written through
+/// `studio.writeTextFile` (files.zig). A name the app will not write (a
+/// dotfile, a device name) answers `InvalidPath`.
+fn saveFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const runtime = self.runtime orelse return error.HandlerFailed;
+    const parsed = std.json.parseFromSlice(DialogPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const p = parsed.value;
+    const ext = files_mod.allowedExtension(p.defaultName) orelse return error.InvalidRequest;
+    var buffer: [native_sdk.platform.max_dialog_path_bytes]u8 = undefined;
+    const chosen = (try runtime.showSaveDialog(.{
+        .title = p.title,
+        .default_path = p.defaultPath,
+        .default_name = p.defaultName,
+    }, &buffer)) orelse return "null";
+    var fixed_buf: [files_mod.max_path_bytes + 8]u8 = undefined;
+    const path = files_mod.fixSavePath(chosen, ext, &fixed_buf) orelse return error.InvalidPath;
+    if (!std.unicode.utf8ValidateSlice(path)) return error.InvalidPath;
+    if (!self.grants.grant(path, .write, false)) return error.InvalidPath;
+    var n: usize = 0;
+    if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    return output[0..n];
 }
 
 /// 隐藏标题栏(macOS hidden_inset_tall)下,前端顶栏的空白处就是标题栏:mousedown 时
@@ -635,66 +678,6 @@ fn windowChrome(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
         chrome.buttons.y,
         chrome.buttons.height,
     });
-}
-
-/// One move from the bundled KataGo engine (v2, synchronous). The page
-/// sends a base64 GTP setup script (newline-separated, limited to the setup
-/// vocabulary in engine.zig) and the side to move. Any async search is
-/// cancelled first; the call then borrows the worker's KataGo process.
-fn katagoMove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
-    const self: *App = @ptrCast(@alignCast(context));
-    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
-    const color_raw = jsonStringField(invocation.request.payload, "color") orelse return error.InvalidRequest;
-    var color_buf: [8]u8 = undefined;
-    const color = jsonUnescape(color_raw, &color_buf) orelse return error.InvalidRequest;
-
-    var script_buf: [96 * 1024]u8 = undefined;
-    const dec = std.base64.standard.Decoder;
-    const script_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
-    if (script_len > script_buf.len) return error.InvalidRequest;
-    dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
-
-    _ = cancelJobs(self, null);
-    self.katago.lockExclusive();
-    defer self.katago.unlockExclusive();
-    const move = self.katago.standard().move(script_buf[0..script_len], color) catch |err| switch (err) {
-        error.InvalidRequest => return error.InvalidRequest,
-        else => return error.HandlerFailed,
-    };
-    return std.fmt.bufPrint(output, "{{\"ok\":true,\"move\":\"{s}\"}}", .{move}) catch error.HandlerFailed;
-}
-
-/// A full KataGo search report for the position (v2, synchronous: blocks
-/// the UI thread for the whole search; the page uses the async command
-/// when the host has it). Same request shape as katagoMove; the reply
-/// carries KataGo's final `info` line and its chosen move, unparsed.
-fn katagoAnalyze(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
-    const self: *App = @ptrCast(@alignCast(context));
-    const b64 = jsonStringField(invocation.request.payload, "b64") orelse return error.InvalidRequest;
-    const color_raw = jsonStringField(invocation.request.payload, "color") orelse return error.InvalidRequest;
-    var color_buf: [8]u8 = undefined;
-    const color = jsonUnescape(color_raw, &color_buf) orelse return error.InvalidRequest;
-
-    var script_buf: [96 * 1024]u8 = undefined;
-    const dec = std.base64.standard.Decoder;
-    const script_len = dec.calcSizeForSlice(b64) catch return error.InvalidRequest;
-    if (script_len > script_buf.len) return error.InvalidRequest;
-    dec.decode(script_buf[0..script_len], b64) catch return error.InvalidRequest;
-
-    _ = cancelJobs(self, null);
-    self.katago.lockExclusive();
-    defer self.katago.unlockExclusive();
-    const result = self.katago.standard().analyze(script_buf[0..script_len], color) catch |err| switch (err) {
-        error.InvalidRequest => return error.InvalidRequest,
-        else => return error.HandlerFailed,
-    };
-    var n: usize = 0;
-    if (!jsonAppend(output, &n, "{\"ok\":true,\"play\":")) return error.HandlerFailed;
-    if (!jsonAppendString(output, &n, result.play)) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, ",\"info\":")) return error.HandlerFailed;
-    if (!jsonAppendString(output, &n, result.info)) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
-    return output[0..n];
 }
 
 /// Engine presence and version are resolved once in `main`, before the
@@ -745,7 +728,8 @@ fn parseAnalyzeRequest(self: *App, payload: []const u8, req: *engine_mod.Request
     const parsed = std.json.parseFromSlice(AnalyzePayload, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
     defer parsed.deinit();
     const p = parsed.value;
-    if (p.id.len > job.id.len) return error.InvalidRequest;
+    // Rejected, never truncated: a cut id would answer the wrong request.
+    if (!validRequestId(p.id)) return error.InvalidRequest;
     @memcpy(job.id[0..p.id.len], p.id);
     job.id_len = p.id.len;
     job.stream = p.stream;
@@ -890,15 +874,34 @@ fn cancelJobs(self: *App, id: ?[]const u8) usize {
     return count;
 }
 
+/// The page's own request id: 1 to 64 characters of `[A-Za-z0-9._:-]`.
+fn validRequestId(id: []const u8) bool {
+    if (id.len == 0 or id.len > 64) return false;
+    for (id) |c| {
+        if (!(std.ascii.isAlphanumeric(c) or c == '.' or c == '_' or c == ':' or c == '-')) return false;
+    }
+    return true;
+}
+
+/// Keep a bridge request id for a later answer. An id longer than the
+/// SDK's limit is refused at once rather than cut (a cut id would never
+/// match the waiting call).
+fn keepBridgeId(rid: []const u8, out: *[native_sdk.bridge.max_id_bytes]u8, len: *usize, responder: native_sdk.bridge.AsyncResponder) bool {
+    if (rid.len == 0 or rid.len > out.len) {
+        responder.fail(rid[0..@min(rid.len, out.len)], .invalid_request, "request id too long") catch {};
+        return false;
+    }
+    @memcpy(out[0..rid.len], rid);
+    len.* = rid.len;
+    return true;
+}
+
 /// `studio.katagoAnalyzeAsync`: queue a search and return immediately; the
 /// reply comes from `drainKatago` once the worker has a result.
 fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     var job = Job{ .active = true, .responder = responder, .window_id = invocation.source.window_id };
-    const rid = invocation.request.id;
-    const rid_len = @min(rid.len, job.bridge_id.len);
-    @memcpy(job.bridge_id[0..rid_len], rid[0..rid_len]);
-    job.bridge_id_len = rid_len;
+    if (!keepBridgeId(invocation.request.id, &job.bridge_id, &job.bridge_id_len, responder)) return;
 
     const req = self.request_scratch;
     req.seq = 0;
@@ -939,6 +942,9 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     self.next_seq += 1;
     req.seq = self.next_seq;
     job.seq = req.seq;
+    // The worker's watchdog budget for a cold start, plus time to wait
+    // behind the request it supersedes (which is being cancelled).
+    job.deadline_ms = nowMs(self) + engine_mod.deadlineMs(req.max_time, true) + engine_mod.warm_grace_ms;
     installWake(self);
     const submitted = self.katago.submit(req) catch |err| {
         respondJob(&job, .failed, @errorName(err), null);
@@ -950,15 +956,26 @@ fn katagoAnalyzeAsync(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     startDrainTimer(self);
 }
 
-/// `studio.katagoCancel` {id}: stop that request (every open one without
-/// an id). The cancelled request itself replies {ok:false, cancelled:true}.
+const CancelPayload = struct {
+    id: ?[]const u8 = null,
+};
+
+/// `studio.katagoCancel` {id}: stop that request; `{}` (no id at all)
+/// stops every open one. The cancelled request itself replies
+/// {ok:false, cancelled:true}. v13: an id that is present but not a valid
+/// request id (empty, too long, odd characters) is an `InvalidRequest`,
+/// never "cancel everything".
 fn katagoCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
-    var id_buf: [64]u8 = undefined;
-    const id: ?[]const u8 = if (jsonStringField(invocation.request.payload, "id")) |raw| jsonUnescape(raw, &id_buf) else null;
+    const parsed = std.json.parseFromSlice(CancelPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const id = parsed.value.id;
+    if (id) |value| {
+        if (!validRequestId(value)) return error.InvalidRequest;
+    }
     // A queued request is answered right here; the running one as soon as
     // KataGo stops (the worker wakes the loop).
-    const count = cancelJobs(self, if (id) |value| (if (value.len > 0) value else null) else null);
+    const count = cancelJobs(self, id);
     return std.fmt.bufPrint(output, "{{\"ok\":true,\"cancelled\":{d}}}", .{count}) catch error.HandlerFailed;
 }
 
@@ -980,6 +997,10 @@ fn emitInfo(runtime: *native_sdk.Runtime, job: *const Job, info: []const u8) voi
 /// the waiting `studio.katagoAnalyzeAsync` calls). UI thread.
 fn drainKatago(self: *App) void {
     const runtime = self.runtime orelse return;
+    const now = nowMs(self);
+    // The watchdog: a KataGo past its request's deadline is killed; the
+    // worker then reports the request failed (`Timeout`) below.
+    _ = self.katago.checkDeadline(now);
     if (self.katago.takeStream()) |partial| {
         defer engine_mod.result_allocator.free(partial.info);
         if (findJob(self, partial.seq)) |job| {
@@ -993,6 +1014,13 @@ fn drainKatago(self: *App) void {
         const job = findJob(self, result.seq) orelse continue;
         const outcome: engine_mod.Outcome = if (job.cancelled) .cancelled else result.outcome;
         respondJob(job, outcome, result.error_name, result);
+    }
+    // The backstop: whatever the worker is doing, no request waits past
+    // its deadline (a cancelled one is answered as cancelled).
+    for (&self.jobs) |*job| {
+        if (!job.active or job.deadline_ms == 0 or now < job.deadline_ms) continue;
+        _ = self.katago.cancel(job.seq);
+        respondJob(job, if (job.cancelled) .cancelled else .failed, "Timeout", null);
     }
     if (!anyJobActive(self)) stopDrainTimer(self);
 }
@@ -1036,14 +1064,12 @@ fn checkUpdate(context: *anyopaque, invocation: native_sdk.bridge.Invocation, re
         return;
     }
     installUpdateWake(self);
+    if (!keepBridgeId(rid, &self.update_bridge_id, &self.update_bridge_id_len, responder)) return;
     const gen = self.updater.start() catch |err| {
         const reply = if (err == error.Busy) "{\"ok\":false,\"error\":\"Busy\"}" else "{\"ok\":false,\"error\":\"Unavailable\"}";
         responder.success(rid, reply) catch {};
         return;
     };
-    const rid_len = @min(rid.len, self.update_bridge_id.len);
-    @memcpy(self.update_bridge_id[0..rid_len], rid[0..rid_len]);
-    self.update_bridge_id_len = rid_len;
     self.update_responder = responder;
     self.update_gen = gen;
     self.update_deadline_ms = nowMs(self) + update_mod.timeout_ms;
@@ -1199,14 +1225,28 @@ const DownloadPayload = struct {
     tag: []const u8 = "",
 };
 
+/// May `tag` be installed over this version? v13: only the tag this
+/// app's own last successful check returned, and only when it is newer
+/// than the running version (no downgrades, no tags the page made up).
+/// Returns the refusal's error name, or null.
+fn installRefusal(self: *App, tag: []const u8) ?[]const u8 {
+    var checked_buf: [64]u8 = undefined;
+    const checked = self.updater.lastTag(&checked_buf);
+    if (checked.len == 0 or !std.mem.eql(u8, checked, tag)) return "NotChecked";
+    if (!update_mod.isNewer(tag, runner.app_version)) return "NotNewer";
+    return null;
+}
+
 /// `studio.updateDownload` {tag}: download this platform's package of
-/// release `tag` and SHA256SUMS from the fixed GitHub release-download
-/// address, verify and unpack it. Answered when done: `{ok:true,
-/// phase:"ready", tag, asset}` or `{ok:false, error}` with error one of
-/// Busy, BadTag, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
+/// release `tag` and SHA256SUMS (and, in a signed build, SHA256SUMS.sig)
+/// from the fixed GitHub release-download address, verify and unpack it.
+/// `tag` must be the one the last `studio.checkUpdate` found, newer than
+/// this version. Answered when done: `{ok:true, phase:"ready", tag, asset}`
+/// or `{ok:false, error}` with error one of Busy, BadTag, NotChecked,
+/// NotNewer, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
 /// NoTempDir, Network, BadRedirect, HttpStatus, NoAsset, TooLarge,
-/// NoChecksum, ChecksumMismatch, Unpack, BadPackage, Disk, Stalled,
-/// Cancelled, OutOfMemory, Unavailable.
+/// NoChecksum, NoSignature, BadSignature, ChecksumMismatch, Unpack,
+/// BadPackage, Disk, Stalled, Cancelled, OutOfMemory, Unavailable.
 fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     const rid = invocation.request.id;
@@ -1220,6 +1260,14 @@ fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         return;
     };
     defer parsed.deinit();
+    const tag = parsed.value.tag;
+    const probe = self.probe_tag_len > 0 and std.mem.eql(u8, tag, self.probe_tag_buf[0..self.probe_tag_len]);
+    if (!probe) {
+        if (installRefusal(self, tag)) |name| {
+            responder.success(rid, install_mod.errorReply(&reply_buf, name)) catch {};
+            return;
+        }
+    }
     const target = installTarget(self, true);
     if (target.blocked != .none) {
         responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
@@ -1229,14 +1277,12 @@ fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
         return;
     };
+    if (!keepBridgeId(rid, &self.install_bridge_id, &self.install_bridge_id_len, responder)) return;
     installWakeUp(self);
-    const gen = self.installer.start(root, parsed.value.tag, nowMs(self)) catch |err| {
+    const gen = self.installer.start(root, tag, nowMs(self)) catch |err| {
         responder.success(rid, install_mod.errorReply(&reply_buf, install_mod.errorName(err))) catch {};
         return;
     };
-    const rid_len = @min(rid.len, self.install_bridge_id.len);
-    @memcpy(self.install_bridge_id[0..rid_len], rid[0..rid_len]);
-    self.install_bridge_id_len = rid_len;
     self.install_responder = responder;
     self.install_gen = gen;
     self.install_active = true;
@@ -1274,20 +1320,34 @@ fn drainInstall(self: *App) void {
 }
 
 /// `studio.updateApply` {}: install the downloaded update. Starts the
-/// embedded helper (src/updater/), answers `{ok:true, phase:"installing"}`
-/// and quits the app; the helper swaps the installation, starts the new
-/// version and rolls back if it does not come up. `{ok:false, error}`:
-/// NotReady, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
-/// NoTempDir, Helper, QuitFailed.
+/// embedded helper (src/updater/) and waits (up to
+/// `install.helper_start_timeout_ms`) for it to prove it is running; then
+/// answers `{ok:true, phase:"installing"}`, lets the page flush its
+/// pending writes and quits. The helper swaps the installation, starts the
+/// new version and rolls back if it does not come up. `{ok:false,
+/// error}`: Busy, NotReady, NotChecked, NotNewer, Unsupported,
+/// NotPackaged, Translocated, ReadOnlyLocation, NoTempDir, Helper,
+/// HelperBusy (another helper is updating this installation),
+/// HelperNotStarted (the app stays open), QuitFailed.
 fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     const rid = invocation.request.id;
     var reply_buf: [256]u8 = undefined;
+    if (self.apply_active or self.flush_active) {
+        responder.success(rid, "{\"ok\":false,\"error\":\"Busy\"}") catch {};
+        return;
+    }
     var staged_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const staged = self.installer.stagedPath(&staged_buf) orelse {
         responder.success(rid, "{\"ok\":false,\"error\":\"NotReady\"}") catch {};
         return;
     };
+    // A probe download (or anything not checked and newer) is never installed.
+    const snap = self.installer.snapshot();
+    if (installRefusal(self, snap.tag())) |name| {
+        responder.success(rid, install_mod.errorReply(&reply_buf, name)) catch {};
+        return;
+    }
     const target = installTarget(self, true);
     if (target.blocked != .none) {
         responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
@@ -1297,22 +1357,168 @@ fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation, re
         responder.success(rid, "{\"ok\":false,\"error\":\"NoTempDir\"}") catch {};
         return;
     };
-    const runtime = self.runtime orelse {
+    if (self.runtime == null) {
         responder.success(rid, "{\"ok\":false,\"error\":\"QuitFailed\"}") catch {};
         return;
-    };
+    }
+    if (!keepBridgeId(rid, &self.apply_bridge_id, &self.apply_bridge_id_len, responder)) return;
     self.installer.markInstalling();
-    if (install_mod.startHelper(self.io, self.env_map, root, target.root(), staged)) |err_name| {
+    const started = install_mod.startHelper(self.io, self.env_map, root, target.root(), staged, &self.apply_started_buf);
+    if (started.err) |err_name| {
         self.installer.markApplyFailed(err_name);
         responder.success(rid, install_mod.errorReply(&reply_buf, err_name)) catch {};
         return;
     }
-    responder.success(rid, "{\"ok\":true,\"phase\":\"installing\"}") catch {};
-    // The helper waits for this process to exit (KataGo stops on the way).
-    runtime.quitApp() catch {
-        // It keeps waiting; quitting by hand still finishes the update.
-        self.installer.markApplyFailed("QuitFailed");
-    };
+    self.apply_started_len = started.started.len;
+    self.apply_responder = responder;
+    self.apply_deadline_ms = nowMs(self) + install_mod.helper_start_timeout_ms;
+    self.apply_active = true;
+    startGateTimer(self);
+}
+
+// ------------------------------------------------------------ quit gate
+//
+// v13. Two waits that must end before the app goes away, both run by one
+// 100 ms timer on the UI thread:
+//
+//   * the update helper's "started" marker (`studio.updateApply`): the app
+//     quits only once a helper is really there to finish the update;
+//   * the page's flush: before a quit (⌘Q / the Dock on macOS, the
+//     window's close button on Windows, an update restart) the page gets
+//     an `app:flush` event and up to `flush_timeout_ms` to write what it
+//     still holds (store.js debounces writes by 300 ms) and answer with
+//     `studio.flushDone`. A page that never installed the hook, or does
+//     not answer in time, does not keep the app open.
+
+fn startGateTimer(self: *App) void {
+    if (self.gate_timer_running) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.startTimer(gate_timer_id, gate_timer_interval_ns, true) catch return;
+    self.gate_timer_running = true;
+}
+
+fn stopGateTimer(self: *App) void {
+    if (!self.gate_timer_running or self.flush_active or self.apply_active) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.cancelTimer(gate_timer_id) catch {};
+    self.gate_timer_running = false;
+}
+
+fn runGate(self: *App) void {
+    const now = nowMs(self);
+    if (self.apply_active) checkHelperStarted(self, now);
+    if (self.flush_active and now >= self.flush_deadline_ms) finishFlush(self);
+    stopGateTimer(self);
+}
+
+/// The update helper proved it runs (or did not, in time).
+fn checkHelperStarted(self: *App, now: i64) void {
+    const marker = self.apply_started_buf[0..self.apply_started_len];
+    const id = self.apply_bridge_id[0..self.apply_bridge_id_len];
+    var started = install_mod.helperStarted(self.io, marker);
+    if (!started and now >= self.apply_deadline_ms) {
+        // Claim the marker: if the helper got there first after all, it
+        // did start; otherwise a late helper finds it taken and gives up.
+        started = !install_mod.claimStarted(self.io, marker);
+        if (!started) {
+            self.apply_active = false;
+            self.installer.markApplyFailed("HelperNotStarted");
+            self.apply_responder.success(id, "{\"ok\":false,\"error\":\"HelperNotStarted\"}") catch {};
+            return;
+        }
+    }
+    if (!started) return;
+    self.apply_active = false;
+    self.apply_responder.success(id, "{\"ok\":true,\"phase\":\"installing\"}") catch {};
+    // The helper waits for this process to exit (KataGo stops on the way);
+    // the page writes what it holds first.
+    beginFlush(self, .quit_app);
+}
+
+/// Ask the page to flush, then do `then`. Without a page hook (or before
+/// the page is up) `then` happens at once.
+fn beginFlush(self: *App, then: AfterFlush) void {
+    if (self.flush_active) {
+        // A second request while one is open (⌘Q twice): the stronger
+        // action wins; the open flush still ends it.
+        if (then == .quit_app) self.after_flush = .quit_app;
+        return;
+    }
+    self.after_flush = then;
+    const runtime = self.runtime orelse return finishFlush(self);
+    if (!self.flush_hook_ready) return finishFlush(self);
+    self.flush_id += 1;
+    var buf: [64]u8 = undefined;
+    const detail = std.fmt.bufPrint(&buf, "{{\"id\":{d}}}", .{self.flush_id}) catch return finishFlush(self);
+    runtime.emitWindowEvent(1, "app:flush", detail) catch return finishFlush(self);
+    self.flush_active = true;
+    self.flush_deadline_ms = nowMs(self) + flush_timeout_ms;
+    startGateTimer(self);
+}
+
+fn finishFlush(self: *App) void {
+    self.flush_active = false;
+    const then = self.after_flush;
+    self.after_flush = .none;
+    switch (then) {
+        .none => {},
+        .reply_terminate => if (comptime builtin.os.tag == .macos) goban_reply_quit(),
+        .close_window => win_close.proceed(),
+        .quit_app => {
+            const runtime = self.runtime orelse return;
+            runtime.quitApp() catch {
+                // The helper keeps waiting; quitting by hand still
+                // finishes the update.
+                self.installer.markApplyFailed("QuitFailed");
+            };
+        },
+    }
+}
+
+/// `studio.flushHook` {}: the page has a flush hook (store.js); from now on
+/// a quit asks it first. Also installs the Windows close interception,
+/// now that the window certainly exists. → `{ok}`.
+fn flushHook(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    self.flush_hook_ready = true;
+    if (!self.win_close_installed) self.win_close_installed = win_close.install(self, onWindowClose);
+    return std.fmt.bufPrint(output, "{{\"ok\":true}}", .{}) catch error.HandlerFailed;
+}
+
+/// `studio.flushDone` {id}: the page wrote everything for flush `id`.
+fn flushDone(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const FlushPayload = struct { id: u64 = 0 };
+    const parsed = std.json.parseFromSlice(FlushPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const current = self.flush_active and parsed.value.id == self.flush_id;
+    if (current) {
+        finishFlush(self);
+        stopGateTimer(self);
+    }
+    return std.fmt.bufPrint(output, "{{\"ok\":{s}}}", .{if (current) "true" else "false"}) catch error.HandlerFailed;
+}
+
+/// Windows: the user closed the window (close button, Alt+F4). True keeps
+/// it open for now; `win_close.proceed` closes it once the page flushed.
+fn onWindowClose(context: *anyopaque) bool {
+    const self: *App = @ptrCast(@alignCast(context));
+    if (!self.flush_hook_ready or self.runtime == null) return false;
+    // Either the flush is open, or it ended at once and `proceed` already
+    // queued the real close: this close is swallowed in both cases.
+    beginFlush(self, .close_window);
+    return true;
+}
+
+/// macOS: the app was asked to quit. 1 delays it until `goban_reply_quit`.
+fn macQuitCallback(context: ?*anyopaque) callconv(.c) c_int {
+    const self: *App = @ptrCast(@alignCast(context orelse return 0));
+    if (!self.flush_hook_ready or self.runtime == null) return 0;
+    // The reply is always asynchronous (macos_open.m), so even a flush
+    // that ends right here answers after AppKit got NSTerminateLater.
+    beginFlush(self, .reply_terminate);
+    return 1;
 }
 
 // ------------------------------------------------------------ models
@@ -1604,22 +1810,39 @@ fn setMenus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, outpu
 
 /// The page polls this once after boot (and while running) instead of relying
 /// on an event that may fire before the webview exists. The queue is consumed
-/// on read; a path never opens twice.
+/// on read; a path never opens twice. v13: the queue is cleared whatever
+/// happens, and a path that cannot be sent (not UTF-8, or past the reply's
+/// room) is dropped alone instead of failing every later call.
 fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
+    defer {
+        for (self.open_paths.items) |path| self.allocator.free(path);
+        self.open_paths.clearRetainingCapacity();
+    }
+    return openPathsJson(self.open_paths.items, output) orelse error.HandlerFailed;
+}
+
+/// `{"paths":[…]}` with every path that is valid UTF-8 and fits.
+fn openPathsJson(paths: []const []const u8, output: []u8) ?[]const u8 {
+    const tail = "]}";
+    if (output.len < tail.len) return null;
+    const room = output[0 .. output.len - tail.len];
     var n: usize = 0;
-    if (!jsonAppend(output, &n, "{\"paths\":[")) return error.HandlerFailed;
+    if (!jsonAppend(room, &n, "{\"paths\":[")) return null;
     var count: usize = 0;
-    for (self.open_paths.items) |path| {
-        if (count > 0 and !jsonAppend(output, &n, ",")) return error.HandlerFailed;
-        if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    for (paths) |path| {
+        if (!std.unicode.utf8ValidateSlice(path)) continue;
+        const mark = n;
+        const ok = (count == 0 or jsonAppend(room, &n, ",")) and jsonAppendString(room, &n, path);
+        if (!ok) {
+            n = mark;
+            continue;
+        }
         count += 1;
     }
-    if (!jsonAppend(output, &n, "]}")) return error.HandlerFailed;
-    for (self.open_paths.items) |path| self.allocator.free(path);
-    self.open_paths.clearRetainingCapacity();
-    return output[0..n];
+    @memcpy(output[n..][0..tail.len], tail);
+    return output[0 .. n + tail.len];
 }
 
 /// A closed packaged app can be launched with GOBAN_SELFTEST_OUT set by the
@@ -1679,6 +1902,35 @@ fn macOpenCallback(context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void 
 fn installPlatformOpenHandler(self: *App) void {
     if (comptime builtin.os.tag == .macos) {
         goban_install_open_handler(self, macOpenCallback);
+        goban_install_quit_handler(self, macQuitCallback);
+    }
+}
+
+/// The release self-test and the screenshot tour write their reports to
+/// files the launcher names in the environment (and the tour waits for an
+/// acknowledgement file beside its report). These are the only paths the
+/// page may use without a dialog; they are trusted because the
+/// environment already is (whoever sets it can run anything as the user).
+fn grantReportFiles(self: *App) void {
+    var buf: [files_mod.max_path_bytes + 16]u8 = undefined;
+    if (self.env_map.get("GOBAN_SELFTEST_OUT")) |p| {
+        if (p.len > 0) {
+            _ = self.grants.grant(p, .write, true);
+            if (std.fmt.bufPrint(&buf, "{s}.progress", .{p})) |progress| {
+                _ = self.grants.grant(progress, .write, true);
+            } else |_| {}
+        }
+    }
+    if (self.env_map.get("GOBAN_UPDATE_PROBE_OUT")) |p| {
+        if (p.len > 0) _ = self.grants.grant(p, .write, true);
+    }
+    if (self.env_map.get("GOBAN_TOUR_OUT")) |p| {
+        if (p.len > 0) {
+            _ = self.grants.grant(p, .write, true);
+            if (std.fmt.bufPrint(&buf, "{s}.ack", .{p})) |ack| {
+                _ = self.grants.grant(ack, .read, true);
+            } else |_| {}
+        }
     }
 }
 
@@ -1686,7 +1938,9 @@ const bundle_id = "dev.hxddh.gobanstudio";
 
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
+    app_state.grants = files_mod.Grants.init(init.gpa);
     defer app_state.deinit();
+    grantReportFiles(&app_state);
     // Optional networks (v5). Not freed at exit: a download thread may
     // still be running.
     var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
@@ -1716,7 +1970,15 @@ pub fn main(init: std.process.Init) !void {
     // Not freed at exit either: a download thread may still be finishing.
     const installer = try std.heap.page_allocator.create(install_mod.Installer);
     installer.init(init.io);
+    installer.setPublicKey(update_public_key);
     app_state.installer = installer;
+    if (init.environ_map.get("GOBAN_UPDATE_PROBE_OUT") != null) {
+        const probe_tag = init.environ_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
+        if (install_mod.validTag(probe_tag)) {
+            @memcpy(app_state.probe_tag_buf[0..probe_tag.len], probe_tag);
+            app_state.probe_tag_len = probe_tag.len;
+        }
+    }
     app_state.resolveFrontendDist();
     app_state.queueLaunchArgs(init.minimal.args);
     installPlatformOpenHandler(&app_state);
@@ -1740,26 +2002,14 @@ test {
     std.testing.refAllDecls(install_mod);
     std.testing.refAllDecls(models_mod);
     std.testing.refAllDecls(store_mod);
+    std.testing.refAllDecls(files_mod);
+    std.testing.refAllDecls(win_close);
 }
 
 test "production source uses frontend assets" {
     const source = native_sdk.frontend.productionSource(.{ .dist = "frontend/dist" });
     try std.testing.expectEqual(native_sdk.WebViewSourceKind.assets, source.kind);
     try std.testing.expectEqualStrings("frontend/dist", source.asset_options.?.root_path);
-}
-
-test "jsonUnescape windows path" {
-    var buf: [64]u8 = undefined;
-    // JSON payload slice for "C:\\Users\\x" (two backslash chars per separator)
-    const raw = "C:\\\\Users\\\\x";
-    const got = jsonUnescape(raw, &buf) orelse return error.TestUnexpectedResult;
-    try std.testing.expectEqualStrings("C:\\Users\\x", got);
-}
-
-test "jsonUnescape plain path unchanged" {
-    var buf: [64]u8 = undefined;
-    const got = jsonUnescape("/tmp/goban-studio.sgf", &buf) orelse return error.TestUnexpectedResult;
-    try std.testing.expectEqualStrings("/tmp/goban-studio.sgf", got);
 }
 
 test "analyze payload rules default to japanese and accept only the three presets" {
@@ -1776,4 +2026,50 @@ test "analyze payload rules default to japanese and accept only the three preset
         defer parsed.deinit();
         try std.testing.expectEqual(c.want, engine_mod.Rules.parse(parsed.value.rules));
     }
+}
+
+test "open paths are sent escaped; one bad path never blocks the others" {
+    var out: [256]u8 = undefined;
+    const paths = [_][]const u8{ "/a/x.sgf", "/a/tab\there.sgf", "/a/bell\x07.sgf", "/a/bad\xff.sgf", "/a/q\"uote.sgf" };
+    const got = openPathsJson(&paths, &out).?;
+    try std.testing.expectEqualStrings("{\"paths\":[\"/a/x.sgf\",\"/a/tab\\there.sgf\",\"/a/bell\\u0007.sgf\",\"/a/q\\\"uote.sgf\"]}", got);
+    // The reply is valid JSON.
+    const parsed = try std.json.parseFromSlice(struct { paths: []const []const u8 }, std.testing.allocator, got, .{});
+    defer parsed.deinit();
+    try std.testing.expectEqual(@as(usize, 4), parsed.value.paths.len);
+    try std.testing.expectEqualStrings("/a/bell\x07.sgf", parsed.value.paths[2]);
+    // Paths that do not fit are dropped one by one, the reply stays whole.
+    var small: [30]u8 = undefined;
+    const some = openPathsJson(&paths, &small).?;
+    try std.testing.expectEqualStrings("{\"paths\":[\"/a/x.sgf\"]}", some);
+    var tiny: [12]u8 = undefined;
+    try std.testing.expectEqualStrings("{\"paths\":[]}", openPathsJson(&paths, &tiny).?);
+}
+
+test "request ids are checked, not cut" {
+    try std.testing.expect(validRequestId("k1"));
+    try std.testing.expect(validRequestId("k" ++ "9" ** 63));
+    try std.testing.expect(!validRequestId(""));
+    try std.testing.expect(!validRequestId("k" ++ "9" ** 64));
+    try std.testing.expect(!validRequestId("k1\"}"));
+    try std.testing.expect(!validRequestId("k 1"));
+}
+
+test "every bridge command is registered once, with the same origins" {
+    inline for (sync_commands ++ .{}) |c| try std.testing.expect(std.mem.startsWith(u8, c.name, "studio."));
+    var names: [sync_commands.len + async_commands.len][]const u8 = undefined;
+    for (sync_commands, 0..) |c, i| names[i] = c.name;
+    for (async_commands, 0..) |c, i| names[sync_commands.len + i] = c.name;
+    for (names, 0..) |a, i| {
+        for (names[i + 1 ..]) |b| try std.testing.expect(!std.mem.eql(u8, a, b));
+    }
+    // The v2 synchronous KataGo commands are gone.
+    for (names) |n| {
+        try std.testing.expect(!std.mem.eql(u8, n, "studio.katagoMove"));
+        try std.testing.expect(!std.mem.eql(u8, n, "studio.katagoAnalyze"));
+    }
+    // The dev server origin only in development builds.
+    var has_dev = false;
+    for (allowed_origins) |o| has_dev = has_dev or std.mem.eql(u8, o, dev_server_origin);
+    try std.testing.expectEqual(app_options.dev_origin, has_dev);
 }

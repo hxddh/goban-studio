@@ -5,7 +5,8 @@
  * The fake host keeps the same rules as store.zig writePath / readPath.
  */
 import { test, assert } from "./helpers.mjs";
-import { FILE_CHUNK_BYTES, readFileChunks, writeFileChunks } from "../../src/web/js/host.js";
+import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
+import { INSTALL_ERRORS, installFallsBack, installMessageKey } from "../../src/web/js/update.js";
 
 function fakeHost() {
   const files = new Map();
@@ -70,4 +71,109 @@ await test("shell files: a file that is exactly a chunk long, and an empty one, 
   assert.equal((await readFileChunks(h.call, "/x/a")).length, FILE_CHUNK_BYTES);
   await writeFileChunks(h.call, "/x/e", new Uint8Array(0));
   assert.equal((await readFileChunks(h.call, "/x/e")).length, 0);
+});
+
+await test("shell files: the dialogs are the host's own and pass only what they understand (v13)", async () => {
+  const calls = [];
+  const call = async (command, payload) => {
+    calls.push({ command, payload });
+    if (command === "studio.openFileDialog") return ["/Users/a/game.sgf"];
+    if (command === "studio.saveFileDialog") return "/Users/a/game.sgf";
+    throw new Error("unknown " + command);
+  };
+  assert.deepEqual(await openFileDialog({ title: "Import", allowMultiple: false, filters: [{}] }, call), ["/Users/a/game.sgf"]);
+  assert.equal(await saveFileDialog({ title: "Export", defaultName: "game.sgf" }, call), "/Users/a/game.sgf");
+  assert.deepEqual(calls, [
+    { command: "studio.openFileDialog", payload: { title: "Import" } },
+    { command: "studio.saveFileDialog", payload: { title: "Export", defaultName: "game.sgf" } },
+  ]);
+  // Cancelled, empty or failed: null, never a throw.
+  assert.equal(await openFileDialog({}, async () => null), null);
+  assert.equal(await openFileDialog({}, async () => []), null);
+  assert.equal(await saveFileDialog({ defaultName: "x.sgf" }, async () => null), null);
+  assert.equal(await saveFileDialog({ defaultName: "x.txt" }, async () => { throw new Error("InvalidRequest"); }), null);
+  // No host at all.
+  assert.equal(await openFileDialog({}), null);
+  assert.equal(await saveFileDialog({ defaultName: "x.sgf" }), null);
+});
+
+await test("shell files: a host refusal (a path it never handed out) reads as a failed read or write", async () => {
+  const refuse = async () => {
+    throw new Error("AccessDenied");
+  };
+  await assert.rejects(readFileChunks(refuse, "/Users/a/.ssh/id_ed25519"), /AccessDenied/);
+  await assert.rejects(writeFileChunks(refuse, "/Users/a/Library/LaunchAgents/x.plist", new Uint8Array(3)), /AccessDenied/);
+});
+
+function fakeFlushHost() {
+  const listeners = new Map();
+  const calls = [];
+  return {
+    calls,
+    host: {
+      on(name, fn) {
+        listeners.set(name, fn);
+        return () => listeners.delete(name);
+      },
+    },
+    call: async (command, payload) => {
+      calls.push({ command, payload });
+      return { ok: true };
+    },
+    emit(name, detail) {
+      listeners.get(name)?.(detail);
+    },
+    has: (name) => listeners.has(name),
+  };
+}
+
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
+await test("shell quit: the page flushes when the host asks, then answers with the same id (v13)", async () => {
+  const h = fakeFlushHost();
+  let flushed = 0;
+  let release;
+  const off = installFlushHook(
+    () =>
+      new Promise((resolve) => {
+        flushed++;
+        release = resolve;
+      }),
+    { host: h.host, call: h.call },
+  );
+  assert.deepEqual(h.calls, [{ command: "studio.flushHook", payload: {} }], "the host learns there is a hook");
+  h.emit("app:flush", { id: 7 });
+  await settle();
+  assert.equal(flushed, 1);
+  assert.equal(h.calls.length, 1, "no answer before the writes are done");
+  release(true);
+  await settle();
+  await settle();
+  assert.deepEqual(h.calls.at(-1), { command: "studio.flushDone", payload: { id: 7 } });
+  off();
+  assert.equal(h.has("app:flush"), false);
+});
+
+await test("shell quit: a failed flush still answers, so the quit is never held up", async () => {
+  const h = fakeFlushHost();
+  installFlushHook(async () => {
+    throw new Error("Disk");
+  }, { host: h.host, call: h.call });
+  h.emit("app:flush", { id: 3 });
+  for (let i = 0; i < 4; i++) await settle();
+  assert.deepEqual(h.calls.at(-1), { command: "studio.flushDone", payload: { id: 3 } });
+  // Without a host (the browser preview) nothing is installed.
+  assert.equal(typeof installFlushHook(() => {}, { host: null }), "function");
+});
+
+await test("shell update: the v13 install refusals are explained, and the unfixable ones fall back to the download page", () => {
+  for (const code of ["NotChecked", "NotNewer", "NoSignature", "BadSignature", "HelperBusy", "HelperNotStarted"]) assert.ok(INSTALL_ERRORS.includes(code), code);
+  assert.equal(installMessageKey("NoSignature"), "update.verifyError");
+  assert.equal(installMessageKey("BadSignature"), "update.verifyError");
+  assert.equal(installMessageKey("HelperNotStarted"), "update.applyError");
+  assert.equal(installMessageKey("HelperBusy"), "update.applyError");
+  assert.equal(installMessageKey("NotChecked"), "update.downloadError");
+  for (const code of ["NoSignature", "BadSignature", "NotNewer"]) assert.equal(installFallsBack(code), true, code);
+  // Worth a retry: check again, or wait for the other helper.
+  for (const code of ["NotChecked", "HelperBusy", "HelperNotStarted"]) assert.equal(installFallsBack(code), false, code);
 });

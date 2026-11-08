@@ -1,18 +1,26 @@
 //! KataGo sidecar for every board size.
 //!
-//! The web layer owns the game; this module owns one persistent KataGo GTP
-//! process. Two ways in:
+//! The web layer owns the game; this module owns the persistent KataGo GTP
+//! processes. One way in, the `Worker` (v3): a dedicated thread owns the
+//! GTP conversation. The UI thread hands it a structured position
+//! (`Request`), the worker brings KataGo's board there incrementally
+//! (undo/play from the last position it sent), searches with
+//! `kata-search_analyze_cancellable`, and queues partial reports and the
+//! final result for the UI thread to collect after a platform wake.
+//! Nothing here touches the webview or the runtime. (v13 removed the v2
+//! synchronous path, a GTP script from the page run on the UI thread: the
+//! page has used the worker since v3, and the script path could block the
+//! window for a whole search.)
 //!
-//!   * `Engine.move` / `Engine.analyze` (v2, synchronous): the page sends a
-//!     short, validated GTP script describing the position and the caller
-//!     blocks until KataGo answers. Kept for compatibility.
-//!   * `Worker` (v3, asynchronous): a dedicated thread owns the GTP
-//!     conversation. The UI thread hands it a structured position
-//!     (`Request`), the worker brings KataGo's board there incrementally
-//!     (undo/play from the last position it sent), searches with
-//!     `kata-search_analyze_cancellable`, and queues partial reports and the
-//!     final result for the UI thread to collect after a platform wake.
-//!     Nothing here touches the webview or the runtime.
+//! v13 watchdog: KataGo is a separate program and can hang (a stuck GPU
+//! driver, a network that never finishes loading, a pipe that stops). The
+//! worker gives every request a deadline (`deadlineMs`): its own `maxTime`
+//! plus a grace, much longer when the process still has to start and load
+//! its network. The UI thread's drain calls `Worker.checkDeadline`; past
+//! the deadline the process is killed. The worker's blocked read then ends,
+//! the request fails with `Timeout` through the ordinary failure path
+//! (process discarded, the next request starts a fresh one), and the page
+//! falls back to its offline engine.
 //!
 //! v5: up to three KataGo processes, one per `Slot`, all driven by the same
 //! worker thread (the page runs one search at a time anyway):
@@ -32,6 +40,12 @@
 //! A missing or unusable engine is not fatal: the bridge returns an error
 //! and the page falls back to its local opponent.
 const std = @import("std");
+const builtin = @import("builtin");
+
+/// Development builds also look for the engine relative to the current
+/// directory (the checkout); a released app never runs whatever binary
+/// happens to sit in the folder it was started from.
+const dev_paths = builtin.mode == .Debug;
 
 const bin_name = if (@import("builtin").os.tag == .windows) "katago.exe" else "katago";
 
@@ -101,6 +115,11 @@ pub const Engine = struct {
     extra_model_len: usize = 0,
     env_map: *std.process.Environ.Map = undefined,
     child: ?std.process.Child = null,
+    /// The running process, for the watchdog's kill from the UI thread.
+    /// Set and cleared under `write_lock`, and cleared before the child is
+    /// reaped, so the handle (pid / process HANDLE) is still valid
+    /// whenever it is visible here.
+    kill_id: ?std.process.Child.Id = null,
     stdin: ?std.Io.File = null,
     stdout: ?std.Io.File = null,
     reader: std.Io.File.Reader = undefined,
@@ -132,6 +151,7 @@ pub const Engine = struct {
         // `stdin` is also read by the UI thread (cancel newline) under
         // `write_lock`; retract it before the process goes away.
         self.setStdin(null);
+        self.setKillId(null);
         if (self.child) |*child| {
             // std's kill sends SIGTERM and then waits; a KataGo that does not
             // exit on SIGTERM (it may still be blocked reading our stdin)
@@ -145,6 +165,28 @@ pub const Engine = struct {
         }
         self.stdout = null;
         self.reader_ready = false;
+    }
+
+    fn setKillId(self: *@This(), id: ?std.process.Child.Id) void {
+        if (self.write_lock) |lock| {
+            lock.lockUncancelable(self.io);
+            defer lock.unlock(self.io);
+            self.kill_id = id;
+        } else {
+            self.kill_id = id;
+        }
+    }
+
+    /// Kill the process without waiting for it (the watchdog, UI thread).
+    /// Caller holds `write_lock`. The worker, blocked reading its output,
+    /// sees the end of the stream and reaps it.
+    fn killUnlocked(self: *@This()) void {
+        const id = self.kill_id orelse return;
+        switch (builtin.os.tag) {
+            .windows => _ = std.os.windows.ntdll.NtTerminateProcess(id, @enumFromInt(1)),
+            .wasi => {},
+            else => std.posix.kill(id, std.posix.SIG.KILL) catch {},
+        }
     }
 
     fn setStdin(self: *@This(), file: ?std.Io.File) void {
@@ -235,13 +277,15 @@ pub const Engine = struct {
                 }
             }
         }
-        candidates[count] = "frontend/dist/engine";
-        count += 1;
-        candidates[count] = "engine";
-        count += 1;
+        if (dev_paths) {
+            candidates[count] = "frontend/dist/engine";
+            count += 1;
+            candidates[count] = "engine";
+            count += 1;
+        }
 
         for (candidates[0..count]) |root| {
-            const abs_root = if (std.fs.path.isAbsolute(root)) root else if (cwd_len > 0)
+            const abs_root = if (std.fs.path.isAbsolute(root)) root else if (dev_paths and cwd_len > 0)
                 (join(&abs_buf, &.{ cwd_buf[0..cwd_len], root }) orelse continue)
             else
                 continue;
@@ -286,13 +330,8 @@ pub const Engine = struct {
         if (self.child != null) return;
         const resolved = self.paths() orelse return error.EngineMissing;
 
-        var override_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-        const log_dir = self.env_map.get("TMPDIR") orelse self.env_map.get("TEMP") orelse self.env_map.get("TMP") orelse ".";
-        const override = std.fmt.bufPrint(
-            &override_buf,
-            "logDir={s},homeDataDir={s},logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false",
-            .{ log_dir, log_dir },
-        ) catch return error.EngineMissing;
+        var override_buf: [std.Io.Dir.max_path_bytes + 512]u8 = undefined;
+        const override = overrideConfig(self.env_map, &override_buf) orelse return error.EngineMissing;
 
         // Only fixed arguments and paths the host resolved itself: the page
         // chooses a slot, never a file.
@@ -317,6 +356,7 @@ pub const Engine = struct {
         const stdin = child.stdin orelse return error.EngineProtocol;
         const stdout = child.stdout orelse return error.EngineProtocol;
         self.child = child;
+        self.setKillId(child.id);
         self.setStdin(stdin);
         self.stdout = stdout;
         self.reader = std.Io.File.Reader.init(stdout, self.io, &self.read_buf);
@@ -368,84 +408,6 @@ pub const Engine = struct {
     fn command(self: *@This(), text: []const u8) ![]const u8 {
         try self.writeLine(text);
         return self.readReply();
-    }
-
-    pub fn validateLine(line: []const u8) bool {
-        // `kata-set-rules` takes exactly one of the three rulesets the app
-        // plays (v5); any other preset or a rules string is rejected.
-        const rules_prefix = "kata-set-rules ";
-        if (std.mem.startsWith(u8, line, rules_prefix)) {
-            return Rules.parse(line[rules_prefix.len..]) != null;
-        }
-        const allowed = [_][]const u8{
-            "clear_board",
-            "undo",
-            "boardsize ",
-            "komi ",
-            "play ",
-            "kata-set-param ",
-            "time_settings ",
-        };
-        for (allowed) |prefix| {
-            if (std.mem.eql(u8, line, prefix) or std.mem.startsWith(u8, line, prefix)) return true;
-        }
-        return false;
-    }
-
-    fn runScript(self: *@This(), script: []const u8) !void {
-        var lines = std.mem.splitScalar(u8, script, '\n');
-        var count: usize = 0;
-        while (lines.next()) |raw| {
-            const line = std.mem.trim(u8, raw, " \t\r");
-            if (line.len == 0) continue;
-            if (!validateLine(line)) return error.InvalidRequest;
-            _ = try self.command(line);
-            count += 1;
-            if (count > 900) return error.InvalidRequest;
-        }
-    }
-
-    /// `script` is newline-separated GTP setup commands generated by the
-    /// page. Anything outside the narrow setup vocabulary is rejected before
-    /// it reaches the child process.
-    pub fn move(self: *@This(), script: []const u8, color: []const u8) ![]const u8 {
-        if (!std.mem.eql(u8, color, "B") and !std.mem.eql(u8, color, "W")) return error.InvalidRequest;
-        try self.start();
-        errdefer self.deinit(self.io);
-        try self.runScript(script);
-        var cmd_buf: [32]u8 = undefined;
-        const genmove = std.fmt.bufPrint(&cmd_buf, "genmove {s}", .{color}) catch return error.InvalidRequest;
-        return self.command(genmove);
-    }
-
-    pub const Analysis = struct {
-        info: []const u8,
-        play: []const u8,
-    };
-
-    /// Set up the position and search it with ownership. The search budget
-    /// comes from the script's `kata-set-param maxVisits` line. Prefers
-    /// `kata-search_analyze` (one final report, no move played); older
-    /// engines fall back to `kata-genmove_analyze` with frequent reports.
-    /// Returns the final `info` report and, when the engine names one, the
-    /// move it would play (otherwise the page takes the top candidate).
-    pub fn analyze(self: *@This(), script: []const u8, color: []const u8) !Analysis {
-        if (!std.mem.eql(u8, color, "B") and !std.mem.eql(u8, color, "W")) return error.InvalidRequest;
-        try self.start();
-        errdefer self.deinit(self.io);
-        try self.runScript(script);
-        var cmd_buf: [80]u8 = undefined;
-        const search = std.fmt.bufPrint(&cmd_buf, "kata-search_analyze {s} ownership true", .{color}) catch return error.InvalidRequest;
-        try self.writeLine(search);
-        self.readAnalysis(null) catch |err| switch (err) {
-            error.EngineRejected => {
-                const fallback = std.fmt.bufPrint(&cmd_buf, "kata-genmove_analyze {s} interval 1 ownership true", .{color}) catch return error.InvalidRequest;
-                try self.writeLine(fallback);
-                try self.readAnalysis(null);
-            },
-            else => return err,
-        };
-        return .{ .info = self.info_buf[0..self.info_len], .play = self.play_buf[0..self.play_len] };
     }
 
     fn keepLine(self: *@This(), line: []const u8) void {
@@ -672,12 +634,65 @@ pub const WakeFn = *const fn (context: ?*anyopaque) anyerror!void;
 
 pub const CancelResult = enum { not_found, removed_pending, signalled_running };
 
+/// How long a request may hold KataGo before the watchdog kills it.
+/// KataGo stops a search at `maxTime` by itself; the grace covers setting
+/// up the position (up to a few thousand GTP lines) and writing the
+/// ownership report. A process that is not running yet must also start and
+/// load its network first: the optional 40-block network on a slow CPU,
+/// or a GPU backend tuning itself on first use, takes minutes, so the cold
+/// budget is generous. Past either, something is wrong and waiting longer
+/// only keeps the page (and every request queued behind it) stuck.
+pub const warm_grace_ms: i64 = 20_000;
+pub const cold_grace_ms: i64 = 240_000;
+
+pub fn deadlineMs(max_time_s: f64, cold: bool) i64 {
+    const t = if (std.math.isFinite(max_time_s) and max_time_s > 0) @min(max_time_s, 600) else 600;
+    const search: i64 = @intFromFloat(t * 1000);
+    return search + (if (cold) cold_grace_ms else warm_grace_ms);
+}
+
+/// A value KataGo can take in `-override-config`. KataGo splits that
+/// argument at commas, each item at its first `=`, and trims spaces, with
+/// no quoting or escaping; so a directory containing any of those (or a
+/// quote, a comment `#`, a control character) would be cut short or turn
+/// into a different setting. Such a directory is skipped, never passed.
+pub fn safeOverrideValue(v: []const u8) bool {
+    if (v.len == 0 or v.len > 1024) return false;
+    if (v[0] == ' ' or v[v.len - 1] == ' ') return false;
+    for (v) |c| {
+        if (c < 0x20 or c == 0x7f or c == ',' or c == '=' or c == '"' or c == '\'' or c == '#') return false;
+    }
+    return true;
+}
+
+const override_fixed = "logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false";
+
+/// The `-override-config` argument: logs and KataGo's own data (tuning
+/// files) in the user's temp directory, never beside a read-only packaged
+/// executable. The first temp directory that `safeOverrideValue` accepts
+/// is used; without one, only the fixed switches are passed.
+pub fn overrideConfig(env: *const std.process.Environ.Map, buf: []u8) ?[]const u8 {
+    const keys = [_][]const u8{ "TMPDIR", "TEMP", "TMP" };
+    var dir: ?[]const u8 = null;
+    for (keys) |key| {
+        const v = env.get(key) orelse continue;
+        if (safeOverrideValue(v) and std.fs.path.isAbsolute(v)) {
+            dir = v;
+            break;
+        }
+    }
+    if (dir == null and builtin.os.tag != .windows) dir = "/tmp";
+    if (dir) |d| {
+        return std.fmt.bufPrint(buf, "logDir={s},homeDataDir={s},{s}", .{ d, d, override_fixed }) catch null;
+    }
+    return std.fmt.bufPrint(buf, "{s}", .{override_fixed}) catch null;
+}
+
 /// The KataGo worker. Lives on the heap for the whole session.
 ///
 /// Threads:
 ///   * UI thread: `submit`, `cancel`, `takeResults`, `takeStream`,
-///     `lockExclusive`/`unlockExclusive` (legacy sync bridge calls),
-///     `shutdown`.
+///     `checkDeadline` (the watchdog), `stopSlot`, `shutdown`.
 ///   * worker thread: `run` — the only code that talks to KataGo while an
 ///     async request is in flight.
 ///
@@ -686,9 +701,10 @@ pub const CancelResult = enum { not_found, removed_pending, signalled_running };
 /// the worker and "mark cancelled" + "send the cancel newline" on the UI
 /// thread are each atomic: a cancel can never slip in between the check
 /// and the search and be lost. `engine_lock` is held by whoever drives a
-/// GTP exchange (the worker for a job, the UI thread for a legacy sync
-/// call). The worker never waits for the UI thread while holding either
-/// lock, and reaches it only through `wake_fn` (documented thread-safe).
+/// GTP exchange (the worker for a job; the UI thread only ever tries it,
+/// in `stopSlot` and `shutdown`). The worker never waits for the UI thread
+/// while holding either lock, and reaches it only through `wake_fn`
+/// (documented thread-safe).
 /// What one KataGo process has been told: owned by whoever holds
 /// `engine_lock`.
 const SlotState = struct {
@@ -733,6 +749,11 @@ pub const Worker = struct {
     /// Slots whose process must stop once the running request ends
     /// (`stopSlot` found the engine busy).
     stop_after: [slot_count]bool = [_]bool{false} ** slot_count,
+    /// When the running request's process is killed (`checkDeadline`);
+    /// 0 while the worker has not started on it yet.
+    running_deadline_ms: i64 = 0,
+    /// The request the watchdog killed: it fails with `Timeout`.
+    timed_out_seq: u64 = 0,
 
     // --- set on the UI thread before the worker starts
     wake_context: ?*anyopaque = null,
@@ -762,7 +783,7 @@ pub const Worker = struct {
         }
     }
 
-    /// The shipped engine (legacy sync calls, status, version).
+    /// The shipped engine (status, version).
     pub fn standard(self: *Worker) *Engine {
         return &self.engines[@intFromEnum(Slot.standard)];
     }
@@ -857,17 +878,19 @@ pub const Worker = struct {
         return value;
     }
 
-    /// Exclusive use of the engine for a legacy synchronous bridge call.
-    /// The caller cancels async work first, so this waits only for KataGo
-    /// to stop. UI thread.
-    pub fn lockExclusive(self: *Worker) void {
-        self.engine_lock.lockUncancelable(self.io);
-    }
-
-    /// The synchronous call rewrote KataGo's board and parameters.
-    pub fn unlockExclusive(self: *Worker) void {
-        self.states[@intFromEnum(Slot.standard)].invalidate();
-        self.engine_lock.unlock(self.io);
+    /// The watchdog, from the UI thread's drain: if the running request is
+    /// past its deadline, kill its KataGo process (the worker's read then
+    /// fails and the request is answered `Timeout`). Returns the request's
+    /// seq when it killed one. Never blocks on the worker.
+    pub fn checkDeadline(self: *Worker, now_ms: i64) u64 {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        if (self.running_seq == 0 or self.running_deadline_ms == 0) return 0;
+        if (now_ms < self.running_deadline_ms) return 0;
+        if (self.timed_out_seq == self.running_seq) return 0;
+        self.timed_out_seq = self.running_seq;
+        self.engines[@intFromEnum(self.running_slot)].killUnlocked();
+        return self.running_seq;
     }
 
     /// Stop one slot's process (its network is being removed). Returns
@@ -934,6 +957,13 @@ pub const Worker = struct {
             // engine_lock while holding `lock`.
             var result = Result{ .seq = self.current.seq };
             self.engine_lock.lockUncancelable(self.io);
+            // The deadline starts now that the engine is ours, and is long
+            // when the process must start (and load its network) first.
+            const cold = self.engines[@intFromEnum(self.current.slot)].child == null;
+            const budget = deadlineMs(self.current.max_time, cold);
+            self.lock.lockUncancelable(self.io);
+            self.running_deadline_ms = std.Io.Timestamp.now(self.io, .awake).toMilliseconds() + budget;
+            self.lock.unlock(self.io);
             self.process(&self.current, &result);
             self.stopRequested();
             self.engine_lock.unlock(self.io);
@@ -959,7 +989,10 @@ pub const Worker = struct {
     fn publish(self: *Worker, result: Result) void {
         while (true) {
             self.lock.lockUncancelable(self.io);
-            if (self.running_seq == result.seq) self.running_seq = 0;
+            if (self.running_seq == result.seq) {
+                self.running_seq = 0;
+                self.running_deadline_ms = 0;
+            }
             if (self.results_len < self.results.len) {
                 self.results[self.results_len] = result;
                 self.results_len += 1;
@@ -984,12 +1017,20 @@ pub const Worker = struct {
         return self.cancel_seq == seq or self.quit;
     }
 
+    fn timedOut(self: *Worker, seq: u64) bool {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        return self.timed_out_seq == seq;
+    }
+
     fn process(self: *Worker, req: *const Request, result: *Result) void {
         self.processInner(req, result) catch |err| {
-            result.error_name = @errorName(err);
+            // Killed by the watchdog: whatever the read reported, the page
+            // hears why.
+            result.error_name = if (self.timedOut(req.seq)) "Timeout" else @errorName(err);
             if (result.info) |info| result_allocator.free(info);
             result.info = null;
-            if (err == error.Cancelled) {
+            if (err == error.Cancelled and !self.timedOut(req.seq)) {
                 result.outcome = .cancelled;
                 return;
             }
@@ -1211,7 +1252,6 @@ test "rules are one of three presets" {
     try std.testing.expect(Rules.parse("chinese ") == null);
     try std.testing.expect(Rules.parse("") == null);
     try std.testing.expectEqualStrings("kata-set-rules chinese", Rules.chinese.command());
-    try std.testing.expect(Engine.validateLine(Rules.korean.command()));
 }
 
 test "human profiles are validated before they reach KataGo" {
@@ -1231,23 +1271,6 @@ test "human profiles are validated before they reach KataGo" {
     try std.testing.expect(Slot.parse("/tmp/x.bin.gz") == null);
 }
 
-test "engine script vocabulary is narrow" {
-    try std.testing.expect(Engine.validateLine("clear_board"));
-    try std.testing.expect(Engine.validateLine("boardsize 19"));
-    try std.testing.expect(Engine.validateLine("kata-set-param maxVisits 200"));
-    try std.testing.expect(Engine.validateLine("undo"));
-    try std.testing.expect(Engine.validateLine("kata-set-rules japanese"));
-    try std.testing.expect(Engine.validateLine("kata-set-rules chinese"));
-    try std.testing.expect(Engine.validateLine("kata-set-rules korean"));
-    try std.testing.expect(!Engine.validateLine("kata-set-rules tromp-taylor"));
-    try std.testing.expect(!Engine.validateLine("kata-set-rules koRule:POSITIONAL"));
-    try std.testing.expect(!Engine.validateLine("kata-set-rules "));
-    try std.testing.expect(!Engine.validateLine("genmove B"));
-    try std.testing.expect(!Engine.validateLine("kata-genmove_analyze B"));
-    try std.testing.expect(!Engine.validateLine("quit"));
-    try std.testing.expect(!Engine.validateLine("loadsgf /etc/passwd"));
-}
-
 test "stopping a process that ignores SIGTERM does not hang" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const io = std.testing.io;
@@ -1262,4 +1285,56 @@ test "stopping a process that ignores SIGTERM does not hang" {
     const elapsed = started.durationTo(std.Io.Timestamp.now(io, .awake)).toMilliseconds();
     try std.testing.expect(engine.child == null);
     try std.testing.expect(elapsed < 5000);
+}
+
+test "the watchdog budget is maxTime plus a grace, long for a cold start" {
+    try std.testing.expectEqual(@as(i64, 6000 + warm_grace_ms), deadlineMs(6, false));
+    try std.testing.expectEqual(@as(i64, 6000 + cold_grace_ms), deadlineMs(6, true));
+    try std.testing.expectEqual(@as(i64, 500 + warm_grace_ms), deadlineMs(0.5, false));
+    // Nonsense never means "no deadline".
+    try std.testing.expectEqual(@as(i64, 600_000 + warm_grace_ms), deadlineMs(std.math.inf(f64), false));
+    try std.testing.expectEqual(@as(i64, 600_000 + warm_grace_ms), deadlineMs(-1, false));
+}
+
+test "override-config values never carry a separator" {
+    try std.testing.expect(safeOverrideValue("/var/folders/x/T/"));
+    try std.testing.expect(safeOverrideValue("C:\\Users\\Kim Lee\\AppData\\Local\\Temp"));
+    for ([_][]const u8{ "", "/tmp/a,logDir=/etc", "/tmp/a=b", "/tmp/\"x\"", "/tmp/#x", "/tmp/a\nb", " /tmp", "/tmp " }) |v| {
+        try std.testing.expect(!safeOverrideValue(v));
+    }
+    var env = std.process.Environ.Map.init(std.testing.allocator);
+    defer env.deinit();
+    var buf: [2048]u8 = undefined;
+    try env.put("TMPDIR", "/tmp/evil,logToStderr=true");
+    try env.put("TEMP", "/var/tmp/goban");
+    const got = overrideConfig(&env, &buf).?;
+    try std.testing.expect(std.mem.startsWith(u8, got, "logDir=/var/tmp/goban,homeDataDir=/var/tmp/goban,"));
+    try std.testing.expect(std.mem.indexOf(u8, got, "evil") == null);
+    try std.testing.expect(std.mem.endsWith(u8, got, "allowResignation=false"));
+}
+
+test "the watchdog kills a process that stops answering" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const io = std.testing.io;
+    var engine: Engine = .{};
+    engine.io = io;
+    // A stand-in for a KataGo that never answers.
+    const argv = [_][]const u8{ "/bin/sh", "-c", "trap '' TERM; while :; do sleep 1; done" };
+    var child = try std.process.spawn(io, .{ .argv = &argv, .stdin = .pipe, .stdout = .pipe, .stderr = .ignore });
+    engine.child = child;
+    engine.kill_id = child.id;
+    engine.stdin = child.stdin;
+    engine.stdout = child.stdout;
+    engine.reader = std.Io.File.Reader.init(child.stdout.?, io, &engine.read_buf);
+    engine.reader_ready = true;
+    const started = std.Io.Timestamp.now(io, .awake);
+    engine.killUnlocked();
+    // The blocked read ends instead of hanging.
+    try std.testing.expectError(error.EngineExited, engine.readReply());
+    const elapsed = started.durationTo(std.Io.Timestamp.now(io, .awake)).toMilliseconds();
+    try std.testing.expect(elapsed < 5000);
+    engine.deinit(io);
+    _ = &child;
+    try std.testing.expect(engine.child == null);
+    try std.testing.expect(engine.kill_id == null);
 }

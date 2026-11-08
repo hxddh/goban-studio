@@ -4,7 +4,7 @@
 import { implOpponent, thetaToGoR } from "../../src/web/js/model/player.js";
 import { test, BLACK, DEFAULT_SETTINGS, EMPTY, Game, HUMAN_VISITS, S, SAMPLE_INFO, STRENGTHS, STRONG_VISIT_SCALE, WHITE, analyse, analysisEngine, anchorMap, assert, beginnerMove, calibrated, chooseMove, defaultKomi, egfExpected, egfNats, empty, enginePayload, fitBT, fs, goRLabel, humanMoveFromAnalysis, humanRequest, humanStyleParams, installed, katagoRules, loadSGF, moveFromAnalysis, mulberry32, newGame, parse, parseInfo, parseVertex, path, pickCandidate, positionPayload, profileGoR, rankParts, root, scaledVisits, setup, suggestHandicap, wilson } from "./helpers.mjs";
 
-await test("rules: KataGo is told the game's rules on both bridge paths", async () => {
+await test("rules: KataGo is told the game's rules", async () => {
   // Async (structured) payload.
   const cn = new Game({ size: 9, rules: "chinese", handicap: 2 });
   cn.play(4, 4);
@@ -20,14 +20,14 @@ await test("rules: KataGo is told the game's rules on both bridge paths", async 
   const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
   assert.equal(positionPayload(pos).setup, "W C7 B A9 B B8");
 
-  // Sync (GTP script) path.
-  const scripts = [];
+  // Through the bridge: every request names the rules and the game's komi.
+  const sent = [];
   globalThis.zero = {
     invoke: async (command, payload) => {
-      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test" };
-      if (command === "studio.katagoAnalyze") {
-        scripts.push(Buffer.from(payload.b64, "base64").toString("utf8"));
-        return { ok: true, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3" };
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test", async: true };
+      if (command === "studio.katagoAnalyzeAsync") {
+        sent.push(payload);
+        return { ok: true, id: payload.id, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3" };
       }
       throw new Error("unexpected command " + command);
     },
@@ -36,11 +36,28 @@ await test("rules: KataGo is told the game's rules on both bridge paths", async 
     const K = await import("../../src/web/js/katago.js?bridge-rules");
     for (const rules of ["japanese", "chinese", "korean"]) {
       await K.analyze(new Game({ size: 9, rules }), { visits: 8 });
-      const script = scripts.at(-1);
-      assert.match(script, new RegExp(`^kata-set-rules ${rules}$`, "m"));
-      assert.equal(script.match(/kata-set-rules/g).length, 1);
-      assert.match(script, new RegExp(`^komi ${defaultKomi(rules)}$`, "m"));
+      assert.equal(sent.at(-1).rules, rules);
+      assert.equal(sent.at(-1).komi, defaultKomi(rules));
     }
+  } finally {
+    delete globalThis.zero;
+  }
+});
+
+await test("a host without the async command cannot search: no synchronous fallback (v13)", async () => {
+  const commands = [];
+  globalThis.zero = {
+    invoke: async (command) => {
+      commands.push(command);
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test" };
+      throw new Error("unexpected command " + command);
+    },
+  };
+  try {
+    const K = await import("../../src/web/js/katago.js?no-async");
+    assert.equal(await K.analyze(new Game({ size: 9 }), { visits: 8 }), null);
+    assert.deepEqual(commands, ["studio.katagoStatus"]);
+    assert.equal(K.canCancel(), false);
   } finally {
     delete globalThis.zero;
   }
@@ -203,14 +220,13 @@ await test("the calibration fit recovers known strengths and maps them onto the 
 });
 
 await test("the native bridge sends setup stones, handicap and moves to KataGo for any size", async () => {
-  let script = "";
+  let payload = null;
   globalThis.zero = {
-    invoke: async (command, payload) => {
-      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test" };
-      if (command === "studio.katagoAnalyze") {
-        script = Buffer.from(payload.b64, "base64").toString("utf8");
-        assert.equal(payload.color, "B");
-        return { ok: true, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3 G7 ownership " + Array(81).fill("0.1").join(" ") };
+    invoke: async (command, p) => {
+      if (command === "studio.katagoStatus") return { available: true, engine: "KataGo", version: "KataGo test", async: true };
+      if (command === "studio.katagoAnalyzeAsync") {
+        payload = p;
+        return { ok: true, id: p.id, play: "C3", info: "info move C3 visits 10 winrate 0.6 scoreLead 3 order 0 pv C3 G7 ownership " + Array(81).fill("0.1").join(" ") };
       }
       throw new Error("unexpected command " + command);
     },
@@ -223,12 +239,14 @@ await test("the native bridge sends setup stones, handicap and moves to KataGo f
     assert.deepEqual(a.play, { x: 2, y: 6 });
     assert.equal(a.ownership.length, 81);
     assert.equal(a.winrate, 0.6);
-    assert.match(script, /boardsize 9/);
-    assert.match(script, /komi 0\.5/);
-    assert.match(script, /kata-set-rules japanese/);
-    assert.match(script, /kata-set-param maxVisits 20/);
-    assert.match(script, /play B G7\nplay B C3/);
-    assert.match(script, /play W E5$/);
+    assert.equal(payload.size, 9);
+    assert.equal(payload.komi, 0.5);
+    assert.equal(payload.rules, "japanese");
+    assert.equal(payload.visits, 20);
+    assert.equal(payload.color, "B");
+    assert.equal(payload.setup, "B G7 B C3");
+    assert.equal(payload.moves, "W E5");
+    assert.match(payload.id, /^k\d+$/);
   } finally {
     delete globalThis.zero;
   }

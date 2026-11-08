@@ -10,17 +10,30 @@
 //!      name; the page never supplies a URL. Redirects are followed by hand
 //!      and only to GitHub's own download hosts, always over HTTPS.
 //!   2. Verify — the asset's SHA-256 must equal its line in SHA256SUMS.
-//!      (Honest scope: this catches corruption, truncation and a wrong
-//!      file. It is not a signature: SHA256SUMS comes from the same release
-//!      over the same TLS connection to GitHub. Builds are ad-hoc signed /
-//!      unsigned; there is no key to check against.)
+//!      On its own that catches corruption, truncation and a wrong file,
+//!      but it is not a signature: SHA256SUMS comes from the same release
+//!      over the same TLS connection to GitHub, so whoever can publish a
+//!      release can publish matching sums. v13: a build made with
+//!      `-Dupdate-pubkey=<base64 Ed25519 public key>` (docs/signing.md)
+//!      also downloads `SHA256SUMS.sig` — the base64 of a 64-byte Ed25519
+//!      signature over the exact bytes of SHA256SUMS — and refuses the
+//!      update without a valid one (`NoSignature`, `BadSignature`). The
+//!      private key never touches GitHub's release storage; it lives in the
+//!      release job's secrets. A build without the option behaves as
+//!      before (checksums only), and says so nowhere it could mislead.
 //!   3. Unpack into a per-user staging directory under the temp dir
 //!      (macOS: `ditto -x -k`, then `codesign --verify --deep --strict`;
 //!      Windows: std.zip with every entry name checked first), and check
 //!      the layout, the bundle id and the executable's CPU architecture.
 //!   4. Apply — on "Restart to update" the app writes its *embedded* helper
-//!      script (src/updater/) next to the staging directory, starts it
-//!      detached and quits. The helper waits for this process to exit,
+//!      script (src/updater/) next to the staging directory and starts it
+//!      detached. v13: the helper takes an exclusive lock for the
+//!      installation (`.<name>.goban-lock` beside it: a second helper for
+//!      the same app refuses) and then creates a "started" marker in the
+//!      staging directory. The app quits only once that marker exists; if
+//!      it does not appear within `helper_start_timeout_ms` the app claims
+//!      the marker itself (so a late helper gives up), stays open and
+//!      reports `HelperNotStarted`. The helper waits for this process to exit,
 //!      swaps the installation (keeping a backup), launches the new app
 //!      with `--goban-update-ack=<file>` and waits for the new app to write
 //!      that file; without it, it rolls back and relaunches the old app with
@@ -43,6 +56,13 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 /// Every download starts with exactly this prefix, then `<tag>/<name>`.
 pub const download_prefix = "https://github.com/hxddh/goban-studio/releases/download/";
 pub const sums_name = "SHA256SUMS";
+/// The detached Ed25519 signature of SHA256SUMS (base64, one line).
+pub const sig_name = "SHA256SUMS.sig";
+const max_sig_bytes: u64 = 1024;
+pub const Ed25519 = std.crypto.sign.Ed25519;
+/// How long the app waits for the helper's "started" marker (v13).
+pub const helper_start_timeout_ms: i64 = 5_000;
+pub const started_prefix = "goban-update-started-";
 /// GitHub answers a release download with a redirect to one of these.
 const redirect_hosts = [_][]const u8{
     "github.com",
@@ -148,7 +168,7 @@ pub fn validTag(tag: []const u8) bool {
 }
 
 fn isAllowedAssetName(name: []const u8) bool {
-    if (std.mem.eql(u8, name, sums_name)) return true;
+    if (std.mem.eql(u8, name, sums_name) or std.mem.eql(u8, name, sig_name)) return true;
     inline for (.{ Platform.macos_arm64, Platform.macos_x64, Platform.windows_x64 }) |p| {
         if (std.mem.eql(u8, name, p.assetName().?)) return true;
     }
@@ -186,6 +206,36 @@ pub fn allowedRedirect(url: []const u8) bool {
         if (std.mem.eql(u8, host, allowed)) return true;
     }
     return false;
+}
+
+// ------------------------------------------------------------ signature
+
+/// The build's update key (`-Dupdate-pubkey`, base64 of 32 bytes), decoded;
+/// null when the option is empty. Evaluated at compile time in main.zig,
+/// so a malformed key fails the build instead of disabling the check.
+pub fn parsePublicKey(b64: []const u8) error{BadKey}!?[Ed25519.PublicKey.encoded_length]u8 {
+    const text = std.mem.trim(u8, b64, " \t\r\n");
+    if (text.len == 0) return null;
+    var out: [Ed25519.PublicKey.encoded_length]u8 = undefined;
+    const dec = std.base64.standard.Decoder;
+    const n = dec.calcSizeForSlice(text) catch return error.BadKey;
+    if (n != out.len) return error.BadKey;
+    dec.decode(&out, text) catch return error.BadKey;
+    return out;
+}
+
+/// Check `sig_text` (base64 of a 64-byte Ed25519 signature, surrounding
+/// whitespace allowed) against the exact bytes of SHA256SUMS.
+pub fn verifySums(sums: []const u8, sig_text: []const u8, public_key: [Ed25519.PublicKey.encoded_length]u8) error{BadSignature}!void {
+    const text = std.mem.trim(u8, sig_text, " \t\r\n");
+    var sig_bytes: [Ed25519.Signature.encoded_length]u8 = undefined;
+    const dec = std.base64.standard.Decoder;
+    const n = dec.calcSizeForSlice(text) catch return error.BadSignature;
+    if (n != sig_bytes.len) return error.BadSignature;
+    dec.decode(&sig_bytes, text) catch return error.BadSignature;
+    const pk = Ed25519.PublicKey.fromBytes(public_key) catch return error.BadSignature;
+    const sig = Ed25519.Signature.fromBytes(sig_bytes);
+    sig.verify(sums, pk) catch return error.BadSignature;
 }
 
 // ------------------------------------------------------------ checksums
@@ -628,6 +678,9 @@ pub const Installer = struct {
     lock: std.Io.Mutex = .init,
     platform: Platform = .unsupported,
     note: LaunchNote = .{},
+    /// Set once before the first download (`setPublicKey`): when present,
+    /// SHA256SUMS must carry a valid signature by it.
+    public_key: ?[Ed25519.PublicKey.encoded_length]u8 = null,
 
     // --- guarded by `lock`
     snap: Snapshot = .{},
@@ -655,6 +708,10 @@ pub const Installer = struct {
         defer self.lock.unlock(self.io);
         self.wake_context = context;
         self.wake_fn = wake_fn;
+    }
+
+    pub fn setPublicKey(self: *Installer, key: ?[Ed25519.PublicKey.encoded_length]u8) void {
+        self.public_key = key;
     }
 
     pub fn snapshot(self: *Installer) Snapshot {
@@ -708,7 +765,7 @@ pub const Installer = struct {
         @memcpy(self.snap.tag_buf[0..tag.len], tag);
         self.snap.tag_len = tag.len;
         const job = try std.heap.page_allocator.create(Job);
-        job.* = .{ .gen = self.snap.gen, .platform = self.platform };
+        job.* = .{ .gen = self.snap.gen, .platform = self.platform, .public_key = self.public_key };
         @memcpy(job.tag_buf[0..tag.len], tag);
         job.tag_len = tag.len;
         @memcpy(job.dir_buf[0..job_dir.len], job_dir);
@@ -783,6 +840,7 @@ pub const Installer = struct {
     const Job = struct {
         gen: u64,
         platform: Platform,
+        public_key: ?[Ed25519.PublicKey.encoded_length]u8 = null,
         tag_buf: [64]u8 = undefined,
         tag_len: usize = 0,
         dir_buf: [path_cap]u8 = undefined,
@@ -869,6 +927,20 @@ pub const Installer = struct {
         _ = try self.download(&client, job.gen, sums_url, sums_path, max_sums_bytes, false, &digest);
         var sums_text_buf: [max_sums_bytes]u8 = undefined;
         const sums_text = readHead(io, sums_path, &sums_text_buf) orelse return error.Disk;
+        // Signed builds: the sums must be signed by the build's key before
+        // anything in them is believed (and before the large download).
+        if (job.public_key) |key| {
+            var sig_path_buf: [path_cap]u8 = undefined;
+            const sig_url = try downloadUrl(&url_buf, job.tag(), sig_name);
+            const sig_path = std.fmt.bufPrint(&sig_path_buf, "{s}{c}{s}", .{ job.dir(), std.fs.path.sep, sig_name }) catch return error.Disk;
+            _ = self.download(&client, job.gen, sig_url, sig_path, max_sig_bytes, false, &digest) catch |err| switch (err) {
+                error.NoAsset => return error.NoSignature,
+                else => return err,
+            };
+            var sig_text_buf: [max_sig_bytes]u8 = undefined;
+            const sig_text = readHead(io, sig_path, &sig_text_buf) orelse return error.Disk;
+            try verifySums(sums_text, sig_text, key);
+        }
         const expected = findSum(sums_text, asset) orelse return error.NoChecksum;
 
         const asset_url = try downloadUrl(&url_buf, job.tag(), asset);
@@ -1001,6 +1073,8 @@ pub fn errorName(err: anyerror) []const u8 {
         error.NoAsset => "NoAsset",
         error.TooLarge => "TooLarge",
         error.NoChecksum => "NoChecksum",
+        error.NoSignature => "NoSignature",
+        error.BadSignature => "BadSignature",
         error.ChecksumMismatch => "ChecksumMismatch",
         error.Unpack => "Unpack",
         error.BadPackage => "BadPackage",
@@ -1014,15 +1088,76 @@ pub fn errorName(err: anyerror) []const u8 {
 
 // ------------------------------------------------------------ apply
 
+/// The installation's helper lock: `.<name>.goban-lock` beside it (a
+/// directory holding the helper's pid on macOS, a delete-on-close file
+/// held open without sharing on Windows; see src/updater/).
+pub fn lockPath(buf: []u8, target: []const u8) ?[]const u8 {
+    const parent = std.fs.path.dirname(target) orelse return null;
+    const name = std.fs.path.basename(target);
+    if (name.len == 0) return null;
+    return std.fmt.bufPrint(buf, "{s}{c}.{s}.goban-lock", .{ parent, std.fs.path.sep, name }) catch null;
+}
+
+/// Is another update helper working on `target` right now? macOS: the
+/// lock directory names a live process. Windows: the lock file exists at
+/// all (it is deleted when its holder's handle closes, even on a crash).
+pub fn helperLockHeld(io: std.Io, target: []const u8) bool {
+    var buf: [path_cap]u8 = undefined;
+    const lock = lockPath(&buf, target) orelse return false;
+    switch (builtin.os.tag) {
+        .windows => return fileExists(io, lock),
+        .macos, .linux => {
+            var pid_path_buf: [path_cap]u8 = undefined;
+            const pid_path = std.fmt.bufPrint(&pid_path_buf, "{s}/pid", .{lock}) catch return false;
+            var text_buf: [32]u8 = undefined;
+            const text = readHead(io, pid_path, &text_buf) orelse return false;
+            const pid = std.fmt.parseInt(std.posix.pid_t, std.mem.trim(u8, text, " \t\r\n"), 10) catch return false;
+            if (pid <= 0) return false;
+            // Signal 0: only "does it exist" (EPERM: it does, another user's).
+            std.posix.kill(pid, @enumFromInt(0)) catch |err| return err == error.PermissionDenied;
+            return true;
+        },
+        else => return false,
+    }
+}
+
+/// Did the helper create its "started" marker?
+pub fn helperStarted(io: std.Io, path: []const u8) bool {
+    var buf: [16]u8 = undefined;
+    const text = readHead(io, path, &buf) orelse return false;
+    return std.mem.startsWith(u8, text, "started");
+}
+
+/// The app stops waiting: create the marker itself, exclusively, so a
+/// helper that starts later finds it taken and gives up without touching
+/// anything. False when the helper got there first (it did start).
+pub fn claimStarted(io: std.Io, path: []const u8) bool {
+    var file = std.Io.Dir.createFileAbsolute(io, path, .{ .exclusive = true }) catch return false;
+    defer file.close(io);
+    file.writeStreamingAll(io, "cancelled\n") catch {};
+    return true;
+}
+
+pub const HelperStart = struct {
+    /// An error name for the page, or null when the helper was started.
+    err: ?[]const u8 = null,
+    /// The marker the helper creates once it holds the lock.
+    started: []const u8 = "",
+};
+
 /// Write the embedded helper into the staging root and start it detached.
-/// The caller quits the app right after. Returns an error name or null.
+/// The caller waits for `HelperStart.started` to appear (`helperStarted`)
+/// before it quits. `started_buf` holds the marker's path.
 pub fn startHelper(
     io: std.Io,
     env: *const std.process.Environ.Map,
     root: []const u8,
     target: []const u8,
     staged: []const u8,
-) ?[]const u8 {
+    started_buf: []u8,
+) HelperStart {
+    const fail = HelperStart{ .err = "Helper" };
+    if (helperLockHeld(io, target)) return .{ .err = "HelperBusy" };
     var token_bytes: [8]u8 = undefined;
     io.random(&token_bytes);
     const token = std.fmt.bytesToHex(token_bytes, .lower);
@@ -1030,24 +1165,25 @@ pub fn startHelper(
     var ack_buf: [path_cap]u8 = undefined;
     var log_buf: [path_cap]u8 = undefined;
     const ext = if (builtin.os.tag == .windows) "ps1" else "sh";
-    const script = std.fmt.bufPrint(&script_buf, "{s}{c}apply-{s}.{s}", .{ root, std.fs.path.sep, &token, ext }) catch return "Helper";
-    const ack = std.fmt.bufPrint(&ack_buf, "{s}{c}{s}{s}.txt", .{ root, std.fs.path.sep, ack_prefix, &token }) catch return "Helper";
-    const parent = std.fs.path.dirname(root) orelse return "Helper";
-    const log = std.fmt.bufPrint(&log_buf, "{s}{c}{s}", .{ parent, std.fs.path.sep, log_name }) catch return "Helper";
+    const script = std.fmt.bufPrint(&script_buf, "{s}{c}apply-{s}.{s}", .{ root, std.fs.path.sep, &token, ext }) catch return fail;
+    const ack = std.fmt.bufPrint(&ack_buf, "{s}{c}{s}{s}.txt", .{ root, std.fs.path.sep, ack_prefix, &token }) catch return fail;
+    const started = std.fmt.bufPrint(started_buf, "{s}{c}{s}{s}.txt", .{ root, std.fs.path.sep, started_prefix, &token }) catch return fail;
+    const parent = std.fs.path.dirname(root) orelse return fail;
+    const log = std.fmt.bufPrint(&log_buf, "{s}{c}{s}", .{ parent, std.fs.path.sep, log_name }) catch return fail;
     {
-        var file = std.Io.Dir.createFileAbsolute(io, script, .{ .exclusive = true }) catch return "Helper";
+        var file = std.Io.Dir.createFileAbsolute(io, script, .{ .exclusive = true }) catch return fail;
         defer file.close(io);
         const text = if (builtin.os.tag == .windows) helper_windows else helper_macos;
-        file.writeStreamingAll(io, text) catch return "Helper";
+        file.writeStreamingAll(io, text) catch return fail;
     }
     var pid_buf: [24]u8 = undefined;
     var timeout_buf: [12]u8 = undefined;
-    const timeout = std.fmt.bufPrint(&timeout_buf, "{d}", .{ack_timeout_s}) catch return "Helper";
+    const timeout = std.fmt.bufPrint(&timeout_buf, "{d}", .{ack_timeout_s}) catch return fail;
     switch (builtin.os.tag) {
         .macos => {
-            const pid = std.fmt.bufPrint(&pid_buf, "{d}", .{std.c.getpid()}) catch return "Helper";
+            const pid = std.fmt.bufPrint(&pid_buf, "{d}", .{std.c.getpid()}) catch return fail;
             _ = std.process.spawn(io, .{
-                .argv = &.{ "/bin/sh", script, pid, target, staged, ack, log, timeout, root },
+                .argv = &.{ "/bin/sh", script, pid, target, staged, ack, log, timeout, root, started },
                 // Never inside the bundle it is about to move.
                 .cwd = .{ .path = root },
                 .stdin = .ignore,
@@ -1056,20 +1192,20 @@ pub fn startHelper(
                 // Its own process group: nothing sent to the app's group
                 // while it quits reaches the helper.
                 .pgid = 0,
-            }) catch return "Helper";
+            }) catch return fail;
         },
         .windows => {
-            const pid = std.fmt.bufPrint(&pid_buf, "{d}", .{std.os.windows.GetCurrentProcessId()}) catch return "Helper";
+            const pid = std.fmt.bufPrint(&pid_buf, "{d}", .{std.os.windows.GetCurrentProcessId()}) catch return fail;
             var ps_buf: [path_cap]u8 = undefined;
             const system_root = env.get("SystemRoot") orelse env.get("SYSTEMROOT") orelse "C:\\Windows";
-            const powershell = std.fmt.bufPrint(&ps_buf, "{s}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", .{system_root}) catch return "Helper";
+            const powershell = std.fmt.bufPrint(&ps_buf, "{s}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", .{system_root}) catch return fail;
             _ = std.process.spawn(io, .{
                 .argv = &.{
                     powershell,     "-NoProfile",  "-NonInteractive", "-ExecutionPolicy", "Bypass",
                     "-WindowStyle", "Hidden",      "-File",           script,             "-AppPid",
                     pid,            "-InstallDir", target,            "-StagedDir",       staged,
                     "-AckFile",     ack,           "-LogFile",        log,                "-AckTimeout",
-                    timeout,        "-CleanupDir", root,
+                    timeout,        "-CleanupDir", root,              "-StartedFile",     started,
                 },
                 // A process whose current directory is inside the install
                 // folder would keep Windows from renaming it.
@@ -1078,11 +1214,11 @@ pub fn startHelper(
                 .stdout = .ignore,
                 .stderr = .ignore,
                 .create_no_window = true,
-            }) catch return "Helper";
+            }) catch return fail;
         },
-        else => return "Unsupported",
+        else => return .{ .err = "Unsupported" },
     }
-    return null;
+    return .{ .started = started };
 }
 
 // ------------------------------------------------------------ replies
@@ -1323,8 +1459,99 @@ test "status and download replies" {
 test "the helpers are embedded and take the documented arguments" {
     try testing.expect(std.mem.indexOf(u8, helper_macos, "APP_PID=") != null);
     try testing.expect(std.mem.indexOf(u8, helper_macos, "--goban-update-ack=") != null);
+    try testing.expect(std.mem.indexOf(u8, helper_macos, "STARTED=${8:-}") != null);
+    try testing.expect(std.mem.indexOf(u8, helper_macos, ".goban-lock") != null);
     try testing.expect(std.mem.indexOf(u8, helper_windows, "$AppPid") != null);
     try testing.expect(std.mem.indexOf(u8, helper_windows, "--goban-update-ack=") != null);
+    try testing.expect(std.mem.indexOf(u8, helper_windows, "[string]$StartedFile") != null);
+    try testing.expect(std.mem.indexOf(u8, helper_windows, "DeleteOnClose") != null);
+}
+
+test "signed sums: a valid signature passes, anything else is refused" {
+    // A test key only (RFC 8032 style deterministic seed); never a real one.
+    const seed: [32]u8 = @splat(7);
+    const kp = try Ed25519.KeyPair.generateDeterministic(seed);
+    const pk = kp.public_key.toBytes();
+    const sums = "aaaa  GobanStudio-macOS-arm64.zip\nbbbb  GobanStudio-Windows-x64.zip\n";
+    const sig = try kp.sign(sums, null);
+    var b64_buf: [128]u8 = undefined;
+    const b64 = std.base64.standard.Encoder.encode(&b64_buf, &sig.toBytes());
+    try verifySums(sums, b64, pk);
+    // Trailing newline / spaces from `echo` are fine.
+    var line_buf: [130]u8 = undefined;
+    const line = try std.fmt.bufPrint(&line_buf, "{s}\n", .{b64});
+    try verifySums(sums, line, pk);
+    // One changed byte in the sums, a different key, garbage: refused.
+    try testing.expectError(error.BadSignature, verifySums("aaab  GobanStudio-macOS-arm64.zip\nbbbb  GobanStudio-Windows-x64.zip\n", b64, pk));
+    const other = (try Ed25519.KeyPair.generateDeterministic(@splat(8))).public_key.toBytes();
+    try testing.expectError(error.BadSignature, verifySums(sums, b64, other));
+    try testing.expectError(error.BadSignature, verifySums(sums, "", pk));
+    try testing.expectError(error.BadSignature, verifySums(sums, "not base64!", pk));
+    try testing.expectError(error.BadSignature, verifySums(sums, b64[0..40], pk));
+    // Interop: what scripts/sign-sums.mjs (node:crypto) writes for the same
+    // seed and bytes verifies here, and the public key it derives is ours
+    // (scripts/tests/shell-signing.mjs checks the node side of this vector).
+    var pk_text_buf: [64]u8 = undefined;
+    try testing.expectEqualStrings("6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=", std.base64.standard.Encoder.encode(&pk_text_buf, &pk));
+    try verifySums(sums, "4kHujrlWGlr4MAOpyzUpWK3WQwCgMLuw5nH17j7qDklf+8RMm8Ji10GLVem333h8FDjqBGn25dE4a5nhNXtLAw==\n", pk);
+    try testing.expectEqualStrings("4kHujrlWGlr4MAOpyzUpWK3WQwCgMLuw5nH17j7qDklf+8RMm8Ji10GLVem333h8FDjqBGn25dE4a5nhNXtLAw==", b64);
+    // The public key option: base64 of exactly 32 bytes, or empty.
+    var pk_b64_buf: [64]u8 = undefined;
+    const pk_b64 = std.base64.standard.Encoder.encode(&pk_b64_buf, &pk);
+    try testing.expectEqualSlices(u8, &pk, &((try parsePublicKey(pk_b64)).?));
+    try testing.expect((try parsePublicKey("")) == null);
+    try testing.expect((try parsePublicKey("  \n")) == null);
+    try testing.expectError(error.BadKey, parsePublicKey("AAAA"));
+    try testing.expectError(error.BadKey, parsePublicKey("@@@@"));
+    // The signature file is one of the few names that may be downloaded.
+    var url_buf: [256]u8 = undefined;
+    try testing.expectEqualStrings(download_prefix ++ "v13.0.0/SHA256SUMS.sig", try downloadUrl(&url_buf, "v13.0.0", sig_name));
+    try testing.expect(validDownloadUrl(download_prefix ++ "v13.0.0/SHA256SUMS.sig"));
+}
+
+test "the helper's started marker is claimed by exactly one side" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [path_cap]u8 = undefined;
+    const dir = try testTempDir(io, &tmp, &dir_buf);
+    var path_buf: [path_cap]u8 = undefined;
+    const marker = try std.fmt.bufPrint(&path_buf, "{s}{c}" ++ started_prefix ++ "00aa.txt", .{ dir, std.fs.path.sep });
+    try testing.expect(!helperStarted(io, marker));
+    // The helper wrote it first: the app cannot claim it, and sees it started.
+    try writeTestFile(io, marker, "started 123\n");
+    try testing.expect(helperStarted(io, marker));
+    try testing.expect(!claimStarted(io, marker));
+    // The app claims first: it is "cancelled", never "started".
+    const late = try std.fmt.bufPrint(&path_buf, "{s}{c}" ++ started_prefix ++ "00bb.txt", .{ dir, std.fs.path.sep });
+    try testing.expect(claimStarted(io, late));
+    try testing.expect(!helperStarted(io, late));
+    try testing.expect(!claimStarted(io, late));
+}
+
+test "a live helper's lock is seen; a stale one is not" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [path_cap]u8 = undefined;
+    const dir = try testTempDir(io, &tmp, &dir_buf);
+    var target_buf: [path_cap]u8 = undefined;
+    const target = try std.fmt.bufPrint(&target_buf, "{s}/Goban Studio.app", .{dir});
+    var lock_buf: [path_cap]u8 = undefined;
+    const lock = lockPath(&lock_buf, target).?;
+    try testing.expect(std.mem.endsWith(u8, lock, "/.Goban Studio.app.goban-lock"));
+    try testing.expect(!helperLockHeld(io, target));
+    try std.Io.Dir.cwd().createDirPath(io, lock);
+    var pid_path_buf: [path_cap]u8 = undefined;
+    const pid_path = try std.fmt.bufPrint(&pid_path_buf, "{s}/pid", .{lock});
+    var pid_text: [24]u8 = undefined;
+    try writeTestFile(io, pid_path, try std.fmt.bufPrint(&pid_text, "{d}\n", .{if (builtin.os.tag == .linux) std.os.linux.getpid() else std.c.getpid()}));
+    try testing.expect(helperLockHeld(io, target));
+    // A pid that cannot be running.
+    try std.Io.Dir.deleteFileAbsolute(io, pid_path);
+    try writeTestFile(io, pid_path, "2147483646\n");
+    try testing.expect(!helperLockHeld(io, target));
 }
 
 /// A stored (uncompressed) zip, for the extraction tests.
