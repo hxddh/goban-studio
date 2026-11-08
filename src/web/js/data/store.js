@@ -21,8 +21,25 @@
  * A failed read or write is reported to `onError({ op, key, error })`
  * (the caller shows it); a failed write stays pending and is tried again
  * on the next put of that key or the next flush. Nothing fails silently.
+ *
+ * v13 (docs/storage.md):
+ *
+ *   await store.open({ lazy })  keys under a `lazy` prefix are listed, not
+ *                               read (games/: read when a view needs one);
+ *                               the rest are read in parallel
+ *   await store.load(key)       read one listed key into memory
+ *   store.isLoaded(key)         in memory (false: on disk, not read yet)
+ *   store.openReport            { listFailed, failed: [{ key, kind, error, preserved }] }
+ *
+ * A key that could not be read (or was saved by a newer version) is
+ * write-blocked: what the app puts there stays in memory and is never
+ * written over the file it could not read. A file that is not JSON is
+ * first copied, byte for byte, to `bad/<key>-<time>.json` (then moved
+ * aside, or kept and blocked for the core files: open's `keepDamaged`). `readOnly`
+ * holds every write (the app's safe state, docs/storage.md). A `migrate`
+ * hook (data/migrate.js) brings each file read to the current format.
  */
-import { hasNative, nativeInvoke } from "../host.js";
+import { hasNative, isPackaged, nativeInvoke } from "../host.js";
 
 /** Raw bytes per bridge call (as store.zig chunk_bytes). */
 export const CHUNK_BYTES = 384 * 1024;
@@ -32,6 +49,11 @@ export const MAX_BYTES = 8 * 1024 * 1024;
 export const WRITE_DELAY = 300;
 /** localStorage prefix of the browser preview. */
 export const LOCAL_PREFIX = "goban9:";
+
+/** Copies of files that could not be parsed (never read back by open). */
+export const BAD_PREFIX = "bad/";
+/** Reads at once while opening or loading many keys. */
+const PARALLEL = 8;
 
 const SEGMENT = /^[a-z0-9_-]+$/;
 const MAX_KEY = 200;
@@ -65,6 +87,25 @@ function fromBase64(b64) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+
+/** Run `fn` over `items`, at most `n` at a time. */
+async function pool(items, n, fn) {
+  let i = 0;
+  const worker = async () => {
+    while (i < items.length) await fn(items[i++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+}
+
+/** The key a damaged file's copy goes to: `bad/<key without .json>-<time>.json`. */
+export function badKey(key, now = Date.now()) {
+  const base = key.slice(0, -5);
+  const out = `${BAD_PREFIX}${base}-${now}.json`;
+  if (validKey(out)) return out;
+  // Too long or too deep: one flat segment.
+  const flat = `${BAD_PREFIX}${base.replace(/\//g, "_").slice(0, 150)}-${now}.json`;
+  return validKey(flat) ? flat : null;
 }
 
 const errorText = (e) => (e && typeof e === "object" && "message" in e ? String(e.message) : String(e));
@@ -174,21 +215,54 @@ export function localBackend(storage = localStorageOrMemory(), prefix = LOCAL_PR
   };
 }
 
+
 /* ---------------------------------------------------------------- store */
+
+/** Thrown by a `migrate` hook for a file saved by a newer version. */
+export class NewerVersionError extends Error {
+  constructor(v) {
+    super("NewerVersion");
+    this.code = "newer";
+    this.v = v;
+  }
+}
 
 /**
  * A store over a backend (default: the host when there is one, else
- * localStorage). `onError({ op: "list" | "read" | "write" | "remove", key,
- * error })` hears every failure; set it later with setErrorHandler.
- * `delay` is the write debounce, `timers` ({ set, clear }) lets tests drive time.
+ * localStorage; a packaged app without its bridge gets neither, see
+ * host.js isPackaged). `onError({ op: "list" | "read" | "write" | "remove",
+ * key, error })` hears every failure; set it later with setErrorHandler.
+ * `delay` is the write debounce, `timers` ({ set, clear }) lets tests drive
+ * time. `migrate(key, value)` → `{ value, changed }` brings a file read to
+ * the current format (it throws NewerVersionError for a newer one); a
+ * changed file is written back. `now` names the copies of damaged files.
  */
-export function createStore({ backend = null, onError = null, delay = WRITE_DELAY, timers = null } = {}) {
+export function createStore({ backend = null, onError = null, delay = WRITE_DELAY, timers = null, migrate = null, now = () => Date.now() } = {}) {
   // Chosen on first use, so the module can be imported before the host is ready.
   let chosen = backend;
-  const backendNow = () => (chosen ||= hasNative() ? hostBackend(nativeInvoke) : localBackend());
+  const backendNow = () => {
+    if (chosen) return chosen;
+    if (hasNative()) return (chosen = hostBackend(nativeInvoke));
+    // The packaged app keeps its data in files; without the bridge it must
+    // not quietly start over in the WebView's localStorage.
+    if (isPackaged()) throw new Error("NoBridge");
+    return (chosen = localBackend());
+  };
   const setT = timers?.set || ((fn, ms) => setTimeout(fn, ms));
   const clearT = timers?.clear || ((id) => clearTimeout(id));
   const mem = new Map();
+  /** Keys on disk that are not read yet (lazy prefixes). */
+  const disk = new Set();
+  /** key → the promise of its read in progress (load). */
+  const loading = new Map();
+  /** Keys whose file could not be read: never written until reopened. */
+  const blocked = new Set();
+  /** key → "put" | "remove" held back (blocked key, or read-only). */
+  const held = new Map();
+  let readOnly = false;
+  let migrator = migrate;
+  /** Damaged files left in place (and blocked) rather than moved aside: open's `keepDamaged`. */
+  let keepDamaged = new Set();
   /** key → "put" | "remove": what is still to be done on disk. */
   const pending = new Map();
   const timer = new Map();
@@ -199,6 +273,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
   let seq = 0;
   let handler = onError;
   let opened = null;
+  let openReport = { listFailed: false, failed: [] };
 
   const report = (op, key, error) => {
     const e = { op, key, error: errorText(error) };
@@ -216,6 +291,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
     if (!validKey(key)) throw new Error(`invalid store key: ${JSON.stringify(key)}`);
   }
 
+  const isHeld = (key) => readOnly || blocked.has(key);
+
   /** Start the pending operation of `key` now (after the one before it). */
   function run(key) {
     clearT(timer.get(key));
@@ -228,6 +305,11 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
     const next = prev.then(async () => {
       // A newer operation of the same key was queued meanwhile: it carries the latest value.
       if (pending.has(key)) return true;
+      // Blocked since it was queued (read-only turned on): held, not written.
+      if (isHeld(key)) {
+        held.set(key, op);
+        return true;
+      }
       try {
         if (op === "remove") await backendNow().remove(key);
         else {
@@ -252,11 +334,100 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
   }
 
   function schedule(key, op) {
-    pending.set(key, op);
     gen.set(key, ++seq);
+    if (isHeld(key)) {
+      held.set(key, op);
+      pending.delete(key);
+      clearT(timer.get(key));
+      timer.delete(key);
+      return;
+    }
+    held.delete(key);
+    pending.set(key, op);
     clearT(timer.get(key));
     timer.set(key, setT(() => run(key), delay));
   }
+
+  /** Keep a byte-for-byte copy of a file that is not JSON; its key, or null. */
+  async function preserve(key, text) {
+    let copy = badKey(key, now());
+    // Never over an earlier copy made in the same millisecond.
+    for (let n = 2; copy && disk.has(copy) && n < 100; n++) copy = badKey(key, `${now()}-${n}`);
+    if (!copy) return null;
+    try {
+      await backendNow().write(copy, text);
+      disk.add(copy);
+      return copy;
+    } catch (err) {
+      report("write", copy, err);
+      return null;
+    }
+  }
+
+  /**
+   * A file's text → its value, through the migrate hook. Throws
+   * { kind: "parse" | "newer", error, preserved } when it cannot be used.
+   */
+  async function decode(key, text) {
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch (err) {
+      throw { kind: "parse", error: errorText(err), preserved: await preserve(key, text) };
+    }
+    if (!migrator) return { value, changed: false };
+    try {
+      const r = migrator(key, value);
+      return r && typeof r === "object" && "value" in r ? r : { value, changed: false };
+    } catch (err) {
+      if (err?.code === "newer") throw { kind: "newer", error: "NewerVersion", preserved: null, v: err.v };
+      throw { kind: "parse", error: errorText(err), preserved: await preserve(key, text) };
+    }
+  }
+
+  /** Read one key from disk into memory (unless something newer is there); true when read. */
+  async function readInto(key) {
+    let text;
+    try {
+      text = await backendNow().read(key);
+    } catch (err) {
+      blocked.add(key);
+      throw { kind: "read", error: errorText(err), preserved: null };
+    }
+    if (text == null) {
+      disk.delete(key);
+      return false;
+    }
+    let r;
+    try {
+      r = await decode(key, text);
+    } catch (f) {
+      if (f.kind === "parse" && f.preserved && !keepDamaged.has(key)) {
+        // Moved aside: its copy is safe, so the damaged file goes and the
+        // key starts over (a game, the learn session …).
+        try {
+          await backendNow().remove(key);
+        } catch (_) {
+          blocked.add(key);
+        }
+        disk.delete(key);
+      } else {
+        // Nothing usable was read, so nothing may be written over it.
+        blocked.add(key);
+      }
+      throw f;
+    }
+    // A put or remove made meanwhile (it took the key off `disk`) is newer than the disk.
+    if (disk.has(key)) {
+      mem.set(key, r.value);
+      disk.delete(key);
+      // A file in an older format is written back in the current one.
+      if (r.changed) schedule(key, "put");
+    }
+    return true;
+  }
+
+  const lazyOf = (prefixes) => (key) => key.startsWith(BAD_PREFIX) || prefixes.some((p) => p && key.startsWith(p));
 
   const api = {
     /** "host" or "local". */
@@ -268,43 +439,118 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       handler = typeof fn === "function" ? fn : null;
     },
 
-    /** Read every key into memory. Unreadable files are reported and left out. */
-    open() {
+    /** The migrate hook (data/migrate.js), before open. */
+    setMigrator(fn) {
+      migrator = typeof fn === "function" ? fn : null;
+    },
+
+    /**
+     * Read every key into memory, except those under a `lazy` prefix (they
+     * are listed, and read by load). Unreadable files are reported, left
+     * out and write-blocked; a failed list makes the whole store read-only
+     * (nothing is known, so anything written could replace something). A
+     * file that is not JSON is copied to bad/ and then moved aside, unless
+     * it is one of `keepDamaged` (the app's core files): those stay where
+     * they are, blocked, for the player to decide (app/safety.jsx).
+     */
+    open({ lazy = [], keepDamaged: keep = [] } = {}) {
       if (opened) return opened;
+      keepDamaged = new Set(keep);
       opened = (async () => {
+        const failed = [];
+        openReport = { listFailed: false, failed };
         let keys = [];
         try {
           keys = await backendNow().list("");
         } catch (err) {
+          openReport.listFailed = true;
+          readOnly = true;
           report("list", "", err);
           return api;
         }
+        const isLazy = lazyOf(lazy);
+        const toRead = [];
         for (const key of [...new Set(keys)].sort()) {
-          try {
-            const text = await backendNow().read(key);
-            if (text == null) continue;
-            // A put made before open finished is newer than the disk.
-            if (!mem.has(key) && !pending.has(key)) mem.set(key, JSON.parse(text));
-          } catch (err) {
-            report("read", key, err);
-          }
+          // A put made before open finished is newer than the disk.
+          if (mem.has(key) || pending.has(key) || held.has(key)) continue;
+          disk.add(key);
+          if (!isLazy(key)) toRead.push(key);
         }
+        // Independent files: read side by side, not one after another.
+        await pool(toRead, PARALLEL, async (key) => {
+          try {
+            await readInto(key);
+          } catch (f) {
+            failed.push({ key, kind: f.kind, error: f.error, preserved: f.preserved || null });
+            report("read", key, f.error);
+          }
+        });
+        failed.sort((a, b) => (a.key < b.key ? -1 : 1));
         return api;
       })();
       return opened;
+    },
+
+    /** What open found: { listFailed, failed: [{ key, kind: "read" | "parse" | "newer", error, preserved }] }. */
+    get openReport() {
+      return openReport;
+    },
+
+    /**
+     * Read one listed key into memory; its value (undefined when it is not
+     * there). A failure is reported and rejects ({ kind, error, preserved }).
+     */
+    load(key) {
+      if (mem.has(key)) return Promise.resolve(mem.get(key));
+      if (!disk.has(key)) return Promise.resolve(undefined);
+      if (loading.has(key)) return loading.get(key);
+      const p = (async () => {
+        try {
+          await readInto(key);
+        } catch (f) {
+          report("read", key, f.error);
+          throw f;
+        } finally {
+          loading.delete(key);
+        }
+        return mem.get(key);
+      })();
+      loading.set(key, p);
+      return p;
+    },
+
+    /** Read every listed key under `prefix` (except `except` prefixes); failures are reported. */
+    async loadAll(prefix = "", { except = [] } = {}) {
+      const keys = [...disk].filter((k) => k.startsWith(prefix) && !k.startsWith(BAD_PREFIX) && !except.some((e) => k.startsWith(e)));
+      await pool(keys, PARALLEL, (k) => api.load(k).catch(() => {}));
+    },
+
+    /** In memory now (a key not on disk at all counts as loaded: there is nothing to read). */
+    isLoaded(key) {
+      return mem.has(key) || !disk.has(key);
+    },
+
+    /** Forget the values under `prefix` (still on disk, read again by load); writes in flight stay. */
+    evict(prefix) {
+      for (const key of [...mem.keys()]) {
+        if (!key.startsWith(prefix) || pending.has(key) || chain.has(key) || held.has(key)) continue;
+        mem.delete(key);
+        disk.add(key);
+      }
     },
 
     get(key) {
       return mem.get(key);
     },
 
+    /** On disk or in memory (read or not). */
     has(key) {
-      return mem.has(key);
+      return mem.has(key) || disk.has(key);
     },
 
-    /** Keys under `prefix` ("" for all, "games/" for the games), sorted. */
+    /** Keys under `prefix` ("" for all, "games/" for the games), read or not, sorted. */
     list(prefix = "") {
-      return [...mem.keys()].filter((k) => k.startsWith(prefix)).sort();
+      return [...new Set([...mem.keys(), ...disk])].filter((k) => k.startsWith(prefix)).sort();
     },
 
     /** Set `key` to `value` (JSON) now; written after the debounce. */
@@ -312,25 +558,32 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       checkKey(key);
       if (value === undefined) throw new Error("store.put needs a value; use remove()");
       mem.set(key, value);
+      disk.delete(key);
       schedule(key, "put");
     },
 
     remove(key) {
       checkKey(key);
       mem.delete(key);
+      disk.delete(key);
       schedule(key, "remove");
     },
 
-    /** Replace every key with `data` ({ key: value }); used by backup import. */
-    replaceAll(data) {
+    /**
+     * Replace every key with `data` ({ key: value }); used by backup import.
+     * Keys under a `keep` prefix (snapshots) and the copies of damaged
+     * files stay as they are.
+     */
+    replaceAll(data, { keep = [] } = {}) {
       for (const key of Object.keys(data)) checkKey(key);
-      for (const key of [...mem.keys()]) if (!(key in data)) api.remove(key);
+      const kept = (k) => k.startsWith(BAD_PREFIX) || keep.some((p) => k.startsWith(p));
+      for (const key of api.list("")) if (!(key in data) && !kept(key)) api.remove(key);
       for (const [key, value] of Object.entries(data)) api.put(key, value);
     },
 
-    /** Every key and value now in memory: { key: value }. */
-    snapshot() {
-      return Object.fromEntries([...mem.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    /** Every key and value now in memory: { key: value } (`except`: prefixes left out). */
+    snapshot({ except = [] } = {}) {
+      return Object.fromEntries([...mem.entries()].filter(([k]) => !except.some((e) => k.startsWith(e))).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
     },
 
     /** Keys with a write or removal not yet on disk. */
@@ -338,7 +591,53 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       return [...pending.keys()].sort();
     },
 
-    /** Write everything pending now; true when all of it reached the disk. */
+    /* --------------------------------------------- the safe state (v13) */
+
+    /** Hold every write in memory (true), or let them go again (false: what was held is written now). */
+    setReadOnly(on) {
+      readOnly = !!on;
+      if (readOnly) return;
+      for (const [key, op] of [...held]) {
+        if (blocked.has(key)) continue;
+        held.delete(key);
+        schedule(key, op);
+      }
+    },
+
+    get readOnly() {
+      return readOnly;
+    },
+
+    /** Keys that are never written (their file could not be read). */
+    blocked() {
+      return [...blocked].sort();
+    },
+
+    /** Keys with writes held back, sorted. */
+    held() {
+      return [...held.keys()].sort();
+    },
+
+    /** Write-block a key (true) or allow it again (false; a held write goes ahead unless read-only). */
+    block(key, on = true) {
+      if (on) {
+        blocked.add(key);
+        return;
+      }
+      blocked.delete(key);
+      if (!readOnly && held.has(key)) {
+        const op = held.get(key);
+        held.delete(key);
+        schedule(key, op);
+      }
+    },
+
+    /** Drop every held write (the safe state's reset, a backup restore). */
+    discardHeld() {
+      held.clear();
+    },
+
+    /** Write everything pending now; true when all of it reached the disk (held writes are not pending). */
     async flush() {
       const keys = new Set([...pending.keys(), ...chain.keys()]);
       const results = await Promise.all([...keys].map((k) => run(k)));

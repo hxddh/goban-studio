@@ -166,11 +166,18 @@ export function takeOver(recordId) {
   jobs.delete(recordId);
 }
 
-/** Cheap check without parsing the game: an own game whose stored review is missing or old. */
+/**
+ * Cheap check without parsing the game: an own finished game whose stored
+ * review is missing or old. Works on the index's record too (v13: the game
+ * file need not be read; data/games.js reviewV, reviewConfidence,
+ * analyzed). A game left unfinished is not analysed until it is finished.
+ */
 export function wantsAnalysis(rec) {
-  if (!isOwnGame(rec)) return false;
-  const r = rec.report;
-  return !r || r.v !== REVIEW_VERSION || !Array.isArray(rec.analysis) || (r.confidence !== "high" && state.engine.available);
+  if (!isOwnGame(rec) || Games.isUnfinished(rec)) return false;
+  const v = rec.report ? rec.report.v : rec.reviewV;
+  const confidence = rec.report ? rec.report.confidence : rec.reviewConfidence;
+  const analyzed = Array.isArray(rec.analysis) || (rec.analysis == null && rec.loaded === false && !!rec.analyzed);
+  return v == null || v !== REVIEW_VERSION || !analyzed || (confidence !== "high" && state.engine.available);
 }
 
 /** The opponent as a job title names it. */
@@ -191,9 +198,26 @@ function gameTitle(rec) {
 export function queueAnalysis(recordId, { owner = "games", signal = null, hidden = false, any = false } = {}) {
   const have = analysisJob(recordId);
   if (have) return have;
-  const found = recordOf(recordId);
-  if (!found || (!any && !isOwnGame(found.rec)) || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
-  const { rec, game } = found;
+  let run;
+  let rec;
+  if (Games.isLoaded(recordId)) {
+    const found = recordOf(recordId);
+    if (!found || (!any && !isOwnGame(found.rec)) || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
+    rec = found.rec;
+    run = (me) => analyse(recordId, found.game, humanColorOf(rec), me, rec.analysis);
+  } else {
+    // v13: the game's file is not read yet; the index says whether it needs
+    // an analysis, and the job reads the file first.
+    rec = Games.getGame(recordId);
+    if (!rec || (!any && !isOwnGame(rec)) || !wantsAnalysis(rec)) return null;
+    run = async (me) => {
+      await Games.loadGame(recordId);
+      if (me.signal.aborted) return null;
+      const found = recordOf(recordId);
+      if (!found || (storedAnalysis(found.rec, found.game) && !wantsAnalysis(found.rec))) return null;
+      return analyse(recordId, found.game, humanColorOf(found.rec), me, found.rec.analysis);
+    };
+  }
   const job = Engine.sched.startJob({
     kind: "analysis",
     owner,
@@ -201,7 +225,7 @@ export function queueAnalysis(recordId, { owner = "games", signal = null, hidden
     hidden,
     title: () => gameTitle(rec),
     meta: { recordId },
-    run: (me) => analyse(recordId, game, humanColorOf(rec), me, rec.analysis),
+    run,
   });
   jobs.set(recordId, job);
   job.promise.then(() => {

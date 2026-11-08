@@ -403,13 +403,15 @@ export default async function ({ test, assert, root }) {
     store.put("games/g-1.json", { id: "g-1" });
     store.put("games/g-2.json", { id: "g-2" });
     await store.flush();
-    const doc = JSON.parse(JSON.stringify(B.exportBackup(store, 1730000000000)));
+    const doc = JSON.parse(JSON.stringify(await B.exportBackup(store, 1730000000000)));
     assert.deepEqual(Object.keys(doc).sort(), ["app", "at", "data", "v"]);
     assert.equal(doc.app, "goban-studio");
-    assert.equal(doc.v, 9);
+    assert.equal(doc.v, 13);
     assert.equal(doc.at, 1730000000000);
     assert.deepEqual(Object.keys(doc.data), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual(B.checkBackup(doc), { ok: true, summary: { keys: 4, games: 2, at: 1730000000000 } });
+    const checked = B.checkBackup(doc);
+    assert.deepEqual(checked.summary, { keys: 4, games: 2, at: 1730000000000 });
+    assert.deepEqual(checked.data["games/g-1.json"], { id: "g-1", v: 13 }, "every file in the current format");
     // The export is a copy: later changes do not leak into it.
     store.get("settings.json").lang = "changed";
     assert.equal(doc.data["settings.json"].lang, "ko");
@@ -419,25 +421,27 @@ export default async function ({ test, assert, root }) {
     assert.equal(B.checkBackup({ app: "other", v: 9, data: {} }).error, "notBackup");
     assert.equal(B.checkBackup({ app: "goban-studio", format: 1, data: { settings: {} } }).error, "notBackup", "a v8 backup");
     assert.equal(B.checkBackup({ ...doc, v: 8 }).error, "olderVersion");
-    assert.equal(B.checkBackup({ ...doc, v: 10 }).error, "newerVersion");
+    assert.equal(B.checkBackup({ ...doc, v: 14 }).error, "newerVersion");
     assert.equal(B.checkBackup({ ...doc, data: [] }).error, "damaged");
     assert.deepEqual(B.checkBackup({ ...doc, data: { "../x.json": {} } }), { ok: false, error: "damaged", key: "../x.json" });
     assert.equal(B.checkBackup({ ...doc, data: { "profile.json": "x" } }).error, "damaged");
-    assert.equal(B.parseBackup("\ufeff" + JSON.stringify(doc)).v, 9);
+    assert.equal(B.parseBackup("\ufeff" + JSON.stringify(doc)).v, 13);
     assert.equal(B.parseBackup("{nope"), null);
-    // Import replaces everything: keys not in the backup go.
+    // Import replaces everything: keys not in the backup go (a snapshot of them is kept).
     store.put("current.json", { sgf: "(;)" });
     store.put("games/g-3.json", { id: "g-3" });
     await store.flush();
     const bad = await B.importBackup(store, { ...doc, v: 8 });
     assert.equal(bad.ok, false);
     assert.ok(host.files.has("current.json"), "a refused import changes nothing");
-    const r = await B.importBackup(store, doc);
+    const r = await B.importBackup(store, doc, { now: 1730000000500 });
     assert.equal(r.ok, true);
     assert.equal(r.written, true);
-    assert.deepEqual(store.list(), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual([...host.files.keys()].sort(), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
-    assert.deepEqual(store.get("settings.json"), { lang: "ko" });
+    assert.equal(r.snapshot, "backups/pre-restore-1730000000500/");
+    const live = (keys) => keys.filter((k) => !k.startsWith("backups/"));
+    assert.deepEqual(live(store.list()), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
+    assert.deepEqual(live([...host.files.keys()].sort()), ["games/g-1.json", "games/g-2.json", "profile.json", "settings.json"]);
+    assert.deepEqual(store.get("settings.json"), { lang: "ko", v: 13 });
     // Importing does not alias the document.
     doc.data["settings.json"].lang = "x";
     assert.equal(store.get("settings.json").lang, "ko");

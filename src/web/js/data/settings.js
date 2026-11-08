@@ -1,13 +1,17 @@
 /**
- * v9 settings: `settings.json` in the store (data/store.js).
+ * Settings: `settings.json` in the store (data/store.js).
  *
  *   loadSettings(store)       the stored settings over the defaults, checked
  *   saveSettings(store, s)    write them (debounced by the store)
  *
  * Pure apart from the store it is given; a missing or broken value falls
- * back to the default of that one setting, never to an error.
+ * back to the default of that one setting, never to an error, and a number
+ * outside its range is brought into it (v13). The file carries the store's
+ * format version `v` (data/migrate.js); the settings themselves do not.
  */
-export const SETTINGS_KEY = "settings.json";
+import { SETTINGS_KEY, STORE_V } from "./migrate.js";
+
+export { SETTINGS_KEY };
 
 export const DEFAULT_SETTINGS = {
   lang: null,
@@ -34,12 +38,25 @@ export const DEFAULT_SETTINGS = {
   firstCountSeen: false, // the one-time note on the first count was shown
 };
 
+/**
+ * Ranks (the app's encoding: kyu 30…1, 0 = 1 dan, -1 = 2 dan …): the
+ * opponent is a rank of the ladder (opponents.js RANKS, 30 … 6 dan), the
+ * player's own rank 30 kyu … 9 dan.
+ */
+export const OPPONENT_RANKS = [-6, 30];
+export const PLAYER_RANKS = [-8, 30];
+/** Capture Go games won: a count, kept to a sane size. */
+const MAX_COUNT = 1e6;
+
+const clampInt = (v, [lo, hi]) => Math.max(lo, Math.min(hi, Math.round(v)));
+
 const ONE_OF = {
   appearance: ["auto", "light", "dark"],
   boardSize: [9, 13, 19],
   defaultRules: ["japanese", "chinese", "korean"],
   timeControl: ["none", "move30", "byoyomi"],
   experience: [null, "new", "rules", "player"],
+  lang: [null, "zh", "en", "ko", "ja"], // i18n.js LANG_IDS (null: detect)
 };
 
 /** Any stored value → complete settings. */
@@ -52,8 +69,13 @@ export function normalizeSettings(raw) {
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;
   if (!Number.isFinite(out.opponentRank)) out.opponentRank = DEFAULT_SETTINGS.opponentRank;
+  out.opponentRank = clampInt(out.opponentRank, OPPONENT_RANKS);
   if (out.playerRank != null && !Number.isFinite(out.playerRank)) out.playerRank = null;
+  if (out.playerRank != null) out.playerRank = clampInt(out.playerRank, PLAYER_RANKS);
   if (!Number.isFinite(out.captureWins) || out.captureWins < 0) out.captureWins = 0;
+  out.captureWins = Math.min(MAX_COUNT, Math.floor(out.captureWins));
+  // The file's version is the store's business, not a setting.
+  delete out.v;
   return out;
 }
 
@@ -62,5 +84,5 @@ export function loadSettings(store) {
 }
 
 export function saveSettings(store, settings) {
-  store.put(SETTINGS_KEY, settings);
+  store.put(SETTINGS_KEY, { ...settings, v: STORE_V });
 }

@@ -402,6 +402,7 @@ function SettingsSheet({ pane: open }) {
                     {t("backup.import")}
                   </Button>
                 </div>
+                <UndoRestoreRow />
                 <div class="actions">
                   <Button kind="danger" onClick={C.clearData}>
                     {t("settings.clearData")}
@@ -677,21 +678,43 @@ function ShortcutsSheet() {
   );
 }
 
+/** v13: the last backup restore can be undone from its snapshot (data/backup.js). */
+function UndoRestoreRow() {
+  const snap = C.restoreSnapshot();
+  if (!snap) return null;
+  let when = "";
+  try {
+    const lang = state.settings.lang;
+    when = new Date(snap.at).toLocaleString(lang === "zh" ? "zh-CN" : lang, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch (_) {}
+  return (
+    <div class="actions">
+      <Button kind="ghost" icon="undo" data-undo-restore onClick={C.undoRestore}>
+        {t("v13.undoRestore.row", [when])}
+      </Button>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- confirm */
 
+/**
+ * A question before an action. A dangerous one (delete, replace) starts
+ * with Cancel focused (v13), so Enter or Space alone never confirms it.
+ */
 function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   return (
     <Modal
       title={title}
       footer={
         <>
-          <Button kind="ghost" onClick={C.closeSheet}>
+          <Button kind="ghost" data-autofocus={danger ? true : undefined} data-confirm-cancel onClick={C.closeSheet}>
             {t("common.cancel")}
           </Button>
           <Button
             kind={danger ? "danger-solid" : "primary"}
             class="primary"
-            data-autofocus
+            data-autofocus={danger ? undefined : true}
             onClick={() => {
               update({ sheet: null });
               onConfirm?.();
