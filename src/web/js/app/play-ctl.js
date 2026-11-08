@@ -79,6 +79,8 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
+      // v13: its Library record (game files are read when needed) is read now, for the review and the result.
+      if (saved.recordId && !Games.isLoaded(saved.recordId)) Games.loadGame(saved.recordId);
       // v8: a game saved during the count (both passed) counts again;
       // otherwise it would have neither a count nor its play controls.
       if (game.phase === "scoring" && !game.current.result) startScoring();

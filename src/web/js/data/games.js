@@ -228,12 +228,13 @@ function change(id, fn) {
     return toRecord(out);
   }
   const shell = shellOf(id);
-  const preview = shell ? fn(shell) : null;
+  // (No entry either: saveGame starts the file afresh in the index; a patch has nothing to show.)
+  const preview = fn(shell);
   if (preview) {
     const e = entryOf({ ...preview, sgf: preview.sgf || "" });
     if (e) {
       // What the index knows until the file is read (the review and analysis stay as they were).
-      index().set(id, { ...e, review: shell.review ?? null, analyzed: !!index().get(id)?.analyzed });
+      index().set(id, { ...e, review: shell?.review ?? null, analyzed: !!index().get(id)?.analyzed });
       saveIndex();
     }
   }
