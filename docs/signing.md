@@ -197,3 +197,55 @@ Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago.exe .\GobanStud
 ```
 
 Or right-click the exe → Properties → Digital Signatures.
+
+## CI: how the workflows handle secrets and update signing (v13)
+
+This section is about the workflows; how to create the update signing key
+itself is described in its own section.
+
+**Where secrets reach.** No secret is set at workflow or job level. In
+`build-macos.yml` the five macOS secrets are given only to the steps that
+read them: *signing mode* (which checks that all five exist), *import
+Developer ID certificate*, and the two notarization steps (the Apple ID
+trio). Signing with the imported identity needs no secret. In
+`build-windows.yml` the two Windows secrets reach only *signing mode* and
+the Authenticode step. The build jobs run with a read-only `GITHUB_TOKEN`;
+a manual run with `release_tag` uploads from a separate `upload` job that
+has write access and no secrets. `release.yml` grants `contents: write` to
+the publish job (and to the calls of the two build workflows, only so their
+`upload` job may exist; the build jobs stay read-only).
+`scripts/tests/shell-ci.mjs` fails if any of this changes.
+
+**Update signing.**
+
+| Name | Kind | What it is |
+| --- | --- | --- |
+| `UPDATE_SIGNING_KEY` | repository **secret** | The private key `scripts/sign-sums.mjs` signs `SHA256SUMS` with |
+| `UPDATE_PUBKEY` | repository **variable** (Settings → Secrets and variables → Actions → Variables) | The matching public key; not secret |
+
+- Both platform builds pass `-Dupdate-pubkey="$UPDATE_PUBKEY"` to
+  `native test` and `native build` (an empty value when the variable is not
+  set, which builds an app that does not require a signature).
+- The publish job writes `SHA256SUMS`, then, if `UPDATE_SIGNING_KEY` is
+  set, runs `node scripts/sign-sums.mjs` (the key is in that step's
+  environment only), checks that `SHA256SUMS.sig` was written, and uploads
+  it with the packages.
+- If `UPDATE_PUBKEY` is set but `UPDATE_SIGNING_KEY` is not, the release
+  fails — in the preflight, before any build, and again before publishing —
+  because those apps would refuse every update from that release. The
+  preflight sees only whether the secret exists
+  (`secrets.UPDATE_SIGNING_KEY != ''`), never its value.
+- Neither set: the release ships an unsigned `SHA256SUMS`, as before, with
+  a notice in the run.
+
+Roll-out order: add the secret first (releases start carrying
+`SHA256SUMS.sig`), then the variable (later builds start requiring it).
+Rotating the key means a release whose apps carry the new public key,
+signed with the old private key, so the installed apps accept it.
+
+**Release guards.** `release.yml` runs only when dispatched from `main`
+(`rehearse=true` runs from any branch and publishes nothing), stops unless
+the tag is `v` + `package.json`'s version (a warning in a rehearsal), and
+creates the tag with `gh release create --target "$GITHUB_SHA"` — the commit
+every package was built from. A tag that already exists at another commit
+stops the release.
