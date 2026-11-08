@@ -59,12 +59,21 @@ on:
         value: ${{ jobs.build.outputs.signing }}
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  NPM_CONFIG_ENGINE_STRICT: "true"
+  # KataGo v1.18.1, checked out by commit (a tag can be moved).
+  KATAGO_COMMIT: 92ee95c0a4b25fec214da00951ab69e97e207729
 
 jobs:
   build:
     runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 100
+    # Builds, tests and signs with a read-only token: nothing here writes
+    # to the repository (the upload job below does, when asked).
+    permissions:
+      contents: read
     outputs:
       signing: ${{ steps.status.outputs.signing }}
     env:
@@ -72,11 +81,8 @@ jobs:
       # keep their v4 form for arm64 and gain "-x64" for Intel.
       ARCH: ${{ inputs.arch || 'arm64' }}
       SUFFIX: ${{ inputs.arch == 'x64' && '-x64' || '' }}
-      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
-      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      # The signing secrets are not set here: each reaches only the steps
+      # that read it (signing mode, import, notarization).
     steps:
       - name: runner CPU matches the requested build
         run: |
@@ -86,16 +92,16 @@ jobs:
             arm64:arm64 | x64:x86_64) echo "building $ARCH on $cpu" ;;
             *) echo "arch $ARCH needs a matching runner (got $cpu): macos-15 for arm64, macos-15-intel for x64"; exit 1 ;;
           esac
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26
-      - uses: mlugg/setup-zig@v2
+          node-version-file: .nvmrc
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.16.0
       - name: install build dependencies
         run: |
-          npm ci
+          npm ci --ignore-scripts
           brew install cmake ninja eigen
       - name: content gate
         run: npm run release-check
@@ -106,7 +112,12 @@ jobs:
         # Intel runner); USE_AVX2=OFF keeps the Intel build to SSE so it runs
         # on every Intel Mac that runs macOS 11+.
         run: |
-          git clone --depth 1 --branch v1.18.1 https://github.com/lightvector/KataGo.git "$RUNNER_TEMP/KataGo"
+          set -euo pipefail
+          # Fetch exactly the pinned commit and check that is what we got.
+          git init -q "$RUNNER_TEMP/KataGo"
+          git -C "$RUNNER_TEMP/KataGo" fetch -q --depth 1 https://github.com/lightvector/KataGo.git "$KATAGO_COMMIT"
+          git -C "$RUNNER_TEMP/KataGo" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/KataGo" rev-parse HEAD)" = "$KATAGO_COMMIT"
           # KataGo 1.18.1 calls quick_exit, which the macOS 14 SDK's libc++
           # does not declare. _Exit preserves immediate-exit fatal-error
           # semantics without requiring a newer deployment target.
@@ -134,9 +145,12 @@ jobs:
           test -n "$move"
           echo "KataGo answered: $move"
       - name: install Native SDK CLI
+        # One pinned install, used by every native step below. Its install
+        # script fetches the `native` binary, so scripts stay on here.
         env:
           SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
         run: |
+          set -euo pipefail
           npm install -g "@native-sdk/cli@${SDK_VERSION}"
           echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
           native --version
@@ -152,16 +166,30 @@ jobs:
           npm run sync
           node scripts/release-check.mjs
       - name: native validate and tests
+        env:
+          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
         run: |
-          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" validate
-          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" test --yes \
-            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos
+          native validate
+          native test --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos -Dupdate-pubkey="$UPDATE_PUBKEY"
       - name: native release build
+        # ReleaseSafe: the shell parses page JSON and KataGo output, and a
+        # bounds or cast bug must stop the app, not corrupt memory.
+        # UPDATE_PUBKEY (empty when unset) is the key SHA256SUMS.sig is
+        # checked against (docs/signing.md).
+        env:
+          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
         run: |
-          npx --yes @native-sdk/cli@"${{ inputs.sdk_version || '0.11.0' }}" build --yes \
-            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos -Doptimize=ReleaseFast
+          native build --yes \
+            -Dnative-sdk-path="$SDK_PATH" -Dplatform=macos -Doptimize=ReleaseSafe -Dupdate-pubkey="$UPDATE_PUBKEY"
       - name: signing mode
         id: mode
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           # The fallback notice goes to stderr; echo it on stdout so the
           # runner turns it into an annotation.
@@ -171,6 +199,12 @@ jobs:
           echo "macOS signing: $mode"
       - name: import Developer ID certificate
         if: ${{ steps.mode.outputs.mode == 'developer-id' }}
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: bash scripts/macos-sign.sh import
       - name: package app, install engine, sign
         run: |
@@ -245,7 +279,7 @@ jobs:
           node scripts/tour-app.mjs "$exe" dist/screenshots
       - name: upload native screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-screenshots-macos${{ inputs.arch == 'x64' && '-x64' || '' }}
           path: dist/screenshots
@@ -253,6 +287,10 @@ jobs:
       - name: notarize and staple the app
         if: ${{ steps.mode.outputs.mode == 'developer-id' }}
         timeout-minutes: 40
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app "$RUNNER_TEMP/GobanStudio-notarize.zip"
           bash scripts/macos-sign.sh notarize "$RUNNER_TEMP/GobanStudio-notarize.zip"
@@ -284,6 +322,10 @@ jobs:
       - name: notarize and staple the dmg
         if: ${{ steps.mode.outputs.mode == 'developer-id' }}
         timeout-minutes: 40
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           bash scripts/macos-sign.sh notarize "dist/GobanStudio-macOS-${ARCH}.dmg"
           spctl -a -vv -t open --context context:primary-signature "dist/GobanStudio-macOS-${ARCH}.dmg"
@@ -301,19 +343,34 @@ jobs:
       - name: remove signing keychain
         if: always()
         run: bash scripts/macos-sign.sh cleanup
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: GobanStudio-macOS-${{ inputs.arch || 'arm64' }}
           path: |
             dist/GobanStudio-macOS-${{ inputs.arch || 'arm64' }}.zip
             dist/GobanStudio-macOS-${{ inputs.arch || 'arm64' }}.dmg
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signing-status-macos${{ inputs.arch == 'x64' && '-x64' || '' }}
           path: dist/signing-macos${{ inputs.arch == 'x64' && '-x64' || '' }}.json
+
+  # Only a manual run with release_tag writes to the repository, from a job
+  # that runs none of the build's tools and holds no signing secret.
+  upload:
+    needs: build
+    if: ${{ inputs.release_tag != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      ARCH: ${{ inputs.arch || 'arm64' }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: GobanStudio-macOS-${{ inputs.arch || 'arm64' }}
+          path: dist
       - name: upload to release
-        if: ${{ inputs.release_tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$TAG" "dist/GobanStudio-macOS-${ARCH}.zip" "dist/GobanStudio-macOS-${ARCH}.dmg" --clobber
+        run: gh release upload "$TAG" "dist/GobanStudio-macOS-${ARCH}.zip" "dist/GobanStudio-macOS-${ARCH}.dmg" --clobber --repo "$GITHUB_REPOSITORY"
