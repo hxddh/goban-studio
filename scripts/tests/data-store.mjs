@@ -130,7 +130,12 @@ export default async function ({ test, assert, root }) {
     assert.ok(S.validKey("a".repeat(195) + ".json"));
     assert.ok(!S.validKey("a".repeat(196) + ".json"));
     for (const p of ["", "games", "games/"]) assert.ok(S.validPrefix(p), p);
-    for (const p of ["/", "../", "games//", "/games/"]) assert.ok(!S.validPrefix(p), p);
+    for (const p of ["/", "../", "games//", "/games/", "con/", "nul"]) assert.ok(!S.validPrefix(p), p);
+    // v13: Windows device names, as a file or a folder, like store.zig.
+    for (const k of ["con.json", "nul.json", "aux.json", "prn.json", "com1.json", "lpt9.json", "games/con.json", "con/x.json", "games/lpt1.json"]) assert.ok(!S.validKey(k), k);
+    for (const k of ["console.json", "com.json", "com0.json", "com10.json", "lpt.json", "nul-1.json", "auxiliary.json"]) assert.ok(S.validKey(k), k);
+    for (const n of ["con", "CON", "Con", "NUL.txt", "COM9", "LPT9.json", "con.tar.gz", "con ", "aux .json"]) assert.ok(S.isDeviceName(n), n);
+    for (const n of ["", "co", "conn", "com", "com0", "com10", "lpt0", "x.con", "console.json", ".con"]) assert.ok(!S.isDeviceName(n), n);
     // The JS limits are the host's.
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /pub const max_file_bytes: u64 = 8 \* 1024 \* 1024;/);

@@ -1298,15 +1298,20 @@ missing. The JavaScript side (`katago.js humanMoveProbabilities`) asks only
 a host whose `studio.katagoStatus` reports `humanPolicy: true`, through
 `studio.katagoHumanPolicy` (position fields as `katagoAnalyzeAsync`, the
 whole main line, the player's colour and the profiles), and expects
-`{ ok, moves: [{ index, p: { profile: probability } }] }`. On the native
-side this is one new request kind on the human slot: bring KataGo to each
-position before a move of that colour (the existing incremental sync), and
-for each profile send `kata-set-param humanSLProfile <profile>` (already
-validated by `validProfile`) and `kata-raw-human-nn 0`, reading the
-probability of the played point from the policy grid (the `play`
-vocabulary and the profile check already exist; the command allowlist and
-a reply parser are new). Until a host offers it, nothing is shown and the
-estimate is unchanged.
+`{ ok, moves: [{ index, p: { profile: probability } }] }`. The native side
+(`src/engine.zig` `processPolicy`, `src/main.zig` `katagoHumanPolicy`) is
+one request kind on the human slot: it brings KataGo to each position
+before a move of that colour (the incremental sync) and, for each profile
+(checked by `validProfile`), sends `kata-set-param humanSLProfile
+<profile>` and `kata-raw-human-nn <colour> 0` (KataGo 1.18.1), reading the
+probability of the played point (or `policyPass`) from the policy grid; an
+illegal point (`NAN`) counts as 0. `index` is the move's 0-based position
+in the main line. The work is bounded (at most 8 profiles and 1600
+evaluations, 200 positions; the reply then says `truncated`), each
+evaluation extends the watchdog's deadline by 20 s, and an abort cancels
+the request by its id. `humanPolicy` is reported only while the human
+model is installed; until then nothing is shown and the estimate is
+unchanged.
 
 ## Limitations
 

@@ -60,10 +60,21 @@ const MAX_KEY = 200;
 const MAX_DEPTH = 4;
 
 /** A storable key (the same rule as store.zig validKey). */
+/**
+ * Windows reserves these names in every folder, with or without an
+ * extension: CON, PRN, AUX, NUL, COM1-9, LPT1-9, in any case (store.zig
+ * isDeviceName refuses the same keys, so a backup made on macOS restores
+ * on Windows).
+ */
+export function isDeviceName(name) {
+  const stem = String(name).split(".")[0].replace(/ +$/, "");
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(stem);
+}
+
 export function validKey(key) {
   if (typeof key !== "string" || key.length <= 5 || key.length > MAX_KEY || !key.endsWith(".json")) return false;
   const segs = key.slice(0, -5).split("/");
-  return segs.length <= MAX_DEPTH && segs.every((s) => SEGMENT.test(s));
+  return segs.length <= MAX_DEPTH && segs.every((s) => SEGMENT.test(s) && !isDeviceName(s));
 }
 
 /** A list prefix: "" or a directory ("games" or "games/"). */
@@ -71,7 +82,7 @@ export function validPrefix(prefix) {
   if (prefix === "") return true;
   if (typeof prefix !== "string" || prefix.length > MAX_KEY) return false;
   const segs = (prefix.endsWith("/") ? prefix.slice(0, -1) : prefix).split("/");
-  return segs.length <= MAX_DEPTH && segs.every((s) => SEGMENT.test(s));
+  return segs.length <= MAX_DEPTH && segs.every((s) => SEGMENT.test(s) && !isDeviceName(s));
 }
 
 /* --------------------------------------------------------------- base64 */
