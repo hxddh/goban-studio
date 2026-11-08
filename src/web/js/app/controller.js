@@ -21,7 +21,7 @@ import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, 
 import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { boardShown, maybeComputerMove, newGame, ponder, restoreCurrent, resumeRecord, reviewCurrentGame, showFinished, suggestedOpponent } from "./play-ctl.js";
+import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, ponder, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
@@ -156,10 +156,10 @@ export async function boot() {
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
-  // Play opens on the board when a game is in progress, else on its home.
-  const g = state.game?.game;
+  // Play opens on the board when a game is in progress (v13: one with a
+  // move of the player's, play-ctl unfinishedGame), else on its home.
   state.space = "today";
-  state.play = { ...state.play, view: g && !g.current.result ? "game" : "home" };
+  state.play = { ...state.play, view: unfinishedGame() ? "game" : "home" };
   if (!settings.onboarded) state.sheet = { kind: "onboarding", step: 0 };
   setRestorer(restore);
   state.ready = true;
@@ -230,7 +230,7 @@ export const SPACES = ["today", "play", "learn", "library"];
  * what to play next. Any review open in Play closes.
  */
 export function playHome() {
-  const live = !!state.game && !state.game.game.current.result;
+  const live = playShowsBoard() && !state.game.game.current.result;
   const view = live ? "game" : "home";
   if (state.space === "play" && state.play.view === view && !state.review) return;
   remember();
@@ -283,14 +283,16 @@ export function goSpace(space) {
       return;
     }
     if (space === "today") return;
-    return state.game && !playReviewingNow() ? playBoard() : playHome();
+    return playShowsBoard() && !playReviewingNow() ? playBoard() : playHome();
   }
   remember();
   // v12: a record or classic is read in the Library; leaving the Library
   // closes it (its edits are kept), so no other space carries it along.
   if (state.review?.meta.space === "library") dropReview();
-  // Play is the board while a game is not over (v12, as before v9).
-  const board = space === "play" && state.game && !state.game.game.current.result && !playReviewingNow();
+  // Play is the board while a game is not over (v12, as before v9); v13:
+  // a game restored at launch with no move of the player's leaves Play on
+  // its home (play-ctl playShowsBoard).
+  const board = space === "play" && playShowsBoard() && !state.game.game.current.result && !playReviewingNow();
   update((s) => {
     s.space = space;
     s.menu = null;
@@ -410,7 +412,6 @@ export async function exportRecord(id) {
   if (!rec) return;
   try {
     const { game } = loadSGF(rec.sgf);
-    const { exportSGF } = await import("./play-ctl.js");
     exportSGF(game, rec.name || "goban-studio");
   } catch (_) {
     toast(t("library.importError"), "error");
@@ -471,7 +472,6 @@ export async function pickImport() {
 
 /** Every stored file as one JSON document (data/backup.js). */
 export async function exportBackup() {
-  const { saveText } = await import("./play-ctl.js");
   await store.flush();
   const doc = await backupDoc(store);
   const day = new Date().toISOString().slice(0, 10);

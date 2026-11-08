@@ -22,9 +22,8 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
-import { back, canGoBack, changeProfile, remember, isRestoring } from "./ctl-core.js";
+import { back, canGoBack, changeProfile, remember, isRestoring, persistLive, resumeLive } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
-import { freshGameState, parkCurrent, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
 import { buildReview, drillOf, judgeTry, keyMovesOf as keyMistakes, reviewFits, tryMoments } from "../play/review-model.js";
 import { analyzeLine, isOwnGame, knownPoints, notePoints, queueAnalysis, storeAnalysis, storedAnalysis, takeOver, visitsFor } from "../play/analysis.js";
 
@@ -122,7 +121,12 @@ function stopReviewWork(r) {
  * ended) turns the board into its review without a history step.
  */
 export function openReview(game, meta = {}) {
-  stopReviewWork(state.review);
+  // v13: the review open before is closed for good first, as leaving it
+  // would: its tried moves dropped (settleLive), its pass handed over, its
+  // edits saved, and the game in play back on its last move. Before, only
+  // its searches stopped, and a live game left one move back took the next
+  // move as a branch.
+  if (state.review) dropReview(state.review, { resume: false });
   stopLive();
   if (!isRestoring() && !meta.inPlace) remember();
   const line = game.mainLine();
@@ -264,8 +268,12 @@ export function closeReview() {
   });
 }
 
-/** Leave a review without touching history (restore, a new game). */
-export function dropReview(r = state.review) {
+/**
+ * Leave a review without touching history (restore, a new game, another
+ * review). `resume: false` (another review opens) leaves the game in play
+ * waiting: the computer does not start its move under the new review.
+ */
+export function dropReview(r = state.review, { resume = true } = {}) {
   if (!r) return;
   settleLive(r);
   saveEdits(r);
@@ -275,8 +283,7 @@ export function dropReview(r = state.review) {
   if (r.source === "current" && state.game && state.game.game === r.game) {
     const line = state.game.game.mainLine();
     state.game.game.goto(line[line.length - 1].id);
-    maybeComputerMove();
-    ponder();
+    if (resume) resumeLive();
   }
   if (state.review === r) state.review = null;
 }
@@ -519,7 +526,7 @@ export function saveEdits(r = state.review) {
     const all = at?.end.children;
     if (at) at.end.children = all.filter((c) => at.kids.includes(c));
     try {
-      persistCurrent();
+      persistLive();
       if (state.game.recordId && Games.getGame(state.game.recordId)) saveRecord(state.game.recordId, r.game);
     } finally {
       if (at) at.end.children = all;
@@ -818,8 +825,8 @@ export function triable(r = state.review) {
 /** Searches per judgement, by board size. */
 const judgeVisits = (size) => (size === 19 ? 160 : size === 13 ? 200 : 240);
 
-/** The position of a node as a game of its own (root stones, then the moves to it). */
-function gameAt(src, node) {
+/** The position of a node as a game of its own (root stones, then the moves to it; play-ctl playFromHere too). */
+export function gameAt(src, node) {
   // v13: the root stones are copied, not placed again from the handicap, and
   // a record's mid-game setup (node.setup) is replayed with its move.
   const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap, placeHandicap: false });
@@ -965,31 +972,6 @@ export function closeTrial() {
   r.focus = tr.index;
   update();
   startLive();
-}
-
-/* ---------------------------------------------------- play from here */
-
-export function playFromHere() {
-  const r = state.review;
-  if (!r) return;
-  // v5: the record's rules and handicap carry over (the handicap is what
-  // the Chinese count compensates); the root stones are set up.
-  const game = gameAt(r.game, r.game.current);
-  // v13: the game in progress goes to the Library as unfinished first.
-  parkCurrent();
-  dropReview(r);
-  if (state.game) state.game.gen++;
-  remember();
-  const humanColor = game.turn;
-  update((s) => {
-    s.game = freshGameState(game, { opponent: "ai", humanColor });
-    s.review = null;
-    s.space = "play";
-    s.play = { ...s.play, view: "game", explorer: null };
-  });
-  persistCurrent();
-  maybeComputerMove();
-  ponder();
 }
 
 /* ---------------------------------------------------------- export */

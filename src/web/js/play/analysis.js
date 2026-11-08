@@ -24,7 +24,7 @@ import { store } from "../data/store.js";
 import { loadSGF } from "../sgf.js";
 import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
-import { learnFromGame } from "../app/play-ctl.js";
+import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 import { humanMoveProbabilities } from "../katago.js";
 import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";

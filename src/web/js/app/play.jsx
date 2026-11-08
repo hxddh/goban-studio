@@ -140,6 +140,7 @@ function statusText(g) {
   if (g.scoring) return t("play.scoring");
   if (game.current.result) return C.resultText(game.current.result);
   if (g.pending) return t("teach.paused");
+  if (g.engineFailed && C.isComputerTurn()) return t("v13ui.engineFailed");
   if (g.thinking && C.isComputerTurn()) return t("play.thinking");
   if (g.thinking) return t("play.hintThinking");
   const color = colorName(game.turn);
@@ -328,6 +329,13 @@ function PlayPanel() {
           <p class="status-line" aria-live="off">
             {statusText(g)}
           </p>
+        )}
+        {g.engineFailed && playing && C.isComputerTurn() && (
+          <div class="actions">
+            <Button kind="primary" icon="resume" onClick={C.retryComputerMove}>
+              {t("v13ui.retryMove")}
+            </Button>
+          </div>
         )}
         {g.pending && <TeachCard />}
         {g.scoring && <ScoringCard />}

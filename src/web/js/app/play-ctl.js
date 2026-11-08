@@ -7,18 +7,18 @@ import { BLACK, WHITE, Game, coordLabel, defaultKomi, normalizeRules } from "../
 import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
-import { addMistake, estimate, focus, implOpponent, recordGame, suggestedGame, themeLosses } from "../model/player.js";
+import { estimate, focus, implOpponent, recordGame, suggestedGame } from "../model/player.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
-import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
+import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setGameHooks, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { describeMistakes, dropReview, openReview, saveEdits } from "./review-ctl.js";
-import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";
+import { dropReview, gameAt, openReview, saveEdits } from "./review-ctl.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
+import { learnFromGame } from "./learn-game.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -52,6 +52,7 @@ export function freshGameState(game, meta = {}) {
     // `rank` the measured rank of that implementation, as shown.
     ...opponentOf(meta),
     thinking: false,
+    engineFailed: false, // v13: the computer could not move; the panel offers Retry
     pondering: false,
     gen: 0,
     hint: null,
@@ -89,11 +90,11 @@ export function restoreCurrent() {
       /* fall through */
     }
   }
-  // A saved game keeps its own rules (no RU in the SGF = Japanese); only a
-  // brand-new board takes the default ruleset and its komi.
-  // v12: Play shows this board as the game to play, so it is one: against
-  // the chosen rank, rated like a game from New game.
-  state.game = freshGameState(new Game({ size: state.settings.boardSize || 19, rules: state.settings.defaultRules }), { opponent: "ai", rank: state.settings.opponentRank, rated: true });
+  // v13: nothing saved, nothing on the board: Play shows its home (the
+  // suggested game, with its handicap, and New game) until a game starts.
+  // (v12 put a blank rated game here, against opponentRank without the
+  // suggested handicap, and showed that instead.)
+  state.game = null;
 }
 
 export function persistCurrent() {
@@ -153,7 +154,13 @@ export function humanMoves(g = state.game) {
   return n;
 }
 
-/** A game in progress that replacing it would lose: no result, and at least one move of the player's. */
+/**
+ * A game in progress that replacing it would lose: no result, and at least
+ * one move of the player's. v13: also what "a game in progress" means on
+ * Today and Play's home (play/home.jsx gameInProgress), and whether Play
+ * opens on the board at launch: a board where only the computer moved is
+ * not one yet.
+ */
 export function unfinishedGame(g = state.game) {
   return !!g && !g.game.mainLine().at(-1)?.result && !g.game.current.result && humanMoves(g) > 0;
 }
@@ -236,7 +243,17 @@ export function playReviewing() {
  * is not over. The clock, the report and the board's keys follow this.
  */
 export function boardShown() {
-  return state.space === "play" && !playReviewing() && !!state.game && (state.play.view === "game" || !state.game.game.current.result);
+  return state.space === "play" && !playReviewing() && playShowsBoard();
+}
+
+/**
+ * v13: Play shows the board (else its home): the game view, or a game in
+ * progress (unfinishedGame). A game just started is in the game view; one
+ * restored at launch with no move of the player's yet, or none at all,
+ * leaves Play on its home with the suggested game.
+ */
+export function playShowsBoard() {
+  return !!state.game && (state.play.view === "game" || unfinishedGame());
 }
 
 export function isComputerTurn() {
@@ -448,20 +465,36 @@ function checkProposal(a) {
 /** How long the computer seems to think (ms): feel.js. */
 export { thinkTime };
 
+/**
+ * v13: where the computer's move comes from. `decide` is the engine's
+ * (KataGo, or the offline engine inside it); `offline` the offline engine
+ * alone (ai.js), tried when `decide` gave no move. The tests replace them
+ * to make each fail.
+ */
+export const moveSources = {
+  decide: (game, opponent, opts) => Engine.decide(game, opponent, opts),
+  offline: (game, opponent) => Engine.offlineMove(game, opponent),
+};
+
 export async function maybeComputerMove({ afterHuman = false } = {}) {
   const g = state.game;
   if (!g || g.thinking || !isComputerTurn() || playReviewing() || g.pending) return;
   const gen = ++g.gen;
   g.thinking = true;
+  g.engineFailed = false;
   update();
   const started = performance.now();
+  // v13: the position the move is for, fixed now (a queued search would read the board when it runs).
+  const node = g.game.current;
   let result = { move: null, analysis: null };
   try {
-    result = await Engine.decide(g.game, { rank: g.rank, impl: g.impl }, { signal: gameSignal(g) });
+    result = (await moveSources.decide(g.game, { rank: g.rank, impl: g.impl }, { signal: gameSignal(g), node })) || result;
   } catch (_) {
     result = { move: null, analysis: null };
   }
   if (state.game !== g || gen !== g.gen) return;
+  if (!result.move && g.game.current === node) result = await offlineFallback(g, gen, result);
+  if (!result || state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
   if (a) g.eval = a;
   if (result.mode) g.opponentMode = result.mode; // "human" | "strong" | "standard" | "offline"
@@ -494,6 +527,42 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   await reply(g, gen, result, started);
 }
 
+/**
+ * v13: the engine gave no move (it failed, or threw): the offline engine
+ * plays this one. Resolves the result to play, or null when that failed
+ * too or the game moved on; then the game waits on Retry (engineFailed),
+ * never stuck on the computer's turn without a way out.
+ */
+async function offlineFallback(g, gen, result) {
+  let move = null;
+  try {
+    move = await moveSources.offline(g.game, { rank: g.rank, impl: g.impl });
+  } catch (_) {
+    move = null;
+  }
+  if (state.game !== g || gen !== g.gen) return null;
+  if (move) return { ...result, move, analysis: result.analysis || null, mode: "offline" };
+  computerFailed(g);
+  return null;
+}
+
+/** The computer could not move: say so, and offer Retry (play.jsx). */
+function computerFailed(g) {
+  g.thinking = false;
+  g.engineFailed = true;
+  announce(t("v13ui.engineFailed"));
+  update();
+}
+
+/** Retry after the computer could not move (the panel's Retry). */
+export function retryComputerMove() {
+  const g = state.game;
+  if (!g?.engineFailed) return;
+  g.engineFailed = false;
+  update();
+  maybeComputerMove();
+}
+
 async function reply(g, gen, result, started) {
   const a = result.analysis;
   // Resign when clearly lost — except the gentlest levels, which play it
@@ -522,10 +591,12 @@ async function reply(g, gen, result, started) {
   if (state.game !== g || gen !== g.gen) return;
   g.thinking = false;
   const move = result.move;
-  if (!move || !isComputerTurn()) {
+  if (!isComputerTurn()) {
     update();
     return;
   }
+  // v13: no move to play (a kept teaching pause whose search had none): never stuck on the computer's turn.
+  if (!move) return computerFailed(g);
   if (move.pass) {
     g.game.pass();
     Audio.pass();
@@ -580,6 +651,7 @@ export function undo() {
   Engine.cancel();
   g.gen++;
   g.thinking = false;
+  g.engineFailed = false;
   g.pending = null;
   g.scoring = null;
   g.hint = null;
@@ -661,18 +733,24 @@ export async function askHint() {
   const g = state.game;
   if (!g || g.thinking || g.pending || g.game.phase !== "playing" || gameOver(g)) return;
   update({ menu: null });
+  // v13: the hint is for this position: an undo, a new move or a new game
+  // while it is being worked out drops it (gen, node).
+  const gen = g.gen;
+  const node = g.game.current;
   g.thinking = true;
   update();
   let h = null;
   try {
-    h = await Engine.hint(g.game, { signal: gameSignal(g) });
+    h = await Engine.hint(g.game, { node, signal: gameSignal(g) });
   } catch (_) {
     h = null;
   }
+  if (state.game !== g || gen !== g.gen) return;
   g.thinking = false;
+  if (g.game.current !== node) return update();
   g.hints++;
   if (h && !h.pass) {
-    g.hint = { x: h.x, y: h.y, reason: hintReason(g.game.current.board.signMap, g.game.turn, h) };
+    g.hint = { x: h.x, y: h.y, reason: hintReason(node.board.signMap, g.game.turn, h) };
     announce(hintText(coordLabel(h.x, h.y, g.game.size), g.hint.reason));
   } else toast(t("play.hintPass"));
   persistCurrent();
@@ -711,14 +789,18 @@ export function clockTick() {
 
 async function startScoring() {
   const g = state.game;
-  g.scoring = { dead: [], score: g.game.score([]), source: "pending", at: performance.now() };
+  // v13: this count's own token: after Resume and a second count, the
+  // first count's late answer is not this one's.
+  const token = {};
+  const node = g.game.current;
+  g.scoring = { dead: [], score: g.game.score([]), source: "pending", at: performance.now(), token };
   update();
   let dead = { stones: [], source: "manual" };
   try {
-    dead = await Engine.deadStones(g.game, { signal: gameSignal(g) });
+    dead = await Engine.deadStones(g.game, { node, signal: gameSignal(g) });
   } catch (_) {}
-  if (state.game !== g || !g.scoring) return;
-  g.scoring = { dead: dead.stones, score: g.game.score(dead.stones), source: dead.source, at: performance.now() };
+  if (state.game !== g || g.scoring?.token !== token || g.game.current !== node) return;
+  g.scoring = { dead: dead.stones, score: g.game.score(dead.stones), source: dead.source, at: performance.now(), token };
   update();
 }
 
@@ -747,6 +829,8 @@ export function confirmScore() {
 export function resumePlay() {
   const g = state.game;
   if (!g?.scoring) return;
+  // v13: the count's search (dead stones) is stopped; its answer would belong to no count.
+  Engine.cancel();
   g.game.resumePlay();
   g.scoring = null;
   persistCurrent();
@@ -832,58 +916,6 @@ export function ratingChange(before, after) {
   return { before: { r: before.r, rank: before.rank, pm: before.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } };
 }
 
-/**
- * What a game against the computer teaches, from its whole-game analysis:
- * the game's record in the player model (per-phase losses, themes and what
- * each cost, model/player.js recordGame), and the two costliest mistakes
- * as drills (ids `${gameId}-${index}`). The analysis does it when it is
- * stored (play/analysis.js storeAnalysis), in the review or in the
- * background. Once per game: its file is marked `learned`. Returns false
- * when it was already done.
- */
-export function learnFromGame({ game, points, humanColor, recordId = null, trendId = recordId, mistakes = null }) {
-  const lib = recordId ? Games.getGame(recordId) : null;
-  if (lib?.learned) return false;
-  mistakes = mistakes || describeMistakes(game, points, humanColor);
-  const now = Date.now();
-  changeProfile((profile) => {
-    let p = profile;
-    // Complete the game's record with per-phase losses and the themes of
-    // up to ten explained mistakes, and what each theme cost (the focus).
-    if (trendId && p.games.some((r) => r.id === String(trendId))) {
-      const summary = summarizeGame({ game, points, meta: { humanColor }, keyMoves: mistakes.top });
-      const ten = describeMistakes(game, points, humanColor, 10).top;
-      const themes = themeCounts(ten, humanColor);
-      p = recordGame(p, { id: String(trendId), ...recordAnalysis(summary, humanColor, themes), themeLoss: themeLosses(ten, humanColor) });
-    }
-    // The two costliest mistakes become drills.
-    const gameId = recordId || String(now);
-    const sgf = game.toSGF();
-    for (const m of mistakes.top.slice(0, 2)) {
-      if (m.loss < 4 || !m.best || m.best.pass) continue;
-      p = addMistake(
-        p,
-        {
-          gameId,
-          index: m.index,
-          sgf,
-          color: m.move.color,
-          played: { x: m.move.x, y: m.move.y },
-          best: { x: m.best.x, y: m.best.y },
-          accept: m.accept,
-          loss: m.loss,
-          theme: m.theme,
-          size: game.size,
-        },
-        now,
-      );
-    }
-    return p;
-  });
-  if (lib) Games.patchGame(recordId, { learned: true });
-  return true;
-}
-
 export function resultHeadline(g) {
   const r = g.game.current.result;
   if (!r) return "";
@@ -960,3 +992,41 @@ export function continueCurrent() {
 export function openNewGame(prefill = null) {
   openSheet("newGame", prefill ? { prefill } : {});
 }
+
+/* ---------------------------------------------------- play from here */
+
+/** A new game against the computer from the position on the review's board. */
+export function playFromHere() {
+  const r = state.review;
+  if (!r) return;
+  // v5: the record's rules and handicap carry over (the handicap is what
+  // the Chinese count compensates); the root stones are set up.
+  const game = gameAt(r.game, r.game.current);
+  // v13: the game in progress goes to the Library as unfinished first.
+  parkCurrent();
+  dropReview(r);
+  if (state.game) state.game.gen++;
+  remember();
+  const humanColor = game.turn;
+  update((s) => {
+    s.game = freshGameState(game, { opponent: "ai", humanColor });
+    s.review = null;
+    s.space = "play";
+    s.play = { ...s.play, view: "game", explorer: null };
+  });
+  persistCurrent();
+  maybeComputerMove();
+  ponder();
+}
+
+// What a finished game teaches (app/learn-game.js), as before v13.
+export { learnFromGame };
+
+// The review controller reaches the game in play through these (ctl-core setGameHooks).
+setGameHooks({
+  persist: () => persistCurrent(),
+  resume: () => {
+    maybeComputerMove();
+    ponder();
+  },
+});

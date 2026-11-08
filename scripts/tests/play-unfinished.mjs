@@ -109,7 +109,7 @@ await test("play unfinished: Play from here in a review, and in the explorer, ke
   imp.play(5, 5);
   const r = Lib.saveGame(imp, { source: "import", name: "record" });
   Review.openReview(loadSGF(r.sgf ?? Lib.getGame(r.id).sgf).game, { source: "record", recordId: r.id, space: "library" });
-  Review.playFromHere();
+  Play.playFromHere();
   assert.equal(Lib.listGames().filter((x) => Lib.isUnfinished(x)).length, 1, "the game in progress went to the Library");
   assert.equal(state.review, null);
   // The explorer's Play from here.

@@ -22,9 +22,14 @@ import { Button, Icon, MoreMenu, Thumb } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 import { useJobs } from "../app/background.jsx";
 
-/** A game is on the board and not finished. */
+/**
+ * A game is in progress: on the board, not finished, and with at least one
+ * move of the player's (v13: the same rule that keeps it when something
+ * replaces it, play-ctl unfinishedGame; a board where only the computer
+ * moved is not one).
+ */
 export function gameInProgress(g = state.game) {
-  return !!g && g.game.moveNumber > 0 && !g.game.current.result;
+  return C.unfinishedGame(g);
 }
 
 /** With more games than this the list gets its filter and search, and shows this many at first. */
