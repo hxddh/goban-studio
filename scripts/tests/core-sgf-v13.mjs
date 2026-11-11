@@ -224,10 +224,17 @@ await test("v13 SGF: a 10,000-move record loads and exports without recursion, i
   // four times the moves may take at most about eleven times as long
   // (locally ≈5×: the superko check still walks the line's hashes); the
   // O(n²) reader this replaced took sixteen times as long or more.
+  // The best of three runs: one stall of a busy machine during a single run
+  // is not a slower reader.
   const time = (text) => {
-    const t0 = performance.now();
-    const r = loadSGF(text);
-    return { r, ms: performance.now() - t0 };
+    let best = null;
+    for (let i = 0; i < 3; i++) {
+      const t0 = performance.now();
+      const r = loadSGF(text);
+      const ms = performance.now() - t0;
+      if (!best || ms < best.ms) best = { r, ms };
+    }
+    return best;
   };
   const small = longRecord(2500);
   time(small); // warm up the JIT before measuring
