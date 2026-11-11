@@ -14,6 +14,7 @@ import { Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { ContinueHero, Level, SuggestedHero, gameInProgress, outcome, recordTitle } from "../play/home.jsx";
 import { pathRow } from "../learn/path.jsx";
+import { FirstLessonHero } from "./first-run.jsx";
 
 const DAY = 86400000;
 
@@ -41,7 +42,7 @@ export function TodayView() {
           <span class="eyebrow">{date}</span>
           <h1>{greeting()}</h1>
         </header>
-        {gameInProgress() ? <ContinueHero /> : <SuggestedHero />}
+        {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
         <TodayList />
         <Level />
         <Week />

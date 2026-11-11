@@ -98,6 +98,7 @@ export const ICONS = {
   // Board
   "stone-black": `<circle cx="10" cy="10" r="6.25" fill="currentColor"/>`,
   "stone-white": `<circle cx="10" cy="10" r="6.25"/>`,
+  folder: `<path d="M2.75 6.25a1.5 1.5 0 0 1 1.5-1.5h3.1l1.9 2h6.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H4.25a1.5 1.5 0 0 1-1.5-1.5z"/>`,
   grid: `<rect x="3.5" y="3.5" width="13" height="13" rx="2"/><path d="M3.5 7.83h13M3.5 12.17h13M7.83 3.5v13M12.17 3.5v13"/>`,
   list: `<path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/>${dot(4, 5.5)}${dot(4, 10)}${dot(4, 14.5)}`,
   info: `<circle cx="10" cy="10" r="7"/><path d="M10 9.25v4.5"/>${dot(10, 6.6)}`,

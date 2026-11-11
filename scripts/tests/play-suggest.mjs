@@ -1,6 +1,7 @@
 /**
- * Play's suggested game: beginners start on 9×9 (with the standard board
- * as the other option); stronger players on 19×19 with a quick 9×9 beside.
+ * Play's suggested game: beginners start on 9×9 (with 13×13, the next
+ * board up, as the other option); stronger players on 19×19 with a quick
+ * 9×9 beside. The steps between the boards: scripts/tests/shell-first-run.mjs.
  */
 import { test, assert, bundle } from "./helpers.mjs";
 
@@ -20,12 +21,14 @@ function player(rank) {
   state.profile = PM.newProfile({ rank });
 }
 
-await test("play suggest: a beginner is offered 9×9 first, with 19×19 as the other option", () => {
+await test("play suggest: a beginner is offered 9×9 first, with 13×13 as the other option", () => {
   player(30);
   const r = C.recommendedGame();
   assert.equal(r.size, 9);
-  assert.equal(r.quick.size, 19);
+  assert.equal(r.quick.size, 13);
   player(C.BEGINNER_RANK);
+  // (Not on the first day, when the hero offers what onboarding promised: scripts/tests/shell-first-run.mjs.)
+  state.settings.experience = null;
   assert.equal(C.recommendedGame().size, 9, "at the threshold still 9×9");
 });
 

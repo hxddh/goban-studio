@@ -4,10 +4,11 @@
  * reviews).
  */
 import { store } from "../data/store.js";
-import { saveSettings } from "../data/settings.js";
+import { defaultRulesOf, saveSettings } from "../data/settings.js";
 import { estimate } from "../model/player.js";
 import { setLang, t } from "../i18n.js";
-import { setSound } from "../audio.js";
+import * as Audio from "../audio.js";
+import { applyBoardTheme } from "../theme.js";
 import { state, update } from "./store.js";
 
 /* ----------------------------------------------- v13: the game in play */
@@ -60,6 +61,11 @@ export function playerRankNow() {
   return e.games > 0 ? e.rank : state.settings.playerRank ?? 30;
 }
 
+/** The rules a new game uses unless its sheet says otherwise: the player's choice, else those of the interface language. */
+export function defaultRules() {
+  return defaultRulesOf(state.settings);
+}
+
 export const tx = (obj) => (obj ? obj[state.settings.lang] ?? obj.en ?? obj.zh ?? "" : "");
 
 export function applyAppearance() {
@@ -69,6 +75,8 @@ export function applyAppearance() {
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
   root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
+  // The board's colours follow the theme and the board style (theme.js).
+  applyBoardTheme({ style: s.boardStyle });
 }
 
 export function setSetting(key, value) {
@@ -77,8 +85,12 @@ export function setSetting(key, value) {
   });
   saveSettings(store, state.settings);
   if (key === "lang") setLang(value);
-  if (key === "sound") setSound(value);
-  if (key === "appearance" || key === "largeText") applyAppearance();
+  if (key === "volume") {
+    Audio.setLevel(value);
+    // The new volume, heard at once (nothing when it is off).
+    Audio.stone();
+  }
+  if (key === "appearance" || key === "largeText" || key === "boardStyle") applyAppearance();
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 

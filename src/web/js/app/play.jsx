@@ -12,7 +12,7 @@ import { ataris } from "./insight.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
 import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
-import { Toolbar } from "./chrome.jsx";
+import { NarrowFold, Toolbar } from "./chrome.jsx";
 import { ReviewView } from "./review.jsx";
 import { classicYear, colorName, moveNumbers, rankLabel } from "./game-view.js";
 import { FirstCountNote } from "./beginner.jsx";
@@ -356,7 +356,9 @@ function PlayPanel() {
         )}
         {g.ghost && <p class="fine">{t("play.confirmHint")}</p>}
       </div>
-      <MoveStrip />
+      <NarrowFold label={t("play.moveList")}>
+        <MoveStrip />
+      </NarrowFold>
       {!state.engine.available && g.opponent === "ai" && <p class="fine panel-note">{t("play.offlineNote")}</p>}
     </aside>
   );

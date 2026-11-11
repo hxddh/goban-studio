@@ -13,12 +13,13 @@ import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce, clockChanged } from "./store.js";
 import { moveText } from "../a11y.js";
-import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setGameHooks, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
+import { changeProfile, confirmAction, defaultRules, openSheet, playerRankNow, remember, resultText, setGameHooks, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
 import { dropReview, gameAt, openReview, saveEdits } from "./review-ctl.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 import { learnFromGame } from "./learn-game.js";
+import { finishedBySize, firstOffer, otherSize, suggestedSize } from "./first-run.js";
 
 /* ------------------------------------------------------------ state */
 
@@ -288,28 +289,53 @@ export function suggestedOpponent(size = 19) {
 export const BEGINNER_RANK = 20;
 
 /**
+ * What onboarding promised and the player has not taken up yet
+ * (first-run.js firstOffer): "lesson" (lesson one), "small" (the gentle
+ * 9×9 game), "full" (the 19×19 game), or null.
+ */
+export function firstRunOffer() {
+  const p = state.profile;
+  return firstOffer({
+    experience: state.settings.experience,
+    games: Games.listGames().length + (p?.games?.length || 0),
+    lessonsDone: Object.values(p?.lessons || {}).filter((l) => l.done).length,
+    gameStarted: unfinishedGame(),
+  });
+}
+
+/**
  * What to play next (Play's suggested game), and why: the week's first
  * focus (model/player.js focus) or the player's level. A beginner is
- * offered 9×9 with the standard board as the other option; everyone else
- * the standard board, with a quick 9×9 game beside it.
- * { size, opponentRank, label, handicap, rank, weak: { theme } | null, quick }.
+ * offered 9×9, then 13×13 after a few games there, before the standard
+ * board (first-run.js suggestedSize); the quieter second offer is the next
+ * board up, or a quick 9×9 beside the standard board. Right after
+ * onboarding the game is the one it promised (`first`): the gentlest level
+ * on 9×9 for someone who knows the rules, an even 19×19 for a player.
+ * { size, opponentRank, label, handicap, rank, weak: { theme } | null, quick, first }.
  */
 export function recommendedGame() {
   const rank = playerRankNow();
-  const small = rank == null || rank >= BEGINNER_RANK;
-  const main = suggestedOpponent(small ? 9 : 19);
+  const beginner = rank == null || rank >= BEGINNER_RANK;
+  const first = firstRunOffer();
+  const size = first === "full" ? 19 : first ? 9 : suggestedSize({ beginner, finished: finishedBySize(Games.listGames()) });
+  let main = suggestedOpponent(size);
+  if (first === "full") main = { ...main, handicap: 0 };
+  else if (first) {
+    const gentle = Engine.nearest(30, Engine.installed());
+    main = { ...main, opponentRank: gentle.rank, label: gentle.label, handicap: 0 };
+  }
   const view = focus(state.profile, Date.now());
   const key = view.focus?.[0]?.key || null;
-  return { ...main, rank, weak: key ? { theme: key } : null, quick: suggestedOpponent(small ? 19 : 9) };
+  return { ...main, rank, weak: key ? { theme: key } : null, quick: suggestedOpponent(otherSize(size)), first };
 }
 
 export function newGame(opts = {}) {
   const size = [9, 13, 19].includes(Number(opts.size)) ? Number(opts.size) : state.settings.boardSize || 19;
   if (opts.rememberSize && size !== state.settings.boardSize) setSetting("boardSize", size);
   const handicap = Math.max(0, Math.min(9, Number(opts.handicap) || 0));
-  // v5: the sheet's choice, else the `defaultRules` setting (Japanese).
-  const rules = normalizeRules(opts.rules ?? state.settings.defaultRules);
-  if (opts.rememberRules && opts.rules && rules !== state.settings.defaultRules) setSetting("defaultRules", rules);
+  // The sheet's choice, else the rules for new games (Settings, or those of the interface language).
+  const rules = normalizeRules(opts.rules ?? defaultRules());
+  if (opts.rememberRules && opts.rules && rules !== defaultRules()) setSetting("defaultRules", rules);
   // Komi: the sheet's, else the ruleset's (6.5 / 7.5 / 6.5; 0.5 with
   // handicap stones, plus N points at the count under Chinese rules).
   const komi = opts.komi !== undefined && opts.komi !== null && Number.isFinite(Number(opts.komi)) ? Number(opts.komi) : defaultKomi(rules, handicap > 0 ? Math.max(2, handicap) : 0);

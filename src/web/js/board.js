@@ -10,25 +10,17 @@
  * corner or side (problems), with lines running off the open edges so the
  * window still reads as part of a full board; stones sit slightly off-grid
  * with a contact shadow; a new stone settles in ~120 ms and captured stones
- * fade out; the last move is a small dot; a keyboard cursor makes the board
+ * fade out; the last move is a thin ring; a keyboard cursor makes the board
  * playable without a pointer.
+ *
+ * Colours come from theme.js (docs/design.md §5): the palette of the page's
+ * theme and of the board style chosen in Settings, read at every draw, so
+ * the board follows light / dark (also when "System" switches while the
+ * app is open) and the high-contrast style without a reload.
  */
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
 import { loadMaterials, stoneVariant } from "./materials.js";
-
-/**
- * The board (docs/design.md §5): one calm plain surface. Line colours are
- * ink at ~70 %, never pure black.
- */
-export const THEME = {
-  base: "#E4CB9A",
-  vignette: "rgba(70, 44, 12, 0.07)",
-  line: "rgba(40, 27, 12, 0.72)",
-  edge: "rgba(40, 27, 12, 0.85)",
-  star: "rgba(40, 27, 12, 0.85)",
-  text: "rgba(74, 52, 26, 0.6)",
-  shadow: "rgba(46, 28, 8, 0.3)",
-};
+import { currentPalette, onBoardTheme } from "./theme.js";
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
@@ -77,12 +69,26 @@ export function frameAspect(model) {
   const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
   return Math.max(0.6, Math.min(1.7, r));
 }
-/** docs/design.md §4: the accent marks attention; good/bad are signals. */
-const ACCENT = "#34529A";
-const GOOD = "#2E7D4F";
-const BAD = "#B3402C";
+/**
+ * docs/design.md §4: the accent marks attention; good/bad are signals.
+ * These are the tones on a light surface (a white stone in any theme); on
+ * the board itself the palette's own are used (theme.js tones).
+ */
+const ON_LIGHT = { accent: "#34529A", good: "#2E7D4F", bad: "#B3402C" };
+/** The same on a black stone: the dark theme's lighter signals. */
+const ON_DARK = { accent: "#9FB6EE", good: "#7FD0A2", bad: "#F09A84" };
 const PLACE_MS = 140;
 const FADE_MS = 260;
+
+/**
+ * The last-move ring for a cell size (css px): 0.4 × cell across, its line
+ * 5 % of a cell and never under 1.25 px, so it stays a ring on a small
+ * board and a hairline on a large one.
+ */
+export function lastMarkOf(cell) {
+  const width = Math.max(1.25, cell * 0.05);
+  return { radius: Math.max(width * 1.6, cell * 0.2), width };
+}
 
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
@@ -142,16 +148,18 @@ export class BoardView {
       this.mats = m;
       this.draw();
     });
+    this._offTheme = onBoardTheme(() => this.draw());
     this.resize();
   }
 
-  /** The board's colours. */
+  /** The board's colours now (theme.js). */
   theme() {
-    return THEME;
+    return currentPalette();
   }
 
   destroy() {
     this._resizeObserver.disconnect();
+    this._offTheme?.();
     cancelAnimationFrame(this.raf);
   }
 
@@ -351,7 +359,7 @@ export class BoardView {
 
   /** The board surface, cached per size. */
   grain(theme, w, h) {
-    const key = `${w}x${h}:${this.dpr}`;
+    const key = `${w}x${h}:${this.dpr}:${theme.key}`;
     if (this.grainCache?.key === key) return this.grainCache.canvas;
     const c = document.createElement("canvas");
     c.width = Math.round(w * this.dpr);
@@ -391,7 +399,7 @@ export class BoardView {
     // 1.6× the inner lines. Lines on an open side of a zoomed window run off
     // by half a cell.
     const dpr = this.dpr;
-    const lineDev = Math.max(1, Math.round(cell * dpr * 0.02));
+    const lineDev = Math.max(1, Math.round(cell * dpr * 0.02 * (theme.lineScale || 1)));
     const edgeDev = Math.max(lineDev + 1, Math.round(lineDev * 1.6));
     const snap = (v, wDev) => {
       const off = (wDev % 2) / 2;
@@ -497,7 +505,7 @@ export class BoardView {
           if (deadSet.has(y * size + x)) alpha = 0.38;
           this.stone(ctx, x, y, v, theme, { scale, alpha });
           const n = m.moveNumbers?.[x + "," + y];
-          if (n && alpha === 1) this.label(ctx, x, y, String(n), v === BLACK ? "#f4efe4" : "#2a241c", cell * (n > 99 ? 0.34 : 0.42));
+          if (n && alpha === 1) this.label(ctx, x, y, String(n), v === BLACK ? theme.onBlack : theme.onWhite, cell * (n > 99 ? 0.34 : 0.42));
         }
       }
     }
@@ -527,19 +535,25 @@ export class BoardView {
       for (const s of m.variation) {
         if (!inWin(s.x, s.y)) continue;
         this.stone(ctx, s.x, s.y, s.c, theme, { alpha: 0.82, shadow: false });
-        if (s.n) this.label(ctx, s.x, s.y, String(s.n), s.c === BLACK ? "#f4efe4" : "#2a241c", cell * 0.42);
+        if (s.n) this.label(ctx, s.x, s.y, String(s.n), s.c === BLACK ? theme.onBlack : theme.onWhite, cell * 0.42);
       }
     }
 
-    // Last move: a small dot, quieter than a ring.
+    // Last move: a thin ring in the stone's opposite tone (docs/design.md
+    // §5) — light on black, dark on white; lighter than a filled dot, which
+    // sat heavily on a white stone. A numbered stone already says it.
     const last = m.lastMove;
-    if (last && !last.pass && inWin(last.x, last.y) && m.board?.[last.y]?.[last.x] && !m.variation) {
+    if (m.lastMark !== false && last && !last.pass && inWin(last.x, last.y) && m.board?.[last.y]?.[last.x] && !m.variation && !m.moveNumbers?.[last.x + "," + last.y]) {
       const c = m.board[last.y][last.x];
       const j = this.jitter(last.x, last.y);
-      ctx.fillStyle = c === BLACK ? "rgba(255,250,240,0.9)" : "rgba(30,26,22,0.85)";
+      const ring = lastMarkOf(cell);
+      ctx.strokeStyle = c === BLACK ? theme.onBlack : theme.onWhite;
+      ctx.globalAlpha = c === BLACK ? 0.92 : 0.8;
+      ctx.lineWidth = ring.width;
       ctx.beginPath();
-      ctx.arc(px(last.x) + j.dx, py(last.y) + j.dy, cell * 0.1, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(px(last.x) + j.dx, py(last.y) + j.dy, ring.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     for (const mark of m.marks || []) {
@@ -550,7 +564,7 @@ export class BoardView {
     // Two-click placement: the pending stone, with a ring.
     if (m.ghost && inWin(m.ghost.x, m.ghost.y)) {
       this.stone(ctx, m.ghost.x, m.ghost.y, m.ghost.color, theme, { alpha: 0.6, shadow: false, jitter: false });
-      ctx.strokeStyle = ACCENT;
+      ctx.strokeStyle = theme.tones.accent;
       ctx.lineWidth = Math.max(1.5, cell * 0.06);
       ctx.beginPath();
       ctx.arc(px(m.ghost.x), py(m.ghost.y), cell * 0.56, 0, Math.PI * 2);
@@ -562,18 +576,20 @@ export class BoardView {
     if (m.interactive && hv && inWin(hv.x, hv.y) && !m.board?.[hv.y]?.[hv.x] && m.hoverColor) {
       if (m.hoverValid) this.stone(ctx, hv.x, hv.y, m.hoverColor, theme, { alpha: 0.42, shadow: false, jitter: false });
       else {
-        ctx.strokeStyle = "rgba(190, 60, 45, 0.7)";
+        ctx.strokeStyle = theme.tones.bad;
+        ctx.globalAlpha = 0.75;
         ctx.lineWidth = Math.max(1.2, cell * 0.06);
         ctx.beginPath();
         ctx.arc(px(hv.x), py(hv.y), cell * 0.22, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
 
     // Keyboard cursor.
     if (m.cursor && inWin(m.cursor.x, m.cursor.y)) {
       const r = cell * 0.5;
-      ctx.strokeStyle = ACCENT;
+      ctx.strokeStyle = theme.tones.accent;
       ctx.lineWidth = Math.max(1.5, cell * 0.07);
       ctx.beginPath();
       ctx.roundRect(px(m.cursor.x) - r, py(m.cursor.y) - r, r * 2, r * 2, r * 0.3);
@@ -608,30 +624,60 @@ export class BoardView {
       ctx.arc(sx, sy, r * 1.08, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (theme.contrast) {
+      // The high-contrast board: flat discs with a clear rim, no sprites.
+      const st = color === BLACK ? theme.stone.black : theme.stone.white;
+      const rim = st.rim ? Math.max(1, g.cell * st.rimWidth) : 0;
+      ctx.fillStyle = st.fill;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - rim / 2, 0, Math.PI * 2);
+      ctx.fill();
+      if (rim) {
+        ctx.strokeStyle = st.rim;
+        ctx.lineWidth = rim;
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
     const sprite = this.sprite(x, y, color);
     if (sprite) {
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
-      ctx.restore();
-      return;
-    }
-    const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
-    if (color === BLACK) {
-      grad.addColorStop(0, "#5d5d59");
-      grad.addColorStop(0.45, "#232321");
-      grad.addColorStop(1, "#0b0b0a");
     } else {
-      grad.addColorStop(0, "#ffffff");
-      grad.addColorStop(0.6, "#f2eee4");
-      grad.addColorStop(1, "#cfc8b8");
+      const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
+      if (color === BLACK) {
+        grad.addColorStop(0, "#5d5d59");
+        grad.addColorStop(0.45, "#232321");
+        grad.addColorStop(1, "#0b0b0a");
+      } else {
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(0.6, "#f2eee4");
+        grad.addColorStop(1, "#cfc8b8");
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (color === WHITE) {
+        ctx.strokeStyle = "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 0.75;
+        ctx.stroke();
+      }
     }
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (color === WHITE) {
-      ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.lineWidth = 0.75;
+    // The dark theme: the same stones, toned for a dim room — white a
+    // little darker so it does not glare, black with a faint rim so it
+    // still parts from the dimmer board.
+    if (color === WHITE && theme.whiteDim > 0) {
+      ctx.fillStyle = `rgba(26, 20, 10, ${theme.whiteDim})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.985, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (color === BLACK && theme.blackRim) {
+      ctx.strokeStyle = theme.blackRim;
+      ctx.lineWidth = Math.max(0.75, g.cell * 0.02);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -663,8 +709,9 @@ export class BoardView {
     const cx = g.ox + mark.x * g.cell + j.dx;
     const cy = g.oy + mark.y * g.cell + j.dy;
     const r = g.cell * 0.27;
-    const tone =
-      mark.tone === "good" ? GOOD : mark.tone === "bad" ? BAD : mark.tone === "accent" ? ACCENT : stoneColor === BLACK ? "#f4efe4" : stoneColor === WHITE ? "#2a241c" : theme.star;
+    // A white stone is a light surface in every theme, a black stone a dark one.
+    const tones = stoneColor === WHITE ? ON_LIGHT : stoneColor === BLACK ? ON_DARK : theme.tones;
+    const tone = tones[mark.tone] || (stoneColor === BLACK ? theme.onBlack : stoneColor === WHITE ? theme.onWhite : theme.star);
     ctx.strokeStyle = tone;
     ctx.fillStyle = tone;
     ctx.lineWidth = Math.max(1.4, g.cell * 0.07);
@@ -690,7 +737,7 @@ export class BoardView {
       // book moves, a ring for KataGo's other candidates); mistakes in
       // --bad. The letter matches the row in the panel.
       const bad = mark.tag === "mistake";
-      const col = bad ? BAD : ACCENT;
+      const col = bad ? tones.bad : tones.accent;
       const rr = g.cell * 0.4;
       ctx.beginPath();
       ctx.arc(cx, cy, rr, 0, Math.PI * 2);
@@ -699,7 +746,8 @@ export class BoardView {
         ctx.fillStyle = col;
         ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.fillStyle = "#fff";
+        // The letter on the disc: white on the light theme's ink tones, dark on the dark theme's tints.
+        ctx.fillStyle = theme.dark ? "#17140E" : "#fff";
       } else {
         ctx.fillStyle = theme.base;
         ctx.fill();

@@ -27,10 +27,5 @@ export const V13_LEARN = {
     "1回目のクリックでは石を表示するだけで、同じ点をもう一度クリックすると着手します。誤クリックが不正解として記録されません。",
   ),
   "review.moveRank": m("你的落子看起来像 ≈ {0}（{1} 到 {2}）", "Your moves look like ≈ {0} ({1} to {2})", "착수는 ≈ {0} 정도로 보입니다 ({1}~{2})", "あなたの着手は ≈ {0} 程度に見えます（{1}〜{2}）"),
-  "review.moveRankHelp": m(
-    "依据人类风格模型：在各个段级位下，你每一手棋出现的可能性。只是粗略参考，不是你的等级分。",
-    "From the human-style model: how likely each of your moves is for players of each rank. A rough guide, not your rating.",
-    "인간형 모델로 각 급·단에서 여러분의 수가 나올 가능성을 비교했습니다. 대략적인 참고일 뿐 기력 평가는 아닙니다.",
-    "人間らしいモデルで、各段級位ごとにあなたの一手一手が打たれる確率を比べました。おおまかな目安で、棋力の評価ではありません。",
-  ),
+  "review.moveRankHelp": m("由人类棋谱模型估计，只是粗略参考，不是你的棋力。", "Estimated by the human-style model: a rough guide, not your rating.", "사람 기보 모델로 추정한 값으로, 대략적인 참고일 뿐 기력은 아닙니다.", "人間の棋譜モデルによる推定です。おおまかな目安で、棋力ではありません。"),
 };

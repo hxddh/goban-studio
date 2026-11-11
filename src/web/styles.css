@@ -26,8 +26,13 @@
   /* Toasts sit on the inverse of the page (--text); their marks need the other theme's signal colours. */
   --inv-good: #6cc08f;
   --inv-warn: #e3b04b;
+  /* The board (theme.js): the light standard palette; the script sets these for the theme and board style in force. */
   --board: #e4cb9a;
   --thumb-board: #e4cb9a;
+  --thumb-line: rgba(60, 40, 20, 0.42);
+  --stone-black: #1d1d1b;
+  --stone-white: #f7f4ec;
+  --stone-rim: rgba(40, 27, 12, 0.5);
   --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.08), 0 2px 4px rgba(60, 40, 12, 0.06), 0 24px 48px -24px rgba(60, 40, 12, 0.35);
   --shadow-pop: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 24px -6px rgba(0, 0, 0, 0.18);
   --shadow-sheet: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px -16px rgba(0, 0, 0, 0.32);
@@ -481,8 +486,8 @@ select, .text-input {
 .hero-progress { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); max-width: 360px; }
 .hero-progress .progress { flex: 1; }
 .empty-board rect { fill: var(--thumb-board); }
-.empty-board line { stroke: rgba(40, 27, 12, 0.5); stroke-width: 0.5; }
-.empty-board circle { fill: rgba(40, 27, 12, 0.7); }
+.empty-board line { stroke: var(--thumb-line); stroke-width: 0.5; }
+.empty-board circle { fill: var(--thumb-line); }
 
 /* inset grouped list */
 .group { margin-top: var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
@@ -496,7 +501,7 @@ button.group-row:hover { background: var(--fill); }
 .gr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gr-text strong { font: 500 13px/18px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-text span { font: var(--t-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.game-row .thumb { width: 40px; height: 40px; border-radius: 3px; flex: none; }
+.game-row .thumb { width: 44px; height: 44px; border-radius: 3px; flex: none; }
 .game-row > .icon { color: var(--text-3); }
 .outcome { font: var(--t-small); color: var(--text-2); white-space: nowrap; }
 .outcome.good { color: var(--good); }
@@ -555,7 +560,7 @@ button.group-row:hover { background: var(--fill); }
 .empty h2 { font: var(--t-head); color: var(--text); }
 .empty .actions { margin-top: var(--s-3); }
 
-.thumb { display: block; }
+.thumb { display: block; width: 76px; height: 76px; }
 
 /* ---------------------------------------------------------------- sheets */
 
@@ -579,7 +584,7 @@ button.group-row:hover { background: var(--fill); }
 .preset span { font: var(--t-small); color: var(--text-3); }
 .mini-grid { width: 48px; height: 48px; }
 .mini-grid rect { fill: var(--thumb-board); }
-.mini-grid line { stroke: rgba(40, 27, 12, 0.55); stroke-width: 0.6; }
+.mini-grid line { stroke: var(--thumb-line); stroke-width: 0.6; }
 
 .form { display: flex; flex-direction: column; gap: var(--s-3); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); min-height: 32px; }
@@ -664,10 +669,33 @@ button.group-row:hover { background: var(--fill); }
   :root[data-native-chrome="inset"] .toolbar { padding-left: 28px; }
   .lesson-list { margin-left: 0; }
 }
+/* Narrow windows (the minimum, 720 px, to 860): the board keeps the top
+ * and the panel becomes a compact bar under it, so nothing a game, a
+ * lesson or a problem needs is below the fold — the two players side by
+ * side with their clocks, then the status with Pass and Undo on one row;
+ * the move list waits behind its disclosure (chrome.jsx NarrowFold). */
 @media (max-width: 860px) {
-  .workspace { grid-template-columns: 1fr; grid-template-rows: auto auto; overflow-y: auto; }
-  .stage { min-height: 70vh; }
-  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
+  .workspace.focus { grid-template-rows: minmax(0, 1fr); }
+  .stage { min-height: 0; padding: var(--s-3); }
+  .panel { border-left: 0; border-top: 1px solid var(--line); max-height: min(46vh, 360px); gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+  /* The toolbar already names the place. */
+  .panel > .panel-title h1, .panel > .panel-title > .eyebrow { display: none; }
+  .panel > .panel-title:not(:has(> :not(h1):not(.eyebrow))) { display: none; }
+  .players { flex-direction: row; }
+  .player { flex: 1; min-width: 0; height: 44px; }
+  .player + .player { border-top: 0; border-left: 1px solid var(--line); }
+  .player.active::before { top: 8px; bottom: 8px; }
+  .panel-state { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-3); }
+  .panel-state > .status-line { flex: 1; min-width: 0; }
+  .panel-state > .card, .panel-state > .note, .panel-state > .fine { flex-basis: 100%; }
+  .narrow-fold { display: flex; flex-direction: column; gap: var(--s-2); }
+  .narrow-fold > .disclosure { padding: 0; min-height: 24px; }
+  .narrow-fold .moves .slot-title { display: none; }
+  .narrow-fold .move-grid { max-height: 120px; }
+  /* A lesson or a problem: the primary stays in view while a long text scrolls. */
+  .panel > .actions { position: sticky; bottom: calc(var(--s-3) * -1); z-index: 1; margin: 0 calc(var(--s-4) * -1) calc(var(--s-3) * -1); padding: var(--s-2) var(--s-4) var(--s-3); background: var(--surface); }
+  .panel > .panel-foot { margin-top: 0; }
   .hero { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -707,8 +735,12 @@ button.group-row:hover { background: var(--fill); }
 .unit.now .unit-no { background: var(--text); color: var(--on-primary); }
 .unit.todo .unit-text h3 { color: var(--text-2); }
 
-/* v5: thumbnails and mini boards */
-:root { --thumb-line: rgba(60, 40, 20, 0.35); }
+/* Mini boards drawn in SVG (the size cards, a hero's empty board, the app's mark) take the board's colours. */
+.sb-mark .mark-board { fill: var(--thumb-board); }
+.sb-mark .mark-line { stroke: var(--thumb-line); stroke-width: 1.6; fill: none; }
+.sb-mark .mark-black { fill: var(--stone-black); }
+.sb-mark .mark-white { fill: var(--stone-white); stroke: var(--stone-rim); stroke-width: 1.5; }
+:root[data-theme="dark"] .sb-mark .mark-black, :root[data-board="contrast"] .sb-mark .mark-black { stroke: var(--stone-rim); stroke-width: 1.5; }
 .opening-tip { font: var(--t-small); margin-bottom: var(--s-2); }
 
 /* v5 review: summary, tree, comments */
@@ -764,7 +796,13 @@ button.group-row:hover { background: var(--fill); }
 .review-tab > .quiet-note { margin-top: 0; }
 
 /* v6: settings as a two-pane window — a source list of panes, one pane shown. */
-.sheet.settings-sheet { width: min(760px, 100%); height: min(600px, calc(100vh - 48px)); }
+.sheet.settings-sheet { width: min(780px, 100%); height: min(620px, calc(100vh - 48px)); }
+/* One pane is never taller than the sheet (docs/design.md §7); its groups keep a steady rhythm. */
+.settings-pane .row > .segmented { flex: none; }
+.settings-pane .fine { max-width: 62ch; }
+.settings-pane .settings-group > .fine { margin-top: calc(var(--s-1) * -1); }
+.level-row .level-now { margin-left: auto; font: 500 13px/20px var(--font); font-variant-numeric: tabular-nums; }
+.level-row > span:first-child { flex: none; }
 .settings-sheet .sheet-body { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 .settings-split { display: grid; grid-template-columns: 184px 1fr; height: 100%; min-height: 0; border-top: 1px solid var(--line); }
 .settings-nav { display: flex; flex-direction: column; gap: 2px; padding: var(--s-3) var(--s-2); background: var(--sidebar); border-bottom-left-radius: var(--r-3); }

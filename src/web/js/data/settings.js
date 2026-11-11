@@ -17,8 +17,10 @@ export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
   coords: true,
-  sound: true,
+  volume: "normal", // off | quiet | normal | loud (audio.js VOLUME_LEVELS)
   numbers: false,
+  lastMoveMark: true, // the mark on the last stone played
+  boardStyle: "standard", // standard | contrast (theme.js boardPalette)
   opponentRank: 30, // the opponent, a rank of the ladder (opponents.js)
   playerRank: null, // self-assessed kyu (30…1) or dan as 0, -1 …; null = new player
   experience: null, // "new" | "rules" | "player"
@@ -34,7 +36,9 @@ export const DEFAULT_SETTINGS = {
   autoStrength: true, // follow the estimate when suggesting an opponent
   boardSize: 19, // the size last chosen for a new game
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
-  defaultRules: "japanese", // japanese | chinese | korean
+  // japanese | chinese | korean; null = never chosen: the rules of the
+  // interface language (rulesForLang), read through defaultRulesOf.
+  defaultRules: null,
   captureWins: 0, // capture Go games won (the beginner bridge, Learn)
   dailySize: 5, // problem items in a day of Learn: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
   firstCountSeen: false, // the one-time note on the first count was shown
@@ -55,19 +59,42 @@ const clampInt = (v, [lo, hi]) => Math.max(lo, Math.min(hi, Math.round(v)));
 const ONE_OF = {
   appearance: ["auto", "light", "dark"],
   boardSize: [9, 13, 19],
-  defaultRules: ["japanese", "chinese", "korean"],
+  defaultRules: [null, "japanese", "chinese", "korean"],
+  volume: ["off", "quiet", "normal", "loud"],
+  boardStyle: ["standard", "contrast"],
   timeControl: ["none", "move30", "byoyomi"],
   experience: [null, "new", "rules", "player"],
   dailySize: [3, 5, 10],
   lang: [null, "zh", "en", "ko", "ja"], // i18n.js LANG_IDS (null: detect)
 };
 
+/**
+ * The rules a new profile starts with, by interface language: Chinese
+ * rules (komi 7.5) in Chinese, Korean rules in Korean, Japanese rules in
+ * Japanese and English.
+ */
+export function rulesForLang(lang) {
+  return lang === "zh" ? "chinese" : lang === "ko" ? "korean" : "japanese";
+}
+
+/** The rules new games use: the player's choice, else those of the interface language. */
+export function defaultRulesOf(settings) {
+  return settings?.defaultRules || rulesForLang(settings?.lang);
+}
+
 /** Any stored value → complete settings. */
 export function normalizeSettings(raw) {
   const s = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const out = { ...DEFAULT_SETTINGS, ...s };
+  // Sound was a switch before it was a volume: off stays off.
+  if (s.volume === undefined && s.sound === false) out.volume = "off";
+  delete out.sound;
+  // A settings file from before the rules followed the language always
+  // carried the rules in use; one of an onboarded player without them
+  // (older still) played Japanese rules. Only a new profile has none.
+  if (s.defaultRules === undefined && s.onboarded === true) out.defaultRules = "japanese";
   for (const [k, allowed] of Object.entries(ONE_OF)) if (!allowed.includes(out[k])) out[k] = DEFAULT_SETTINGS[k];
-  for (const k of ["coords", "sound", "numbers", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
+  for (const k of ["coords", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
     if (typeof out[k] !== "boolean") out[k] = DEFAULT_SETTINGS[k];
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;

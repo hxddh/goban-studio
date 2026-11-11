@@ -29,7 +29,7 @@ export const LEARN = {
   "learn.path.doneLine": m("明天会有新的复习和题目。", "Tomorrow brings new reviews and problems.", "내일 새 복습과 문제가 기다립니다.", "明日はまた新しい復習と問題があります。"),
   // Today's session, one item after another.
   "learn.session.of": m("今天 {0} / {1}", "Today {0} of {1}", "오늘 {0} / {1}", "今日 {0} / {1}"),
-  "learn.backHome": m("回到学棋", "Back to Learn", "배우기로", "学ぶに戻る"),
+  "learn.backHome": m("回到练习", "Back to Practice", "연습으로", "練習に戻る"),
   // The week's focus, in the path's one line, and its lesson.
   "learn.focus.lesson": m("相关课程：{0}", "Lesson: {0}", "관련 강의: {0}", "関連する課：{0}"),
   "learn.why.points": m("最近 {1} 局在这里损失约 {0} 目", "Lost ≈{0} points here in your last {1} games", "최근 {1}판에서 약 {0}집 손해", "最近の{1}局で約{0}目の損"),
