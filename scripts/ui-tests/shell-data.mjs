@@ -162,8 +162,19 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click('[data-pane="data"]');
     await page.click("[data-undo-restore]");
     await Promise.all([page.waitForNavigation(), page.click(".sheet-foot .btn.primary")]);
-    await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /before the last restore/.test(t.message)));
+    await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /Undone\. Your data is as it was before the restore/.test(t.message)));
     assert(await page.evaluate(() => localStorage.getItem("goban9:marker.json") === "{}"), "undo put it back");
+    // The undo kept a copy of what it replaced, so it is offered again (an undo can be undone)…
+    const snaps = await page.evaluate(() => [...new Set(Object.keys(localStorage).map((k) => /^goban9:backups\/pre-restore-(\d+)\//.exec(k)?.[1]).filter(Boolean))]);
+    assert(snaps.length === 1, `one snapshot is kept, the undo's own: ${snaps}`);
+    await page.keyboard.press("Control+,");
+    await page.click('[data-pane="data"]');
+    await page.waitForSelector("[data-undo-restore]");
+    assert((await page.textContent(".settings-pane")).includes("30 days"), "the row says how long the copy is kept");
+    // …until a new backup is exported: the player then holds a newer copy.
+    await Promise.all([page.waitForEvent("download"), page.click(".settings-group .btn >> text=Export backup")]);
+    await page.waitForSelector("[data-undo-restore]", { state: "detached" });
+    await page.waitForFunction(() => !Object.keys(localStorage).some((k) => k.startsWith("goban9:backups/")), null, { timeout: 3000 });
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

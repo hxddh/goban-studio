@@ -42,7 +42,12 @@ export function Sheets() {
   );
 }
 
-function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelledBy, class: cls = "" }) {
+/**
+ * The frame of a sheet. `onClose` is what its close button and a click
+ * outside do; `onEscape` (a sheet opened from another sheet) is what Esc
+ * does instead of closing every sheet.
+ */
+function Modal({ title, children, footer, wide, onClose = C.closeSheet, onEscape, labelledBy, class: cls = "" }) {
   const ref = useRef(null);
   useEffect(() => {
     const prev = document.activeElement;
@@ -53,6 +58,12 @@ function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelled
     return () => prev?.focus?.({ preventScroll: true });
   }, []);
   const onKey = (e) => {
+    if (e.key === "Escape" && onEscape) {
+      // Before the page's own Esc (app.jsx), which would close the sheet outright.
+      e.stopPropagation();
+      e.preventDefault();
+      return onEscape();
+    }
     if (e.key !== "Tab") return;
     const items = [...ref.current.querySelectorAll("button:not([disabled]), input:not([disabled]), select, [tabindex='0']")];
     if (!items.length) return;
@@ -290,7 +301,7 @@ let settingsPane = "general";
  * pane at a time on the right — like the system's own settings window.
  * No pane is taller than the sheet (scripts/ui-tests/shell-sheets.mjs).
  */
-function SettingsSheet({ pane: open }) {
+function SettingsSheet({ pane: open, focus }) {
   // "engine" was the networks' place at the end of Playing; it is the Engines pane.
   const want = open === "engine" ? "engines" : open;
   const [pane, setPane] = useState(want && SETTINGS_PANES.some((p) => p.id === want) ? want : settingsPane);
@@ -328,7 +339,7 @@ function SettingsSheet({ pane: open }) {
           ))}
         </nav>
         <div class="settings-pane" data-pane={pane} role="tabpanel" aria-label={t(SETTINGS_PANES.find((p) => p.id === pane).key)}>
-          <Pane />
+          <Pane focus={focus} />
         </div>
       </div>
     </Modal>
@@ -448,7 +459,7 @@ function PlayingPane() {
 }
 
 /** The estimate, where it comes from, and the way to change where it starts. */
-function YouPane() {
+function YouPane({ focus }) {
   const s = state.settings;
   const e = state.profile ? C.playerEstimate() : null;
   return (
@@ -458,7 +469,7 @@ function YouPane() {
         <div class="row level-row">
           <span>{t("settings.estimated")}</span>
           <strong class="level-now">{state.profile ? estimateLabel(state.profile) : t("settings.rankUnknown")}</strong>
-          <Button size="sm" data-change-level onClick={() => C.openSheet("level")}>
+          <Button size="sm" data-change-level data-autofocus={focus === "level" ? true : undefined} onClick={() => C.openSheet("level")}>
             {t("settings.level.change")}
           </Button>
         </div>
@@ -551,12 +562,14 @@ function AboutPane() {
 function LevelSheet() {
   const start = state.profile ? C.playerEstimate().rank : state.settings.playerRank;
   const [rank, setRank] = useState(Math.max(-8, Math.min(30, Math.round(start ?? 30))));
-  const back = () => C.openSheet("settings", { pane: "you" });
+  // Back to where it was opened, with the focus on the button that opened it.
+  const back = () => C.openSheet("settings", { pane: "you", focus: "level" });
   const text = rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]);
   return (
     <Modal
       title={t("onboarding.rankQuestion")}
       onClose={back}
+      onEscape={back}
       footer={
         <>
           <Button kind="ghost" onClick={back}>

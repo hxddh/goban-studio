@@ -61,6 +61,21 @@ export function detectLang(nav) {
   return "en";
 }
 
+/**
+ * The language tag a piece of user content needs so it is set in the right
+ * faces whatever the interface language (styles.css `[lang]:lang(…)`): a
+ * player's name in an imported record, a comment. Kana means Japanese,
+ * hangul Korean; Han characters alone are Chinese or Japanese and cannot
+ * be told apart, so they get no tag (null) and take the interface's face —
+ * as does anything else. Use it as `<span lang={textLang(name) || undefined}>`.
+ */
+export function textLang(text) {
+  const s = String(text ?? "");
+  if (/[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/.test(s)) return "ja";
+  if (/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]/.test(s)) return "ko";
+  return null;
+}
+
 export function t(key, params) {
   const table = DICT[current] || DICT[FALLBACK_LANG];
   let s = table[key];

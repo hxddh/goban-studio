@@ -4,9 +4,9 @@
  * the player chooses), the board style — and which interface language a
  * system gets.
  */
-import { test, assert, DEFAULT_SETTINGS, normalizeSettings, createStore, bundle } from "./helpers.mjs";
+import { test, assert, fs, path, root, DEFAULT_SETTINGS, normalizeSettings, createStore, bundle } from "./helpers.mjs";
 import { defaultRulesOf, rulesForLang, saveSettings, loadSettings } from "../../src/web/js/data/settings.js";
-import { detectLang, LANG_IDS } from "../../src/web/js/i18n.js";
+import { detectLang, LANG_IDS, textLang } from "../../src/web/js/i18n.js";
 import * as Audio from "../../src/web/js/audio.js";
 
 await test("settings: the sound switch became a volume — off stays off, on is normal, and a chosen volume is kept", () => {
@@ -104,6 +104,29 @@ await test("language: a Traditional Chinese system gets the Chinese interface, n
   assert.equal(detectLang(nav("de-DE")), "en");
   assert.equal(detectLang({ language: "zh-HK" }), "zh", "no list, one language");
   assert.equal(detectLang({ languages: [] }), "en");
+});
+
+await test("language: user content is tagged by its script — kana Japanese, hangul Korean, Han alone untagged — and tagged text has its own font stacks", () => {
+  assert.equal(textLang("井山裕太"), null, "Han characters alone could be Chinese or Japanese");
+  assert.equal(textLang("いやま ゆうた"), "ja");
+  assert.equal(textLang("一力 遼 (イチリキ)"), "ja");
+  assert.equal(textLang("신진서"), "ko");
+  assert.equal(textLang("申眞諝 신진서"), "ko");
+  assert.equal(textLang("Ke Jie"), null);
+  assert.equal(textLang(""), null);
+  assert.equal(textLang(null), null);
+  const css = fs.readFileSync(path.join(root, "src/web/styles.css"), "utf8");
+  const rule = (lang) => css.split("\n").find((l) => l.startsWith("[lang]:not(:root)") && l.includes(`:lang(${lang})`)) || "";
+  assert.match(rule("zh-Hant"), /"PingFang TC".*"Microsoft JhengHei UI"/, "Traditional Chinese faces");
+  assert.ok(rule("zh-Hant").includes(":lang(zh-TW)") && rule("zh-Hant").includes(":lang(zh-HK)"));
+  assert.match(rule("ja"), /"Hiragino Sans".*"Yu Gothic UI"/, "Japanese faces for a tagged name in any interface language");
+  assert.match(rule("ko"), /"Apple SD Gothic Neo".*"Malgun Gothic"/);
+  // A plain zh tag is Simplified, and does not catch what is tagged Traditional.
+  const plain = css.split("\n").find((l) => l.startsWith("[lang]:not(:root):lang(zh):not(")) || "";
+  assert.match(plain, /"PingFang SC"/);
+  assert.ok(plain.includes(":not(:lang(zh-Hant))"));
+  // Latin faces come first in each, so Latin text looks the same everywhere.
+  for (const l of ["zh-Hant", "ja", "ko"]) assert.match(rule(l), /font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text"/, l);
 });
 
 await test("new game: the rules a game starts with are the player's choice, else those of the interface language", async () => {

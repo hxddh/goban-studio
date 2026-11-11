@@ -21,8 +21,9 @@
  * - Grid lines are one device pixel; under GRID_MIN px a cell they would
  *   be most of the picture, so they are dropped. Star points appear from
  *   STAR_MIN px.
- * - Stones are flat discs that fill their cell. A white stone gets a
- *   hairline rim (never thinner than RIM_MIN device px) drawn *around*
+ * - Stones are flat discs that fill their cell (whole-pixel squares under
+ *   GRID_MIN px a cell, where a disc would be a blur). A white stone gets
+ *   a hairline rim (never thinner than RIM_MIN device px) drawn *around*
  *   it, so the stone keeps its size and still parts from the board at two
  *   pixels a cell; a black stone gets a light one on the dark boards.
  *
@@ -41,7 +42,7 @@ const STARS = { 19: [3, 9, 15], 13: [3, 6, 9], 9: [2, 4, 6] };
 
 /**
  * What to draw for a cols × rows position on a square of `pxDev` device
- * pixels: { cell, ox, oy, grid, stars, stoneR, rim, lineOffset }.
+ * pixels: { cell, ox, oy, grid, stars, starR, square, stoneR, rim, lineOffset }.
  */
 export function thumbPlan(cols, rows, pxDev) {
   const n = Math.max(1, cols, rows);
@@ -57,7 +58,9 @@ export function thumbPlan(cols, rows, pxDev) {
     grid,
     // Only a whole board has star points to show.
     stars: cell >= STAR_MIN && cols === rows && !!STARS[cols],
-    starR: Math.max(1, cell * 0.11),
+    starR: Math.max(1.25, cell * 0.12),
+    // Too small for a round stone: a crisp square of the whole cell.
+    square: !grid,
     // A little air between stones once there is room for it.
     stoneR: cell / 2 - (cell >= 8 ? 0.5 : 0),
     rim: Math.max(RIM_MIN, Math.min(1.5, cell * 0.07)),
@@ -128,19 +131,21 @@ export function drawThumb(ctx, spec, plan, pal, pxDev) {
   }
   // Rims first, as discs a hairline larger than the stones: every stone
   // then covers its neighbours' rims, and none loses size to its own.
+  const shape = (s, r) => {
+    if (plan.square) return ctx.fillRect(s.cx - r, s.cy - r, r * 2, r * 2);
+    ctx.beginPath();
+    ctx.arc(s.cx, s.cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
   for (const s of stones) {
     const st = s.c === "b" ? pal.stone.black : pal.stone.white;
     if (!st.rim) continue;
     ctx.fillStyle = st.rim;
-    ctx.beginPath();
-    ctx.arc(s.cx, s.cy, plan.stoneR + plan.rim, 0, Math.PI * 2);
-    ctx.fill();
+    shape(s, plan.stoneR + plan.rim);
   }
   for (const s of stones) {
     ctx.fillStyle = (s.c === "b" ? pal.stone.black : pal.stone.white).fill;
-    ctx.beginPath();
-    ctx.arc(s.cx, s.cy, plan.stoneR, 0, Math.PI * 2);
-    ctx.fill();
+    shape(s, plan.stoneR);
   }
 }
 

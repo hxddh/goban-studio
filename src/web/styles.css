@@ -77,6 +77,15 @@
 :root:lang(zh) { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; }
 :root:lang(ja) { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", system-ui, sans-serif; }
 :root:lang(ko) { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", system-ui, sans-serif; }
+/* Text in another language than the interface's (a player's name in an
+ * imported record, a language's own name): an element tagged with `lang`
+ * takes that language's faces, so a Japanese name keeps Japanese glyph
+ * forms in an English or Chinese window and Traditional Chinese is not set
+ * in a Simplified face. (i18n.js textLang tells which tag a string needs.) */
+[lang]:not(:root):lang(zh-Hant), [lang]:not(:root):lang(zh-TW), [lang]:not(:root):lang(zh-HK) { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans CJK TC", system-ui, sans-serif; }
+[lang]:not(:root):lang(zh):not(:lang(zh-Hant)):not(:lang(zh-TW)):not(:lang(zh-HK)) { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; }
+[lang]:not(:root):lang(ja) { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", system-ui, sans-serif; }
+[lang]:not(:root):lang(ko) { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", system-ui, sans-serif; }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -803,6 +812,8 @@ button.group-row:hover { background: var(--fill); }
 .settings-pane .settings-group > .fine { margin-top: calc(var(--s-1) * -1); }
 .level-row .level-now { margin-left: auto; font: 500 13px/20px var(--font); font-variant-numeric: tabular-nums; }
 .level-row > span:first-child { flex: none; }
+/* Numbers that change keep their width (docs/design.md §2): move numbers and points in the move list, counts in rows and heroes, download and update progress. */
+.move-grid, .hero-text h2, .gr-text span, .play-level, .model-status, .update-progress .fine, .status-line, .outcome { font-variant-numeric: tabular-nums; }
 .settings-sheet .sheet-body { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 .settings-split { display: grid; grid-template-columns: 184px 1fr; height: 100%; min-height: 0; border-top: 1px solid var(--line); }
 .settings-nav { display: flex; flex-direction: column; gap: 2px; padding: var(--s-3) var(--s-2); background: var(--sidebar); border-bottom-left-radius: var(--r-3); }

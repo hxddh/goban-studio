@@ -98,10 +98,12 @@ await test("thumbnails: what is drawn follows the cell size in device pixels —
   assert.equal(tiny.grid, false, "no grid at two pixels a cell");
   assert.equal(tiny.stars, false);
   assert.equal(tiny.stoneR, 1, "stones fill their cell");
+  assert.equal(tiny.square, true, "as crisp squares: a two-pixel disc would be a blur");
   assert.ok(tiny.rim >= RIM_MIN, "the rim stays a visible hairline");
   const retina = thumbPlan(19, 19, 80);
   assert.equal(retina.cell, 4);
   assert.equal(retina.grid, true, "the grid appears from four device pixels a cell");
+  assert.equal(retina.square, false, "round stones from there on");
   assert.equal(retina.stars, false);
   assert.ok(retina.rim >= RIM_MIN);
   // The same board on a hero (96 px) and the 44 px row.
@@ -143,7 +145,8 @@ await test("thumbnails: both notations give the same picture, rims are drawn und
       fillStyle: "",
       strokeStyle: "",
       lineWidth: 0,
-      fillRect: (...a) => calls.push(["rect", ctx.fillStyle, ...a]),
+      // A square stone (tiny cells) is recorded like a disc: centre and half-width.
+      fillRect: (x, y, w, h) => calls.push(w === 40 || calls.length === 0 ? ["rect", ctx.fillStyle, x, y, w, h] : ["disc", ctx.fillStyle, x + w / 2, y + h / 2, w / 2]),
       beginPath: () => {},
       moveTo: () => {},
       lineTo: () => calls.push(["line"]),
@@ -169,6 +172,9 @@ await test("thumbnails: both notations give the same picture, rims are drawn und
     assert.ok(lastRim >= 0 && lastRim < firstBody, `${pal.key}: rims before bodies`);
     assert.equal(discs.filter((c) => c[4] === stoneR).length, 2, "two stones");
   }
+  // At two pixels a cell the stones are squares, the rim still under and around them.
+  const tinyCalls = draw(fromString("w" + ".".repeat(360), 19), 40, boardPalette());
+  assert.deepEqual(tinyCalls.filter((c) => c[0] === "disc").map((c) => [c[1], c[4]]), [[boardPalette().stone.white.rim, 1 + thumbPlan(19, 19, 40).rim], [boardPalette().stone.white.fill, 1]]);
   // No grid is stroked when the cells are too small for one.
   assert.ok(!draw(fromString(".".repeat(361), 19), 40, boardPalette()).some((c) => c[0] === "stroke"));
   assert.ok(draw(fromString(".".repeat(361), 19), 80, boardPalette()).some((c) => c[0] === "stroke" && c[2] === 1), "one device pixel");

@@ -34,24 +34,24 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
     await check(`v13 ui: Play's home, Settings' new rows, Retry and the turned problem in ${locale}, ${scheme} — audit`, async () => {
       const page = await fresh(locale);
       await page.emulateMedia({ colorScheme: scheme });
-      // A new player: Learn opens; Play has no game, so it shows its home with the suggested game.
+      // A new player: Today opens; Play has no game, so it shows its home with the suggested game.
       await page.goto(origin + "/");
       await page.waitForSelector(".ob-card");
       await page.click(".ob-card .btn.primary");
       await page.click(".choice >> nth=0");
-      await page.waitForSelector(".steps");
+      await page.waitForSelector('.page.today [data-hero="first-lesson"]');
       await page.keyboard.press("Control+2");
       await page.waitForSelector(".play-home .hero");
       assert((await page.locator("canvas.board").count()) === 0, "no blank board in Play");
       assert(await page.evaluate(() => window.__state.game === null), "no game made up");
       await inspect(page, `${locale} Play's home`);
-      // Settings: the confirm-move switches (Playing) and the Undo restore row (Data, with a snapshot there).
+      // Settings: the confirm-move switches (Board) and the Undo restore row (Data, with a snapshot there).
       await page.evaluate(() => localStorage.setItem(`goban9:backups/pre-restore-${Date.now() - 60000}/settings.json`, "{}"));
       await page.reload();
       await page.waitForFunction(() => window.__state?.ready);
       await page.keyboard.press("Control+,");
-      await page.click('[data-pane="playing"]');
-      await inspect(page, `${locale} Settings, Playing`);
+      await page.click('[data-pane="board"]');
+      await inspect(page, `${locale} Settings, Board`);
       await page.click('[data-pane="data"]');
       await page.waitForSelector("[data-undo-restore]");
       await inspect(page, `${locale} Settings, Data with Undo restore`);

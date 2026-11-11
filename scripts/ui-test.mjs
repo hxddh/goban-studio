@@ -150,11 +150,21 @@ async function clickPoint(page, x, y) {
   await page.mouse.click(p.x, p.y);
 }
 
+/**
+ * Go through onboarding and start what the answer asked for: lesson one
+ * (choice 0), the gentle 9×9 game (1) or the 19×19 game (2). Every new
+ * player lands on Today first (`firstLanding` checks that screen itself);
+ * its hero's primary starts the lesson or the game in one click, which is
+ * where the checks that call this begin.
+ */
 async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.goto(origin + "/");
   await page.waitForSelector(".ob-card");
   await page.click(".ob-card .btn.primary");
   await page.click(`.choice >> nth=${choice}`);
+  await firstLanding(page, choice);
+  await page.click(".today .hero .btn.primary");
+  await page.waitForFunction(() => window.__state.space !== "today");
   await page.waitForSelector("canvas.board, .page");
   // v10: someone who knows the rules is offered the placement quiz on Learn's
   // home; checks that are not about it answer "Not now" first, then come back.
@@ -170,6 +180,17 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   // The store writes a moment later (data/store.js): onboarding is on disk before a test reloads.
   // (With a fake native host the files go to the host instead.)
   await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:settings.json") || "{}").onboarded === true, null, { timeout: 3000 });
+}
+
+/** After the last onboarding answer: Today, with the hero for that answer and nothing started. */
+async function firstLanding(page, choice) {
+  // Someone who plays is asked for a level first.
+  if (choice === 2) {
+    await page.waitForSelector(".ob-card .slider-field");
+    await page.click(".ob-card .btn.primary");
+  }
+  await page.waitForSelector(".page.today .hero .btn.primary");
+  await page.waitForSelector(".ob-card", { state: "detached" });
 }
 
 async function snap(page, name, mask = []) {
@@ -206,7 +227,7 @@ async function snap(page, name, mask = []) {
 
 /* ------------------------------------------------------------- flows */
 
-await check("first run → lesson one for a new player, no errors", async () => {
+await check("first run → Today, then lesson one in one click for a new player, no errors", async () => {
   // Each run is a new browser context (cold cache); the last page goes on.
   let page;
   const timing = await withinBudget("firstRender", "first render", async () => {
@@ -219,6 +240,10 @@ await check("first run → lesson one for a new player, no errors", async () => 
   });
   await page.click(".ob-card .btn.primary");
   await page.click(".choice >> nth=0");
+  // Nobody is dropped into a lesson: the app's home first, its hero offering lesson one.
+  await page.waitForSelector('.page.today [data-hero="first-lesson"]');
+  assert((await page.locator(".steps, canvas.board").count()) === 0, "a lesson or a board opened by itself");
+  await page.click(".today .hero .btn.primary");
   await page.waitForSelector(".steps");
   assert((await page.textContent(".panel")).includes("Step 1"), "lesson one did not open");
   assert(page.errors.length === 0, page.errors.join("; "));
@@ -527,7 +552,10 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await audit(page, "onboarding");
     await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
-    await page.waitForSelector("canvas.board, .page");
+    await firstLanding(page, 1);
+    await audit(page, "Today on the first run");
+    await page.click(".today .hero .btn.primary");
+    await page.waitForSelector("canvas.board");
     await audit(page, "the board");
     for (const [k, name] of [["1", "Today"], ["2", "Play"], ["3", "Practice"], ["4", "Library"]]) {
       await page.keyboard.press("Control+" + k);
@@ -722,7 +750,7 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
 // Each area keeps its browser checks in scripts/ui-tests/*.mjs (by area: shell-*, play-*, learn-*).
 for (const f of fs.readdirSync(path.join(root, "scripts/ui-tests")).filter((n) => n.endsWith(".mjs")).sort()) {
   const mod = await import("./ui-tests/" + f);
-  await mod.default({ check, assert, fresh, onboard, clickPoint, pointOf, origin, browser, audit, medianOf });
+  await mod.default({ check, assert, fresh, onboard, firstLanding, clickPoint, pointOf, origin, browser, audit, medianOf });
 }
 
 /* ------------------------------------------------------------ visuals */
