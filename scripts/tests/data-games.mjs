@@ -97,6 +97,58 @@ await test("data games: one file per game; the game in progress is separate and 
   }
 });
 
+await test("data games: the history in two groups, in three orders; several games deleted at once", () => {
+  const { store } = memStore();
+  Games.useStore(store);
+  try {
+    const at = (id, t) => Games.patchGame(id, { updatedAt: t });
+    const won = Games.saveGame(finished("B+R"), { name: "won", opponent: "ai", humanColor: BLACK });
+    const lost = Games.saveGame(finished("W+3.5"), { name: "lost", opponent: "ai", humanColor: BLACK });
+    const whiteWon = Games.saveGame(finished("W+R"), { name: "won as White", opponent: "ai", humanColor: -1 });
+    const draw = Games.saveGame(finished("Draw"), { name: "draw", opponent: "ai", humanColor: BLACK });
+    const imp = Games.saveGame(finished("B+R"), { name: "imported", source: "import" });
+    const open1 = Games.saveGame(finished(null), { name: "unfinished 1", opponent: "ai", humanColor: BLACK });
+    const open2 = Games.saveGame(finished(null), { name: "unfinished 2", opponent: "human" });
+    const board = Games.saveGame(finished(null), { name: "a board", source: "board" });
+    [won, lost, whiteWon, draw, imp, open1, open2, board].forEach((r, i) => at(r.id, 1000 + i));
+    const { unfinished, finished: rest } = Games.groupGames(Games.listGames());
+    assert.deepEqual(unfinished.map((g) => g.name), ["unfinished 2", "unfinished 1"], "games played here without a result, newest first");
+    assert.deepEqual(rest.map((g) => g.name), ["a board", "imported", "draw", "won as White", "lost", "won"], "everything else: a saved board and an imported record are not games to continue");
+    assert.deepEqual(Games.sortGames(rest, "oldest").map((g) => g.name), ["won", "lost", "won as White", "draw", "imported", "a board"]);
+    assert.deepEqual(Games.sortGames(rest, "newest").map((g) => g.name), rest.map((g) => g.name));
+    assert.deepEqual(Games.sortGames(rest, "result").map((g) => g.name), ["won as White", "won", "lost", "a board", "imported", "draw"], "your wins, your losses, then the rest; newest first within each");
+    assert.deepEqual(Games.sortGames(rest, "nonsense").map((g) => g.name), rest.map((g) => g.name));
+    assert.notEqual(Games.sortGames(rest), rest, "a new array");
+    assert.deepEqual(Games.SORTS, ["newest", "oldest", "result"]);
+    // Several at once (the unfinished games cleared, an import undone).
+    assert.equal(Games.deleteGames([open1.id, open2.id, "no-such-game", "../x"]), 2);
+    assert.equal(Games.groupGames(Games.listGames()).unfinished.length, 0);
+    assert.equal(Games.listGames().length, 6);
+  } finally {
+    Games.useStore(null);
+  }
+});
+
+await test("data games: a game's biggest swing is in the index, for its row, when KataGo's review is stored", async () => {
+  const { store } = memStore();
+  Games.useStore(store);
+  try {
+    const a = Games.saveGame(finished(), { name: "a", opponent: "ai", humanColor: BLACK });
+    assert.equal(Games.getGame(a.id).swing, null, "no review yet");
+    const moments = [{ index: 12, loss: 3.26 }, { index: 31, loss: 11.74 }, { index: 40, loss: null }];
+    Games.patchGame(a.id, { report: { v: 1, lineKey: "x", confidence: "high", moments } });
+    assert.deepEqual(Games.getGame(a.id).swing, { index: 31, loss: 11.5 }, "the costliest moment, to half a point");
+    assert.deepEqual(Games.listGames()[0].swing, { index: 31, loss: 11.5 });
+    await store.flush();
+    assert.deepEqual(store.get(Games.INDEX_KEY).games[a.id].review.swing, { index: 31, loss: 11.5 }, "kept in the index: the list reads no game file");
+    // The offline estimate names no losses: nothing to show.
+    Games.patchGame(a.id, { report: { v: 1, lineKey: "x", confidence: "low", moments: [{ index: 5, loss: null }] } });
+    assert.equal(Games.getGame(a.id).swing, null);
+  } finally {
+    Games.useStore(null);
+  }
+});
+
 await test("data games: the analysis and the review live in the game's own file and go with it", () => {
   const { store } = memStore();
   Games.useStore(store);

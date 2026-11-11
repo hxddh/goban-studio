@@ -284,6 +284,17 @@ with `assisted: true`: it stays in the list and its analysis still feeds
 the focus, but it makes no rating step and no history point, and its
 moves are not read as a prior either.
 
+**A game counted again is rated again, not twice.** `model/rerate.js`:
+`rateBase(profile, size)` is the estimate's state on a board size before a
+game is recorded (the app keeps it with the game's file); `rerateGame(
+profile, id, { won, result, opponent, base })` puts that state back, takes
+the game's point out of the history and records the game again under its
+new result, so a recount that turns a win into a loss leaves exactly what
+a loss would have left. `canRerate` allows it only while no later game on
+that board size has been rated (a step cannot be taken out of the middle
+of the estimate); a game that was never rated can always be recorded
+again.
+
 None of this needed a new file version: `first`, `seen`, `days`, `marks`,
 `assisted` and a history point's `r`/`sd` are optional additions to the
 version-13 profile, and a file without them reads as before.
