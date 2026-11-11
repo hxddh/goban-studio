@@ -27,7 +27,7 @@ export function statusOf(s = state) {
   }
   for (const kind of KINDS) {
     const one = s.models?.[kind];
-    if (isBusy(one)) return { kind: "modelDownloading", pane: "playing", icon: "download", text: t("status.downloading", [percent(one)]) };
+    if (isBusy(one)) return { kind: "modelDownloading", pane: "engines", icon: "download", text: t("status.downloading", [percent(one)]) };
   }
   if (u?.status === "available") return { kind: "updateAvailable", pane: "about", icon: "sparkle", text: t("status.updateAvailable") };
   return null;

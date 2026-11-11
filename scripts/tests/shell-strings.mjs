@@ -95,7 +95,9 @@ await test("every key in the string table is used by the interface", () => {
     "explorer.tag.", // explorer.jsx: "explorer.tag." + tag
     "goal.", // practice-ctl.js goalText: "goal." + pz.goal
     "grade.", // "grade." + 1…5
+    "explorer.row.", // play/home.jsx: the two explorer rows, whole | corner
     "library.kind.", // play/home.jsx: the history's filter chips
+    "library.sort.", // play/home.jsx: the sort choices
     "lossKind.", // insight.js loss kinds
     "models.error.", // models-ctl.js modelErrorText
     "models.human.", // sheets.jsx ModelRow: `models.${kind}.name` / `.desc`

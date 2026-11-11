@@ -259,6 +259,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     // Black's wall was dead after all.
     await clickPoint(page, 4, 0);
     await page.waitForFunction(() => window.__state.review.recount.dead.length === 9);
+    // The board is drawn from the state a frame later: wait for the board itself.
+    await page.waitForFunction(() => window.__board.model.deadStones.length === 9);
     seen = await onBoard();
     assert(seen.dead === 9 && seen.black === 0, JSON.stringify(seen));
     await page.click(".review-panel .score-card .btn.primary");

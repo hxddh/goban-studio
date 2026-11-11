@@ -127,7 +127,7 @@ export default async function ({ check, assert, fresh, clickPoint, origin }) {
     // The rows.
     const row = (name) => page.locator(".game-item", { hasText: name }).first();
     const first = (await row("Game 1").locator(".gr-text span").first().textContent()).replace(/\s+/g, " ");
-    assert(first.startsWith("Today · 9 × 9 · 8 moves · vs computer"), first);
+    assert(first.startsWith("Today · 9 × 9 · 8 moves · Computer, "), first);
     assert(first.includes("biggest swing at move 41 (about 12.5 points)"), "the analysed game's biggest swing: " + first);
     assert((await row("Game 2").locator(".gr-text span").first().textContent()).startsWith("Yesterday"), "yesterday is said as a day");
     assert(/\b20\d\d\b/.test(await row("Game 3").locator(".gr-text span").first().textContent()), "after a week it is a date");

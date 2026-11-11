@@ -30,7 +30,7 @@ await test("shell status: an update ready, being downloaded or there to download
   assert.equal(statusOf({ updateCheck: { status: "downloading", progress: null }, models: models() }).text, t("status.downloadingUpdate"));
   assert.equal(statusOf({ updateCheck: { status: "downloading", progress: 1 }, models: models() }).text, t("status.downloading", [99]), "never 100% before it is ready");
   const model = statusOf({ updateCheck: null, models: models({ human: { status: "downloading", progress: 0.07 } }) });
-  assert.deepEqual([model.kind, model.pane, model.text], ["modelDownloading", "playing", t("status.downloading", [7])]);
+  assert.deepEqual([model.kind, model.pane, model.text], ["modelDownloading", "engines", t("status.downloading", [7])]);
   assert.equal(statusOf({ updateCheck: null, models: models({ strong: { status: "verifying", progress: 1 } }) }).kind, "modelDownloading");
   const there = statusOf({ updateCheck: { status: "available", latest: "14.0.0" }, models: models() });
   assert.deepEqual([there.kind, there.pane, there.text], ["updateAvailable", "about", t("status.updateAvailable")]);
