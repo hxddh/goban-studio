@@ -91,7 +91,8 @@ export default async function ({ test, assert, root }) {
     assert.equal(rec.rating.before, Math.round(P.thetaToGoR(mu0)));
     assert.equal(rec.rating.delta, rec.rating.after - rec.rating.before);
     assert.ok(rec.rating.delta > 0);
-    assert.deepEqual(won.history, [{ at: 1, size: 19, rank: P.estimate(won).rank, pm: P.estimate(won).pm }]);
+    const est = P.estimate(won);
+    assert.deepEqual(won.history, [{ at: 1, size: 19, rank: est.rank, pm: est.pm, r: est.r, sd: Math.round((est.hi - est.lo) / 2) }]);
     // Other boards keep their prior.
     assert.equal(won.rating[9].games, 0);
     assert.equal(won.rating[9].mu, mu0);
@@ -351,7 +352,7 @@ export default async function ({ test, assert, root }) {
   await test("model review: v9–v12 problem records migrate to the memory model (migrateProblemRecord)", () => {
     const old = { tries: 3, solved: true, clean: true, last: NOW - 2 * DAY, due: NOW + 5 * DAY, streak: 3, solvedAt: NOW - 2 * DAY };
     const m = P.migrateProblemRecord(old);
-    assert.deepEqual(m, { tries: 3, streak: 3, due: NOW + 5 * DAY, s: 7, d: 3.5, reps: 3, lapses: 0, rating: P.RATING.GOOD, solved: true, clean: true, last: NOW - 2 * DAY, solvedAt: NOW - 2 * DAY });
+    assert.deepEqual(m, { tries: 3, streak: 3, due: NOW + 5 * DAY, s: 7, d: 3.5, reps: 3, lapses: 0, rating: P.RATING.GOOD, solved: true, clean: true, last: NOW - 2 * DAY, solvedAt: NOW - 2 * DAY, first: "clean" });
     const missed = P.migrateProblemRecord({ tries: 1, solved: false, clean: false, last: NOW, due: NOW + DAY, streak: 0 });
     assert.deepEqual([missed.s, missed.d, missed.lapses, missed.rating, missed.due], [P.MEMORY.S0[0], 6.5, 1, P.RATING.AGAIN, NOW + DAY]);
     // Idempotent, pure, and the v13 shape passes through.
@@ -419,7 +420,7 @@ export default async function ({ test, assert, root }) {
 
   await test("model profile: v9–v13 are read; anything else is not read; bad parts are dropped", () => {
     const empty = P.newProfile();
-    assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "placement", "problems", "rating", "v", "week"]);
+    assert.deepEqual(Object.keys(empty).sort(), ["classics", "days", "games", "history", "lessons", "marks", "mistakes", "placement", "problems", "rating", "v", "week"]);
     assert.equal(empty.v, 13);
     assert.deepEqual(Object.keys(empty.rating), ["9", "13", "19"]);
     // A v8 progress object, or junk, is not migrated.
@@ -579,9 +580,16 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.solvingLevel([...at(1, 4, 1), ...at(2, 4, 1), ...at(3, 1, 4)]), 2);
     // A lucky run at grade 4 over misses at grade 2 is not level 4.
     assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 1, 4), ...at(4, 5, 0)]), 1);
-    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)]), 4, "consistent below: level 4");
-    // A grade without results does not block the grades above it.
-    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)]), 3);
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(3, 2, 0), ...at(4, 5, 0)]), 4, "consistent below: level 4");
+    // A grade without results blocks the grades above it…
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)]), 2, "nothing known at grade 3");
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)]), 1);
+    assert.equal(P.solvingLevel(at(5, 6, 0)), 1, "grade 5 alone says nothing about the grades below");
+    assert.equal(P.solvingLevel(at(5, 6, 0), { fallback: false }), null);
+    // …unless the grade the player was started at covers it (the placement, or `cover`).
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)], { cover: 2 }), 3);
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)], { prior: 3 }), 4);
+    assert.equal(P.solvingLevel(at(5, 6, 0), { prior: 3, fallback: false }), null, "placed at 3: grade 4 is not covered");
     // Three of five clean at grade 3: not enough alone (smoothed to 4/7), enough with a prior of 3 (4.5/7), not with a prior of 1.
     assert.equal(P.solvingLevel(at(3, 3, 2)), 1);
     assert.equal(P.solvingLevel(at(3, 3, 2), { prior: 3 }), 3);
@@ -679,7 +687,7 @@ export default async function ({ test, assert, root }) {
     for (const it of focusItems) assert.ok(GRADES[it.id].grade >= 2 && GRADES[it.id].grade <= 3);
     const stretch = items.filter((i) => i.role === "stretch");
     assert.equal(stretch.length, 1);
-    assert.equal(GRADES[stretch[0].id].grade, 4);
+    assert.equal(GRADES[stretch[0].id].grade, 3, "one grade above the level, no more");
     assert.deepEqual(P.planProblems({ profile: p, model, pool: PROBLEMS, grades: GRADES, now: NOW + 3600000 }), items);
     // Without a focus: the reviews, no focus problems; the level is measured, so one stretch.
     const plain = P.planProblems({ profile: p, model: { ...model, focus: [] }, pool: PROBLEMS, grades: GRADES, now: NOW });
@@ -811,17 +819,18 @@ export default async function ({ test, assert, root }) {
         assert.ok(grade <= P.PLACEMENT.MAX_GRADE + 1 && Math.abs(grade - P.placementTarget(results)) <= 1, `${id} grade ${grade}, target ${P.placementTarget(results)}`);
         results.push({ id, grade, solved: answer(grade) });
       }
-      assert.ok(results.length >= P.PLACEMENT.MIN && results.length <= P.PLACEMENT.MAX, `${results.length} problems`);
       assert.equal(results[0].grade, P.PLACEMENT.START);
+      if (P.placementFloored(results)) return { grade: P.placementGrade(results), ids: results.map((r) => r.id), n: results.length };
+      assert.ok(results.length >= P.PLACEMENT.MIN && results.length <= P.PLACEMENT.MAX, `${results.length} problems`);
       const life = results.filter((r) => P.PLACEMENT.LIFE_GOALS.includes(def(r.id).goal)).length;
       assert.ok(life >= P.PLACEMENT.LIFE, `${life} life-and-death problems`);
       assert.ok(new Set(results.map((r) => def(r.id).theme)).size >= 5, "themes mixed");
       return { grade: P.placementGrade(results), ids: results.map((r) => r.id), n: results.length };
     };
     assert.equal(run(() => true).grade, P.PLACEMENT.MAX_GRADE, "every answer right: capped");
-    const wrong = run(() => false);
-    assert.equal(wrong.grade, 1, "every answer wrong");
-    assert.equal(wrong.n, P.PLACEMENT.MIN, "a stable grade ends the quiz early");
+    const stable = run((g) => g <= 1);
+    assert.equal(stable.grade, 1);
+    assert.equal(stable.n, P.PLACEMENT.MIN, "a stable grade ends the quiz early");
     assert.equal(run((g) => g <= 3).grade, 3, "solves up to grade 3");
     assert.equal(run((g) => g <= 2).grade, 2);
     // Drawn per player: another seed, another quiz; the same seed, the same quiz.
@@ -834,8 +843,20 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.placementGrade([]), null);
     assert.equal(P.placementGrade([g3(true)]), 1, "one solve is not enough");
     assert.equal(P.placementGrade([g3(true), g3(true)]), 3);
-    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false)]), 3);
-    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false), g3(false)]), 1);
+    // From grade 3 up it must be solved more often than missed; at grade 2 as often is enough.
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false)]), 3);
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false)]), 1, "half right at grade 3 is not passed");
+    const g2 = (solved) => ({ id: "y", grade: 2, solved });
+    assert.equal(P.placementGrade([g2(true), g2(true), g2(false), g2(false)]), 2);
+    assert.equal(P.placementGrade([g2(true), g2(true), g2(false), g2(false), g2(false)]), 1);
+    // The floor: the first four answers all missed end the quiz at grade 1.
+    const none = run(() => false);
+    assert.deepEqual([none.grade, none.n], [1, P.PLACEMENT.FLOOR], "every answer wrong: four problems, grade 1");
+    const miss = (grade) => ({ id: "m" + grade + Math.random(), grade, solved: false });
+    assert.ok(!P.placementDone([miss(2), miss(1), miss(1)]), "three misses are not the floor yet");
+    assert.ok(P.placementDone([miss(2), miss(1), miss(1), miss(1)]));
+    assert.ok(!P.placementDone([miss(2), miss(1), { id: "s", grade: 1, solved: true }, miss(2)]), "one solve among the first four: the quiz goes on");
+    assert.ok(!P.placementFloored([{ id: "s", grade: 2, solved: true }, miss(3), miss(2), miss(1), miss(1)]), "only the first four count");
     assert.equal(P.placementGrade([{ grade: 5, solved: true }, { grade: 5, solved: true }]), 1, "grade 5 is beyond the placement");
     assert.ok(!P.placementDone([]));
 

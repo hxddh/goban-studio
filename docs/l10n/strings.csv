@@ -737,7 +737,7 @@
 "explorer.zoomCorner","Zoom to the corner","放大右上角","","우상귀 확대","","右上隅を拡大",""
 "explorer.zoomWhole","Show the whole board","显示整个棋盘","","판 전체 보기","","盤全体を表示",""
 "explorer.name.whole.san-san","3-3 point","三三","","삼삼","","三々",""
-"explorer.name.whole.high-chinese","High Chinese opening","高中国流","","높은 중국류","","高い中国流",""
+"explorer.name.whole.high-chinese","High Chinese opening","高中国流","","고중국류","","高中国流",""
 "explorer.name.whole.komoku-star","3-4 point and star point","小目·星位","","소목·화점","","小目・星",""
 "explorer.name.whole.star-early-33","Early 3-3 invasion","早点三三","","이른 삼삼 침입","","早い三々入り",""
 "explorer.name.corner.star-knight-response","Star point, knight's move response","星位·小飞挂·小飞应","","화점 날일자 걸침·날일자 받기","","星・小ゲイマガカリ・小ゲイマ受け",""

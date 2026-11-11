@@ -63,6 +63,33 @@ try {
     assert.equal(keyNow(), key);
   });
 
+  await test("learn session: a lesson step's goal line is its own where the lesson gives one, else the line of its kind", () => {
+    beginner("stones-board");
+    C.openLesson("stones-board", 0);
+    const cur = () => state.learn.lesson.cur;
+    assert.equal(cur().kind, "read");
+    assert.equal(C.stepGoalText(cur()), null, "a read step has no goal line");
+    C.lessonContinue();
+    assert.equal(cur().kind, "place");
+    assert.equal(C.stepGoalText(cur()), "Black to play: the centre point");
+    state.settings = { ...state.settings, lang: "zh" };
+    A.setLang("zh");
+    assert.equal(C.stepGoalText(cur()), "黑先，下在棋盘正中央");
+    state.settings = { ...state.settings, lang: "en" };
+    A.setLang("en");
+    C.lessonContinue();
+    assert.equal(C.stepGoalText(cur()), "Black to play: next to your stone");
+    // A place step without its own goal keeps the generic line; a problem step its puzzle's goal.
+    C.openLesson("stones-liberties", 3);
+    assert.equal(cur().kind, "problem");
+    assert.equal(C.stepGoalText(cur()), C.goalText(cur().pz));
+    const plain = COURSE.flatMap((u) => u.lessons).find((l) => l.steps.some((s) => s.kind === "place" && !s.goal));
+    C.openLesson(plain.id, plain.steps.findIndex((s) => s.kind === "place" && !s.goal));
+    assert.equal(C.stepGoalText(cur()), "Black to play: find the best point");
+    assert.equal(C.stepGoalText(null), null);
+    C.learnHome();
+  });
+
   await test("learn session: a restart keeps what is done today; another day starts afresh", async () => {
     beginner("stones-capture");
     C.startPath();

@@ -20,8 +20,11 @@
  * `ko: "ok"` step at any level. v13: an endgame step (`goal: "endgame"`,
  * the solver's counting mode) is proved like the bank's endgame problems:
  * validate() checks the exact count and the stored answer and margin, or
- * value and choices. Text must exist in all four languages. Exits non-zero
- * on any failure.
+ * value and choices. Text must exist in all four languages. A lesson has
+ * at most two read steps, never two in a row, and a read step says one
+ * thing: at most 420 characters in English and 170 in Chinese. A place or
+ * problem step may carry its own goal line (`goal`, four languages). Exits
+ * non-zero on any failure.
  */
 import { COURSE } from "../src/web/js/content/course.js";
 import { createPuzzle, solveFirstMoves, solutionLine, initialState, play, indexOf, status, parseDiagram, outsideReach, validate } from "../src/web/js/solver.js";
@@ -33,6 +36,9 @@ const MIN_STEPS = 310;
 const LEVELS = [undefined, "intermediate", "advanced"];
 const MIN_ADVANCED_LESSONS = 27;
 const MAX_PROBLEM_MS = 2000;
+/** Read steps per lesson (never two in a row), and how long one may be, by language. */
+const MAX_READS = 2;
+const MAX_READ = { en: 420, zh: 170 };
 const showLines = process.argv.includes("--lines");
 
 const failures = [];
@@ -165,9 +171,19 @@ for (const unit of COURSE) {
       }
       kinds[step.kind]++;
       checkText(sw, "text", step.text);
+      // A step's own goal line (shown in place of the generic "find the best point").
+      if (step.goal !== undefined) {
+        checkText(sw, "goal", step.goal);
+        if (step.kind === "read") fail(sw, "a read step has no goal line");
+      }
       if (step.kind === "read") {
         reads++;
         if (i > 0 && list[i - 1].kind === "read") fail(sw, "two read steps in a row");
+        // One thing per step: a read step is short enough to take in at a glance.
+        for (const [lang, max] of Object.entries(MAX_READ)) {
+          const n = step.text?.[lang]?.length || 0;
+          if (n > max) fail(sw, `read step is ${n} characters in ${lang} (at most ${max}): split it or trim it`);
+        }
         if (step.board) {
           const placed = placeDiagram(sw, step.board);
           if (placed) {
@@ -288,7 +304,7 @@ for (const unit of COURSE) {
         }
       }
     });
-    if (reads > 1) fail(lw, `${reads} read steps (at most one per lesson)`);
+    if (reads > MAX_READS) fail(lw, `${reads} read steps (at most ${MAX_READS} per lesson, never two in a row)`);
   }
 }
 

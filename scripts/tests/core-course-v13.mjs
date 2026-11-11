@@ -55,7 +55,47 @@ await test("v13 advanced: opening and joseki come first, handicap strategy last,
   assert.deepEqual(adv.filter((id) => v6.includes(id)), v6);
 });
 
+await test("advanced opening: the Chinese opening is Q16, Q3 and R9 — the side stone one line below the middle, nearer the 3-4 point", () => {
+  const l = lesson("adv-open-chinese");
+  const stones = (board, ch) => board.diagram.flatMap((row, y) => row.split(" ").map((c, x) => (c === ch ? `${x},${y}` : null)).filter(Boolean)).sort();
+  // [x, y] from the top left: Q16 = 15,3; Q3 = 15,16; R9 = 16,10; Q9 = 15,10; D4 = 3,15; D16 = 3,3.
+  const read = l.steps[0];
+  assert.deepEqual(stones(read.board, "X"), ["15,16", "15,3", "16,10"], "the diagram: Q16, Q3, R9");
+  assert.deepEqual(stones(read.board, "O"), ["3,15", "3,3"]);
+  const label = (s) => read.board.marks.find((m) => m.label === s);
+  assert.deepEqual([label("1").x, label("1").y, label("3").x, label("3").y, label("5").x, label("5").y], [15, 3, 15, 16, 16, 10]);
+  assert.deepEqual([label("A").x, label("A").y], [15, 10], "A is the high Chinese opening's Q9");
+  // The first exercise: R9 or Q9, and nothing else.
+  assert.deepEqual(stones(l.steps[1].board, "X"), ["15,16", "15,3"]);
+  assert.deepEqual(l.steps[1].accept, [{ x: 16, y: 10 }, { x: 15, y: 10 }]);
+  // The second, along the bottom: the same three points mirrored on the diagonal (D4, R4, and L3 or L4).
+  const flip = (list) => list.map((p) => p.split(",").reverse().join(",")).sort();
+  assert.deepEqual(stones(l.steps[2].board, "X"), flip(stones(l.steps[1].board, "X")));
+  assert.deepEqual(stones(l.steps[2].board, "O"), flip(stones(l.steps[1].board, "O")));
+  assert.deepEqual(l.steps[2].accept, [{ x: 10, y: 16 }, { x: 10, y: 15 }]);
+  // No language says "the very middle" any more, and the terms are the usual ones.
+  for (const s of l.steps) for (const f of ["text", "success", "wrong"]) if (s[f]) {
+    assert.doesNotMatch(s[f].zh, /正中央/, "zh");
+    assert.doesNotMatch(s[f].en, /[Hh]alfway/, "en");
+    assert.doesNotMatch(s[f].ko, /높은 중국류/, "ko");
+    assert.doesNotMatch(s[f].ja, /高い中国流/, "ja");
+  }
+  assert.match(read.text.en, /one line below the middle/);
+  assert.match(read.text.zh, /比正中低一路/);
+  // The other lessons that show the opening use the same stones.
+  for (const [id, i] of [["adv-open-direction", 2], ["adv-joseki-choose", 2]]) {
+    const b = stones(lesson(id).steps[i].board, "X");
+    for (const p of ["15,3", "15,16", "16,10"]) assert.ok(b.includes(p), `${id}#${i}: ${p}`);
+  }
+  // Against it White approaches from the bottom, one point away from the 3-4 stone — not between Black's stones.
+  assert.deepEqual(lesson("adv-open-direction").steps[2].accept, [{ x: 13, y: 16 }, { x: 13, y: 15 }]);
+});
+
 await test("v13 advanced: every opening and joseki step the book knows accepts only book-quality moves", () => {
+  // The Chinese opening's side stone: the book has the position before it, but KataGo's search there
+  // did not look at R9 or Q9 (it prefers an enclosure), so these two steps have no evaluation to hold
+  // them to. When a rebuilt book lists the move, this exception fails and must go.
+  const unsearched = new Set(["adv-open-chinese#1", "adv-open-chinese#2"]);
   let known = 0;
   for (const id of ["adv-opening", "adv-joseki", "adv-handicap"])
     for (const l of unit(id).lessons)
@@ -64,12 +104,18 @@ await test("v13 advanced: every opening and joseki step the book knows accepts o
         const { hit, x0, y0 } = bookHit(s.board, s.toMove);
         if (!hit) return;
         const judged = s.accept.map((a) => hit.continuations.find((c) => c.x === a.x + x0 && c.y === a.y + y0)).filter(Boolean);
+        if (unsearched.has(`${l.id}#${i}`)) {
+          assert.equal(judged.length, 0, `${l.id}#${i}: the book now evaluates this step; take it out of the exception`);
+          return;
+        }
         assert.ok(judged.length, `${l.id}#${i}: no accepted point is a book move or a KataGo candidate`);
         for (const c of judged) assert.ok(c.loss <= Book.JOSEKI_LOSS, `${l.id}#${i}: an accepted point loses ${c.loss.toFixed(1)} points in the book`);
         known++;
       });
-  // The named lines (Chinese opening, sanrensei, the pincers, the 3-4 approaches) are all covered.
-  assert.ok(known >= 20, `${known} steps checked against the book`);
+  // The named lines (sanrensei, the pincers, the 3-4 approaches) are all covered. The steps on the
+  // Chinese opening are not: the book was built before its line was corrected and has no evaluation
+  // for them (docs/lesson-audit.md, "v13 units waiting for a run").
+  assert.ok(known >= 19, `${known} steps checked against the book`);
 });
 
 await test("v13 advanced: the joseki read diagrams number book lines move by move", () => {

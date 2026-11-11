@@ -88,6 +88,22 @@ await test("learn placement: offered once to someone who knows the rules; 10–1
   assert.notDeepEqual(other, seen);
 });
 
+await test("learn placement: four misses in a row from the start end the quiz there, at grade 1", async () => {
+  knowsRules();
+  const seen = await takeQuiz(5, 0);
+  assert.equal(seen.length, PM.PLACEMENT.FLOOR, "no more problems after the first four are missed");
+  assert.deepEqual(seen.map((id) => GRADES[id].grade), [2, 1, 1, 1]);
+  assert.equal(state.learn.placement, null);
+  assert.equal(state.learn.view, "home");
+  assert.equal(state.profile.placement.grade, 1);
+  assert.equal(C.placementOffered(), false);
+  // One solve among the first four: the quiz goes on to its usual length.
+  knowsRules();
+  const longer = await takeQuiz(5, 1);
+  assert.ok(longer.length >= PM.PLACEMENT.MIN, `${longer.length} problems`);
+  assert.equal(state.profile.placement.grade, 1);
+});
+
 await test("learn placement: Continue without an answer counts as missed; leaving ends it unfinished; Not now is remembered", () => {
   knowsRules();
   C.startPlacement({ seed: 3 });

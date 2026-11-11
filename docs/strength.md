@@ -1187,6 +1187,12 @@ anchor as the labels (GoR(θ) = 4100 − K·e^(−θ/20), K fixed by
 Opponents are the levels' **measured** θ (the tables above), not their
 rounded labels: on 19×19 `30k` is θ 0 (≈ 34 kyu), not "30 kyu".
 
+**Games with help.** A game in which the player took a move back or asked
+for a hint is not rated: it is stored with `assisted: true`, stays in the
+list of games and its analysis still counts for the week's focus, but it
+makes no rating step and adds no history point (`recordGame`, `undos` /
+`hints`; teaching mode's own warnings are not hints).
+
 **Update.** Each rated game (against the computer, at least 12 moves, not
 a draw — unchanged from v5) is one Glicko step in natural units:
 
