@@ -289,7 +289,7 @@ src/web/js/              the core, one module each: rules and scoring, SGF,
 src/web/js/app/          the application: state, controllers, views, sheets,
                          shortcuts, feedback
 src/web/js/play/         Play's home and Library, the review model, analysis, import
-src/web/js/learn/        Practice: the path, today's session, the catalog,
+src/web/js/practice/     Practice: the path, today's session, the catalog,
                          placement, review transforms
 src/web/js/data/         the file store, games, settings, backups, migrations
 src/web/js/model/        the player model: rating, spaced review, focus, the path

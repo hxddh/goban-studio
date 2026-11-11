@@ -693,7 +693,7 @@ quiz and the rank-to-grade mapping stay conservative (docs/plan.md,
 
 A problem shown again in review is turned or mirrored (one of the eight
 board symmetries) and, except endgame problems, often recoloured, so that
-White plays (`src/web/js/learn/transform.js`; docs/plan.md, "Review").
+White plays (`src/web/js/practice/transform.js`; docs/plan.md, "Review").
 `node scripts/check-transforms.mjs` proves the whole bank under a
 transform each (543 problems in about 22 s, locally): the solver's
 `validate()` passes, the correct first moves are exactly the stored ones

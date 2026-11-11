@@ -13,7 +13,7 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 570 checks in 69 files |
+| Unit and data tests | `npm test` | 585 checks in 69 files |
 | Interface tests | `npm run ui-test` | 141 checks, 18 visual baselines |
 | Zig tests | `npm run test:native` | 72 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
@@ -57,7 +57,7 @@ Node process. No browser, no native SDK.
 | data | `data-*.mjs` | the file store (write chains, chunked writes, retries, the key allow-list), the safe state for unreadable files, migrations, saved games and their index, deleting with undo, settings, backups and undoing a restore |
 | model | `model-*.mjs` | the player model: rating, games with help left unrated, counting a game again, the solving level from first sight, spaced review and its daily cap, the path over simulated weeks, focus, progress and milestones |
 | play | `play-*.mjs` | the game controller, undo and redo, the clock, the opponent ladder and pacing, teaching warnings, explanations, the post-game review and its edit history, the summary, suggestions, unfinished games, import, the explorer |
-| learn | `learn-*.mjs` | the beginner path, today's path and session, placement, problem sessions, review transforms, tile status |
+| practice | `practice-*.mjs` | the beginner path, today's path and session, placement, problem sessions, review transforms, tile status |
 | shell | `shell-*.mjs` | the four spaces, first run, settings, toasts and error cards, the status line, board palettes; every string in four languages with the same placeholders, every key the interface uses present and **every key in the table used**; the release and update logic (signing notes, signed sums, the updater's page side, optional networks); the user's files and package READMEs; and the CI and release workflows themselves (`shell-ci.mjs`) |
 
 `shell-ci.mjs` reads the workflow files as data and checks what this page

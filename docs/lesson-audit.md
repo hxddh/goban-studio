@@ -176,7 +176,7 @@ generated section below does not list them yet. Before KataGo sees them:
 - Every opening and joseki step whose position is in the opening book
   (`content/book.json`, KataGo 1.18.1, 2000 visits) accepts only moves the
   book rates within `JOSEKI_LOSS` (1.5 points) of its best;
-  `scripts/tests/core-course-v13.mjs` enforces this.
+  `scripts/tests/core-course-advanced.mjs` enforces this.
 - **The Chinese opening has no evaluation yet.** The lesson
   (`adv-open-chinese`) and the book's table (`scripts/make-book.mjs`) used
   Q16–R4–R10 (high: Q10) until it was corrected to the real opening,

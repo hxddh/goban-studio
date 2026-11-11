@@ -602,6 +602,6 @@ review (every tab), a finished game's post-game review (every tab), every
 Settings pane — in four combinations of language, light/dark and larger text, and
 runs the accessibility audit, the raw-key, clipping, sideways-scroll and
 one-primary checks on each. A new page joins that list in the same change.
-v13 adds `scripts/ui-tests/shell-v13ui.mjs` (Play's home for a new player,
+`scripts/ui-tests/shell-audit.mjs` adds the audit of (Play's home for a new player,
 the confirm-move switches, *Undo restore*, the safe state, *Retry* and a
 problem shown turned, in four languages), and the audit asks 4.5:1 of small text.

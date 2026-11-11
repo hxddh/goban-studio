@@ -87,7 +87,7 @@ run.
 | What | Command | Notes |
 | --- | --- | --- |
 | Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code. No warnings are allowed; fix the code rather than disabling a rule |
-| Unit and data tests | `npm test` | Node only, about a minute. `node scripts/test.mjs play-,learn-` runs only files whose names contain those |
+| Unit and data tests | `npm test` | Node only, about a minute. `node scripts/test.mjs play-,practice-` runs only files whose names contain those |
 | Content gate | `npm run release-check` | counts, four languages, pins and versions |
 | Interface tests | `npm run build && npm run sync && npm run ui-test` | Chromium via Playwright (`npx playwright install chromium` once). `UI_ONLY=<text>` runs matching checks |
 | Visual baselines | `npm run ui-update` | only after an intended visual change; look at every changed picture and commit it |
@@ -101,7 +101,7 @@ cards come from the shared pieces described at the top of
 `src/web/js/app/parts.jsx`.
 
 Write a test for every behaviour change, in the area's file
-(`scripts/tests/{core,data,model,play,learn,shell}-*.mjs`,
+(`scripts/tests/{core,data,model,play,practice,shell}-*.mjs`,
 `scripts/ui-tests/*.mjs`). Prefer tests that exercise behaviour over ones
 that search source text. `docs/QA.md` lists what each gate covers.
 
@@ -119,7 +119,7 @@ that search source text. `docs/QA.md` lists what each gate covers.
   `docs/l10n/strings.csv` is generated (`node scripts/export-strings.mjs`),
   never edited by hand.
   A count goes through `tn(key, n)` (its English singular is `key.one`);
-  a label and its value through `v13ui.labelValue` (CJK takes a
+  a label and its value through `common.labelValue` (CJK takes a
   full-width colon), never `` `${label}: ${value}` ``; a Korean particle
   after a placeholder is written `{0:은/는}` and follows the word put in.
 - **No unreviewed generated content.** Problems, lessons, commentary or

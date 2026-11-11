@@ -369,7 +369,7 @@ B5：真实 learnPath，定级三级，回忆率 85%，60 天
 
 记录日期：2026-11-11 · 对象：v14.0.0。以上各节是 v13 评审的原文，没有改动；本节只记录 §4 的建议在 v14 里做到了哪一步。“已做”指代码已合并并有测试；“部分”指只做了其中一段，表里写明缺的是哪一段；“未做”写明原因。行号以 v14.0.0 的代码为准。
 
-验证结果（本地，Node 24）：`npm run lint` 零警告；`npm test` 570 项；`npm run ui-test` 141 项；Zig 测试 72 项通过、3 项在 Linux 上跳过；`release-check` 通过（23 单元 · 104 课 · 377 步 · 543 题 · 20 名局）。
+验证结果（本地，Node 24）：`npm run lint` 零警告；`npm test` 585 项；`npm run ui-test` 141 项；Zig 测试 72 项通过、3 项在 Linux 上跳过；`release-check` 通过（23 单元 · 104 课 · 377 步 · 543 题 · 20 名局）。
 
 先说三件没有照建议做的事：
 
@@ -441,11 +441,11 @@ B5：真实 learnPath，定级三级，回忆率 85%，60 天
 | A ESLint、Prettier、`checkJs` | 部分 | ESLint 零警告，进了 `checks.yml`（`no-undef`、`no-unused-vars`、`react-hooks/rules-of-hooks`）。**没有 Prettier，没有 `jsconfig` 和类型检查** |
 | A 面板、菜单、设置页的行为测试；替换 grep 式测试 | 部分 | 前一半已做（`shell-sheets.mjs`、`shell-settings.mjs`）。读源码文本的旧测试大多还在 |
 | A 调试句柄不进生产；求解器移到 Worker | 部分 | `app/debug.js`：句柄只在测试下存在。求解器仍在主线程 |
-| B 按领域分层；store 切片；拆大控制器；去掉 `export *` | 未做 | 结构没有动。`play-ctl.js`、`review-ctl.js`、`player.js` 因为新功能反而更长了（约 1200、1470、1850 行）；`controller.js` 仍有 `export *` |
-| C `learn` → `practice`；合并 `v13-*.js`；删考古注释 | 未做 | 空间 id 和目录仍叫 `learn`，`messages/v13-*.js` 和 `v13ui.*` 键还在。新代码按规定不再写版本注释，旧注释没有清理 |
+| B 按领域分层；store 切片；拆大控制器；去掉 `export *` | 部分 | `controller.js` 只剩 54 行具名转出；`play-ctl`、`review-ctl`、`model/player.js`、`sheets.jsx` 各拆成若干不超过约 550 行的模块，旧路径只留转出；导入环 2 → 0，`data/` 不再引用 `app/`（`shell-structure.mjs` 守住）。**store 仍是一个全局对象、整树重渲染**；`review.jsx`、`practice-ctl.js` 等 7 个文件仍超过 600 行 |
+| C `learn` → `practice`；合并 `v13-*.js`；删考古注释 | 已做 | 空间 id、目录、测试文件和样式类都叫 `practice`；文案按区域分成 6 个文件，每个键前缀只在一个文件里，40 个 `v13.*` 键按含义改名（`shell-strings.mjs` 守住）；带版本号的注释从 691 行减到 164 行，剩下的是存储格式版本这类事实 |
 | C README 重写；`design.md`、`usability.md` 更新 | 已做 | README 只写现状，`release-check` 核对其中的数量并拒绝按版本写的标题；`design.md` §7 按现在的界面重写；`usability.md` 的任务已更新，并在标题里写明测试没有做过 |
-| D 样式表重建；令牌覆盖率 | 未做 | 新规则都用令牌，但 `styles.css` 仍是一个文件，没有覆盖率脚本 |
-| D 深色 `--bad` 配对；英文界面里的日文人名 | 部分 | 加了 `--on-bad` 等令牌，深色下约 6.8:1。日文人名在英文界面里仍按默认字体顺序 |
+| D 样式表重建；令牌覆盖率 | 已做 | `styles.css` 按 18 个固定顺序的分区重排，仍是一个文件；间距 72% → 95%、圆角 66% → 94%、阴影和层级 100%，`:root` 之外不再写颜色；`shell-styles.mjs` 守住覆盖率，并核对 `design.md` 的令牌表与样式表逐值一致 |
+| D 深色 `--bad` 配对；英文界面里的日文人名 | 部分 | 加了 `--on-bad` 等令牌，深色下约 6.8:1。棋谱行和复盘标题里含假名或谚文的人名带上了语言标记；只有汉字的人名无法判断，仍按界面语言的字体 |
 | E 合并 JSON 写入器；抽出下载代码；拆 `main.zig` | 部分 | `src/json.zig`、`src/net.zig`、`src/paths.zig`、`src/instance.zig`。`main.zig` 仍有约 2400 行 |
 | E 签名绑定版本；密钥进受保护的 environment；演练不签名 | 已做，待所有者配置 | `SHA256SUMS` 里的 `VERSION` 行、`install.zig` `sumsBinding`、解包后核对 `build-info.json`；`release.yml` 的 `sign` 作业（`shell-ci.mjs` 守住）。**密钥还没有生成，`release-signing` 环境要由所有者创建**，所以本版的更新仍只有校验和 |
 | E Native SDK 进 lockfile；去掉 `upload` 侧门 | 已做 | `package.json` 精确版本加 lockfile 哈希，`scripts/native-sdk.mjs`；两个构建工作流不再有 `upload` 作业 |

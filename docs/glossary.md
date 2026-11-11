@@ -327,7 +327,7 @@ The v13 joseki lines follow the opening book's corner tree move by move
 (`star-one-space-low-pincer`, `star-two-space-low-pincer`,
 `komoku-high-approach-attach`, `komoku-low-approach`), and the whole-board
 steps follow its named lines (`chinese`, `sanrensei`);
-`scripts/tests/core-course-v13.mjs` checks every accepted point the book
+`scripts/tests/core-course-advanced.mjs` checks every accepted point the book
 knows against it.
 
 ## Decisions on doubtful terms

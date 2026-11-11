@@ -3,11 +3,9 @@
 The plan picks one or two things to work on ("this week's focus"), says why,
 and orders Practice's path for today around them. It is part of the one
 player model, `src/web/js/model/player.js` (`evidence`, `focus`,
-`keepFocus`, `learnPath`; pure, tested in `scripts/tests/model-player.mjs`,
-`model-progress.mjs` and `learn-path.mjs`). The app side is
-`src/web/js/learn/session.js`. The thresholds are `RULES` in player.js.
-The space is called Practice in the interface; the code and this page
-still say Learn in names such as `learnPath`.
+`keepFocus`, `practicePath`; pure, tested in `scripts/tests/model-player.mjs`,
+`model-progress.mjs` and `practice-path.mjs`). The app side is
+`src/web/js/practice/session.js`. The thresholds are `RULES` in player.js.
 
 ## What counts as evidence
 
