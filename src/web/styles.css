@@ -187,7 +187,7 @@ kbd { font: 500 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; backgr
 .sb-item.on { background: var(--fill-2); color: var(--text); }
 .sb-item.on .icon { color: var(--text); }
 
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .place { flex: 1; display: flex; flex-direction: column; min-height: 0; animation: place-in var(--dur-3) var(--ease-out); }
 @keyframes place-in { from { opacity: 0; } to { opacity: 1; } }
 
@@ -632,7 +632,9 @@ button.group-row:hover { background: var(--fill); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* a task in progress or failed (store.js runTask), above the page */
-.task-notice { display: flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: 36px; padding: var(--s-1) var(--s-4); background: var(--fill); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); }
+/* Laid over the page under the toolbar, never in its flow: a notice that comes
+   or goes must not move the board under the pointer. */
+.task-notice { position: absolute; top: var(--tb); left: 0; right: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: 36px; padding: var(--s-1) var(--s-4); background: var(--surface); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-pop); }
 .task-notice.error { background: var(--bad-soft); }
 .task-notice.error > .icon { color: var(--bad); }
 .task-notice .link { font: inherit; font-weight: 500; color: var(--text); }
