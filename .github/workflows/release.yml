@@ -9,10 +9,6 @@ on:
       tag:
         description: "Release tag, e.g. v1.0.0; must be v + package.json version; notes file must exist"
         required: true
-      sdk_version:
-        description: "@native-sdk/cli version used by both platform builds"
-        required: false
-        default: "0.11.0"
       rehearse:
         description: "Run every gate and both builds, publish nothing (allowed from any branch)"
         type: boolean
@@ -36,9 +32,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
           REHEARSE: ${{ inputs.rehearse }}
-          # Only whether the secret exists reaches this step, never its value.
-          HAS_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY != '' }}
-          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
         run: |
           set -euo pipefail
           # The tag is created at the commit that was built ($GITHUB_SHA), so
@@ -56,13 +49,11 @@ jobs:
               exit 1
             fi
           fi
-          # An app built with the update public key refuses an unsigned
-          # SHA256SUMS, so such a release must ship SHA256SUMS.sig. Checked
-          # here so a missing key fails in seconds, not after the builds.
-          if [ -n "$UPDATE_PUBKEY" ] && [ "$HAS_UPDATE_SIGNING_KEY" != "true" ]; then
-            echo "::error title=update signing::vars.UPDATE_PUBKEY is set but the UPDATE_SIGNING_KEY secret is not (docs/signing.md)"
-            exit 1
-          fi
+          # The update signing key is a secret of the `release-signing`
+          # environment and cannot be seen from here: the `sign` job checks
+          # it. If it is missing there, nothing is published, and that job
+          # can be re-run once the secret is in place (the packages are kept
+          # as artifacts).
           if [ "$REHEARSE" = "true" ]; then echo "rehearsal: nothing will be tagged"; exit 0; fi
           test -f ".github/release-notes/${TAG}.md" || { echo "missing .github/release-notes/${TAG}.md"; exit 1; }
           published=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
@@ -71,14 +62,12 @@ jobs:
 
   macos:
     needs: preflight
-    # The build job itself runs read-only (its own permissions in the called
-    # workflow); only that workflow's optional upload-to-release job, which
-    # a release never triggers, could use more.
+    # The platform builds write nothing to the repository: they hand their
+    # packages to the assemble job as artifacts.
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/build-macos.yml
     with:
-      sdk_version: ${{ inputs.sdk_version }}
       runner: macos-15
       arch: arm64
     # Signing secrets are optional (docs/signing.md); without them the
@@ -94,10 +83,9 @@ jobs:
   macos-intel:
     needs: preflight
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/build-macos.yml
     with:
-      sdk_version: ${{ inputs.sdk_version }}
       runner: macos-15-intel
       arch: x64
     secrets: inherit
@@ -105,18 +93,18 @@ jobs:
   windows:
     needs: preflight
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/build-windows.yml
-    with:
-      sdk_version: ${{ inputs.sdk_version }}
     secrets: inherit
 
-  publish:
+  # Everything a release holds, checked and checksummed, with a read-only
+  # token and no secret. Rehearsals stop after this job.
+  assemble:
     needs: [preflight, macos, macos-intel, windows]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.macos.result == 'success' && needs.macos-intel.result == 'success' && needs.windows.result == 'success' }}
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -184,14 +172,66 @@ jobs:
           test -s dist-windows/GobanStudio-Windows-x64.zip
           ls -lh dist-macos dist-windows
       - name: checksums
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          # The in-app updater (v5) checks the .zip it downloads against this
+          # The in-app updater checks the .zip it downloads against this
           # file's line for that exact name.
           (cd dist-macos && sha256sum GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg GobanStudio-macOS-x64.zip GobanStudio-macOS-x64.dmg) > SHA256SUMS
           (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip) >> SHA256SUMS
+          # The sums name the release they are for: VERSION holds the tag
+          # and a newline, and its line here is covered by the signature.
+          # An app refuses sums whose VERSION is not the tag it asked for
+          # (src/install.zig sumsBinding), so one release's signed files
+          # cannot be offered as another's. Older apps skip the line.
+          printf '%s\n' "$TAG" > VERSION
+          sha256sum VERSION >> SHA256SUMS
           cat SHA256SUMS
-          test "$(wc -l < SHA256SUMS)" -eq 5
+          test "$(wc -l < SHA256SUMS)" -eq 6
+          sha256sum -c --ignore-missing SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums
+          path: |
+            SHA256SUMS
+            VERSION
+          if-no-files-found: error
+
+  # The one job that holds the update signing key. It never runs in a
+  # rehearsal, and it runs in the protected environment `release-signing`:
+  # the key is an environment secret there, so a run needs the
+  # environment's reviewers' approval and its branch rule (main) before the
+  # key exists for it (docs/signing.md, "Update signing in CI"). It checks
+  # out nothing but the signing script and signs exactly the bytes the
+  # assemble job produced.
+  sign:
+    needs: [preflight, assemble]
+    if: ${{ !cancelled() && inputs.rehearse != true && needs.assemble.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: release-signing
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            scripts/sign-sums.mjs
+            .nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: checksums
+      - name: the sums are for this tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          test "$(cat VERSION)" = "$TAG"
+          grep -x "$(sha256sum VERSION)" SHA256SUMS
       - name: sign SHA256SUMS
         # SHA256SUMS.sig is what an app built with vars.UPDATE_PUBKEY trusts
         # (docs/signing.md, "Update signing in CI"). The private key reaches
@@ -203,7 +243,7 @@ jobs:
           set -euo pipefail
           if [ -z "$UPDATE_SIGNING_KEY" ]; then
             if [ -n "$UPDATE_PUBKEY" ]; then
-              echo "::error title=update signing::the apps enforce signed updates (vars.UPDATE_PUBKEY) but UPDATE_SIGNING_KEY is not set"
+              echo "::error title=update signing::the apps enforce signed updates (vars.UPDATE_PUBKEY) but UPDATE_SIGNING_KEY is not set in the release-signing environment"
               exit 1
             fi
             echo "::notice title=update signing::UPDATE_SIGNING_KEY not set; SHA256SUMS ships unsigned (docs/signing.md)"
@@ -212,10 +252,53 @@ jobs:
           node scripts/sign-sums.mjs
           test -s SHA256SUMS.sig
           echo "SHA256SUMS.sig written"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums-signature
+          path: SHA256SUMS.sig
+          if-no-files-found: ignore
+
+  publish:
+    needs: [preflight, assemble, sign]
+    if: ${{ !cancelled() && inputs.rehearse != true && needs.assemble.result == 'success' && needs.sign.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: GobanStudio-macOS-arm64
+          path: dist-macos
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: GobanStudio-macOS-x64
+          path: dist-macos
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: GobanStudio-Windows-x64
+          path: dist-windows
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: checksums
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: checksums-signature
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+      - name: the packages are the ones that were checksummed
+        run: |
+          set -euo pipefail
+          mkdir check
+          cp dist-macos/* dist-windows/* VERSION check/
+          (cd check && sha256sum -c ../SHA256SUMS)
+          rm -rf check
       - name: publish
         if: ${{ inputs.rehearse != true }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
@@ -232,6 +315,7 @@ jobs:
             dist-macos/GobanStudio-macOS-x64.dmg
             dist-windows/GobanStudio-Windows-x64.zip
             SHA256SUMS
+            VERSION
           )
           if [ -f SHA256SUMS.sig ]; then assets+=(SHA256SUMS.sig); fi
           # --target: the tag is created at the commit every package was
@@ -241,6 +325,9 @@ jobs:
             --draft \
             --title "Goban Studio $TAG" \
             --notes-file release-notes.md
+          # Into the draft only, and never over a file that is there: a
+          # published release's files are not replaced, by this workflow or
+          # any other (there is no upload path outside this job).
           gh release upload "$TAG" "${assets[@]}"
           gh release edit "$TAG" --draft=false
           gh release view "$TAG" --json url,isDraft,assets

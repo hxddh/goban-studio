@@ -5,6 +5,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 export PATH="${HOME}/.native/toolchains/zig-0.16.0:${PATH}"
+# The Native SDK and its `native` CLI come from the lockfile (npm ci), not
+# from a global install; this also runs the SDK's toolchain install.
+node scripts/native-sdk.mjs toolchain
+SDK_PATH="$(node scripts/native-sdk.mjs path)"
+node scripts/patch-sdk.mjs "$SDK_PATH"
+export PATH="${ROOT}/node_modules/.bin:${PATH}"
 
 echo "==> build frontend bundle"
 npm run build
@@ -14,7 +20,7 @@ echo "==> unit tests"
 node scripts/test.mjs
 
 echo "==> zig build -Doptimize=ReleaseSafe"
-zig build -Doptimize=ReleaseSafe
+zig build -Dnative-sdk-path="$SDK_PATH" -Doptimize=ReleaseSafe
 
 echo "==> native package"
 mkdir -p dist
@@ -38,6 +44,8 @@ echo "==> zip"
   mkdir -p dmg
   ditto GobanStudio.app "dmg/Goban Studio.app"
   cp README-macOS.txt dmg/README-macOS.txt
+  # Drag the app onto this to install it.
+  ln -s /Applications dmg/Applications
   rm -f GobanStudio-macOS-arm64.dmg
   hdiutil create -volname "Goban Studio" -srcfolder dmg -ov -format UDZO GobanStudio-macOS-arm64.dmg
   rm -rf GobanStudio.app dmg

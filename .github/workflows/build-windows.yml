@@ -2,25 +2,7 @@ name: build-windows
 
 on:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Existing release tag to upload to (optional)
-        required: false
-        default: ""
-      sdk_version:
-        description: "@native-sdk/cli version"
-        required: false
-        default: "0.11.0"
   workflow_call:
-    inputs:
-      release_tag:
-        type: string
-        required: false
-        default: ""
-      sdk_version:
-        type: string
-        required: false
-        default: "0.11.0"
     # Optional: with both, the exe and katago.exe are Authenticode-signed;
     # without them the build is unsigned (docs/signing.md). release.yml
     # passes them with `secrets: inherit`.
@@ -48,8 +30,9 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 60
-    # Builds, tests and signs with a read-only token: nothing here writes
-    # to the repository (the upload job below does, when asked).
+    # Builds, tests and signs with a read-only token: nothing in this
+    # workflow writes to the repository. Packages reach a release only
+    # through release.yml, which checksums and signs them together.
     permissions:
       contents: read
     outputs:
@@ -92,23 +75,18 @@ jobs:
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
           test -n "$move"
           echo "KataGo answered: $move"
-      - name: install Native SDK CLI
-        # One pinned install, used by every native step below. Its install
-        # script fetches the `native` binary, so scripts stay on here.
-        env:
-          SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
+      - name: Native SDK from the lockfile
+        # `npm ci` above installed @native-sdk/cli and the `native` binary
+        # for this runner at the version and hashes in package-lock.json.
+        # Its install script (skipped by --ignore-scripts) is run here: it
+        # fetches the SDK's toolchain and checks every file against the
+        # manifest inside the package (scripts/native-sdk.mjs).
         run: |
           set -euo pipefail
-          # The install script downloads a helper from GitHub releases,
-          # which times out now and then (504): try up to four times.
-          for attempt in 1 2 3 4; do
-            if npm install -g "@native-sdk/cli@${SDK_VERSION}"; then break; fi
-            if [ "$attempt" = 4 ]; then exit 1; fi
-            echo "::warning::Native SDK install failed (attempt $attempt); retrying"
-            sleep $((attempt * 20))
-          done
-          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
-          native --version
+          node scripts/native-sdk.mjs toolchain
+          echo "SDK_PATH=$(node scripts/native-sdk.mjs path)" >> "$GITHUB_ENV"
+          echo "$(npm root)/.bin" >> "$GITHUB_PATH"
+          node_modules/.bin/native --version
       - name: build frontend
         run: |
           npm run build
@@ -324,6 +302,12 @@ jobs:
           # entry under GobanStudio/ (src/install.zig safeEntryName).
           assert all(n.startswith("GobanStudio/") and ":" not in n and "/../" not in n for n in names), "entry outside GobanStudio/"
           assert any(n == "GobanStudio/resources/frontend/dist/index.html" for n in names), "missing index.html"
+          # The updater installs a package only if the package itself says
+          # it is the release's version (src/install.zig stagedVersionMatches).
+          import json
+          built = json.loads(z.read("GobanStudio/resources/frontend/dist/build-info.json"))["app"]
+          wanted = json.load(open("package.json"))["version"]
+          assert built == wanted, f"build-info.json says {built}, package.json {wanted}"
           info = z.getinfo(next(n for n in names if n.endswith("bin/goban-studio.exe")))
           assert info.external_attr >> 16 & 0o111, "exe has no execute bits"
           print(f"zip entries: {len(names)}; forward slashes; Unix modes present")
@@ -337,22 +321,3 @@ jobs:
         with:
           name: signing-status-windows
           path: dist/signing-windows.json
-
-  # Only a manual run with release_tag writes to the repository, from a job
-  # that runs none of the build's tools and holds no signing secret.
-  upload:
-    needs: build
-    if: ${{ inputs.release_tag != '' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: GobanStudio-Windows-x64
-          path: dist
-      - name: upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$TAG" dist/GobanStudio-Windows-x64.zip --clobber --repo "$GITHUB_REPOSITORY"

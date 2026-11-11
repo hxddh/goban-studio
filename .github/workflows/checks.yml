@@ -30,8 +30,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      # No dependency needs its install script (esbuild finds its platform
-      # binary through its optional dependency).
+      # No dependency needs its install script here (esbuild finds its
+      # platform binary through its optional dependency; the Native SDK's
+      # toolchain is only needed by the platform builds).
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run release-check
@@ -42,13 +43,12 @@ jobs:
   # The Zig shell's unit tests (updater URL allow-list, SHA-256 parsing, zip
   # entry checks, …) and a compile of the app, on Linux with the SDK's null
   # platform: no window system is needed, so every pull request runs them.
-  # The macOS and Windows hosts themselves are compiled and tested by the
-  # platform builds (build-macos.yml, build-windows.yml).
+  # The macOS and Windows hosts are compiled and tested by `native-hosts`
+  # below when a pull request touches them, and by the platform builds
+  # (build-macos.yml, build-windows.yml).
   native:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      SDK_VERSION: "0.11.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -59,12 +59,13 @@ jobs:
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.16.0
-      - name: install Native SDK sources
-        # --ignore-scripts: the postinstall downloads the `native` CLI binary,
-        # which the null-platform build and tests do not use.
+      - name: Native SDK from the lockfile
+        # @native-sdk/cli is a devDependency at one exact version, with its
+        # hash in package-lock.json. Its install script (the SDK's own
+        # toolchain) is not needed for the null-platform build and tests.
         run: |
-          npm install -g --ignore-scripts "@native-sdk/cli@${SDK_VERSION}"
-          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
+          npm ci --ignore-scripts
+          echo "SDK_PATH=$(node scripts/native-sdk.mjs path)" >> "$GITHUB_ENV"
       - name: patch Native SDK
         run: |
           node scripts/patch-sdk.mjs "$SDK_PATH"
@@ -73,6 +74,93 @@ jobs:
         run: zig build test -Dnative-sdk-path="$SDK_PATH" -Dplatform=null --summary all
       - name: zig build
         run: zig build -Dnative-sdk-path="$SDK_PATH" -Dplatform=null --summary all
+
+  # Which files a pull request touches.
+  changes:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      native: ${{ steps.files.outputs.native }}
+    steps:
+      # The merge commit of the pull request and its two parents: the first
+      # parent is the base branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: does this pull request touch the shell, the build or the workflows?
+        id: files
+        run: |
+          set -euo pipefail
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/files.txt"
+          if grep -E '^(src/[^/]+\.(zig|m)$|src/updater/|build\.zig|app\.zon$|\.github/workflows/|scripts/(native-sdk|patch-sdk)\.mjs$|package(-lock)?\.json$)' "$RUNNER_TEMP/files.txt"; then
+            echo "native=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "native=false" >> "$GITHUB_OUTPUT"
+            echo "no shell, build or workflow file changed: the macOS and Windows compile is skipped"
+          fi
+
+  # The shell compiled and unit-tested against the real macOS and Windows
+  # hosts (src/macos_open.m, src/win_close.zig, the platform halves of
+  # install.zig, models.zig and net.zig, and the SDK's own host sources),
+  # which the Linux job above cannot compile. Only for pull requests that
+  # touch the shell, the build files or the workflows; no KataGo, no
+  # packaging, no signing, nothing written anywhere.
+  native-hosts:
+    needs: changes
+    if: ${{ needs.changes.outputs.native == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: macos
+          - os: windows-latest
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+      - name: install build dependencies
+        run: npm ci --ignore-scripts
+      - name: Native SDK from the lockfile
+        run: |
+          set -euo pipefail
+          node scripts/native-sdk.mjs toolchain
+          echo "SDK_PATH=$(node scripts/native-sdk.mjs path)" >> "$GITHUB_ENV"
+          echo "$(npm root)/.bin" >> "$GITHUB_PATH"
+          node_modules/.bin/native --version
+      - name: patch Native SDK
+        run: |
+          node scripts/patch-sdk.mjs "$SDK_PATH"
+          node scripts/patch-sdk.mjs --check "$SDK_PATH"
+      - name: build frontend
+        # The shell embeds nothing of it, but `native validate` and the
+        # app's asset checks expect frontend/dist to exist.
+        run: |
+          npm run build
+          npm run sync
+      - name: native validate and tests
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          native validate
+          native test --yes -Dnative-sdk-path="$SDK_PATH" -Dplatform="$PLATFORM"
+      - name: native build
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: native build --yes -Dnative-sdk-path="$SDK_PATH" -Dplatform="$PLATFORM" -Doptimize=ReleaseSafe
 
   ui:
     runs-on: ubuntu-latest
