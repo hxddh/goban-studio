@@ -219,6 +219,9 @@ export function MoreMenu({ id, items, label }) {
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   const onKey = (e) => {
+    // Only an open menu takes keys: with the menu closed and the focus on
+    // its button, Esc and the arrows belong to the page (a sheet, a review).
+    if (!open) return;
     const list = [...ref.current.querySelectorAll("[role=menuitem]:not([disabled])")];
     const i = list.indexOf(document.activeElement);
     if (e.key === "ArrowDown") {

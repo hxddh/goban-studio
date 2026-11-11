@@ -450,6 +450,14 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
         await page.waitForSelector(".score-card");
       },
     };
+    // With the menu closed, Esc on its button belongs to the page: a sheet opened behind it closes.
+    await page.keyboard.press("Control+,");
+    await page.waitForSelector(".settings-sheet");
+    await page.evaluate(() => document.querySelector(".panel .menu-wrap .icon-btn").focus());
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".settings-sheet", { state: "detached", timeout: 3000 }).catch(() => {
+      throw new Error("Esc on a closed menu's button was swallowed by the menu");
+    });
     // Count ends the game, so it goes last.
     const order = [...items.filter((l) => l !== "Count"), "Count"];
     for (const label of order) {
