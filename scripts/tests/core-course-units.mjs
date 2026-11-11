@@ -1,6 +1,6 @@
 /**
- * Course (v13): the ko and judgement units, area scoring, and the endgame
- * unit rebuilt on sealed, solver-counted positions.
+ * Core: the course's ko and judgement units, area scoring, and the endgame
+ * unit on sealed, solver-counted positions.
  */
 import { test, COURSE, S, assert } from "./helpers.mjs";
 import { FOCUS_LESSONS } from "../../src/web/js/model/player.js";
@@ -74,7 +74,7 @@ function count(g) {
   return out;
 }
 
-await test("v13 course: the ko and judgement units are intermediate units after fighting, before the advanced course", () => {
+await test("course: the ko and judgement units are intermediate units after fighting, before the advanced course", () => {
   const ids = COURSE.map((u) => u.id);
   const fighting = ids.indexOf("fighting");
   assert.equal(ids[fighting + 1], "ko-fighting");
@@ -85,14 +85,14 @@ await test("v13 course: the ko and judgement units are intermediate units after 
   assert.deepEqual(unit("judgement").lessons.map((l) => l.id), ["judge-count", "judge-ahead", "judge-behind"]);
 });
 
-await test("v13 course: every focus lesson exists", () => {
+await test("course: every focus lesson exists", () => {
   const ids = new Set(COURSE.flatMap((u) => u.lessons.map((l) => l.id)));
   for (const [key, list] of Object.entries(FOCUS_LESSONS)) for (const id of list) assert.ok(ids.has(id), `${key}: ${id}`);
   assert.ok(FOCUS_LESSONS.ko.includes("ko-threat"));
   assert.ok(FOCUS_LESSONS.endgame.includes("endgame-big"));
 });
 
-await test("v13 endgame: every interactive step is a sealed endgame problem the solver proves", () => {
+await test("endgame: every interactive step is a sealed endgame problem the solver proves", () => {
   const eg = unit("endgame");
   assert.ok(eg.lessons.length >= 8);
   let n = 0;
@@ -108,7 +108,7 @@ await test("v13 endgame: every interactive step is a sealed endgame problem the 
   assert.ok(n >= 18, `${n} endgame problems`);
 });
 
-await test("v13 endgame: a big gote move beats a small double sente, and the lesson no longer says double sente always comes first", () => {
+await test("endgame: a big gote move beats a small double sente, and the lesson no longer says double sente always comes first", () => {
   const step = lesson("endgame-big").steps.find((s) => s.kind === "problem");
   const pz = S.createPuzzle(step.problem);
   const st = S.initialState(pz);
@@ -126,12 +126,12 @@ await test("v13 endgame: a big gote move beats a small double sente, and the les
   assert.match(read, /bigger gote/);
 });
 
-await test("v13 endgame: the value questions match the deiri count", () => {
+await test("endgame: the value questions match the deiri count", () => {
   const values = lesson("endgame-counting").steps.filter((s) => s.kind === "problem").map((s) => S.deiri(S.createPuzzle(s.problem)).value);
   assert.deepEqual(values, [2, 1, 6]);
 });
 
-await test("v13 area scoring: the lesson's count of unit 8's game and the rules it names", () => {
+await test("area scoring: the lesson's count of unit 8's game and the rules it names", () => {
   const ids = unit("game").lessons.map((l) => l.id);
   assert.equal(ids[ids.indexOf("game-score") + 1], "game-area-scoring");
   const read = lesson("game-area-scoring").steps[0];
@@ -154,7 +154,7 @@ await test("v13 area scoring: the lesson's count of unit 8's game and the rules 
   }
 });
 
-await test("v13 judgement: the count in the text is the count on the board", () => {
+await test("judgement: the count in the text is the count on the board", () => {
   const l = lesson("judge-count");
   const rows = l.steps[0].board.diagram;
   // Black's hane: (4, 8) hane, White blocks (5, 8), Black connects (3, 8).
@@ -174,7 +174,7 @@ await test("v13 judgement: the count in the text is the count on the board", () 
     }
 });
 
-await test("v13 ko: the boards really hold a ko and the threat really threatens", () => {
+await test("ko: the boards really hold a ko and the threat really threatens", () => {
   const l = lesson("ko-threat");
   const rows = l.steps[1].board.diagram;
   const g = grid(rows);

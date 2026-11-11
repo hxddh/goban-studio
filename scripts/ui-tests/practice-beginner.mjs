@@ -365,7 +365,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     { locale: "ja-JP", scheme: "dark", large: false },
   ];
   for (const c of combos) {
-    await check(`v8 beginner: bridges and capture Go in ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""} — audit, no clipping`, async () => {
+    await check(`beginner: bridges and capture Go in ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""} — audit, no clipping`, async () => {
       const page = await start(c.locale);
       await page.emulateMedia({ colorScheme: c.scheme });
       await lessonDone(page, "stones-capture", c.large ? { largeText: true } : {});

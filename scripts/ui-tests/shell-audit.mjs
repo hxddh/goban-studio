@@ -1,6 +1,6 @@
 /**
- * Shell, v13 interface layer in the browser: the screens and rows v13
- * added pass the accessibility audit (now 4.5:1 for small text) in four
+ * Shell: screens and rows outside the main places pass the accessibility
+ * audit (4.5:1 for small text) in four
  * languages, light and dark — Play's home for a new player (the suggested
  * game, no blank board), Settings' confirm-move switches and its Undo
  * restore row, the safe-state screen, the computer's Retry and the
@@ -31,7 +31,7 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
 
   for (const [locale, scheme] of LOCALES) {
     const cjk = !locale.startsWith("en") && !locale.startsWith("ko");
-    await check(`v13 ui: Play's home, Settings' new rows, Retry and the turned problem in ${locale}, ${scheme} — audit`, async () => {
+    await check(`shell audit: Play's home, Settings' new rows, Retry and the turned problem in ${locale}, ${scheme} — audit`, async () => {
       const page = await fresh(locale);
       await page.emulateMedia({ colorScheme: scheme });
       // A new player: Today opens; Play has no game, so it shows its home with the suggested game.
@@ -95,7 +95,7 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
       await page.close();
     });
 
-    await check(`v13 ui: the safe-state screen in ${locale}, ${scheme} — audit`, async () => {
+    await check(`shell audit: the safe-state screen in ${locale}, ${scheme} — audit`, async () => {
       const page = await fresh(locale);
       await page.emulateMedia({ colorScheme: scheme });
       await page.context().addInitScript(() => {
@@ -114,7 +114,7 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
     });
   }
 
-  await check("v13 ui: a menu opened and closed at once leaves no outside-click listener behind", async () => {
+  await check("shell audit: a menu opened and closed at once leaves no outside-click listener behind", async () => {
     const page = await fresh();
     await page.context().addInitScript(() => {
       let n = 0;

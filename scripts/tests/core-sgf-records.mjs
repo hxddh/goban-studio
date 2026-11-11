@@ -1,5 +1,5 @@
 /**
- * Core: SGF (v13) — real-world records: setup after the root and in the middle of a game,
+ * Core: SGF, real-world records — setup after the root and in the middle of a game,
  * board sizes, invalid points, HA without AB, CA charsets, and records too long or deep for recursion.
  */
 import GoBoard from "@sabaki/go-board";
@@ -10,7 +10,7 @@ setLang("en");
 
 const bytes = (...parts) => new Uint8Array(parts.flatMap((p) => (typeof p === "string" ? [...Buffer.from(p, "latin1")] : p)));
 
-await test("v13 SGF: setup in a move-less node right after the root is the starting position, and survives export", () => {
+await test("SGF: setup in a move-less node right after the root is the starting position, and survives export", () => {
   const { game, warnings } = loadSGF("(;GM[1]SZ[9];AB[cc][dd]AW[ee];B[gg])");
   assert.deepEqual(warnings, []);
   assert.equal(game.root.board.get([2, 2]), BLACK);
@@ -35,7 +35,7 @@ await test("v13 SGF: setup in a move-less node right after the root is the start
   assert.equal(chain.root.turn, WHITE);
 });
 
-await test("v13 SGF: setup later in the game is on the board for the moves after it, and is written back", () => {
+await test("SGF: setup later in the game is on the board for the moves after it, and is written back", () => {
   // White's corner stone gets a black neighbour from the setup, which also
   // clears Black's centre stone; Black then captures in one move.
   const text = "(;GM[1]FF[4]SZ[9];B[ee];W[aa];AB[ba]AE[ee]C[edited];B[ab]C[capture];W[cc])";
@@ -61,7 +61,7 @@ await test("v13 SGF: setup later in the game is on the board for the moves after
   assert.match(occupied.warnings[0], /Move 2 \(cc\) is illegal/);
 });
 
-await test("v13 SGF: KataGo is sent the position a mid-game setup produced, and the moves after it", () => {
+await test("SGF: KataGo is sent the position a mid-game setup produced, and the moves after it", () => {
   const { game } = loadSGF("(;GM[1]FF[4]SZ[9];B[ee];W[aa];AB[ba]AE[ee];B[ab];W[cc])");
   const end = game.mainLine().at(-1);
   const p = positionPayload(game, end);
@@ -77,7 +77,7 @@ await test("v13 SGF: KataGo is sent the position a mid-game setup produced, and 
   assert.equal(game.mainLine()[3].setup !== null, true);
 });
 
-await test("v13 SGF: setup at the start of a variation stays in that variation; trailing setup is a warning", () => {
+await test("SGF: setup at the start of a variation stays in that variation; trailing setup is a warning", () => {
   const { game, warnings } = loadSGF("(;GM[1]SZ[9];B[ee](;AW[cc];W[dd])(;W[ff])(;AB[aa]))");
   const b = game.mainLine()[1];
   assert.equal(b.children.length, 2);
@@ -88,7 +88,7 @@ await test("v13 SGF: setup at the start of a variation stays in that variation; 
   assert.match(warnings[0], /end of a line/);
 });
 
-await test("v13 SGF: a board size the app cannot play is a clear error, not a 19×19 board", () => {
+await test("SGF: a board size the app cannot play is a clear error, not a 19×19 board", () => {
   for (const sz of ["15", "7", "25", "19:13", "x"]) {
     assert.throws(
       () => loadSGF(`(;GM[1]FF[4]SZ[${sz}];B[aa])`),
@@ -102,7 +102,7 @@ await test("v13 SGF: a board size the app cannot play is a clear error, not a 19
   for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(MESSAGES["sgf.unsupportedSize"][lang].includes("{0}"), lang);
 });
 
-await test("v13 SGF: only an empty value or tt is a pass; other invalid points are warnings", () => {
+await test("SGF: only an empty value or tt is a pass; other invalid points are warnings", () => {
   const ok = loadSGF("(;GM[1]SZ[19];B[];W[tt];B[pd])");
   assert.deepEqual(ok.warnings, []);
   const okLine = ok.game.mainLine();
@@ -133,7 +133,7 @@ await test("v13 SGF: only an empty value or tt is a pass; other invalid points a
   }
 });
 
-await test("v13 SGF: HA without AB places no stones; HA[0]; HA with AB places them once", () => {
+await test("SGF: HA without AB places no stones; HA[0]; HA with AB places them once", () => {
   const text = "(;GM[1]FF[4]SZ[19]RU[Chinese]HA[2]KM[0.5];B[pd];B[dp];W[qp])";
   const { game, warnings } = loadSGF(text);
   assert.deepEqual(warnings, []);
@@ -163,7 +163,7 @@ await test("v13 SGF: HA without AB places no stones; HA[0]; HA with AB places th
   assert.equal(placed.root.turn, WHITE);
 });
 
-await test("v13 SGF: bytes are decoded by the record's CA charset", () => {
+await test("SGF: bytes are decoded by the record's CA charset", () => {
   const cases = [
     ["GB2312", [186, 218, 183, 189], "黑方"],
     ["GBK", [186, 218, 183, 189], "黑方"],
@@ -219,7 +219,7 @@ function longRecord(n) {
   return s + ")";
 }
 
-await test("v13 SGF: a 10,000-move record loads and exports without recursion, in linear time", () => {
+await test("SGF: a 10,000-move record loads and exports without recursion, in linear time", () => {
   // Near-linear, not a wall-clock budget (shared runners vary several-fold):
   // four times the moves may take at most about eleven times as long
   // (locally ≈5×: the superko check still walks the line's hashes); the
@@ -250,7 +250,7 @@ await test("v13 SGF: a 10,000-move record loads and exports without recursion, i
   assert.ok(ms < Math.max(11 * a.ms, 200), `10,000 moves ${Math.round(ms)} ms vs 2,500 moves ${Math.round(a.ms)} ms`);
 });
 
-await test("v13 SGF: 5,000 nested variations load and export without recursion", () => {
+await test("SGF: 5,000 nested variations load and export without recursion", () => {
   const color = (i) => (i % 2 ? "W" : "B");
   const N = 5000;
   // Deep main line, a one-move variation at every level.
@@ -284,7 +284,7 @@ await test("v13 SGF: 5,000 nested variations load and export without recursion",
   assert.equal(treeLayout(b).nodes.length, 1 + 2 * N);
 });
 
-await test("v13 SGF: comments and marks of move-less variation nodes survive export", () => {
+await test("SGF: comments and marks of move-less variation nodes survive export", () => {
   const text = "(;GM[1]FF[4]SZ[9](;C[root note]TR[aa];B[ee])(;B[cc](;W[dd])(;C[side note]SQ[bb]LB[cc:X])))";
   const { game } = loadSGF(text);
   assert.equal(game.root.comment, "root note");
@@ -298,7 +298,7 @@ await test("v13 SGF: comments and marks of move-less variation nodes survive exp
   assert.equal(back.toSGF(), out);
 });
 
-await test("v13 rules: a handicap of one is no stone, Black first, handicap komi; sizes without points play even", () => {
+await test("rules: a handicap of one is no stone, Black first, handicap komi; sizes without points play even", () => {
   for (const rules of ["japanese", "chinese", "korean"]) {
     const g = new Game({ size: 19, rules, handicap: 1 });
     assert.equal(g.root.board.signMap.flat().filter((v) => v).length, 0, rules);
@@ -313,7 +313,7 @@ await test("v13 rules: a handicap of one is no stone, Black first, handicap komi
   assert.equal(odd.root.board.signMap.flat().filter((v) => v).length, 0);
 });
 
-await test("v13 rules: positional superko still holds with the cached hashes", () => {
+await test("rules: positional superko still holds with the cached hashes", () => {
   // A 4×4 cycle (found by search): the twelfth move would recreate the
   // board after the ninth, which simple ko alone does not forbid.
   const moves = [[2, 1], [0, 1], [2, 2], [1, 0], [0, 3], [1, 2], [1, 1], [0, 2], [3, 0], [2, 0], [0, 0]];

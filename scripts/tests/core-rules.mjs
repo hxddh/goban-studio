@@ -154,7 +154,7 @@ const CORNER_LIFE = [
   ".........",
 ];
 
-await test("v13 scoring: a corner group alive and the rest owned by one side, under all three rulesets", () => {
+await test("scoring: a corner group alive and the rest owned by one side, under all three rulesets", () => {
   const counts = territoryMap(fromRows(CORNER_LIFE).board).flat();
   assert.equal(counts.filter((v) => v === BLACK).length, 65);
   assert.equal(counts.filter((v) => v === WHITE).length, 4);
@@ -178,7 +178,7 @@ await test("v13 scoring: a corner group alive and the rest owned by one side, un
   assert.equal(cn.black + cn.white - cn.komi, 81);
 });
 
-await test("v13 scoring: a side group alive and the rest owned; colours swapped", () => {
+await test("scoring: a side group alive and the rest owned; colours swapped", () => {
   const side = [
     ".XO...OX.",
     ".XO...OX.",
@@ -202,7 +202,7 @@ await test("v13 scoring: a side group alive and the rest owned; colours swapped"
   assert.equal(w.result, "W+" + (65 + 7 + 7.5 - 9));
 });
 
-await test("v13 scoring: open regions stay dame until living stones of both colours divide the board", () => {
+await test("scoring: open regions stay dame until living stones of both colours divide the board", () => {
   // Both colours touch the open region: dame.
   const early = fromRows([".........", ".........", "..X......", ".........", ".........", ".........", "......O..", ".........", "........."]);
   assert.equal(territoryMap(early.board).flat().every((v) => v === 0), true);

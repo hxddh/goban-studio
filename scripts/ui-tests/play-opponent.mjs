@@ -13,7 +13,7 @@ const label = (r) => (r > 0 ? `≈ ${r} kyu` : `≈ ${1 - r} dan`);
 const MODE_WORDS = /human-style|stronger network|plays like a person/i;
 
 export default async function ({ check, assert, fresh, onboard, audit }) {
-  await check("v9 opponent: New game chooses a rank on one slider, shown as the measured rank, with no mode wording", async () => {
+  await check("opponent: New game chooses a rank on one slider, shown as the measured rank, with no mode wording", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await page.keyboard.press("Control+n");
@@ -46,7 +46,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     return seen.join(" · ");
   });
 
-  await check("v9 opponent: with the suggestion off, New game opens at the remembered rank; Settings has no human-style switch", async () => {
+  await check("opponent: with the suggestion off, New game opens at the remembered rank; Settings has no human-style switch", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await page.evaluate(() => {

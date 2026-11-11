@@ -1,5 +1,5 @@
 /**
- * Course: the steps as written — a read step says one thing and is short,
+ * Core: the course's steps as written — a read step says one thing and is short,
  * a lesson's diagrams follow its own story, and the first steps ask for
  * what their text asks for. Loaded by scripts/test.mjs.
  */

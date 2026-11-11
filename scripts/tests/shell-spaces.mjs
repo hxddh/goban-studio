@@ -50,7 +50,7 @@ try {
     assert.ok(app.indexOf("await C.boot()") > 0 && app.indexOf("await C.boot()") < app.indexOf("  render(\n"), "the first render waits for boot");
   });
 
-  await test("shell: four spaces, Today, Play, Practice and Library, in the sidebar, the keyboard and the native menus (v12)", () => {
+  await test("shell: four spaces, Today, Play, Practice and Library, in the sidebar, the keyboard and the native menus", () => {
     A.setLang("en");
     assert.deepEqual(A.SPACES.map((s) => s.id), ["today", "play", "practice", "library"]);
     assert.deepEqual(C.SPACES, ["today", "play", "practice", "library"]);

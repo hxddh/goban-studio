@@ -16,7 +16,7 @@
  * (placed first, since they come earliest in a game) and handicap strategy
  * (last). Their opening and joseki steps follow lines of the opening book
  * (content/book.json): a joseki step is the book's corner tree move by move,
- * and scripts/tests/core-course-v13.mjs checks every accepted point the
+ * and scripts/tests/core-course-advanced.mjs checks every accepted point the
  * book knows against the book's KataGo evaluation (JOSEKI_LOSS). Lessons
  * cannot link into the explorer yet, so the text only points to it. Steps
  * the book does not cover wait for the KataGo lesson audit
@@ -135,7 +135,7 @@ const CORNER_OTHER_LONG = [". . . o X , ,", ". o o o X , ,", ". o X X X , ,", ".
 // every accepted point within a point of the book's best move. The Chinese
 // opening is the exception: it is taught as the named opening it is, and its
 // side stone is not among the book's searched moves (the book has the position
-// before it; scripts/tests/core-course-v13.mjs names the steps).
+// before it; scripts/tests/core-course-advanced.mjs names the steps).
 
 // The Chinese opening: the star point Q16, the 3-4 point Q3 (third line from the bottom) and the side
 // stone one line below the middle of the right side (low at R9, high at Q9).

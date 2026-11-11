@@ -44,7 +44,7 @@ await test("rules: KataGo is told the game's rules", async () => {
   }
 });
 
-await test("a host without the async command cannot search: no synchronous fallback (v13)", async () => {
+await test("a host without the async command cannot search: no synchronous fallback", async () => {
   const commands = [];
   globalThis.zero = {
     invoke: async (command) => {

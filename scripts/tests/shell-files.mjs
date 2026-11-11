@@ -74,7 +74,7 @@ await test("shell files: a file that is exactly a chunk long, and an empty one, 
   assert.equal((await readFileChunks(h.call, "/x/e")).length, 0);
 });
 
-await test("shell files: the dialogs are the host's own and pass only what they understand (v13)", async () => {
+await test("shell files: the dialogs are the host's own and pass only what they understand", async () => {
   const calls = [];
   const call = async (command, payload) => {
     calls.push({ command, payload });
@@ -130,7 +130,7 @@ function fakeFlushHost() {
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
-await test("shell quit: the page flushes when the host asks, then answers with the same id (v13)", async () => {
+await test("shell quit: the page flushes when the host asks, then answers with the same id", async () => {
   const h = fakeFlushHost();
   let flushed = 0;
   let release;

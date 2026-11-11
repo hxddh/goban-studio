@@ -1,7 +1,7 @@
 /**
- * Core: the v13 advanced units (opening frameworks, joseki choice, handicap
- * strategy), checked against the opening book and the solver, and the v13
- * terminology and fact fixes in the problem bank and the classic games.
+ * Core: the advanced units on opening frameworks, joseki choice and handicap
+ * strategy, checked against the opening book and the solver, and the
+ * terminology and facts of the problem bank and the classic games.
  */
 import { test, CLASSICS, COURSE, PROBLEMS, S, assert, fs, path, root, Book, BOOK } from "./helpers.mjs";
 import { handicapPoints } from "../../src/web/js/rules.js";
@@ -43,7 +43,7 @@ function bookHit(board, toMove) {
   return { hit: Book.lookup(BOOK.trees.corner, m, toMove), x0, y0 };
 }
 
-await test("v13 advanced: opening and joseki come first, handicap strategy last, every earlier lesson kept", () => {
+await test("advanced: opening and joseki come first, handicap strategy last, every earlier lesson kept", () => {
   const adv = COURSE.filter((u) => u.level === "advanced").map((u) => u.id);
   assert.deepEqual(adv.slice(0, 3), ["adv-opening", "adv-joseki", "adv-judgement"]);
   assert.equal(adv[adv.length - 1], "adv-handicap");
@@ -91,7 +91,7 @@ await test("advanced opening: the Chinese opening is Q16, Q3 and R9 — the side
   assert.deepEqual(lesson("adv-open-direction").steps[2].accept, [{ x: 13, y: 16 }, { x: 13, y: 15 }]);
 });
 
-await test("v13 advanced: every opening and joseki step the book knows accepts only book-quality moves", () => {
+await test("advanced: every opening and joseki step the book knows accepts only book-quality moves", () => {
   // The Chinese opening's side stone: the book has the position before it, but KataGo's search there
   // did not look at R9 or Q9 (it prefers an enclosure), so these two steps have no evaluation to hold
   // them to. When a rebuilt book lists the move, this exception fails and must go.
@@ -118,7 +118,7 @@ await test("v13 advanced: every opening and joseki step the book knows accepts o
   assert.ok(known >= 19, `${known} steps checked against the book`);
 });
 
-await test("v13 advanced: the joseki read diagrams number book lines move by move", () => {
+await test("advanced: the joseki read diagrams number book lines move by move", () => {
   for (const id of ["adv-joseki-low-pincer", "adv-joseki-two-space", "adv-joseki-high-approach", "adv-joseki-knight"]) {
     const read = lesson(id).steps[0];
     assert.equal(read.kind, "read", id);
@@ -130,7 +130,7 @@ await test("v13 advanced: the joseki read diagrams number book lines move by mov
   }
 });
 
-await test("v13 advanced: the urgent point is the solver's vital point, and leaving it lets White kill", () => {
+await test("advanced: the urgent point is the solver's vital point, and leaving it lets White kill", () => {
   const steps = lesson("adv-open-urgent").steps;
   const place = steps.find((s) => s.kind === "place");
   const kill = steps.find((s) => s.kind === "problem");
@@ -148,7 +148,7 @@ await test("v13 advanced: the urgent point is the solver's vital point, and leav
   for (const st of pzLive.stones) assert.equal(m[st.y][st.x], st.c, `stone at ${st.x},${st.y}`);
 });
 
-await test("v13 advanced: handicap boards use the app's handicap points", () => {
+await test("advanced: handicap boards use the app's handicap points", () => {
   const four = handicapPoints(19, 4);
   const nine = handicapPoints(19, 9);
   for (const l of unit("adv-handicap").lessons)
@@ -162,7 +162,7 @@ await test("v13 advanced: handicap boards use the app's handicap points", () => 
     }
 });
 
-await test("v13 terms: the problem bank says rabbity six and capture to save, and ja liberties are 呼吸点 outside races", () => {
+await test("terms: the problem bank says rabbity six and capture to save, and ja liberties are 呼吸点 outside races", () => {
   const six = PROBLEMS.filter((p) => /flower-six/.test(p.id));
   assert.ok(six.length >= 2);
   for (const p of six) assert.equal(p.title.en, "Rabbity six", p.id);
@@ -178,7 +178,7 @@ await test("v13 terms: the problem bank says rabbity six and capture to save, an
   }
 });
 
-await test("v13 facts: the 1996 Fujitsu Cup note names Lee Changho's first world title (1992 Tong-Yang Cup)", () => {
+await test("facts: the 1996 Fujitsu Cup note names Lee Changho's first world title (1992 Tong-Yang Cup)", () => {
   const c = CLASSICS.find((x) => x.id === "lee-ma-1996");
   for (const lang of ["zh", "en", "ko", "ja"]) {
     assert.match(c.note[lang], /1992/, lang);
@@ -190,7 +190,7 @@ await test("v13 facts: the 1996 Fujitsu Cup note names Lee Changho's first world
   assert.match(CLASSICS.find((x) => x.id === "sakata-otake-1969").note.zh, /第八期/);
 });
 
-await test("v13 docs: the glossary lists the v13 terms", () => {
+await test("docs: the glossary lists the v13 terms", () => {
   const md = fs.readFileSync(path.join(root, "docs/glossary.md"), "utf8");
   for (const term of ["中国流", "三连星", "模样", "重复", "置き碁", "下ツケ", "カケツギ", "rabbity six"]) assert.ok(md.includes(term), term);
 });

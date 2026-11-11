@@ -448,7 +448,7 @@ await check("all four languages render every place without overflow or missing s
   }
 });
 
-await check("v6 explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
+await check("explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+4");
@@ -547,7 +547,7 @@ async function newTwoPlayer9(page) {
 }
 
 for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
-  await check(`v6 a11y: every place passes the audit (${locale}, ${scheme})`, async () => {
+  await check(`a11y: every place passes the audit (${locale}, ${scheme})`, async () => {
     const page = await fresh(locale);
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto(origin + "/");
@@ -599,7 +599,7 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
   });
 }
 
-await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
+await check("a11y: every Tab stop shows a focus ring (§10)", async () => {
   const page = await fresh();
   await onboard(page, 1);
   const missing = [];
@@ -637,7 +637,7 @@ await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
 });
 
 for (const locale of ["en-US", "zh-CN"]) {
-  await check(`v6 a11y: the board speaks — moves, points, last move, turn, rows (${locale})`, async () => {
+  await check(`a11y: the board speaks — moves, points, last move, turn, rows (${locale})`, async () => {
     const page = await fresh(locale);
     await onboard(page, 1);
     const L = await page.evaluate(() => window.__state.settings.lang);
@@ -678,7 +678,7 @@ for (const locale of ["en-US", "zh-CN"]) {
   });
 }
 
-await check("v6 a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
+await check("a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+3");
@@ -708,7 +708,7 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   await page.close();
 });
 
-await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc", async () => {
+await check("a11y: radio groups take arrow keys, menus give focus back on Esc", async () => {
   const page = await fresh();
   await onboard(page, 1);
   // A segmented control (New game: the opponent).
