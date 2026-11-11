@@ -69,27 +69,39 @@ export function suggestHandicap(playerRank, opponentRank, size) {
  */
 export { LANES } from "./scheduler.js";
 export const sched = scheduler;
-const analyzeQ = (game, opts = {}) => {
+/**
+ * One queued search as { analysis, cancelled }. `cancelled` is true when
+ * the search was stopped (its signal, cancel(), quitting) rather than
+ * answered: a null analysis then says nothing about the engine, and the
+ * position it was for is no longer wanted.
+ */
+async function searchQ(game, opts = {}) {
   const { lane = "background", signal = null, ...rest } = opts;
-  return scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal, preemptible: KataGo.canCancel() });
-};
+  const status = { cancelled: false };
+  const analysis = await scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal, preemptible: KataGo.canCancel(), status });
+  return { analysis, cancelled: status.cancelled || !!signal?.aborted };
+}
+const analyzeQ = (game, opts = {}) => searchQ(game, opts).then((r) => r.analysis);
 
 /**
  * An analysis search on the analysis engine (the stronger network when it is
  * installed, with scaled visits), falling back to the shipped network when
- * that process cannot answer.
+ * that process cannot answer. A cancelled search is neither a failure of
+ * the stronger process nor a reason to search the same position again.
  */
-async function analysisQ(game, opts = {}) {
+async function analysisR(game, opts = {}) {
   const engine = analysisEngine();
-  if (engine === "standard") return analyzeQ(game, opts);
-  const a = await analyzeQ(game, { ...opts, engine, visits: scaledVisits(opts.visits ?? 64, engine) });
-  if (a || opts.signal?.aborted) {
-    if (a) strongFailures = 0;
-    return a;
+  if (engine === "standard") return searchQ(game, opts);
+  const first = await searchQ(game, { ...opts, engine, visits: scaledVisits(opts.visits ?? 64, engine) });
+  if (first.cancelled) return { analysis: null, cancelled: true };
+  if (first.analysis) {
+    strongAnswered();
+    return first;
   }
-  strongFailures++;
-  return analyzeQ(game, opts);
+  strongFailed();
+  return searchQ(game, opts);
 }
+const analysisQ = (game, opts = {}) => analysisR(game, opts).then((r) => r.analysis);
 
 let cached = null;
 export async function info() {
@@ -108,8 +120,26 @@ export async function info() {
  * (app/models-ctl.js) from the host's status; all false until then.
  */
 const models = { strong: false, human: false };
-/** Consecutive failures of the strong process; after two, use the standard one. */
+/**
+ * Consecutive failures of the strong process. After two, the standard one
+ * is used instead, but not for good: STRONG_RETRY_MS after the last
+ * failure the strong process is tried again, and any answer from it clears
+ * the count. Only a search that ran and came back empty is a failure; a
+ * cancelled one is not (see searchQ).
+ */
 let strongFailures = 0;
+let strongFailedAt = 0;
+/** How long the strong process rests after two failures in a row. */
+export const STRONG_RETRY_MS = 2 * 60 * 1000;
+
+function strongFailed() {
+  strongFailures++;
+  strongFailedAt = Date.now();
+}
+
+function strongAnswered() {
+  strongFailures = 0;
+}
 
 export function setModels({ strong, human } = {}) {
   if (strong !== undefined) {
@@ -119,8 +149,9 @@ export function setModels({ strong, human } = {}) {
   if (human !== undefined) models.human = !!human;
 }
 
-export function modelsState() {
-  return { ...models, strongUsable: models.strong && strongFailures < 2 };
+export function modelsState(now = Date.now()) {
+  const resting = strongFailures >= 2 && now - strongFailedAt < STRONG_RETRY_MS;
+  return { ...models, strongUsable: models.strong && !resting };
 }
 
 /** The process for analysis, review, hints and scoring. */
@@ -338,32 +369,35 @@ export function humanRequest(human) {
  * ("human", "strong", "standard", or "offline" for the local fallback).
  * When an optional process cannot answer, the nearest standard level plays
  * the move (and `impl` says so).
+ *
+ * A search that was cancelled (the signal, or cancel(): the player took
+ * the move back, started another game) ends the decision there: the result
+ * has no move and `cancelled: true`. Nothing else is searched and the
+ * offline engine is not asked, because the position is no longer wanted.
  */
 export async function decide(game, opponent, { signal, lane = "move", node = game.current } = {}) {
   const inst = installed();
   let it = resolveOpponent(opponent, inst);
   const rank = opponent && typeof opponent === "object" && Number.isFinite(Number(opponent.rank)) ? Number(opponent.rank) : Number.isFinite(Number(opponent)) ? Number(opponent) : implLabel(it.id);
   if (it.kind === "human") {
-    const analysis = await analyzeQ(game, { ...humanRequest(it.level.human), node, signal, lane });
-    if (signal?.aborted) return { move: null, analysis: null, mode: "human", impl: it.id };
+    const { analysis, cancelled } = await searchQ(game, { ...humanRequest(it.level.human), node, signal, lane });
+    if (cancelled) return { move: null, analysis: null, mode: "human", impl: it.id, cancelled: true };
     const move = analysis && humanMoveFromAnalysis(game, analysis, it.level.human);
     if (move) return { move, analysis, mode: "human", impl: it.id };
     // The human process could not answer: what plays the rank without it.
     it = impl(levelFor(rank, { strong: inst.strong }).impl);
   }
   if (it.kind === "strong") {
-    const analysis = await analyzeQ(game, { visits: it.level.strong.visits, engine: "strong", node, signal, lane });
-    if (signal?.aborted) return { move: null, analysis: null, mode: "strong", impl: it.id };
+    const { analysis, cancelled } = await searchQ(game, { visits: it.level.strong.visits, engine: "strong", node, signal, lane });
+    if (cancelled) return { move: null, analysis: null, mode: "strong", impl: it.id, cancelled: true };
+    if (analysis) strongAnswered();
+    else strongFailed();
     const move = analysis && moveFromAnalysis(game, analysis, it.level);
-    if (move) {
-      strongFailures = 0;
-      return { move, analysis, mode: "strong", impl: it.id };
-    }
-    if (!analysis) strongFailures++;
+    if (move) return { move, analysis, mode: "strong", impl: it.id };
     it = impl(levelFor(rank, {}).impl);
   }
-  const analysis = await analyzeQ(game, { visits: it.level.visits, node, signal, lane });
-  if (signal?.aborted) return { move: null, analysis: null, mode: "standard", impl: it.id };
+  const { analysis, cancelled } = await searchQ(game, { visits: it.level.visits, node, signal, lane });
+  if (cancelled) return { move: null, analysis: null, mode: "standard", impl: it.id, cancelled: true };
   if (analysis) {
     const move = moveFromAnalysis(game, analysis, it.level);
     if (move) return { move, analysis, mode: "standard", impl: it.id };
@@ -406,8 +440,8 @@ export function cancel() {
 export async function chooseMove(game, opponent, opts = {}) {
   // Never resign, never pass early while the board is open: KataGo's own
   // choice is a pass only when the game is really over.
-  const { move, impl: played } = await decide(game, opponent, opts);
-  if (move) return move;
+  const { move, impl: played, cancelled } = await decide(game, opponent, opts);
+  if (move || cancelled) return move;
   const std = impl(played)?.kind === "standard" ? impl(played) : impl(levelFor(implLabel(played), {}).impl);
   return chooseLocal(game, { level: std.level.local, color: game.turn });
 }
@@ -415,13 +449,13 @@ export async function chooseMove(game, opponent, opts = {}) {
 /** The engine's suggestion for the side to move, with a short line (the player waits on it). */
 export async function hint(game, { signal, lane = "move", node = game.current } = {}) {
   // v13: the position asked about, fixed now (a queued search would otherwise read the board when it runs).
-  const analysis = await analysisQ(game, { node, visits: 200, signal, lane });
+  const { analysis, cancelled } = await analysisR(game, { node, visits: 200, signal, lane });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
     return { ...toMove(top), pv: top.pv || [], source: "katago" };
   }
-  // The board moved on meanwhile (an undo): no answer for a position no longer there.
-  if (signal?.aborted || game.current !== node) return null;
+  // Cancelled, or the board moved on meanwhile (an undo): no answer for a position no longer wanted.
+  if (cancelled || game.current !== node) return null;
   const move = await chooseLocal(game, { level: 4, color: game.turn });
   return { ...move, pv: [], source: "offline" };
 }
