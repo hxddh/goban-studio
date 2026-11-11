@@ -168,12 +168,23 @@ group per screen region.
   move number and point on the right), the note shown only for the move on
   the board. v12: written moves only — the v11 rows made from KataGo's
   swings ("about 5 points lost") read as noise and were removed.
-* **Today (v12, as before v9).** The app opens here. A date and a
-  greeting; one hero — the game in progress or the suggested game — with
-  the page's one primary button; one row for today's practice (what is
-  next, done of total, *Start* / *Continue*; the placement quiz in its
-  place before the first path); your level; this week in one line; the
-  last three games. Nothing empty is shown as a card.
+* **Today.** The app opens here. A date and a greeting; one hero — the
+  game in progress or the suggested game — with the page's one primary
+  button; one row for today's practice (the next row of the path, done of
+  total, *Start* / *Continue*; the placement quiz in its place before the
+  first path). Then *Your progress*, one group of rows, each a line of
+  words on the left and a small picture on the right, the pictures ending
+  on one edge: the level (the estimate with its ±, and from three rated
+  games its line over the newest forty with the change in words, "up
+  about 2 ranks over 30 days" — honest ≈, no axis); what is mastered (a
+  thin bar in three parts — mastered, learning, not started — and, on
+  click, the same bar theme by theme); the last four weeks as 28 dots, a
+  day practised or not (never a streak, never a count of days missed);
+  and the newest milestones, three at most, as plain lines with their
+  dates. A row with nothing to show is left out, and with no row the
+  whole group is: a new player sees no empty chart. Then this week in one
+  line — a part that is zero is not said — and the last three games. A
+  milestone reached is said once, in one success toast.
 * **Play (v12).** The board. With no game on it: the suggested game (the
   one primary) and *New game* in the toolbar. v13: "no game on it" is
   literal — with nothing saved, Play opens on that home (the suggested
@@ -186,19 +197,56 @@ group per screen region.
   offline engine plays it; when that fails too, the panel says so and
   offers *Retry* (the one primary). The game is never left waiting on the
   computer with nothing to press.
-* **Practice (v9 Learn; v12 name).** One path chosen for you: a short ordered list of rows
-  (5–8: the next lesson, reviews due, the week's focus, one stretch
-  problem, the beginner bridges), each saying why it is there in a few
-  words; the week's focus and its reason in one line above it. One primary
-  (*Start* / *Continue*) plays the rows as one session; at the end a quiet
-  "done for today". Below it, on the same page (v12; v9–v11 hid it one
-  row away): the course as one group of unit rows, the problem topics as
-  rows, the basic shapes as chips.
-  A problem row shows its position as a small tile (v10), so rows that
-  share a title look different. Before the first path, someone who knows
-  the rules is offered the placement quiz in its place (v10): one card with
-  the one primary (*Start*) and a quiet *Not now*; six problems, the toolbar
-  saying which one; the grade it ends on sets where the course starts.
+* **Practice.** One path chosen for you: a short ordered list of rows
+  (the next lesson, reviews due, the week's focus, one stretch problem,
+  new problems, the beginner bridges). Problems that follow one another
+  with the same theme and reason are one row, named after the theme with
+  its count ("Ladders · 4 problems") and showing up to four positions as
+  small tiles on the right; a row part done says "1 / 4". Each row says
+  why it is there in the model's own terms: *Due for review*, what your
+  games showed ("Came up 3 times in your last 4 games"), *A step up*,
+  *New at your level*, then how hard it is. Above the rows: the week's
+  focus in one line (its evidence there only when no row says it), and
+  one quiet line with the review load on the left ("4 to review today ·
+  37 mastered", zero parts left out) and the day's size on the right — a
+  small segmented control, 3 / 5 / 10. One primary (*Start* / *Continue*)
+  plays the rows as one session; at the end a quiet "done for today".
+  Below it, on the same page: the course as one group of unit rows, the
+  problem topics as rows, the basic shapes as chips. Before the first
+  path, someone who knows the rules is offered the placement quiz in its
+  place: one card with the one primary (*Start*) and a quiet *Not now*;
+  10–12 problems, the toolbar saying which one; its result is a
+  difficulty and the ranks it is meant for ("You start at Level 2
+  (≈ 18–14 kyu)").
+* **A topic.** A grid of positions, grouped by difficulty (the first
+  group with something unsolved is open; its header says done of total).
+  A tile is the problem's corner of the board, drawn sharp at any size:
+  board edges where the position touches them, the stones the goal is
+  about with a small dot. Under it: who plays, its number, its name once
+  solved, and one quiet mark of its state — nothing (not tried), a ring
+  (tried), a check (solved), a turning arrow (due for review), a filled
+  check (mastered); the same in words for a screen reader. Arrow keys
+  move through the grid, which is one tab stop; Enter opens. Tiles draw
+  as they come near the screen.
+* **Difficulty.** Five levels, called *Level 1* … *Level 5* (难度 1–5)
+  with the five-dot meter, never a word that reads as a rank or a class
+  of player; where it helps, the ranks a level is meant for, marked ≈
+  (1: 30–19 kyu, 2: 18–14, 3: 13–11, 4: 10–7, 5: 6 kyu and stronger).
+* **A problem's name.** The name of a shape or technique is most of the
+  answer, so it is not shown before the problem is solved or its answer
+  shown: the panel's heading is the goal ("Black to play: kill"), the
+  toolbar says *Problem*, lists and tiles show the name only of a problem
+  the player has solved, and the placement quiz and every review follow
+  the same rule. Once solved, the name is the result line ("This problem:
+  Straight three") and the toolbar's title, and its theme joins the
+  facts. A hint may name the technique: asking for one is a choice. After
+  a miss the panel says when the problem comes back ("It comes back
+  tomorrow").
+* **Going on.** Nothing in a lesson or a session goes on by itself: a
+  solved step keeps its feedback until *Continue* or Enter, and Enter is
+  the primary button of a finished problem or drill too (also with the
+  board focused). A lesson step with its own goal says it in the goal
+  line.
 * **Library (v12; v9–v11 Play's home).** Toolbar holds Import. One
   column, no tabs, no primary: your games as compact rows with a
   thumbnail (filter and search only once the list is long; the first eight

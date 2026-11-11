@@ -172,11 +172,11 @@ export const MESSAGES = {
   "goal.live": m("{0}先，做活", "{0} to play: live", "{0}선: 사세요", "{0}先：生きてください"),
   "goal.place": m("{0}先，下在最好的位置", "{0} to play: find the best point", "{0}선: 가장 좋은 곳에 두세요", "{0}先：一番良い所に打ってください"),
 
-  "grade.1": m("入门", "Beginner", "입문", "入門"),
-  "grade.2": m("初级", "Elementary", "초급", "初級"),
-  "grade.3": m("中级", "Intermediate", "중급", "中級"),
-  "grade.4": m("高级", "Advanced", "고급", "上級"),
-  "grade.5": m("挑战", "Challenge", "도전", "挑戦"),
+  "grade.1": m("难度 1", "Level 1", "난이도 1", "難易度 1"),
+  "grade.2": m("难度 2", "Level 2", "난이도 2", "難易度 2"),
+  "grade.3": m("难度 3", "Level 3", "난이도 3", "難易度 3"),
+  "grade.4": m("难度 4", "Level 4", "난이도 4", "難易度 4"),
+  "grade.5": m("难度 5", "Level 5", "난이도 5", "難易度 5"),
 
   "topic.capture": m("吃子", "Capturing", "따내기", "石を取る"),
   "topic.capture.desc": m("打吃方向、征子、双打吃、气紧。", "Atari direction, ladders, double atari, shortage of liberties.", "단수 방향, 축, 양단수, 자충.", "アタリの方向、シチョウ、両アタリ、ダメヅマリ。"),
@@ -242,7 +242,7 @@ export const MESSAGES = {
 
   "shortcuts.title": m("键盘快捷键", "Keyboard shortcuts", "단축키", "キーボードショートカット"),
   "shortcuts.browse": m("前后翻手（对局中按 ← 进入复盘）", "Step through moves (← in a live game opens review)", "수 넘기기 (대국 중 ←는 복기로)", "手を進める・戻す（対局中の←で検討へ）"),
-  "shortcuts.continue": m("课程中进入下一步", "Next step in a lesson", "강의의 다음 단계", "講座の次のステップ"),
+  "shortcuts.continue": m("进入下一步或下一题", "Next step or problem", "다음 단계 또는 문제", "次のステップ・問題へ"),
   "shortcuts.board": m("用键盘在棋盘上移动并落子", "Move on the board and place a stone", "키보드로 판 위를 움직이고 착수", "キーボードで盤上を移動して打つ"),
   "shortcuts.close": m("关闭面板或退出专注模式", "Close a panel or leave focus mode", "창 닫기 또는 집중 모드 종료", "パネルを閉じる・集中モード終了"),
 

@@ -1,6 +1,7 @@
 /**
  * Learn: the path, today's session and the catalog in the browser — the
- * home is one short list with one primary, each row says why it is there,
+ * home is one short list with one primary, each row says why it is there
+ * (problems of one theme share a row),
  * a row or the primary starts the session, finishing an item moves to the
  * next, and the end is a quiet "done for today"; the catalog is one row
  * away. Every new Learn view is checked in four languages, light and dark,
@@ -45,10 +46,12 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
 
   await check("learn path: the home is one short list with one primary; each row says why; the catalog is one row away", async () => {
     const page = await newPlayer();
-    const rows = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, text: r.innerText })));
-    assert(rows.length >= 5 && rows.length <= 8, `${rows.length} rows`);
+    const rows = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), text: r.innerText })));
+    assert(rows.length >= 2 && rows.length <= 8, `${rows.length} rows`);
     assert(rows[0].kind === "lesson" && rows[0].text.includes("Next lesson"), JSON.stringify(rows[0]));
-    for (const r of rows.slice(1)) assert(r.kind === "problem" && r.text.includes("At your level"), JSON.stringify(r));
+    // The day's five problems, those of one theme in one row, each row with its reason and how hard it is.
+    for (const r of rows.slice(1)) assert(r.kind === "problem" && /New at your level|A step up/.test(r.text) && /Level \d/.test(r.text) && /\d problems?/.test(r.text), JSON.stringify(r));
+    assert(rows.slice(1).reduce((n, r) => n + r.count, 0) === 5, `five problems: ${JSON.stringify(rows)}`);
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
     assert((await page.textContent(".learn-path .btn.primary")).trim() === "Start", "Start");
     // No Daily five, no focus card, no mistakes section, no course hero, no tiles on the page.
@@ -73,7 +76,9 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
 
   await check("learn path: the session plays the rows in order — a lesson, then problems with Continue — to a quiet done for today", async () => {
     const page = await newPlayer();
-    const total = await page.locator(".learn-path .path-row").count();
+    const rowCount = await page.locator(".learn-path .path-row").count();
+    // The session plays the items; a row may hold several problems.
+    const total = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].reduce((n, r) => n + Number(r.dataset.count), 0));
     await page.click(".learn-path .btn.primary");
     await page.waitForFunction(() => window.__state.learn.view === "lesson" && !!window.__state.learn.daily);
     assert((await page.textContent(".toolbar")).includes(`Today 1 of ${total}`), "its place in the toolbar");
@@ -98,7 +103,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await page.click(".celebrate .btn.primary");
     await page.waitForFunction(() => window.__state.learn.view === "problem" && window.__state.learn.daily?.done.length === 1);
     assert((await page.textContent(".toolbar")).includes(`Today 2 of ${total}`), "the second item");
-    assert((await page.textContent(".panel .eyebrow")).includes("At your level"), "why it is there");
+    assert(/New at your level|A step up/.test(await page.textContent(".panel .eyebrow")), "why it is there");
     // Each problem: the answer, then Continue.
     for (let n = 2; n <= total; n++) {
       await page.waitForFunction((n) => window.__state.learn.view === "problem" && document.querySelector(".toolbar").innerText.includes(`Today ${n} of`), n);
@@ -110,7 +115,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await inspect(page, "done for today");
     await page.click(".session-done .btn.primary");
     await page.waitForSelector(".learn-path");
-    assert((await page.locator(".learn-path .path-row.done").count()) === total, "every row checked");
+    assert((await page.locator(".learn-path .path-row.done").count()) === rowCount, "every row checked");
     assert((await page.locator(".btn.primary:visible").count()) === 0, "nothing left to start");
     assert((await page.textContent(".learn-path .section-title")).trim() === "Done for today", "the heading says so");
     assert(page.errors.length === 0, page.errors.join("; "));

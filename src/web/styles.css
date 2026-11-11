@@ -527,14 +527,6 @@ button.group-row:hover { background: var(--fill); }
 .lesson-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 
-.problem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--s-2); }
-.problem-card { display: flex; align-items: center; gap: var(--s-2); height: 40px; padding: 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); cursor: pointer; text-align: left; color: var(--text); }
-.problem-card:hover { border-color: var(--line-2); }
-.problem-card.done { color: var(--text-3); }
-.problem-card .icon { margin-left: auto; color: var(--good); }
-.problem-card .dot { margin-left: auto; }
-.problem-no { min-width: 20px; font: var(--t-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
-.problem-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .theme-filter { margin-bottom: var(--s-2); }
 
 .celebrate { align-items: center; text-align: center; padding: var(--s-6); min-width: 360px; gap: var(--s-3); }
@@ -841,9 +833,74 @@ button.group-row:hover { background: var(--fill); }
 .catalog .units.map .unit-text h3 { font: 500 13px/18px var(--font); }
 .catalog .units-heading { margin: 0; padding: var(--s-3) var(--s-4) var(--s-1); border-top: 1px solid var(--line); }
 
-/* v7 problems */
-.problem-card .problem-title { display: inline-flex; align-items: center; gap: var(--s-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.problem-card .grade-dots { margin-left: auto; }
+/* Practice and Today. A topic is a grid of positions (learn/tile.jsx), each
+ * with a quiet mark of its state; a problem's panel leads with its goal;
+ * the path merges problems of one theme into a row with their positions as
+ * tiles and carries the review load and the day's size on one line;
+ * Today's progress is one group of rows (app/today.jsx). */
+:root { --tile-black: #1b1a17; --tile-white: #fbf8f1; --tile-rim: rgba(27, 26, 23, 0.45); }
+.problem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-2); }
+.problem-card { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; padding: var(--s-1); border: 0; border-radius: var(--r-2); background: none; cursor: pointer; text-align: left; color: var(--text); }
+.problem-card:hover { background: var(--fill); }
+.tile { display: block; width: 100%; aspect-ratio: 1; border-radius: var(--r-1); background: var(--thumb-board); overflow: hidden; }
+.tile svg { display: block; width: 100%; height: 100%; }
+.tile line { stroke: var(--thumb-line); stroke-width: 0.035; }
+.tile line.edge { stroke-width: 0.08; }
+.tile circle.b { fill: var(--tile-black); }
+.tile circle.w { fill: var(--tile-white); stroke: var(--tile-rim); stroke-width: 0.05; }
+.tile circle.key-b { fill: var(--tile-white); }
+.tile circle.key-w { fill: var(--tile-black); }
+.tile-foot { display: flex; align-items: center; gap: var(--s-1); min-height: 18px; padding: 0 2px; font: var(--t-small); color: var(--text-3); }
+.tile-foot .problem-no { font-variant-numeric: tabular-nums; }
+.tile-foot .problem-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.tile-mark { flex: none; display: grid; place-items: center; width: 16px; height: 16px; margin-left: auto; }
+.tile-mark.tried { box-sizing: border-box; width: 8px; height: 8px; margin-right: 4px; border: 1.5px solid var(--text-3); border-radius: 50%; }
+.tile-mark.solved { color: var(--good); }
+.tile-mark.due { color: var(--text-2); }
+.tile-mark.mastered { border-radius: 50%; background: var(--good); color: var(--surface); }
+.grade-band { font: var(--t-small); color: var(--text-3); }
+.panel-title h1.goal { font: 500 14px/20px var(--font); }
+.result-lines { display: flex; flex-direction: column; gap: var(--s-1); }
+.result-name { font: var(--t-read); color: var(--text); }
+.path-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); min-height: 28px; margin-top: var(--s-2); }
+.path-load { font: var(--t-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.daily-size { display: inline-flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+.daily-size .segmented button { height: 22px; padding: 0 10px; font-variant-numeric: tabular-nums; }
+.path-tiles { flex: none; display: flex; gap: var(--s-1); }
+.path-tiles .done { opacity: 0.45; }
+.progress-list { margin-top: 0; }
+.progress-row { display: flex; align-items: center; gap: var(--s-4); width: 100%; min-height: 56px; padding: var(--s-2) var(--s-4); border: 0; background: none; text-align: left; color: inherit; }
+button.progress-row { cursor: pointer; }
+button.progress-row:hover { background: var(--fill); }
+.progress-row > .icon { flex: none; color: var(--text-3); }
+.spark { flex: none; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--text-2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.spark circle { fill: var(--text); }
+.mastery-bar { flex: none; display: flex; gap: 2px; width: 160px; height: 6px; border-radius: 3px; overflow: hidden; }
+.mastery-bar i { flex: 0 1 0; height: 100%; }
+.mastery-bar .mastered { background: var(--good); }
+.mastery-bar .learning { background: var(--text-3); }
+.mastery-bar .unseen { background: var(--fill-2); }
+.mastery-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s-2) var(--s-5); margin: 0; padding: 0 var(--s-4) var(--s-4); list-style: none; }
+.mastery-themes li { display: flex; align-items: center; gap: var(--s-3); font: var(--t-small); color: var(--text-2); }
+.mastery-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mastery-themes .mastery-bar { width: 72px; height: 4px; }
+.day-dots { flex: none; display: flex; align-items: center; gap: 3px; }
+.day-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--fill-2); }
+.day-dots i.on { background: var(--text-2); }
+.day-dots i.week { margin-left: 5px; }
+/* The charts end where the mastery row's bar ends, left of its chevron. */
+li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
+.progress-row.milestones { padding-top: var(--s-3); padding-bottom: var(--s-3); }
+.milestone-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.milestone { display: flex; align-items: baseline; gap: var(--s-3); }
+.gr-text .milestone-text { flex: 1; min-width: 0; color: var(--text-2); }
+@media (forced-colors: active) {
+  .tile, .mastery-bar i, .day-dots i { forced-color-adjust: none; }
+  .mastery-bar .unseen, .day-dots i { outline: 1px solid CanvasText; outline-offset: -1px; }
+  .spark polyline { stroke: CanvasText; }
+  .spark circle { fill: CanvasText; }
+}
 
 /* v8 beginner path: the lesson bridge's one line, and the first count's note */
 .celebrate .bridge-lead { max-width: 360px; font: var(--t-body); color: var(--text-2); }

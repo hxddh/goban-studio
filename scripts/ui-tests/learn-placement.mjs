@@ -54,6 +54,9 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
       asked = i;
       const sub = await page.textContent(".toolbar .tb-sub, .tb-sub");
       assert(sub.includes(`${i} of ${i > 10 ? 12 : 10}`), `where it is: ${sub}`);
+      // The quiz asks for the answer, so it does not show the problem's name: only its goal.
+      const shown = await page.evaluate(() => ({ name: window.__state.learn.problem.def.title.en, title: document.querySelector(".tb-title h1").innerText.trim(), h1: document.querySelector(".panel h1").innerText.trim() }));
+      assert(shown.title === "Problem" && shown.h1.includes("to play") && shown.h1 !== shown.name, `a quiz problem named: ${JSON.stringify(shown)}`);
       // Show the answer (a miss), then Continue.
       await page.click('.panel .actions .btn:has-text("Show answer")');
       await page.click(".panel .actions .btn.primary");
@@ -64,6 +67,10 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     assert((await page.locator(".placement-offer").count()) === 0, "the offer is gone");
     const placed = await page.evaluate(() => window.__state.profile.placement);
     assert(placed?.grade === 1, JSON.stringify(placed));
+    // The result is a difficulty with the ranks it is meant for, never a class of player.
+    const said = await page.evaluate(() => window.__state.toasts.map((x) => x.message).join(" | "));
+    assert(said.includes("Done. You start at Level 1 (≈ 30–19 kyu)."), `the result: ${said}`);
+    assert(!/Beginner|Advanced|Challenge/.test(said), said);
     await page.close();
   });
 

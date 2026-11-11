@@ -22,7 +22,7 @@ import { state, toast, update } from "../app/store.js";
 import { changeProfile } from "../app/ctl-core.js";
 import { PLACEMENT, placementGrade, placementNext, placementOffered as offered, setPlacement } from "../model/player.js";
 import { GRADES, PROBLEMS, withContent } from "../content.js";
-import { learnHome, openProblem } from "../app/practice-ctl.js";
+import { gradeBandText, learnHome, openProblem } from "../app/practice-ctl.js";
 import { resetSession } from "./session.js";
 
 /** Whether Learn's home offers the quiz now. */
@@ -78,7 +78,8 @@ function finish() {
   changeProfile((p) => setPlacement(p, { grade }, Date.now()));
   resetSession();
   learnHome();
-  toast(t("placement.done", [t("grade." + grade)]));
+  // Where the path starts, as a difficulty and the ranks it is meant for — never a name such as "Advanced".
+  toast(t("placement.done", [t("grade." + grade), gradeBandText(grade)]));
 }
 
 /** Not now: the path starts from what onboarding said, and the offer does not come back. */

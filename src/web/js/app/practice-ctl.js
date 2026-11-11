@@ -16,10 +16,19 @@ import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember, tx
 import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
 import { continuePlacement, placementAnswer } from "../learn/placement.js";
 import { reviewTransform, transformProblem } from "../learn/transform.js";
+import { gradeBand } from "../learn/progress.js";
+import "../learn/milestones.js"; // follows the profile: new milestones are kept and said once
 
 export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
 export const gradeOf = (id) => GRADES[id]?.grade || 1;
+
+/** "≈ 18–14 kyu": the ranks a difficulty is meant for (the grades are estimated, so it is marked ≈). */
+export function gradeBandText(grade) {
+  const band = gradeBand(grade);
+  if (!band) return "";
+  return band.to == null ? t("grade.bandTop", [band.from]) : t("grade.band", [band.from, band.to]);
+}
 
 /* -------------------------------------------------------------- course */
 
@@ -159,20 +168,12 @@ function showLesson(lessonId, stepIndex, daily) {
   });
 }
 
-let autoTimer = 0;
-function scheduleAutoContinue() {
-  clearTimeout(autoTimer);
-  const L = state.learn.lesson;
-  if (!L) return;
-  const index = L.index;
-  autoTimer = setTimeout(() => {
-    const now = state.learn.lesson;
-    if (state.learn.view === "lesson" && now === L && now.index === index && !now.finished) lessonContinue();
-  }, 1500);
-}
-
+/**
+ * On to the next step, or the end of the lesson. Only the learner goes on
+ * (Continue, or Enter): a solved step stays on screen until they have read
+ * what it says.
+ */
 export function lessonContinue() {
-  clearTimeout(autoTimer);
   const L = state.learn.lesson;
   if (!L) return;
   const next = L.index + 1;
@@ -194,7 +195,6 @@ export function lessonContinue() {
 }
 
 export function lessonBack() {
-  clearTimeout(autoTimer);
   const L = state.learn.lesson;
   if (!L || L.index === 0) return;
   L.index -= 1;
@@ -205,7 +205,6 @@ export function lessonBack() {
 
 /** Learn's home: the path (learn/path.jsx). */
 export function learnHome() {
-  clearTimeout(autoTimer);
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "learn";
@@ -215,7 +214,6 @@ export function learnHome() {
 
 /** The catalog, for browsing: the course, the problem topics and the basic shapes (learn/catalog.jsx). */
 export function openCatalog() {
-  clearTimeout(autoTimer);
   if (!isRestoring()) remember();
   update((s) => {
     s.space = "learn";
@@ -319,11 +317,13 @@ function showProblem(id, daily, placement = false) {
   const p = shownDef(written, { placement });
   const pz = S.createPuzzle(p);
   pz.view = problemView(pz);
+  // Tried before: this showing is a review (a miss says when it comes back).
+  const review = (state.profile.problems?.[id]?.tries || 0) > 0;
   update((s) => {
     s.space = "learn";
     // The placement quiz goes on only on its own problems (learn/placement.js).
     const keep = placement && s.learn.placement ? s.learn.placement : null;
-    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz) }, mistake: null, daily: daily || null, placement: keep, topic: daily ? s.learn.topic : p.topic };
+    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz), review }, mistake: null, daily: daily || null, placement: keep, topic: daily ? s.learn.topic : p.topic };
   });
 }
 
@@ -543,12 +543,12 @@ function finishProblem(P) {
   P.result = endResult(P);
   P.status = "won";
   P.feedback = "solved";
+  P.named = true;
   P.busy = false;
   Audio.correct ? Audio.correct() : Audio.win();
   recordAttempt(P, true);
   announce(t(feedbackKey(P), endgameArgs(P)));
   update();
-  if (state.learn.view === "lesson" && state.learn.lesson?.cur === P) scheduleAutoContinue();
 }
 
 /**
@@ -559,6 +559,7 @@ function finishProblem(P) {
 function recordAttempt(P, solved) {
   if (P.recorded === "solved" || (P.recorded && !solved)) return;
   const first = !P.recorded;
+  if (first && !solved) P.missed = true;
   P.recorded = solved ? "solved" : "miss";
   if (state.learn.view === "problem" && P.def) {
     const now = Date.now();
@@ -617,6 +618,7 @@ export function showAnswer() {
   Object.assign(P, problemState(P.pz), { used: true, recorded: P.recorded });
   P.answer = line.map((m, i) => ({ ...m, n: i + 1 }));
   P.status = "answer";
+  P.named = true;
   if (!P.recorded) recordAttempt(P, false);
   update();
 }
@@ -656,7 +658,6 @@ function placePlay(x, y) {
     Audio.correct?.();
     announce(t("practice.right"));
     update();
-    scheduleAutoContinue();
     return;
   }
   C.result = "wrong";
@@ -671,6 +672,38 @@ export function goalText(pz) {
   if (pz.counting) return t(pz.ask === "value" ? "goal.endgameValue" : "goal.endgame", [color]);
   return t("goal." + pz.goal, [color]);
 }
+
+/**
+ * A problem's goal from its definition alone, for lists and tiles (no
+ * puzzle is built): the same words as goalText of its puzzle. Empty until
+ * the problem's body has arrived (content.js).
+ */
+export function defGoalText(def) {
+  const user = defToMove(def);
+  if (user == null) return "";
+  const color = t(user === BLACK ? "common.black" : "common.white");
+  if (def.goal === "endgame") return t(def.ask === "value" ? "goal.endgameValue" : "goal.endgame", [color]);
+  return t("goal." + def.goal, [color]);
+}
+
+/** The colour that plays first in a problem, from its definition (1 black, -1 white); null before its body is here. */
+export function defToMove(def) {
+  if (!def?.goal || !Array.isArray(def.diagram)) return null;
+  if (def.goal === "endgame") return BLACK;
+  const keyBlack = def.diagram.some((row) => row.includes("x"));
+  const attack = def.goal === "capture" || def.goal === "kill";
+  return def.toMove ?? ((attack ? !keyBlack : keyBlack) ? BLACK : -BLACK);
+}
+
+/**
+ * Whether a problem's name may be shown. The name of a shape or technique
+ * ("Straight three", "Snapback") is most of the answer, so the problem on
+ * the board says only its goal until it is solved or the answer is shown
+ * in this visit (`P.named`), and a list shows the name only of a problem
+ * the player has solved.
+ */
+export const problemNamed = (P) => !!P?.named;
+export const nameKnown = (id) => !!state.profile.problems?.[id]?.solved;
 
 /**
  * The goal line of a lesson step (`cur`, the step as built for the board):
