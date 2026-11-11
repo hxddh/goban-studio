@@ -255,7 +255,7 @@ await check("two-player 9×9 game to the count, with the board played by keyboar
   }
   for (let i = 0; i < 2; i++) {
     await page.keyboard.press("Control+Shift+P");
-    await page.click(".sheet-foot .btn.primary");
+    await page.click(".pass-ask .btn.primary");
   }
   await page.waitForSelector(".score-card");
   await page.click(".score-card .btn.primary");
@@ -294,7 +294,7 @@ await check("a board click paints within budget", async () => {
   return timing;
 });
 
-await check("review: a variation, back to the game, Esc closes the layer", async () => {
+await check("review: a line tried and kept, back to the game, Esc closes the layer", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+n");
@@ -307,7 +307,10 @@ await check("review: a variation, back to the game, Esc closes the layer", async
   await page.waitForSelector(".review-layer");
   await page.keyboard.press("ArrowLeft");
   await clickPoint(page, 6, 6);
-  await page.waitForSelector(".var-bar");
+  // The stone starts a line being tried; Keep makes it a variation of the record.
+  await page.waitForSelector(".draft-bar");
+  await page.click(".draft-bar .link >> nth=0");
+  await page.waitForSelector(".var-bar:not(.draft-bar)");
   await page.click(".var-bar .link >> nth=0");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".review-layer", { state: "detached" });
@@ -322,7 +325,7 @@ await check("a classic opens in review within budget", async () => {
     // Play again: its home, with the history and the classics.
     await page.keyboard.press("Control+4");
     const t0 = Date.now();
-    await page.click(".collection-row >> nth=0");
+    await page.click(".home-classics .collection-row >> nth=0");
     await page.waitForSelector(".review-layer .chart");
     const ms = Date.now() - t0;
     await page.close();
@@ -551,7 +554,7 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await page.click(".game-item .icon-btn");
     await audit(page, "history row menu");
     await page.keyboard.press("Escape");
-    await page.click(".collection-row >> nth=0");
+    await page.click(".home-classics .collection-row >> nth=0");
     await page.waitForSelector(".review-layer .chart");
     await audit(page, "review");
     await page.keyboard.press("Control+3");
@@ -597,7 +600,7 @@ await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
     total += await stops("space " + k);
   }
   await page.keyboard.press("Control+4");
-  await page.click(".collection-row >> nth=0");
+  await page.click(".home-classics .collection-row >> nth=0");
   await page.waitForSelector(".review-layer .chart");
   total += await stops("review");
   assert(!missing.length, missing.join("; "));
@@ -773,7 +776,7 @@ for (const vp of [
     await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.model.size === 9);
     for (let i = 0; i < 2; i++) {
       await page.keyboard.press("Control+Shift+P");
-      await page.click(".sheet-foot .btn.primary");
+      await page.click(".pass-ask .btn.primary");
     }
     await page.waitForSelector(".score-card .btn.primary:not([disabled])");
     await page.click(".score-card .btn.primary");

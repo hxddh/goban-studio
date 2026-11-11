@@ -98,8 +98,16 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await fresh();
     await onboard(page, 1);
     await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.geom?.cell > 10);
-    await clickPoint(page, 2, 2);
-    await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
+    // Two moves of the player's (a single stray click is not kept), each answered by the computer.
+    for (let k = 1; k <= 2; k++) {
+      const p = await page.evaluate(() => {
+        const g = window.__state.game.game;
+        for (const [x, y] of [[2, 2], [6, 6], [2, 6], [6, 2], [4, 4]]) if (g.canPlay(x, y).ok) return [x, y];
+        return null;
+      });
+      await clickPoint(page, ...p);
+      await page.waitForFunction((n) => window.__state.game.game.moveNumber >= n && !window.__state.game.thinking && window.__state.game.game.turn === window.__state.game.humanColor, 2 * k, { timeout: 20000 });
+    }
     const before = await page.evaluate(() => window.__state.game.game.mainLine().length);
     // New game: two players on 9×9.
     await page.keyboard.press("Control+n");
@@ -110,8 +118,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForFunction(() => window.__state.toasts.some((t) => /unfinished/.test(t.message)));
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .game-row");
-    const row = await page.textContent(".library-home .game-row");
-    assert(row.includes("Unfinished"), row);
+    // It is in the Library's group of unfinished games, and its row continues it.
+    assert((await page.textContent(".unfinished-group .slot-title")).trim() === "Unfinished", "the unfinished group");
+    const row = await page.textContent(".unfinished-group .game-row");
+    assert(row.includes("Continue"), row);
     await page.click(".library-home .game-row");
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game" && window.__state.game.recordId);
     const now = await page.evaluate(() => ({ len: window.__state.game.game.mainLine().length, opponent: window.__state.game.opponent }));

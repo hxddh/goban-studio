@@ -27,12 +27,26 @@ const sources = () => {
 };
 
 /** Every kind of sheet this file opens (kept equal to sheets.jsx by the first check). */
-const SHEETS_TESTED = ["confirm", "newGame", "onboarding", "rename", "settings", "shortcuts"];
+const SHEETS_TESTED = ["confirm", "importReport", "newGame", "onboarding", "rename", "settings", "sgfGames", "shortcuts"];
 /** Every menu this file opens: the id it is given in the source → its items, in order. */
 const MENUS_TESTED = {
-  '"play-more"': ["Hint", "Review so far", "Count", "Save to library", "Export SGF", "Focus mode", "Resign"],
+  '"play-more"': ["Redo", "Hint", "Review so far", "Count", "Save to library", "Export SGF", "Focus mode", "Resign"],
   '"rec-" + g.id': ["Rename", "Export SGF", "Delete"],
+  // These three are opened, item by item, in play-library.mjs and play-edits.mjs.
+  '"unf-" + g.id': ["Look at it", "Export SGF", "Delete"],
+  '"lib-import"': ["Choose files…", "Paste SGF"],
+  '"review-result"': ["Count again"],
 };
+
+/** A file of `n` small games, as one SGF text. */
+const COLLECTION = (n) => Array.from({ length: n }, (_, i) => `(;GM[1]FF[4]SZ[9]PB[Black ${i + 1}]PW[White ${i + 1}]RE[B+R];B[cc];W[gg])`).join("\n");
+/** Paste text on the page, as ⌘V does. */
+const paste = (page, text) =>
+  page.evaluate((text) => {
+    const dt = new DataTransfer();
+    dt.setData("text", text);
+    document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, text);
 
 /* --------------------------------------------------------- a fake host */
 
@@ -253,15 +267,42 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     assert((await page.locator(".sheet .btn.danger-solid").count()) === 1, "its action is the danger button");
     await sheetOpensAndCloses(page, "confirm", { title: "Erase all data?" });
     assert(await page.evaluate(() => Object.keys(window.__files).includes("settings.json")), "Esc deleted nothing");
-    // An ordinary confirmation (Pass, in a game): the action has the focus.
-    await startGame(page, 0);
-    await page.focus("canvas.board");
+    // A file with several games, pasted on the Library: the chooser.
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".library-home .game-item");
+    const importButton = page.locator(".toolbar .btn", { hasText: "Import SGF" });
+    await importButton.focus();
     await markFocus(page);
-    await page.keyboard.press("Control+Shift+P");
+    await paste(page, COLLECTION(60));
+    await page.waitForSelector(".import-sheet .import-row");
+    assert((await page.locator(".import-sheet .import-row").count()) === 50, "the chooser lists one page of the file's games");
+    await sheetOpensAndCloses(page, "sgfGames", { title: "This file holds 60 games" });
+    // An ordinary confirmation (Import all, of a large file): the action has the focus.
+    await importButton.focus();
+    await markFocus(page);
+    await paste(page, COLLECTION(60));
+    await page.waitForSelector(".import-sheet .import-all");
+    await page.click(".import-sheet .import-all");
     await page.waitForFunction(() => window.__state.sheet?.kind === "confirm" && !!document.querySelector("[role=dialog]")?.contains(document.activeElement));
     assert(await page.evaluate(() => document.activeElement?.matches(".sheet-foot .btn.primary")), "an ordinary confirmation starts on its action");
-    await sheetOpensAndCloses(page, "confirm", { title: await page.textContent("#sheet-title") });
-    assert(await page.evaluate(() => window.__state.game.game.moveNumber === 0), "Esc did not pass");
+    await sheetOpensAndCloses(page, "confirm", { title: "Import all 60 games?" });
+    assert((await page.locator(".game-item").count()) === 2, "Esc imported nothing");
+    // What an import came to (two files, one of them unreadable): the toast's Details opens the report.
+    await page.setInputFiles("#file-input", [
+      { name: "good.sgf", mimeType: "application/x-go-sgf", buffer: Buffer.from(COLLECTION(1)) },
+      { name: "bad.sgf", mimeType: "application/x-go-sgf", buffer: Buffer.from("this is not a record") },
+    ]);
+    await page.waitForSelector(".toast .toast-action");
+    assert((await page.textContent(".toast .toast-text")).includes("Imported 1 game"), await page.textContent(".toast .toast-text"));
+    await page.click(".toast .toast-action");
+    await page.waitForSelector(".import-sheet .import-notes li");
+    const report = await sheetInfo(page);
+    assert(report.kind === "importReport" && report.name === "Import details" && report.modal === "true", JSON.stringify(report));
+    assert((await page.textContent(".import-notes")).includes("bad"), "the report names the file that could not be read");
+    await page.waitForFunction(() => document.querySelector("[role=dialog]")?.contains(document.activeElement), null, { timeout: 3000 });
+    await page.keyboard.press("Escape");
+    await page.waitForSelector("[role=dialog]", { state: "detached" });
+    noErrors(page, "the import sheets");
     await page.close();
   });
 
@@ -269,11 +310,21 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await seeded();
     await startGame(page, 0);
     assert(await page.evaluate(() => window.__state.play.view === "game" && window.__state.game.opponent === "human"), "New game → Start did not start the game");
-    // Pass, confirmed with the keyboard alone.
+    // Pass is asked in the panel, not in a sheet, and confirmed with the keyboard alone.
     await page.keyboard.press("Control+Shift+P");
-    await page.waitForFunction(() => window.__state.sheet?.kind === "confirm" && !!document.querySelector("[role=dialog]")?.contains(document.activeElement));
+    await page.waitForFunction(() => window.__state.sheet === null && document.activeElement?.matches(".pass-ask .btn.primary"));
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => window.__state.sheet === null && window.__state.game.game.mainLine().length === 2, null, { timeout: 3000 });
+    // A confirmation confirms: Import all of a large file, with Enter on its action.
+    await page.keyboard.press("Control+4");
+    await page.waitForSelector(".library-home .game-item");
+    await paste(page, COLLECTION(60));
+    await page.waitForSelector(".import-sheet .import-all");
+    await page.click(".import-sheet .import-all");
+    await page.waitForFunction(() => window.__state.sheet?.kind === "confirm" && document.activeElement?.matches(".sheet-foot .btn.primary"));
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => window.__state.sheet === null && window.__state.toasts.some((x) => x.message === "Imported 60 games"), null, { timeout: 15000 });
+    await page.waitForFunction(() => Object.keys(window.__files).filter((k) => k.startsWith("games/")).length === 62, null, { timeout: 5000 });
     // Settings: a switch changes the setting and reaches the disk.
     await page.keyboard.press("Control+,");
     await page.click(".settings-tab[data-pane=board]");
@@ -409,7 +460,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     noErrors(page, `menu item "${label}"`);
   }
 
-  await check("shell menus: every item of the game's menu does something — hint, review, count, save, export, focus, resign", async () => {
+  await check("shell menus: every item of the game's menu does something — redo, hint, review, count, save, export, focus, resign", async () => {
     const page = await seeded();
     // Enough stones for Count (two per line of the board).
     await startGame(page, 18);
@@ -417,6 +468,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const items = MENUS_TESTED['"play-more"'];
     const settle = {
       // Each item, then back to the board for the next.
+      Redo: async () => {
+        await page.waitForFunction(() => window.__state.game.game.moveNumber === 18 && window.__state.game.redo.length === 0);
+      },
       Hint: async () => {
         await page.waitForFunction(() => !window.__state.game.thinking && (!!window.__state.game.hint || window.__state.toasts.length > 0), null, { timeout: 20000 });
       },
@@ -462,6 +516,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const order = [...items.filter((l) => l !== "Count"), "Count"];
     for (const label of order) {
       await page.waitForFunction(() => window.__state.toasts.every((x) => x.tone !== "error"));
+      // Redo has something to do after an undo.
+      if (label === "Redo") {
+        await page.click(".panel .actions .btn >> nth=1");
+        await page.waitForFunction(() => window.__state.game.game.moveNumber === 17);
+      }
       await openMenu(page, button, items);
       await runItem(page, items.indexOf(label), label);
       await settle[label]();
@@ -706,7 +765,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .collection-row");
     assert(await page.evaluate(() => !window.__state.review), "nothing open yet");
-    await page.click(".collection-row >> nth=0");
+    await page.click(".home-classics .collection-row >> nth=0");
     await page.waitForSelector(".task-notice.error");
     const said = await page.textContent(".task-notice.error");
     assert(said.includes("couldn't be loaded") && said.includes("Retry"), said);

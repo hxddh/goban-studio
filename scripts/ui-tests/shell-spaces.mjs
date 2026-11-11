@@ -42,7 +42,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     // The Library: your games, the classics, the explorer, Import SGF.
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .collection-row");
-    assert((await page.locator(".library-home [data-explorer]").count()) === 1, "the explorer row");
+    assert((await page.locator(".library-home .home-explorer [data-explorer]").count()) === 2, "the explorer's rows: the whole board and the corner");
+    assert(await page.evaluate(() => !!(document.querySelector(".home-explorer").compareDocumentPosition(document.querySelector(".home-classics")) & Node.DOCUMENT_POSITION_FOLLOWING)), "the explorer has its own section, before the classics");
     assert((await page.locator(".btn.primary:visible").count()) === 0, "no primary in the Library");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
