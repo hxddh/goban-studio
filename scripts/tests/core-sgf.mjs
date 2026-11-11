@@ -1,7 +1,7 @@
 /**
  * Core: SGF (FF[4]) — round trips of moves, setup, comments, markup, rules and unknown properties.
  */
-import { test, BLACK, CLASSICS, Game, MESSAGES, WHITE, assert, empty, loadSGF, newGame, root, rulesFromSgf, setup } from "./helpers.mjs";
+import { test, BLACK, CLASSICS, Game, MESSAGES, WHITE, assert, loadSGF, newGame, rulesFromSgf, setup } from "./helpers.mjs";
 
 await test("SGF export/import keeps moves, comments, setup and variations", () => {
   const g = setup(

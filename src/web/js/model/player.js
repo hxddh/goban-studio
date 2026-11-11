@@ -36,7 +36,7 @@
  *   - the beginner bridges: app/beginner.js;
  *   - game records: persist.normalizeGameRecord, with themes and themeLoss.
  */
-import { LEVELS, SIZES, fromBoard, gorToTheta, isLevel, levelTheta, measuredRank, onBoard, rankToRating, ratingToRank, sizeOf, thetaToGoR } from "./ladder.js";
+import { LEVELS, SIZES, gorToTheta, isLevel, levelTheta, measuredRank, onBoard, rankToRating, ratingToRank, sizeOf, thetaToGoR } from "./ladder.js";
 import { normalizeMoveRank } from "./move-rank.js";
 
 export * from "./ladder.js";

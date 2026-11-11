@@ -33,6 +33,9 @@ jobs:
       # No dependency needs its install script (esbuild finds its platform
       # binary through its optional dependency).
       - run: npm ci --ignore-scripts
+      # Static checks first (eslint.config.js): an undefined name or an
+      # unused variable fails here, before anything runs.
+      - run: npm run lint
       - run: npm test
       - run: npm run release-check
       - run: npm run build

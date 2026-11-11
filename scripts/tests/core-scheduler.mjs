@@ -11,13 +11,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function until(fn, ms = 8000, what = "condition") {
-  const end = Date.now() + ms;
-  while (!fn()) {
-    if (Date.now() > end) throw new Error("timed out waiting for " + what);
-    await sleep(5);
-  }
-}
 
 export default async function ({ test, assert, root }) {
   const { createScheduler, LANES, anySignal } = await import("../../src/web/js/scheduler.js");

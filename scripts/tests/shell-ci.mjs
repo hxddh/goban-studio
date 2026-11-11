@@ -231,6 +231,20 @@ await test("ci: pull requests compile and test the Zig shell on Linux", () => {
   assert.deepEqual(checks.jobs.web.strategy.matrix.node, ["24", "26"]);
 });
 
+await test("ci: pull requests run the static checks before the tests, with exact-pinned tools and no warnings allowed", () => {
+  const sh = runs(wf["checks.yml"].jobs.web).split("\n");
+  const at = (line) => sh.indexOf(line);
+  assert.ok(at("npm run lint") > at("npm ci --ignore-scripts") && at("npm run lint") < at("npm test"), `lint runs after the install and before the tests: ${sh.join(" | ")}`);
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  assert.equal(pkg.scripts.lint, "eslint . --max-warnings 0");
+  assert.match(pkg.scripts.verify, /^npm run lint && npm test/, "npm run verify lints first");
+  for (const dep of ["eslint", "eslint-plugin-react-hooks", "globals"]) assert.match(pkg.devDependencies[dep], /^\d+\.\d+\.\d+$/, `${dep} is pinned to one version`);
+  // The config checks what it says (a rule dropped by mistake would pass everything).
+  const config = fs.readFileSync(path.join(root, "eslint.config.js"), "utf8");
+  for (const rule of ["no-undef", "no-unused-vars", "no-redeclare", "no-dupe-keys", "no-unreachable", "no-const-assign", "no-import-assign", "no-self-assign", "eqeqeq", "react-hooks/rules-of-hooks"]) assert.ok(config.includes(`"${rule}"`) || config.includes(`${rule}:`), rule);
+  assert.match(config, /reportUnusedDisableDirectives: "error"/);
+});
+
 await test("ci: one pinned Native SDK install, ReleaseSafe builds, the update key passed in", () => {
   for (const f of ["build-macos.yml", "build-windows.yml"]) {
     const sh = runs(wf[f].jobs.build);

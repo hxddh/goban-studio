@@ -1,7 +1,7 @@
 /**
  * Core: the opening book — its trees, lookups, symmetries and transpositions.
  */
-import { test, BLACK, BOOK, BOOK_RAW, Book, EMPTY, LANG_IDS, MESSAGES, WHITE, assert, empty, emptyMap, fs, gtp, mv, path, replay, root, setup, symMap, t } from "./helpers.mjs";
+import { test, BLACK, BOOK, BOOK_RAW, Book, EMPTY, LANG_IDS, MESSAGES, WHITE, assert, emptyMap, fs, gtp, path, replay, root, symMap } from "./helpers.mjs";
 
 await test("explorer: the shipped book has both trees, its network and a compact size", () => {
   assert.equal(BOOK_RAW.format, Book.BOOK_FORMAT);

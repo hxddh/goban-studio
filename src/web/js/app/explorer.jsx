@@ -10,7 +10,7 @@ import { t, tn } from "../i18n.js";
 import { BLACK, formatPoints } from "../rules.js";
 import { state } from "./store.js";
 import * as X from "./explorer-ctl.js";
-import { Button, Icon, IconButton, Segmented } from "./parts.jsx";
+import { Button, IconButton, Segmented } from "./parts.jsx";
 import { Board } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 

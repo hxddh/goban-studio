@@ -1,7 +1,7 @@
 /**
  * Shell: release — the static page, updates, signing notes, screenshots, the tour, the updater and the optional networks.
  */
-import { test, APP_VERSION, BLACK, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, bundle, fs, loadSettings, normalizeSettings, path, root, sleep, t } from "./helpers.mjs";
+import { test, APP_VERSION, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, fs, normalizeSettings, path, root, t } from "./helpers.mjs";
 
 await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
@@ -40,7 +40,7 @@ await test("design tokens meet the contrast rules in docs/design.md (light and d
 
 await test("removing a network retries while the engine is busy, without blocking", async () => {
   let calls = 0;
-  const invoke = async (cmd) => {
+  const invoke = async () => {
     calls++;
     return calls < 3 ? { ok: false, error: "Busy", models: {} } : { ok: true, models: {} };
   };

@@ -20,7 +20,7 @@
  * review, hints and scoring use it. Every optional path falls back to the
  * shipped network when its process cannot answer.
  */
-import { BLACK, WHITE, EMPTY } from "./rules.js";
+import { BLACK, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
 import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 import { scheduler } from "./scheduler.js";

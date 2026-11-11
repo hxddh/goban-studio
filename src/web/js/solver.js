@@ -652,11 +652,6 @@ function keyInfo(pz, board, keyIdx) {
   return { captured: false, minLibs, libs, libMin, chains, enemies, libSum };
 }
 
-/** Fewest liberties among the key chains (0 when a key stone is gone). */
-function keyLiberties(pz, board, keyIdx) {
-  return keyInfo(pz, board, keyIdx).minLibs;
-}
-
 /**
  * Every key chain has a liberty nobody may play (outside the region), so no
  * sequence can capture it: chains only grow, and that liberty stays empty.

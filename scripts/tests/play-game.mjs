@@ -38,17 +38,6 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------- A1: pre-empting a search */
 
-  /** A search that takes `ms`, logs when it starts, and stops on abort. */
-  const slow = (log, name, ms = 10) => (signal) =>
-    new Promise((resolve) => {
-      log.push(name);
-      const id = setTimeout(() => resolve(name), ms);
-      signal.addEventListener("abort", () => {
-        clearTimeout(id);
-        resolve(null);
-      });
-    });
-
 
   // The app with a fake async KataGo host (as in core-scheduler.mjs).
   const A = await bundle(root, [

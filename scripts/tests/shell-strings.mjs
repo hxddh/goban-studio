@@ -1,7 +1,7 @@
 /**
  * Shell: the string table — every key the interface uses exists, in all four languages, and the review sheet matches.
  */
-import { test, LANG_IDS, MESSAGES, PROBLEMS, assert, empty, fs, newGame, path, root, setLang, t } from "./helpers.mjs";
+import { test, LANG_IDS, MESSAGES, PROBLEMS, assert, fs, path, root, setLang, t } from "./helpers.mjs";
 
 await test("shell strings: the area files (shell, play, learn) are merged into the table, in four languages with the same placeholders", async () => {
   // The same placeholders (a language may use one twice: "{0}×{0}").

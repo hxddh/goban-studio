@@ -1,7 +1,7 @@
 /**
  * Core: accessibility — what the board says about points, moves, rows and the turn.
  */
-import { test, A11y, BLACK, LANG_IDS, MESSAGES, WHITE, a11yBoard, assert, empty, fs, path, root, setLang, t } from "./helpers.mjs";
+import { test, A11y, BLACK, LANG_IDS, MESSAGES, WHITE, a11yBoard, assert, fs, path, root, setLang } from "./helpers.mjs";
 
 await test("a11y: points read their coordinate (no I), stone, group and liberties", () => {
   setLang("en");
