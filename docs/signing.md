@@ -25,7 +25,9 @@ missing.
 
 `release.yml` passes them to `build-macos.yml` and `build-windows.yml` with
 `secrets: inherit`. Running a platform workflow on its own
-(`workflow_dispatch`) reads the same repository secrets.
+(`workflow_dispatch`) reads the same repository secrets. The key that
+signs updates is separate and is not a repository secret: see "Update
+signing" below.
 
 ## What the workflows do
 
@@ -167,9 +169,9 @@ headers and does not).
 Each platform job's summary says "Developer ID signed, notarized and
 stapled" / "Authenticode-signed and timestamped", or names the fallback.
 The `signing-status-macos` / `signing-status-windows` artifacts hold the
-JSON the release job used, and the publish job's summary (and the
+JSON the release job used, and the `assemble` job's summary (and the
 `release-notes` artifact) shows the notes exactly as they would be
-published.
+published. A rehearsal never signs `SHA256SUMS`.
 
 **A downloaded macOS build.**
 
@@ -198,7 +200,7 @@ Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago.exe .\GobanStud
 
 Or right-click the exe → Properties → Digital Signatures.
 
-## CI: how the workflows handle secrets and update signing (v13)
+## CI: how the workflows handle secrets and update signing
 
 This section is about the workflows; how to create the update signing key
 itself is described in its own section.
@@ -279,7 +281,7 @@ creates the tag with `gh release create --target "$GITHUB_SHA"` — the commit
 every package was built from. A tag that already exists at another commit
 stops the release.
 
-## Signed updates (v13)
+## Signed updates
 
 Code signing tells the operating system who built the app. The in-app
 updater needs a second, independent answer: is this release's
@@ -293,7 +295,7 @@ never lives in the release itself.
 | Name | Kind | What it is |
 | --- | --- | --- |
 | `UPDATE_PUBKEY` | repository **variable** | Base64 of the 32-byte Ed25519 public key. The build passes it as `-Dupdate-pubkey=…`; it is compiled into the app. |
-| `UPDATE_SIGNING_KEY` | repository **secret** | The private key (PKCS#8 PEM, or base64 of the 32-byte seed). Only `scripts/sign-sums.mjs` in the release job reads it. |
+| `UPDATE_SIGNING_KEY` | **environment secret** of `release-signing` | The private key (PKCS#8 PEM, or base64 of the 32-byte seed). Only `scripts/sign-sums.mjs` in the release's `sign` job reads it. |
 
 **Create the pair** on a trusted machine (nothing is written to disk):
 
@@ -301,20 +303,22 @@ never lives in the release itself.
 node scripts/gen-update-key.mjs
 # UPDATE_PUBKEY (repository variable; build option -Dupdate-pubkey):
 # 6kps…0iw=
-# UPDATE_SIGNING_KEY (repository secret; never commit it):
+# UPDATE_SIGNING_KEY (secret of the environment release-signing; never commit it):
 # -----BEGIN PRIVATE KEY----- …
 ```
 
-Store the first value as the variable `UPDATE_PUBKEY` and the PEM as the
-secret `UPDATE_SIGNING_KEY` (Settings → Secrets and variables → Actions),
-then clear the terminal. Never commit either; no key is in this repository.
+Store the first value as the repository variable `UPDATE_PUBKEY`
+(Settings → Secrets and variables → Actions → Variables) and the PEM as
+the secret `UPDATE_SIGNING_KEY` **of the environment `release-signing`**
+(Settings → Environments; "The `release-signing` environment" above),
+not as a repository secret. Then clear the terminal. Never commit either; no key is in this repository.
 
 **What the workflows do with them.**
 
 - `build-macos.yml` and `build-windows.yml` add
   `-Dupdate-pubkey="${{ vars.UPDATE_PUBKEY }}"` to the native build. Empty
-  (the variable is not set) means an unsigned-updates build, exactly as
-  before v13.
+  (the variable is not set) means a build that does not require a
+  signature.
 - `release.yml`, in its `sign` job (the `release-signing` environment,
   never in a rehearsal), runs `node scripts/sign-sums.mjs SHA256SUMS` with
   `UPDATE_SIGNING_KEY` (and `UPDATE_PUBKEY`, so a key that does not match
@@ -375,7 +379,7 @@ import("./scripts/sign-sums.mjs").then(({ publicKeyFrom, verifySums }) =>
   console.log(verifySums(fs.readFileSync("SHA256SUMS"), fs.readFileSync("SHA256SUMS.sig", "utf8"), publicKeyFrom(process.env.UPDATE_PUBKEY)) ? "signature OK" : "BAD signature"));'
 ```
 
-### Other update safeguards (v13)
+### Other update safeguards
 
 - **No downgrades, no unchecked tags.** The app remembers the tag its own
   last successful update check returned; `studio.updateDownload` and

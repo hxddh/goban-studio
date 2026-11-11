@@ -1,5 +1,7 @@
 # 围棋 App 可行性评估
 
+> 本文写于开发之前，描述的不是现在的应用。现在的应用见仓库根目录的 [README](../README.md) 和 `docs/QA.md`。
+
 > 这是开发前的评估文档（2026-11-01）。实现进度、已验证范围与未验证边界见仓库根目录的 `README.md` 和 `docs/QA.md`；本文件保留当时的架构与工期判断，不随实现自动更新。
 
 **参照仓库**：[hxddh/chessboard](https://github.com/hxddh/chessboard) `main @ 2558785`（v17.0.0）

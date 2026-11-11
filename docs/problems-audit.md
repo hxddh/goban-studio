@@ -1,5 +1,13 @@
 # Problem audit (v4): real-board rules
 
+> This file is a record, section by section, of what each audit found.
+> Two things read differently in the app now: the five grades are shown
+> as **Level 1–5**, each with the ranks it is meant for (≈), and no longer
+> as Beginner … Challenge; and a problem's title, which names its
+> technique, is shown only after the problem is solved. The bank itself
+> has not changed since the v13 grading: 543 problems, the hardest meant
+> for about 5 kyu, every first showing Black to play.
+
 Until v4 the solver proved life-and-death problems with a fixed region: once
 a stone was captured, its point stayed out of play. On a real board that
 point can be played again (retake, throw back in, fill the eye), and a
