@@ -208,6 +208,47 @@ await test("release notes and package READMEs say how the build was really signe
   }
 });
 
+await test("this version's release notes fit the release workflow, and the README describes the present", () => {
+  const read = (file) => fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/g, "\n");
+  const tag = `v${APP_VERSION}`;
+  // The preflight of release.yml: the tag is v + package.json's version, and its notes file exists.
+  assert.equal(JSON.parse(read("package.json")).version, APP_VERSION);
+  const notes = read(`.github/release-notes/${tag}.md`);
+  assert.ok(notes.startsWith(`# Goban Studio ${tag}\n`), "the notes are titled with the tag");
+  // The assemble job rewrites the block between the markers with what the builds did, and nothing else.
+  assert.equal(notes.split("<!-- first-launch -->").length, 2, "one first-launch block");
+  assert.ok(notes.indexOf("## Download and first launch") < notes.indexOf("<!-- first-launch -->"));
+  const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
+  const out = Sign.applyToNotes(notes, adhoc, Sign.normalizeStatus("windows", {}), adhoc);
+  assert.match(out, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg` or `\.zip` \| Ad-hoc signed, \*\*not notarized\*\*/);
+  assert.match(out, /\| Windows \(x64\) \| `GobanStudio-Windows-x64\.zip` \| \*\*Not Authenticode-signed\.\*\*/);
+  assert.doesNotMatch(out, /See the package README/, "the placeholder cells are replaced");
+  const outside = (text) => text.replace(/<!-- first-launch -->[\s\S]*?<!-- \/first-launch -->/, "");
+  assert.equal(outside(out), outside(notes), "the rest of the notes is published as written");
+  // What is not done is said last, and plainly.
+  const sections = [...notes.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+  assert.equal(sections.at(-1), "Known limits");
+  const limits = notes.slice(notes.indexOf("## Known limits"));
+  for (const said of [/Not checked by people/, /not code-signed/, /no Windows installer/i, /not been tried by hand/, /opening book/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
+
+  // The README: the app as it is, the user's half before the developer's, the real release command.
+  const readme = read("README.md");
+  assert.doesNotMatch(readme, /^#+ .*\bv\d+\b/m, "no heading tells a version's story");
+  assert.doesNotMatch(readme, /\bv\d+(\.\d+)* (adds|is|keeps|brings|reads)\b/, "no version narration");
+  assert.ok(readme.indexOf("## Download and first launch") < readme.indexOf("# For developers"));
+  assert.ok(readme.indexOf("# For developers") < readme.indexOf("## Architecture"));
+  assert.ok(readme.includes(`gh workflow run release.yml --ref main -f tag=${tag}`), "the release command is this version's");
+  assert.match(readme, /release-signing/);
+  // Where the data is: the folders the shell really uses (src/paths.zig, checked against docs/storage.md in shell-files.mjs).
+  const storage = read("docs/storage.md");
+  for (const folder of ["~/Library/Application Support/dev.hxddh.gobanstudio", "%LOCALAPPDATA%\\dev.hxddh.gobanstudio\\Data"]) {
+    assert.ok(readme.includes(folder) && storage.includes(folder) && notes.includes(folder), folder);
+  }
+  assert.doesNotMatch(readme, /goban-studio\.exe\.WebView2/, "the WebView2 cache is not where the data is");
+  // First launch on macOS 15: the button in System Settings, as the generated notes say.
+  assert.match(readme, /macOS 15 or later[^|]*Open Anyway/);
+});
+
 await test("screenshot checks catch blank and repeated screens", () => {
   const make = (w, h, fn) => {
     const png = new PNG({ width: w, height: h });
