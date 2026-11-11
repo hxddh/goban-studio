@@ -76,6 +76,38 @@ await test("data safety: a file that cannot be read is reported and write-blocke
   assert.ok(be.files.has("profile.json"));
 });
 
+await test("data safety: a lazy file whose read failed is read again on the next load, and can then be written; flush runs its hooks first", async () => {
+  const be = memBackend(new Map([["settings.json", '{"lang":"ko"}'], ["games/a-1.json", '{"id":"a-1","sgf":"(;)"}']]));
+  const { store, errors } = await open(be, { lazy: ["games/"] });
+  be.fail.add("games/a-1.json");
+  await assert.rejects(store.load("games/a-1.json"));
+  assert.ok(errors.some((e) => e.op === "read" && e.key === "games/a-1.json"));
+  assert.deepEqual(store.blocked(), ["games/a-1.json"], "nothing is written over a file that could not be read");
+  assert.equal(store.isLoaded("games/a-1.json"), false, "still on disk, still to be read");
+  // The disk answers again (a Retry): the file is read, and a change to it now reaches the disk.
+  be.fail.clear();
+  assert.equal((await store.load("games/a-1.json")).id, "a-1");
+  assert.deepEqual(store.blocked(), []);
+  store.put("games/a-1.json", { id: "a-1", sgf: "(;)", meta: { name: "renamed" } });
+  assert.equal(await store.flush(), true);
+  assert.match(be.files.get("games/a-1.json"), /renamed/);
+  // onFlush: what a module holds back on purpose is made final before the writes go out.
+  const order = [];
+  const off = store.onFlush(() => {
+    order.push("hook");
+    store.remove("games/a-1.json");
+  });
+  store.onFlush(() => {
+    throw new Error("a broken hook does not stop the flush");
+  });
+  assert.equal(await store.flush(), true);
+  assert.deepEqual(order, ["hook"]);
+  assert.equal(be.files.has("games/a-1.json"), false, "the hook's removal went out with this flush");
+  off();
+  await store.flush();
+  assert.deepEqual(order, ["hook"], "a hook that was taken off is not called again");
+});
+
 await test("data safety: a damaged file is copied byte for byte to bad/<key>-<time>.json before anything else, and never read back as data", async () => {
   const be = memBackend(new Map([["settings.json", '{"lang":"ko", BROKEN'], ["games/a-1.json", "\u0000garbage"]]));
   const keep = { keepDamaged: ["settings.json"] };
