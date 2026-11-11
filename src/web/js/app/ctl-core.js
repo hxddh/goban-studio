@@ -6,7 +6,7 @@
 import { store } from "../data/store.js";
 import { defaultRulesOf, saveSettings } from "../data/settings.js";
 import { estimate } from "../model/level.js";
-import { setLang, t } from "../i18n.js";
+import { hasLang, loadLang, setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { applyBoardTheme } from "../theme.js";
 import { state, update } from "./store.js";
@@ -84,7 +84,11 @@ export function setSetting(key, value) {
     s.settings = { ...s.settings, [key]: value };
   });
   saveSettings(store, state.settings);
-  if (key === "lang") setLang(value);
+  if (key === "lang") {
+    setLang(value);
+    // A language not read yet (i18n.js loadLang) shows as soon as its strings are there.
+    if (!hasLang(value)) loadLang(value).then((ok) => ok && state.settings.lang === value && (syncMenus(), update()));
+  }
   if (key === "volume") {
     Audio.setLevel(value);
     // The new volume, heard at once (nothing when it is off).

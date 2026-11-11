@@ -28,8 +28,9 @@ for (const f of ["book.json"]) {
   fs.copyFileSync(path.join(src, "js", "content", f), path.join(dist, "content", f));
 }
 // The course, problems and classics past the start-up index
-// (src/web/js/content.js), written by bundle.mjs.
-for (const f of ["course.json", "problems.json", "classics.json"]) {
+// (src/web/js/content.js), and the strings of each language but English
+// (src/web/js/i18n.js loadLang), written by bundle.mjs.
+for (const f of ["course.json", "problems.json", "classics.json", "strings-zh.json", "strings-ko.json", "strings-ja.json"]) {
   const from = path.join(src, "js", "content-lazy", f);
   if (!fs.existsSync(from)) throw new Error(`${from} is missing: run npm run build first`);
   fs.copyFileSync(from, path.join(dist, "content", f));

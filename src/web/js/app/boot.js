@@ -10,7 +10,7 @@ import { SETTINGS_KEY, loadSettings } from "../data/settings.js";
 import { CURRENT_KEY, GAMES_PREFIX, migrateFile } from "../data/migrate.js";
 import { BACKUPS_PREFIX, expireSnapshots } from "../data/backup.js";
 import { normalizeProfile, setPriorRank } from "../model/profile.js";
-import { detectLang, setLang, t } from "../i18n.js";
+import { detectLang, loadLang, preloadLangs, setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasNative, isPackaged } from "../host.js";
 import { onContentWait, preload as preloadContent, withContent } from "../content.js";
@@ -71,6 +71,15 @@ async function waitForBridge(ms = 1500) {
  * not be read puts the app in its safe state (read-only, no onboarding,
  * app/safety.jsx) instead of taking the player for a new one.
  */
+/**
+ * The strings of the language about to be shown, before the first render.
+ * Start-up never waits long for them: after a second and a half it goes on
+ * in English, and the language's own strings arrive when they arrive.
+ */
+function stringsFor(lang, ms = 1500) {
+  return Promise.race([loadLang(lang).then((ok) => ok && state.ready && update()), new Promise((resolve) => setTimeout(resolve, ms))]);
+}
+
 export async function boot() {
   store.setErrorHandler(storeError);
   // A click that needs a content part not here yet shows that it is loading,
@@ -78,6 +87,7 @@ export async function boot() {
   onContentWait((part, load) => runTask("content:" + part, load, { label: t("task.loading"), error: t("task.contentFailed") }));
   if (isPackaged() && !hasNative() && !(await waitForBridge())) {
     const lang = detectLang();
+    await stringsFor(lang);
     setLang(lang);
     update({ bootError: { kind: "bridge" }, settings: { ...loadSettings({ get: () => null }), lang } });
     return;
@@ -98,6 +108,7 @@ export async function boot() {
   state.settings = settings;
   state.profile = normalizeProfile(store.get(PROFILE_KEY));
   state.storeProblem = problem ? { ...problem, continued: false } : null;
+  await stringsFor(settings.lang);
   setLang(settings.lang);
   Audio.setLevel(settings.volume);
   applyAppearance();
@@ -117,6 +128,8 @@ export async function boot() {
   // (content.js). Nothing on screen reads them before it is opened, and
   // what opens them waits for them, so their arrival renders nothing.
   preloadContent(() => update());
+  // The other languages too, so choosing one in Settings shows it at once.
+  setTimeout(preloadLangs, 1500);
   Engine.info().then((info) => {
     update({ engine: info });
     maybeComputerMove();

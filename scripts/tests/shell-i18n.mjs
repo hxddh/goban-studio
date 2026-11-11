@@ -1,9 +1,10 @@
 /**
  * Shell, localisation: a key missing in a language falls back to
  * English; counts take their plural form (tn); a label and its value use
- * each language's own colon; a Korean particle follows the word before it.
+ * each language's own colon; a Korean particle follows the word before it;
+ * a language whose strings are a file of their own is read before it shows.
  */
-import { test, assert } from "./helpers.mjs";
+import { test, assert, path, root } from "./helpers.mjs";
 
 const I = await import("../../src/web/js/i18n.js");
 const { t, tn, josa, setLang, DICT, FALLBACK_LANG } = I;
@@ -86,4 +87,64 @@ await test("i18n: Korean particles follow the word before them", () => {
   setLang("en");
   // The particle marker is Korean's only: other languages keep plain placeholders.
   assert.equal(t("library.vsEngine", ["≈ 12 kyu"]), "Computer, ≈ 12 kyu");
+});
+
+await test("i18n: a language kept in its own file reads as English until it is read, then as itself; a file that cannot be read is tried again", async () => {
+  // The app's script is built with English only (scripts/bundle.mjs); here the same module over a two-key table.
+  const esbuild = await import("esbuild");
+  const table = {
+    name: "table",
+    setup(b) {
+      b.onLoad({ filter: /[\\/]js[\\/]messages\.js$/ }, () => ({
+        contents: 'export const LAZY_LANGS = ["zh", "ko", "ja"]; export const MESSAGES = { "a.hello": { en: "Hello {0}" }, "a.only": { en: "Only" } };',
+        loader: "js",
+      }));
+    },
+  };
+  const out = await esbuild.build({ entryPoints: [path.join(root, "src/web/js/i18n.js")], bundle: true, format: "esm", write: false, plugins: [table], logLevel: "error" });
+  const L = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text).toString("base64"));
+  assert.equal(L.hasLang("en"), true, "English is in the script");
+  assert.equal(L.hasLang("ko"), false);
+  assert.equal(L.hasLang("xx"), false, "not a language");
+  assert.equal(await L.loadLang("en"), true, "nothing to read");
+  // Shown before its strings are there: English, never a raw key.
+  L.setLang("ko");
+  assert.equal(L.t("a.hello", ["A"]), "Hello A");
+  // The file cannot be read: still English, and said to the caller.
+  const asked = [];
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    assert.equal(await L.loadLang("ko", { read: async (url) => (asked.push(url), Promise.reject(new Error("404"))) }), false);
+  } finally {
+    console.error = quiet;
+  }
+  assert.deepEqual(asked, ["content/strings-ko.json"]);
+  assert.equal(L.hasLang("ko"), false);
+  assert.equal(L.t("a.only"), "Only");
+  // Read once, however many ask at the same moment; keys the table does not have are not taken in.
+  let reads = 0;
+  const read = async () => (reads++, { "a.hello": "안녕 {0}", "x.unknown": "?", "a.only": 7 });
+  const [one, two] = await Promise.all([L.loadLang("ko", { read }), L.loadLang("ko", { read })]);
+  assert.deepEqual([one, two, reads], [true, true, 1]);
+  assert.equal(L.hasLang("ko"), true);
+  assert.equal(L.t("a.hello", ["A"]), "안녕 A");
+  assert.equal(L.t("a.only"), "Only", "a value that is not a string is left as it was");
+  assert.equal(L.t("x.unknown"), "x.unknown");
+  assert.equal(await L.loadLang("ko", { read }), true);
+  assert.equal(reads, 1, "not read again");
+  // The rest, in the background.
+  const others = [];
+  await Promise.all(["zh", "ja"].map((id) => L.loadLang(id, { read: async (url) => (others.push(url), {}) })));
+  assert.deepEqual(others.sort(), ["content/strings-ja.json", "content/strings-zh.json"]);
+  assert.deepEqual(await L.preloadLangs(), [], "nothing left to read");
+});
+
+await test("i18n: in the tests and the tools every language is in the table, and nothing is read", async () => {
+  const { LAZY_LANGS } = await import("../../src/web/js/messages.js");
+  assert.deepEqual(LAZY_LANGS, []);
+  for (const id of I.LANG_IDS) {
+    assert.equal(I.hasLang(id), true, id);
+    assert.equal(await I.loadLang(id, { read: () => assert.fail("read " + id) }), true);
+  }
 });

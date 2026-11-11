@@ -8,8 +8,13 @@
  * placeholder can carry the particle that suits the word put in it
  * ({0:은/는}, see josa). It has no DOM side effects at
  * import time, so the Node tests can load it directly.
+ *
+ * In the app's script only English is in the table; another language is a
+ * file beside the content (content/strings-<id>.json), read by loadLang
+ * before that language is shown. Until it is there, and if it cannot be
+ * read, its strings are the English ones.
  */
-import { MESSAGES } from "./messages.js";
+import { LAZY_LANGS, MESSAGES } from "./messages.js";
 
 export const LANG_IDS = ["zh", "en", "ko", "ja"];
 // English (zh before): a key missing in a language reads in the language most users can read.
@@ -30,6 +35,45 @@ for (const id of LANG_IDS) {
 }
 
 let current = FALLBACK_LANG;
+
+/* ----------------------------------------- languages read when first shown */
+
+const pending = new Set(LAZY_LANGS.filter((id) => LANG_IDS.includes(id) && id !== FALLBACK_LANG));
+const loading = {};
+
+/** Whether a language's own strings are in memory. */
+export function hasLang(id) {
+  return LANG_IDS.includes(id) && !pending.has(id);
+}
+
+/**
+ * Read a language's strings if they are not in memory yet. Resolves true
+ * when they are (at once for a language that is), false when the file
+ * could not be read: the language then shows the English strings, and the
+ * next call tries again.
+ */
+export function loadLang(id, { read = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${url}: ${r.status}`)))) } = {}) {
+  if (!pending.has(id)) return Promise.resolve(LANG_IDS.includes(id));
+  loading[id] ||= Promise.resolve()
+    .then(() => read(`content/strings-${id}.json`))
+    .then((table) => {
+      if (!table || typeof table !== "object") throw new Error("not a string table");
+      for (const [key, value] of Object.entries(table)) if (typeof value === "string" && key in DICT[id]) DICT[id][key] = value;
+      pending.delete(id);
+      return true;
+    })
+    .catch((e) => {
+      console.error("strings:", id, e?.message || e);
+      delete loading[id];
+      return false;
+    });
+  return loading[id];
+}
+
+/** Every language still to be read, in the background (after start-up, so a change of language is at once). */
+export function preloadLangs() {
+  return Promise.all([...pending].map((id) => loadLang(id)));
+}
 
 export function setLang(id) {
   if (LANG_IDS.includes(id)) current = id;
