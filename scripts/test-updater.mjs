@@ -27,6 +27,10 @@
  *              the same installation must refuse (exit 2) without creating
  *              its "started" marker; the first one's marker exists, and its
  *              lock is gone once it exits.
+ *   one instance  The real app is started twice on one data folder
+ *              (GOBAN_DATA_DIR), the second time with an .sgf file: the
+ *              second process must hand the file over and exit by itself,
+ *              and the first must keep running (src/instance.zig).
  *   read-only  The real app, launched from a folder this user cannot write
  *              (GOBAN_UPDATE_PROBE_OUT), must report canInstall:false,
  *              blocked:"ReadOnlyLocation"; launched from a writable copy,
@@ -147,6 +151,11 @@ function runHelper({ pid, target, staged, ack, log, ackTimeout = 60, exitTimeout
   const env = { ...process.env };
   // The real app keeps its WebView2 profile in the install folder by default.
   delete env.WEBVIEW2_USER_DATA_FOLDER;
+  // Each run's app gets a data folder of its own, so no app of an earlier
+  // test (still on its way out) holds the lock this one needs. (On macOS
+  // the helper starts the app with `open`, which does not pass the
+  // environment on: there it uses the default folder.)
+  env.GOBAN_DATA_DIR = path.join(tempDir("data"), "data");
   const argv = isMac
     ? ["/bin/sh", [helper, String(pid), target, staged, ack, log, String(ackTimeout), cleanup, ...(started ? [started] : [])]]
     : [
@@ -260,7 +269,7 @@ async function lockFile(file) {
 async function probe(target, { tag = "", timeoutMs = 120000 } = {}) {
   const dir = tempDir("probe");
   const out = path.join(dir, "probe.json");
-  const env = { ...process.env, GOBAN_UPDATE_PROBE_OUT: out, WEBVIEW2_USER_DATA_FOLDER: path.join(dir, "webview2") };
+  const env = { ...process.env, GOBAN_UPDATE_PROBE_OUT: out, GOBAN_DATA_DIR: path.join(dir, "data"), WEBVIEW2_USER_DATA_FOLDER: path.join(dir, "webview2") };
   delete env.GOBAN_SELFTEST_OUT;
   delete env.GOBAN_TOUR_OUT;
   if (tag) env.GOBAN_UPDATE_PROBE_TAG = tag;
@@ -422,6 +431,59 @@ if (!liveTag) {
       throw e;
     } finally {
       app.kill();
+    }
+  });
+
+  await test("one instance: a second launch hands its file to the running app and exits; the first keeps running", async () => {
+    const target = install(tempDir("one"));
+    const dir = tempDir("one-data");
+    const data = path.join(dir, "data");
+    const out = path.join(dir, "probe.json");
+    const env = { ...process.env, GOBAN_DATA_DIR: data, GOBAN_UPDATE_PROBE_OUT: out, WEBVIEW2_USER_DATA_FOLDER: path.join(dir, "webview2") };
+    delete env.GOBAN_SELFTEST_OUT;
+    delete env.GOBAN_TOUR_OUT;
+    const exe = path.join(target, exeRel);
+    const first = spawn(exe, [], { cwd: path.dirname(exe), env, stdio: "inherit" });
+    let firstExit = null;
+    first.on("exit", (code, signal) => {
+      firstExit = { code, signal };
+    });
+    try {
+      // The probe report is written by the page: the first instance is up.
+      await waitFor(() => fs.existsSync(out), 120000, "the first instance's page");
+      assert.ok(fs.existsSync(path.join(data, "instance.lock")), "the first instance took the data folder's lock");
+      const sgf = path.join(dir, "second.sgf");
+      fs.writeFileSync(sgf, "(;GM[1]FF[4]SZ[9];B[ee])\n");
+      const env2 = { ...env };
+      delete env2.GOBAN_UPDATE_PROBE_OUT;
+      const began = Date.now();
+      const second = spawn(exe, [sgf], { cwd: path.dirname(exe), env: env2, stdio: ["ignore", "inherit", "pipe"] });
+      let said = "";
+      second.stderr.on("data", (chunk) => {
+        said += chunk;
+      });
+      const code = await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve("still running"), 30000);
+        second.on("exit", (c, signal) => {
+          clearTimeout(timer);
+          resolve(signal || c);
+        });
+      });
+      const took = Date.now() - began;
+      if (code === "still running") second.kill();
+      console.log(`second launch: exit ${code} after ${took} ms; said: ${said.trim().split("\n").filter((l) => /goban-studio:/.test(l)).join(" | ") || "(nothing)"}`);
+      assert.equal(code, 0, "the second launch ends by itself");
+      assert.doesNotMatch(said, /got no answer/, "the running app took the request");
+      // Its own words when they reach us (a windowed Windows process may
+      // have no stderr); else its speed: an unanswered launch waits 4 s.
+      assert.ok(/handed over/.test(said) || took < 3500, `handed over (${took} ms)`);
+      assert.equal(firstExit, null, "the first instance is still running");
+      const inbox = path.join(data, "inbox");
+      assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], "the request was taken out of the inbox");
+    } finally {
+      first.kill();
+      await sleep(500);
+      await stopProcessesIn(target);
     }
   });
 

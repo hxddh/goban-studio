@@ -50,6 +50,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const update = @import("update.zig");
+const json = @import("json.zig");
+const net = @import("net.zig");
+const paths = @import("paths.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
@@ -60,28 +63,35 @@ pub const sums_name = "SHA256SUMS";
 pub const sig_name = "SHA256SUMS.sig";
 const max_sig_bytes: u64 = 1024;
 pub const Ed25519 = std.crypto.sign.Ed25519;
-/// How long the app waits for the helper's "started" marker (v13).
-pub const helper_start_timeout_ms: i64 = 5_000;
+/// A small text file holding the release's tag and a newline. SHA256SUMS
+/// lists its hash, so the signed bytes name the version they are for.
+pub const version_name = "VERSION";
+/// How long the app waits for the helper's "started" marker. A cold
+/// Windows PowerShell under an antivirus scan can take well over ten
+/// seconds to run its first line; the page shows "installing" meanwhile
+/// (`studio.updateStatus`), and the app stays usable if the time runs out.
+pub const helper_start_timeout_ms: i64 = 25_000;
 pub const started_prefix = "goban-update-started-";
-/// GitHub answers a release download with a redirect to one of these.
-const redirect_hosts = [_][]const u8{
-    "github.com",
-    "objects.githubusercontent.com",
-    "release-assets.githubusercontent.com",
-    "github-releases.githubusercontent.com",
-};
-const max_redirects = 5;
 const user_agent = "GobanStudio-updater";
-pub const bundle_id = "dev.hxddh.gobanstudio";
+pub const bundle_id = paths.bundle_id;
 
 /// Hard limits: the packages are ~100 MB; SHA256SUMS is a few lines.
 pub const max_asset_bytes: u64 = 1024 * 1024 * 1024;
 const max_sums_bytes: u64 = 64 * 1024;
 const max_zip_entries = 50_000;
 const max_unpacked_bytes: u64 = 3 * 1024 * 1024 * 1024;
-/// No byte for this long while downloading: give up with `Stalled`
-/// (std.http has no socket timeout; the UI thread enforces it).
+/// No byte for this long while downloading: the connection is abandoned
+/// (std.http has no socket timeout; the UI thread enforces it) and the
+/// download continues on a new one from the bytes already on disk, up to
+/// `max_stall_retries` times; then it fails with `Stalled`.
 pub const stall_timeout_ms: i64 = 60_000;
+pub const max_stall_retries: u32 = 3;
+/// A connection that breaks off is retried this many times, each
+/// continuing the file where it stopped.
+pub const max_network_retries: u32 = 4;
+/// Download threads that may exist at once: the live one and the
+/// abandoned ones still stuck in a read.
+const max_running: u32 = max_stall_retries + 3;
 /// How long the helper waits for the new app to acknowledge its launch.
 pub const ack_timeout_s: u32 = 90;
 
@@ -190,23 +200,8 @@ pub fn validDownloadUrl(url: []const u8) bool {
     return validTag(rest[0..slash]) and isAllowedAssetName(rest[slash + 1 ..]);
 }
 
-/// A redirect target: HTTPS, no user info or port, host exactly one of
-/// GitHub's download hosts, printable ASCII without spaces.
-pub fn allowedRedirect(url: []const u8) bool {
-    const scheme = "https://";
-    if (url.len > 4096 or !std.mem.startsWith(u8, url, scheme)) return false;
-    for (url) |c| {
-        if (c <= 0x20 or c >= 0x7f or c == '\\') return false;
-    }
-    const rest = url[scheme.len..];
-    const end = std.mem.indexOfAny(u8, rest, "/?#") orelse rest.len;
-    const host = rest[0..end];
-    if (end == rest.len or rest[end] != '/') return false;
-    for (redirect_hosts) |allowed| {
-        if (std.mem.eql(u8, host, allowed)) return true;
-    }
-    return false;
-}
+/// A redirect target must be one of GitHub's download hosts (net.zig).
+pub const allowedRedirect = net.allowedRedirect;
 
 // ------------------------------------------------------------ signature
 
@@ -236,6 +231,97 @@ pub fn verifySums(sums: []const u8, sig_text: []const u8, public_key: [Ed25519.P
     const pk = Ed25519.PublicKey.fromBytes(public_key) catch return error.BadSignature;
     const sig = Ed25519.Signature.fromBytes(sig_bytes);
     sig.verify(sums, pk) catch return error.BadSignature;
+}
+
+// ------------------------------------------------------------ version
+//
+// A signature over SHA256SUMS alone says "these packages are ours", not
+// "these packages are version X": whoever controls a release could attach
+// an older release's packages, sums and signature to a new tag, and every
+// app would take the old (perhaps vulnerable) version as an update, or
+// never see a newer one. So the release job adds one more line to
+// SHA256SUMS before signing it: the SHA-256 of a file `VERSION` that holds
+// the tag and a newline. `sha256sum -c` still reads the file; apps that do
+// not know the line skip it, as they skip the .dmg lines.
+
+pub const Binding = enum {
+    /// SHA256SUMS names exactly this tag.
+    bound,
+    /// SHA256SUMS has no VERSION line (a release older than the binding).
+    absent,
+    /// SHA256SUMS names another version.
+    mismatch,
+};
+
+/// Do these sums belong to release `tag`?
+pub fn sumsBinding(sums: []const u8, tag: []const u8) Binding {
+    if (!hasSumLine(sums, version_name)) return .absent;
+    const listed = findSum(sums, version_name) orelse return .mismatch;
+    var sha = Sha256.init(.{});
+    sha.update(tag);
+    sha.update("\n");
+    var digest: [Sha256.digest_length]u8 = undefined;
+    sha.final(&digest);
+    return if (sumsMatch(listed, digest)) .bound else .mismatch;
+}
+
+/// Refuse sums that are not for `tag`. A build that checks signatures
+/// requires the binding (`NoVersion` without it); a build without a key
+/// trusts the release anyway and only refuses a line that names another
+/// version.
+pub fn checkBinding(sums: []const u8, tag: []const u8, signed: bool) error{ NoVersion, VersionMismatch }!void {
+    switch (sumsBinding(sums, tag)) {
+        .bound => {},
+        .absent => if (signed) return error.NoVersion,
+        .mismatch => return error.VersionMismatch,
+    }
+}
+
+/// Is there any line for `name` (well formed or not)?
+fn hasSumLine(sums: []const u8, name: []const u8) bool {
+    var lines = std.mem.splitScalar(u8, sums, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trimEnd(u8, raw, "\r \t");
+        if (line.len <= name.len) continue;
+        if (!std.mem.endsWith(u8, line, name)) continue;
+        const before = line[line.len - name.len - 1];
+        if (before == ' ' or before == '\t' or before == '*') return true;
+    }
+    return false;
+}
+
+/// The version in the package's `build-info.json`
+/// (`{"app": "14.0.0", …}`, written by scripts/sync-dist.mjs).
+pub fn buildInfoVersion(text: []const u8, out: []u8) ?[]const u8 {
+    const Info = struct { app: []const u8 = "" };
+    var scratch: [4096]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&scratch);
+    const parsed = std.json.parseFromSliceLeaky(Info, fba.allocator(), text, .{ .ignore_unknown_fields = true }) catch return null;
+    if (parsed.app.len == 0 or parsed.app.len > out.len) return null;
+    @memcpy(out[0..parsed.app.len], parsed.app);
+    return out[0..parsed.app.len];
+}
+
+/// The value of `CFBundleShortVersionString` in an Info.plist (XML).
+pub fn plistVersion(text: []const u8) ?[]const u8 {
+    const key = "<key>CFBundleShortVersionString</key>";
+    const at = std.mem.indexOf(u8, text, key) orelse return null;
+    const rest = text[at + key.len ..];
+    const open = std.mem.indexOf(u8, rest, "<string>") orelse return null;
+    // The value belongs to this key only when nothing but white space
+    // separates them.
+    if (std.mem.trim(u8, rest[0..open], " \t\r\n").len != 0) return null;
+    const value = rest[open + "<string>".len ..];
+    const close = std.mem.indexOf(u8, value, "</string>") orelse return null;
+    return std.mem.trim(u8, value[0..close], " \t\r\n");
+}
+
+/// Is `version` (as a package states it: "14.0.0") the version of `tag`
+/// ("v14.0.0")? Compared as versions, so "14.0" equals "v14.0.0".
+pub fn versionIsTag(version: []const u8, tag: []const u8) bool {
+    const a = update.Version.parse(version) orelse return false;
+    const b = update.Version.parse(tag) orelse return false;
+    return a.order(b) == .eq;
 }
 
 // ------------------------------------------------------------ checksums
@@ -298,11 +384,20 @@ pub fn hashFile(io: std.Io, path: []const u8) ![Sha256.digest_length]u8 {
 
 // ------------------------------------------------------------ packages
 
-/// The staged package's top-level item inside `unpacked/`.
+/// The staged package's top-level item inside `unpacked/`: the name the
+/// release's .zip holds today.
 pub fn stagedRootName(p: Platform) []const u8 {
+    return stagedRootNames(p)[0];
+}
+
+/// Every top-level name a package for `p` may carry. The macOS .zip holds
+/// `GobanStudio.app` (what every released app expects); `Goban Studio.app`
+/// (the name in the .dmg) is accepted too, so a later release can give
+/// both downloads the same name without stranding this version.
+pub fn stagedRootNames(p: Platform) []const []const u8 {
     return switch (p) {
-        .macos_arm64, .macos_x64 => "GobanStudio.app",
-        else => "GobanStudio",
+        .macos_arm64, .macos_x64 => &.{ "GobanStudio.app", "Goban Studio.app" },
+        else => &.{"GobanStudio"},
     };
 }
 
@@ -431,6 +526,38 @@ fn readHead(io: std.Io, path: []const u8, buf: []u8) ?[]const u8 {
     return buf[0..n];
 }
 
+/// Where the package states its own version, relative to its root.
+fn buildInfoRel(p: Platform) []const u8 {
+    const s = std.fs.path.sep_str;
+    return switch (p) {
+        .macos_arm64, .macos_x64 => "Contents" ++ s ++ "Resources" ++ s ++ "frontend" ++ s ++ "dist" ++ s ++ "build-info.json",
+        else => "resources" ++ s ++ "frontend" ++ s ++ "dist" ++ s ++ "build-info.json",
+    };
+}
+
+/// Does the unpacked package say it is version `tag`? Its
+/// `build-info.json` must (both platforms), and on macOS its Info.plist
+/// too. A package that is really an older build under a new tag fails
+/// here even when its checksum is the published one.
+pub fn stagedVersionMatches(io: std.Io, platform: Platform, root_path: []const u8, tag: []const u8) bool {
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const info_path = std.fmt.bufPrint(&path_buf, "{s}{c}{s}", .{ root_path, std.fs.path.sep, buildInfoRel(platform) }) catch return false;
+    var info_buf: [2048]u8 = undefined;
+    const info = readHead(io, info_path, &info_buf) orelse return false;
+    var version_buf: [64]u8 = undefined;
+    const version = buildInfoVersion(info, &version_buf) orelse return false;
+    if (!versionIsTag(version, tag)) return false;
+    switch (platform) {
+        .macos_arm64, .macos_x64 => {
+            const plist = std.fmt.bufPrint(&path_buf, "{s}/Contents/Info.plist", .{root_path}) catch return false;
+            var plist_buf: [16 * 1024]u8 = undefined;
+            const text = readHead(io, plist, &plist_buf) orelse return false;
+            return versionIsTag(plistVersion(text) orelse return false, tag);
+        },
+        else => return true,
+    }
+}
+
 /// Is the unpacked package what this app expects: the right layout, the
 /// right bundle id (macOS) and an executable for `platform`'s CPU?
 pub fn checkStaged(io: std.Io, platform: Platform, root_path: []const u8) bool {
@@ -447,7 +574,8 @@ pub fn checkStaged(io: std.Io, platform: Platform, root_path: []const u8) bool {
             if (std.mem.indexOf(u8, text, "<string>" ++ bundle_id ++ "</string>") == null) return false;
         },
         .windows_x64 => {
-            const index = std.fmt.bufPrint(&path_buf, "{s}\\resources\\frontend\\dist\\index.html", .{root_path}) catch return false;
+            const sep = std.fs.path.sep;
+            const index = std.fmt.bufPrint(&path_buf, "{s}{c}resources{c}frontend{c}dist{c}index.html", .{ root_path, sep, sep, sep, sep }) catch return false;
             if (!fileExists(io, index)) return false;
         },
         .unsupported => return false,
@@ -667,6 +795,9 @@ pub const Snapshot = struct {
     total: u64 = 0,
     error_name: []const u8 = "",
     last_activity_ms: i64 = 0,
+    /// Times this download was continued on a new connection after the
+    /// old one went silent.
+    retries: u32 = 0,
 
     pub fn tag(self: *const Snapshot) []const u8 {
         return self.tag_buf[0..self.tag_len];
@@ -681,11 +812,20 @@ pub const Installer = struct {
     /// Set once before the first download (`setPublicKey`): when present,
     /// SHA256SUMS must carry a valid signature by it.
     public_key: ?[Ed25519.PublicKey.encoded_length]u8 = null,
+    /// Set once before the first download (`setEnv`): where the proxy
+    /// settings are read from (net.zig). Null: always connect directly.
+    env: ?*const std.process.Environ.Map = null,
+    /// Tests: called instead of starting a download thread.
+    spawn_hook: ?*const fn (self: *Installer, job: *Job) void = null,
 
     // --- guarded by `lock`
     snap: Snapshot = .{},
     cancel_requested: bool = false,
     running: u32 = 0,
+    /// Which thread of the current generation is the live one: a stalled
+    /// connection is abandoned by starting the next attempt.
+    attempt: u64 = 0,
+    stall_retries: u32 = 0,
     wake_context: ?*anyopaque = null,
     wake_fn: ?WakeFn = null,
     /// The staging directory for the current generation (`<root>/<token>`).
@@ -714,6 +854,10 @@ pub const Installer = struct {
         self.public_key = key;
     }
 
+    pub fn setEnv(self: *Installer, env: ?*const std.process.Environ.Map) void {
+        self.env = env;
+    }
+
     pub fn snapshot(self: *Installer) Snapshot {
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
@@ -739,9 +883,10 @@ pub const Installer = struct {
             .downloading, .verifying, .unpacking, .installing => return error.Busy,
             else => {},
         }
-        // A thread abandoned earlier (stalled socket) may still be running;
-        // allow one such straggler, it only ever touches its own directory.
-        if (self.running >= 2) return error.Busy;
+        // Threads abandoned earlier (stalled sockets) may still be running;
+        // they only ever touch their own directory, and never write once
+        // they are not the live attempt.
+        if (self.running >= max_running) return error.Busy;
         if (!self.root_cleaned and self.running == 0) {
             std.Io.Dir.cwd().deleteTree(self.io, root) catch {};
             self.root_cleaned = true;
@@ -757,6 +902,9 @@ pub const Installer = struct {
         self.staged_len = 0;
         self.cancel_requested = false;
         self.snap.gen += 1;
+        self.attempt += 1;
+        self.stall_retries = 0;
+        self.snap.retries = 0;
         self.snap.phase = .downloading;
         self.snap.received = 0;
         self.snap.total = 0;
@@ -764,21 +912,34 @@ pub const Installer = struct {
         self.snap.last_activity_ms = now_ms;
         @memcpy(self.snap.tag_buf[0..tag.len], tag);
         self.snap.tag_len = tag.len;
-        const job = try std.heap.page_allocator.create(Job);
-        job.* = .{ .gen = self.snap.gen, .platform = self.platform, .public_key = self.public_key };
-        @memcpy(job.tag_buf[0..tag.len], tag);
-        job.tag_len = tag.len;
-        @memcpy(job.dir_buf[0..job_dir.len], job_dir);
-        job.dir_len = job_dir.len;
-        const thread = std.Thread.spawn(.{ .stack_size = 16 * 1024 * 1024 }, run, .{ self, job }) catch |err| {
-            std.heap.page_allocator.destroy(job);
+        self.spawnLocked() catch |err| {
             self.snap.phase = .failed;
             self.snap.error_name = "Unavailable";
             return err;
         };
-        thread.detach();
-        self.running += 1;
         return self.snap.gen;
+    }
+
+    /// Lock held: start a thread for the current generation and attempt,
+    /// working in the current job directory.
+    fn spawnLocked(self: *Installer) !void {
+        const job = try std.heap.page_allocator.create(Job);
+        job.* = .{ .gen = self.snap.gen, .attempt = self.attempt, .platform = self.platform, .public_key = self.public_key };
+        const tag = self.snap.tag();
+        @memcpy(job.tag_buf[0..tag.len], tag);
+        job.tag_len = tag.len;
+        @memcpy(job.dir_buf[0..self.job_dir_len], self.job_dir_buf[0..self.job_dir_len]);
+        job.dir_len = self.job_dir_len;
+        if (self.spawn_hook) |hook| {
+            hook(self, job);
+        } else {
+            const thread = std.Thread.spawn(.{ .stack_size = 16 * 1024 * 1024 }, run, .{ self, job }) catch |err| {
+                std.heap.page_allocator.destroy(job);
+                return err;
+            };
+            thread.detach();
+        }
+        self.running += 1;
     }
 
     /// Stop the download, or discard a staged update. UI thread.
@@ -807,13 +968,27 @@ pub const Installer = struct {
         return self.snap.phase;
     }
 
-    /// The UI thread's watchdog: a download without a byte for
-    /// `stall_timeout_ms` is abandoned as `Stalled`.
+    /// The UI thread's watchdog. A download without a byte for
+    /// `stall_timeout_ms` is stuck on a dead connection: its thread is
+    /// abandoned and a new one continues from the bytes on disk. After
+    /// `max_stall_retries` of those the download fails as `Stalled` (true).
     pub fn checkStall(self: *Installer, now_ms: i64) bool {
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
         if (self.snap.phase != .downloading) return false;
         if (now_ms - self.snap.last_activity_ms < stall_timeout_ms) return false;
+        if (self.stall_retries < max_stall_retries and self.running < max_running and self.job_dir_len > 0) {
+            const previous = self.attempt;
+            self.attempt += 1;
+            if (self.spawnLocked()) |_| {
+                self.stall_retries += 1;
+                self.snap.retries = self.stall_retries;
+                self.snap.last_activity_ms = now_ms;
+                return false;
+            } else |_| {
+                self.attempt = previous;
+            }
+        }
         self.cancel_requested = true;
         self.snap.gen += 1;
         self.snap.phase = .failed;
@@ -837,8 +1012,9 @@ pub const Installer = struct {
 
     // -------------------------------------------------- download thread
 
-    const Job = struct {
+    pub const Job = struct {
         gen: u64,
+        attempt: u64 = 0,
         platform: Platform,
         public_key: ?[Ed25519.PublicKey.encoded_length]u8 = null,
         tag_buf: [64]u8 = undefined,
@@ -854,32 +1030,46 @@ pub const Installer = struct {
         }
     };
 
-    fn current(self: *Installer, gen: u64) bool {
-        self.lock.lockUncancelable(self.io);
-        defer self.lock.unlock(self.io);
-        return self.snap.gen == gen and !self.cancel_requested;
+    /// Lock held: is `job` the thread the UI is waiting for?
+    fn liveLocked(self: *Installer, job: *const Job) bool {
+        return self.snap.gen == job.gen and self.attempt == job.attempt and !self.cancel_requested;
     }
 
-    fn setPhase(self: *Installer, gen: u64, phase: Phase) void {
+    fn current(self: *Installer, job: *const Job) bool {
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
-        if (self.snap.gen == gen) self.snap.phase = phase;
+        return self.liveLocked(job);
     }
 
-    fn progress(self: *Installer, gen: u64, received: u64, total: u64) void {
+    fn setPhase(self: *Installer, job: *const Job, phase: Phase) void {
+        self.lock.lockUncancelable(self.io);
+        defer self.lock.unlock(self.io);
+        if (self.liveLocked(job)) self.snap.phase = phase;
+    }
+
+    /// Note that bytes arrived (the stall watchdog reads the time); with
+    /// `report` also how many, for the page. False: `job` is not live.
+    fn progress(self: *Installer, job: *const Job, report: bool, received: u64, total: u64) bool {
         const now = std.Io.Timestamp.now(self.io, .awake).toMilliseconds();
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
-        if (self.snap.gen != gen) return;
-        self.snap.received = received;
-        self.snap.total = total;
+        if (!self.liveLocked(job)) return false;
+        if (report) {
+            self.snap.received = received;
+            self.snap.total = total;
+        }
         self.snap.last_activity_ms = now;
+        return true;
     }
 
     fn finish(self: *Installer, job: *Job, outcome: anyerror!void, staged: []const u8) void {
         self.lock.lockUncancelable(self.io);
         self.running -= 1;
-        const wanted = self.snap.gen == job.gen and !self.cancel_requested;
+        const same_gen = self.snap.gen == job.gen and !self.cancel_requested;
+        const wanted = same_gen and self.attempt == job.attempt;
+        // Replaced by a later attempt of the same download, which works in
+        // the same directory: this thread leaves everything as it is.
+        const superseded = same_gen and !wanted;
         if (wanted) {
             if (outcome) |_| {
                 @memcpy(self.staged_buf[0..staged.len], staged);
@@ -896,7 +1086,7 @@ pub const Installer = struct {
         self.lock.unlock(self.io);
         // Cancelled, abandoned or failed: nothing in the directory is kept.
         const failed = if (outcome) |_| false else |_| true;
-        if (!wanted or failed) std.Io.Dir.cwd().deleteTree(self.io, job.dir()) catch {};
+        if (!superseded and (!wanted or failed)) std.Io.Dir.cwd().deleteTree(self.io, job.dir()) catch {};
         std.heap.page_allocator.destroy(job);
         if (wanted) {
             if (wake_fn) |f| f(wake_context) catch {};
@@ -913,18 +1103,19 @@ pub const Installer = struct {
     fn work(self: *Installer, job: *Job, staged_buf: []u8, staged: *[]const u8) !void {
         const io = self.io;
         const asset = job.platform.assetName() orelse return error.Unsupported;
-        var client: std.http.Client = .{ .allocator = std.heap.page_allocator, .io = io };
-        defer client.deinit();
+        // Through the proxy the environment or the system names, if any.
+        var session: net.Session = undefined;
+        session.init(std.heap.page_allocator, io, self.env, "github.com");
+        defer session.deinit();
 
         var url_buf: [512]u8 = undefined;
         var path_buf: [path_cap]u8 = undefined;
-        var digest: [Sha256.digest_length]u8 = undefined;
 
         // SHA256SUMS first: small, and a release without it is refused
         // before the large download starts.
         const sums_url = try downloadUrl(&url_buf, job.tag(), sums_name);
         const sums_path = std.fmt.bufPrint(&path_buf, "{s}{c}{s}", .{ job.dir(), std.fs.path.sep, sums_name }) catch return error.Disk;
-        _ = try self.download(&client, job.gen, sums_url, sums_path, max_sums_bytes, false, &digest);
+        try self.fetchFile(&session, job, sums_url, sums_path, max_sums_bytes, false, false);
         var sums_text_buf: [max_sums_bytes]u8 = undefined;
         const sums_text = readHead(io, sums_path, &sums_text_buf) orelse return error.Disk;
         // Signed builds: the sums must be signed by the build's key before
@@ -933,7 +1124,7 @@ pub const Installer = struct {
             var sig_path_buf: [path_cap]u8 = undefined;
             const sig_url = try downloadUrl(&url_buf, job.tag(), sig_name);
             const sig_path = std.fmt.bufPrint(&sig_path_buf, "{s}{c}{s}", .{ job.dir(), std.fs.path.sep, sig_name }) catch return error.Disk;
-            _ = self.download(&client, job.gen, sig_url, sig_path, max_sig_bytes, false, &digest) catch |err| switch (err) {
+            self.fetchFile(&session, job, sig_url, sig_path, max_sig_bytes, false, false) catch |err| switch (err) {
                 error.NoAsset => return error.NoSignature,
                 else => return err,
             };
@@ -941,111 +1132,166 @@ pub const Installer = struct {
             const sig_text = readHead(io, sig_path, &sig_text_buf) orelse return error.Disk;
             try verifySums(sums_text, sig_text, key);
         }
+        // The (signed) sums must be the ones of the tag being installed.
+        try checkBinding(sums_text, job.tag(), job.public_key != null);
         const expected = findSum(sums_text, asset) orelse return error.NoChecksum;
 
+        // The package. A thread that takes over a stalled download finds
+        // the file and continues it.
         const asset_url = try downloadUrl(&url_buf, job.tag(), asset);
         var zip_buf: [path_cap]u8 = undefined;
         const zip_path = std.fmt.bufPrint(&zip_buf, "{s}{c}{s}", .{ job.dir(), std.fs.path.sep, asset }) catch return error.Disk;
-        _ = try self.download(&client, job.gen, asset_url, zip_path, max_asset_bytes, true, &digest);
+        try self.fetchFile(&session, job, asset_url, zip_path, max_asset_bytes, true, true);
 
-        self.setPhase(job.gen, .verifying);
-        if (!self.current(job.gen)) return error.Cancelled;
-        if (!sumsMatch(expected, digest)) return error.ChecksumMismatch;
-        // Re-read from disk: what gets unpacked is what was verified.
+        self.setPhase(job, .verifying);
+        if (!self.current(job)) return error.Cancelled;
+        // Hashed from disk: what gets unpacked is what was verified,
+        // however many connections its bytes arrived on.
         const on_disk = hashFile(io, zip_path) catch return error.Disk;
         if (!sumsMatch(expected, on_disk)) return error.ChecksumMismatch;
 
-        self.setPhase(job.gen, .unpacking);
-        if (!self.current(job.gen)) return error.Cancelled;
+        self.setPhase(job, .unpacking);
+        if (!self.current(job)) return error.Cancelled;
         var unpack_buf: [path_cap]u8 = undefined;
         const unpacked = std.fmt.bufPrint(&unpack_buf, "{s}{c}unpacked", .{ job.dir(), std.fs.path.sep }) catch return error.Disk;
+        // A second attempt starts from a clean tree.
+        std.Io.Dir.cwd().deleteTree(io, unpacked) catch {};
         try unpack(io, job.platform, zip_path, unpacked);
-        const root_name = stagedRootName(job.platform);
-        const staged_root = std.fmt.bufPrint(staged_buf, "{s}{c}{s}", .{ unpacked, std.fs.path.sep, root_name }) catch return error.Disk;
+        var staged_root: []const u8 = "";
+        for (stagedRootNames(job.platform)) |root_name| {
+            const candidate = std.fmt.bufPrint(staged_buf, "{s}{c}{s}", .{ unpacked, std.fs.path.sep, root_name }) catch return error.Disk;
+            if (fileExists(io, candidate)) {
+                staged_root = candidate;
+                break;
+            }
+        }
+        if (staged_root.len == 0) return error.BadPackage;
         if (!checkStaged(io, job.platform, staged_root)) return error.BadPackage;
+        // The package itself must say it is the version that was asked for.
+        if (!stagedVersionMatches(io, job.platform, staged_root, job.tag())) return error.VersionMismatch;
         if (builtin.os.tag == .macos) {
             if (!runTool(io, &.{ "/usr/bin/codesign", "--verify", "--deep", "--strict", staged_root })) return error.BadPackage;
         }
         // The zip is no longer needed; the staged tree is.
         std.Io.Dir.deleteFileAbsolute(io, zip_path) catch {};
-        if (!self.current(job.gen)) return error.Cancelled;
+        if (!self.current(job)) return error.Cancelled;
         staged.* = staged_root;
     }
 
-    /// GET `url` into `out_path`, following redirects only to GitHub's
-    /// download hosts; returns the byte count and the SHA-256 in `digest`.
-    fn download(
+    /// Where a download's bytes go: a file only the live attempt writes.
+    const FileSink = struct {
+        installer: *Installer,
+        job: *const Job,
+        file: std.Io.File,
+        report: bool,
+        /// Bytes on disk so far.
+        stored: u64 = 0,
+
+        fn sinkWrite(context: *anyopaque, bytes: []const u8, offset: u64) anyerror!void {
+            const ctx: *FileSink = @ptrCast(@alignCast(context));
+            const self = ctx.installer;
+            self.lock.lockUncancelable(self.io);
+            defer self.lock.unlock(self.io);
+            if (!self.liveLocked(ctx.job)) return error.Cancelled;
+            ctx.file.writePositionalAll(self.io, bytes, offset) catch return error.Disk;
+            ctx.stored = offset + bytes.len;
+        }
+
+        fn sinkRestart(context: *anyopaque) anyerror!void {
+            const ctx: *FileSink = @ptrCast(@alignCast(context));
+            const self = ctx.installer;
+            self.lock.lockUncancelable(self.io);
+            defer self.lock.unlock(self.io);
+            if (!self.liveLocked(ctx.job)) return error.Cancelled;
+            ctx.file.setLength(self.io, 0) catch return error.Disk;
+            ctx.stored = 0;
+        }
+
+        fn sinkProgress(context: *anyopaque, received: u64, total: u64) bool {
+            const ctx: *FileSink = @ptrCast(@alignCast(context));
+            return ctx.installer.progress(ctx.job, ctx.report, received, total);
+        }
+
+        fn sink(ctx: *FileSink) net.Sink {
+            return .{ .context = ctx, .write = sinkWrite, .restart = sinkRestart, .progress = sinkProgress };
+        }
+    };
+
+    /// Sleep `ms` before a retry, in short steps. False: no longer live.
+    fn waitRetry(self: *Installer, job: *const Job, ms: i64) bool {
+        var left = ms;
+        while (left > 0) : (left -= 250) {
+            if (!self.current(job)) return false;
+            std.Io.sleep(self.io, .fromMilliseconds(250), .awake) catch {};
+        }
+        return self.current(job);
+    }
+
+    /// GET `url` (one of this repository's release downloads) into
+    /// `out_path`, following redirects only to GitHub's download hosts.
+    /// With `resume_existing` a file already there is continued with a
+    /// Range request. A connection that breaks off is retried
+    /// (`max_network_retries` times in a row without a byte), each time
+    /// asking only for the rest.
+    fn fetchFile(
         self: *Installer,
-        client: *std.http.Client,
-        gen: u64,
-        first_url: []const u8,
+        session: *net.Session,
+        job: *const Job,
+        url: []const u8,
         out_path: []const u8,
         max_bytes: u64,
         report: bool,
-        digest: *[Sha256.digest_length]u8,
-    ) !u64 {
-        if (!validDownloadUrl(first_url)) return error.BadTag;
+        resume_existing: bool,
+    ) !void {
+        if (!validDownloadUrl(url)) return error.BadTag;
         const io = self.io;
-        var bufs: [2][4096]u8 = undefined;
-        var url: []const u8 = first_url;
-        var hops: usize = 0;
+        // Only the live attempt opens (and may empty) the file.
+        const file = blk: {
+            self.lock.lockUncancelable(io);
+            defer self.lock.unlock(io);
+            if (!self.liveLocked(job)) return error.Cancelled;
+            break :blk std.Io.Dir.createFileAbsolute(io, out_path, .{ .read = true, .truncate = !resume_existing }) catch return error.Disk;
+        };
+        defer file.close(io);
+        var ctx: FileSink = .{ .installer = self, .job = job, .file = file, .report = report };
+        var offset: u64 = if (resume_existing) (file.length(io) catch 0) else 0;
+        if (offset > max_bytes) {
+            try FileSink.sinkRestart(&ctx);
+            offset = 0;
+        }
+        const chunk = std.heap.page_allocator.alloc(u8, 64 * 1024) catch return error.OutOfMemory;
+        defer std.heap.page_allocator.free(chunk);
+        var failures: u32 = 0;
+        var requests: u32 = 0;
         while (true) {
-            if (!self.current(gen)) return error.Cancelled;
-            const uri = std.Uri.parse(url) catch return error.BadRedirect;
-            var req = client.request(.GET, uri, .{
-                .redirect_behavior = .unhandled,
-                .keep_alive = false,
-                .headers = .{
-                    .user_agent = .{ .override = user_agent },
-                    .accept_encoding = .omit,
+            ctx.stored = offset;
+            requests += 1;
+            _ = net.fetch(session, .{
+                .url = url,
+                .user_agent = user_agent,
+                .offset = offset,
+                .max_bytes = max_bytes,
+            }, ctx.sink(), chunk) catch |err| switch (err) {
+                error.Network => {
+                    // What arrived is on disk; ask for the rest.
+                    failures = nextFailureCount(failures, ctx.stored > offset);
+                    if (failures > max_network_retries or requests > 64) return error.Network;
+                    offset = ctx.stored;
+                    if (!self.waitRetry(job, net.retryDelayMs(failures))) return error.Cancelled;
+                    continue;
                 },
-            }) catch return error.Network;
-            defer req.deinit();
-            req.sendBodiless() catch return error.Network;
-            var response = req.receiveHead(&.{}) catch return error.Network;
-            // Never drain an unwanted body on the way out.
-            if (req.connection) |c| c.closing = true;
-            const status = @intFromEnum(response.head.status);
-            if (status == 301 or status == 302 or status == 303 or status == 307 or status == 308) {
-                hops += 1;
-                if (hops > max_redirects) return error.BadRedirect;
-                const location = response.head.location orelse return error.BadRedirect;
-                if (!allowedRedirect(location)) return error.BadRedirect;
-                const next = &bufs[hops % 2];
-                @memcpy(next[0..location.len], location);
-                url = next[0..location.len];
-                continue;
-            }
-            if (status == 404) return error.NoAsset;
-            if (status != 200) return error.HttpStatus;
-            const total = response.head.content_length orelse 0;
-            if (total > max_bytes) return error.TooLarge;
-            if (report) self.progress(gen, 0, total);
-
-            var file = std.Io.Dir.createFileAbsolute(io, out_path, .{ .truncate = true }) catch return error.Disk;
-            defer file.close(io);
-            var transfer: [16 * 1024]u8 = undefined;
-            const body = response.reader(&transfer);
-            var sha = Sha256.init(.{});
-            var chunk: [64 * 1024]u8 = undefined;
-            var received: u64 = 0;
-            while (true) {
-                if (!self.current(gen)) return error.Cancelled;
-                const n = body.readSliceShort(&chunk) catch return error.Network;
-                if (n == 0) break;
-                received += n;
-                if (received > max_bytes) return error.TooLarge;
-                sha.update(chunk[0..n]);
-                file.writeStreamingAll(io, chunk[0..n]) catch return error.Disk;
-                if (report) self.progress(gen, received, total);
-                if (n < chunk.len) break;
-            }
-            if (total != 0 and received != total) return error.Network;
-            sha.final(digest);
-            return received;
+                else => return err,
+            };
+            return;
         }
     }
 };
+
+/// Broken connections in a row that brought nothing: one that did bring
+/// bytes starts the count again.
+pub fn nextFailureCount(failures: u32, made_progress: bool) u32 {
+    return if (made_progress) 1 else failures + 1;
+}
 
 fn unpack(io: std.Io, platform: Platform, zip_path: []const u8, dest: []const u8) !void {
     switch (platform) {
@@ -1075,6 +1321,9 @@ pub fn errorName(err: anyerror) []const u8 {
         error.NoChecksum => "NoChecksum",
         error.NoSignature => "NoSignature",
         error.BadSignature => "BadSignature",
+        error.NoVersion => "NoVersion",
+        error.VersionMismatch => "VersionMismatch",
+        error.SizeMismatch => "Network",
         error.ChecksumMismatch => "ChecksumMismatch",
         error.Unpack => "Unpack",
         error.BadPackage => "BadPackage",
@@ -1121,6 +1370,44 @@ pub fn helperLockHeld(io: std.Io, target: []const u8) bool {
     }
 }
 
+/// A helper is done within minutes (it waits at most five for the app to
+/// exit and a minute and a half for the new one). A lock older than this
+/// was left behind by a helper that was killed, or names a process id that
+/// now belongs to something else: it must not keep the app from starting.
+pub const helper_lock_max_age_ms: i64 = 20 * 60 * 1000;
+
+fn lockAgeMs(io: std.Io, target: []const u8) ?i64 {
+    var buf: [path_cap]u8 = undefined;
+    const lock = lockPath(&buf, target) orelse return null;
+    const stat = std.Io.Dir.cwd().statFile(io, lock, .{}) catch return null;
+    const now = std.Io.Timestamp.now(io, .real).toMilliseconds();
+    return now - stat.mtime.toMilliseconds();
+}
+
+pub fn lockIsRecent(age_ms: i64) bool {
+    // A clock that went backwards makes the lock look new: still recent.
+    return age_ms < helper_lock_max_age_ms;
+}
+
+/// Is an update helper replacing the installation at `target` right now?
+/// A launch must not get in its way: files opened from the folder being
+/// swapped would make the swap fail. When the lock's age cannot be read
+/// the answer is no: better a launch that disturbs an update (the helper
+/// retries, then rolls back) than an app that will not start.
+pub fn updateInProgress(io: std.Io, target: []const u8) bool {
+    if (!helperLockHeld(io, target)) return false;
+    return lockIsRecent(lockAgeMs(io, target) orelse return false);
+}
+
+/// `updateInProgress` for the installation this process runs from; false
+/// for a development build.
+pub fn ownUpdateInProgress(io: std.Io) bool {
+    var exe_buf: [path_cap]u8 = undefined;
+    const exe_len = std.process.executablePath(io, &exe_buf) catch return false;
+    const root = installRootFromExe(exe_buf[0..exe_len], builtin.os.tag) orelse return false;
+    return updateInProgress(io, root);
+}
+
 /// Did the helper create its "started" marker?
 pub fn helperStarted(io: std.Io, path: []const u8) bool {
     var buf: [16]u8 = undefined;
@@ -1157,7 +1444,9 @@ pub fn startHelper(
     started_buf: []u8,
 ) HelperStart {
     const fail = HelperStart{ .err = "Helper" };
-    if (helperLockHeld(io, target)) return .{ .err = "HelperBusy" };
+    // A lock left behind long ago by a helper that was killed is not one;
+    // a lock whose age cannot be read is taken at its word.
+    if (helperLockHeld(io, target) and lockIsRecent(lockAgeMs(io, target) orelse 0)) return .{ .err = "HelperBusy" };
     var token_bytes: [8]u8 = undefined;
     io.random(&token_bytes);
     const token = std.fmt.bytesToHex(token_bytes, .lower);
@@ -1223,53 +1512,38 @@ pub fn startHelper(
 
 // ------------------------------------------------------------ replies
 
-fn appendRaw(buf: []u8, n: *usize, text: []const u8) bool {
-    if (n.* + text.len > buf.len) return false;
-    @memcpy(buf[n.*..][0..text.len], text);
-    n.* += text.len;
-    return true;
-}
-
-/// Tags, asset names and error names are validated ASCII; no escaping.
-fn appendQuoted(buf: []u8, n: *usize, text: []const u8) bool {
-    for (text) |c| {
-        if (c < 0x20 or c == '"' or c == '\\' or c >= 0x7f) return false;
-    }
-    return appendRaw(buf, n, "\"") and appendRaw(buf, n, text) and appendRaw(buf, n, "\"");
-}
-
 /// The `studio.updateStatus` reply.
 pub fn statusReply(out: []u8, snap: *const Snapshot, platform: Platform, blocked: Blocked, note: *const LaunchNote) []const u8 {
     var n: usize = 0;
-    var num: [64]u8 = undefined;
-    const counts = std.fmt.bufPrint(&num, ",\"received\":{d},\"total\":{d}", .{ snap.received, snap.total }) catch "";
-    const ok = appendRaw(out, &n, "{\"ok\":true,\"phase\":") and
-        appendQuoted(out, &n, @tagName(snap.phase)) and
-        appendRaw(out, &n, ",\"tag\":") and
-        appendQuoted(out, &n, snap.tag()) and
-        appendRaw(out, &n, ",\"asset\":") and
-        appendQuoted(out, &n, platform.assetName() orelse "") and
-        appendRaw(out, &n, ",\"platform\":") and
-        appendQuoted(out, &n, platform.label()) and
-        appendRaw(out, &n, counts) and
-        appendRaw(out, &n, ",\"error\":") and
-        appendQuoted(out, &n, snap.error_name) and
-        appendRaw(out, &n, ",\"canInstall\":") and
-        appendRaw(out, &n, if (blocked == .none) "true" else "false") and
-        appendRaw(out, &n, ",\"blocked\":") and
-        appendQuoted(out, &n, if (blocked == .none) "" else @tagName(blocked)) and
-        appendRaw(out, &n, ",\"justUpdated\":") and
-        appendRaw(out, &n, if (note.just_updated) "true" else "false") and
-        appendRaw(out, &n, ",\"installFailed\":") and
-        appendRaw(out, &n, if (note.install_failed) "true" else "false") and
-        appendRaw(out, &n, "}");
+    var num: [96]u8 = undefined;
+    const counts = std.fmt.bufPrint(&num, ",\"received\":{d},\"total\":{d},\"retries\":{d}", .{ snap.received, snap.total, snap.retries }) catch "";
+    const ok = json.append(out, &n, "{\"ok\":true,\"phase\":") and
+        json.appendString(out, &n, @tagName(snap.phase)) and
+        json.append(out, &n, ",\"tag\":") and
+        json.appendString(out, &n, snap.tag()) and
+        json.append(out, &n, ",\"asset\":") and
+        json.appendString(out, &n, platform.assetName() orelse "") and
+        json.append(out, &n, ",\"platform\":") and
+        json.appendString(out, &n, platform.label()) and
+        json.append(out, &n, counts) and
+        json.append(out, &n, ",\"error\":") and
+        json.appendString(out, &n, snap.error_name) and
+        json.append(out, &n, ",\"canInstall\":") and
+        json.append(out, &n, if (blocked == .none) "true" else "false") and
+        json.append(out, &n, ",\"blocked\":") and
+        json.appendString(out, &n, if (blocked == .none) "" else @tagName(blocked)) and
+        json.append(out, &n, ",\"justUpdated\":") and
+        json.append(out, &n, if (note.just_updated) "true" else "false") and
+        json.append(out, &n, ",\"installFailed\":") and
+        json.append(out, &n, if (note.install_failed) "true" else "false") and
+        json.append(out, &n, "}");
     if (!ok) return "{\"ok\":false,\"error\":\"Unavailable\"}";
     return out[0..n];
 }
 
 pub fn errorReply(out: []u8, name: []const u8) []const u8 {
     var n: usize = 0;
-    if (appendRaw(out, &n, "{\"ok\":false,\"error\":") and appendQuoted(out, &n, name) and appendRaw(out, &n, "}")) return out[0..n];
+    if (json.append(out, &n, "{\"ok\":false,\"error\":") and json.appendString(out, &n, name) and json.append(out, &n, "}")) return out[0..n];
     return "{\"ok\":false,\"error\":\"Unavailable\"}";
 }
 
@@ -1277,11 +1551,11 @@ pub fn errorReply(out: []u8, name: []const u8) []const u8 {
 pub fn downloadReply(out: []u8, snap: *const Snapshot, platform: Platform) []const u8 {
     if (snap.phase != .ready) return errorReply(out, if (snap.error_name.len > 0) snap.error_name else "Unavailable");
     var n: usize = 0;
-    const ok = appendRaw(out, &n, "{\"ok\":true,\"phase\":\"ready\",\"tag\":") and
-        appendQuoted(out, &n, snap.tag()) and
-        appendRaw(out, &n, ",\"asset\":") and
-        appendQuoted(out, &n, platform.assetName() orelse "") and
-        appendRaw(out, &n, "}");
+    const ok = json.append(out, &n, "{\"ok\":true,\"phase\":\"ready\",\"tag\":") and
+        json.appendString(out, &n, snap.tag()) and
+        json.append(out, &n, ",\"asset\":") and
+        json.appendString(out, &n, platform.assetName() orelse "") and
+        json.append(out, &n, "}");
     if (!ok) return "{\"ok\":false,\"error\":\"Unavailable\"}";
     return out[0..n];
 }
@@ -1445,7 +1719,7 @@ test "status and download replies" {
     snap.tag_len = 6;
     const note: LaunchNote = .{};
     try testing.expectEqualStrings(
-        "{\"ok\":true,\"phase\":\"downloading\",\"tag\":\"v5.0.1\",\"asset\":\"GobanStudio-macOS-arm64.zip\",\"platform\":\"macos-arm64\",\"received\":10,\"total\":100,\"error\":\"\",\"canInstall\":true,\"blocked\":\"\",\"justUpdated\":false,\"installFailed\":false}",
+        "{\"ok\":true,\"phase\":\"downloading\",\"tag\":\"v5.0.1\",\"asset\":\"GobanStudio-macOS-arm64.zip\",\"platform\":\"macos-arm64\",\"received\":10,\"total\":100,\"retries\":0,\"error\":\"\",\"canInstall\":true,\"blocked\":\"\",\"justUpdated\":false,\"installFailed\":false}",
         statusReply(&out, &snap, .macos_arm64, .none, &note),
     );
     try testing.expect(std.mem.indexOf(u8, statusReply(&out, &snap, .windows_x64, .ReadOnlyLocation, &note), "\"canInstall\":false,\"blocked\":\"ReadOnlyLocation\"") != null);
@@ -1548,10 +1822,202 @@ test "a live helper's lock is seen; a stale one is not" {
     var pid_text: [24]u8 = undefined;
     try writeTestFile(io, pid_path, try std.fmt.bufPrint(&pid_text, "{d}\n", .{if (builtin.os.tag == .linux) std.os.linux.getpid() else std.c.getpid()}));
     try testing.expect(helperLockHeld(io, target));
+    // A launch during the swap stays out of the way.
+    try testing.expect(updateInProgress(io, target));
     // A pid that cannot be running.
     try std.Io.Dir.deleteFileAbsolute(io, pid_path);
     try writeTestFile(io, pid_path, "2147483646\n");
     try testing.expect(!helperLockHeld(io, target));
+    try testing.expect(!updateInProgress(io, target));
+    // A lock that outlived any helper never keeps the app from starting.
+    try testing.expect(lockIsRecent(0));
+    try testing.expect(lockIsRecent(5 * 60 * 1000));
+    try testing.expect(!lockIsRecent(helper_lock_max_age_ms));
+    try testing.expect(!updateInProgress(io, "/nowhere/Goban Studio.app"));
+}
+
+test "signed sums name their version: a release's files cannot be served under another tag" {
+    // What release.yml writes: `printf '%s\n' "$TAG" > VERSION`, then a
+    // `sha256sum` line for it.
+    const zip = ("a" ** 64) ++ "  GobanStudio-macOS-arm64.zip\n";
+    var digest: [32]u8 = undefined;
+    Sha256.hash("v14.0.0\n", &digest, .{});
+    const hex = hexDigest(digest);
+    var buf: [512]u8 = undefined;
+    const sums = try std.fmt.bufPrint(&buf, "{s}{s}  VERSION\n", .{ zip, &hex });
+    try testing.expectEqual(Binding.bound, sumsBinding(sums, "v14.0.0"));
+    // The line as `sha256sum VERSION` prints it (scripts/tests/shell-ci.mjs
+    // has the same vector).
+    try testing.expectEqual(Binding.bound, sumsBinding(zip ++ "03f8f8d787997ec97ed6273980f539025f918130669d7660b538ed4dbe40a0a2  VERSION\n", "v14.0.0"));
+    try checkBinding(sums, "v14.0.0", true);
+    try checkBinding(sums, "v14.0.0", false);
+    // The same signed bytes offered as another release.
+    try testing.expectEqual(Binding.mismatch, sumsBinding(sums, "v99.0.0"));
+    try testing.expectEqual(Binding.mismatch, sumsBinding(sums, "v14.0.1"));
+    try testing.expectEqual(Binding.mismatch, sumsBinding(sums, "14.0.0"));
+    try testing.expectError(error.VersionMismatch, checkBinding(sums, "v99.0.0", true));
+    try testing.expectError(error.VersionMismatch, checkBinding(sums, "v99.0.0", false));
+    // Sums from before the binding: a signed build refuses them, an
+    // unsigned one (which trusts the release anyway) does not.
+    try testing.expectEqual(Binding.absent, sumsBinding(zip, "v13.0.0"));
+    try testing.expectError(error.NoVersion, checkBinding(zip, "v13.0.0", true));
+    try checkBinding(zip, "v13.0.0", false);
+    // A VERSION line that cannot be read is not "absent".
+    try testing.expectEqual(Binding.mismatch, sumsBinding(zip ++ "nothex  VERSION\n", "v14.0.0"));
+    try testing.expectEqual(Binding.mismatch, sumsBinding(zip ++ ("z" ** 64) ++ "  VERSION\n", "v14.0.0"));
+    var two_buf: [512]u8 = undefined;
+    const two = try std.fmt.bufPrint(&two_buf, "{s}{s}  VERSION\n{s}  VERSION\n", .{ zip, &hex, "b" ** 64 });
+    try testing.expectEqual(Binding.mismatch, sumsBinding(two, "v14.0.0"));
+    // A file whose name only ends the same is not the binding.
+    try testing.expectEqual(Binding.absent, sumsBinding(zip ++ ("c" ** 64) ++ "  NOT-VERSION\n", "v14.0.0"));
+    // The line does not disturb the package lines (nor did it in the
+    // parser of the versions before it, which is this same `findSum`).
+    try testing.expectEqualStrings("a" ** 64, &(findSum(sums, "GobanStudio-macOS-arm64.zip").?));
+    // The app never downloads VERSION: it is not one of its asset names.
+    var url_buf: [256]u8 = undefined;
+    try testing.expectError(error.BadTag, downloadUrl(&url_buf, "v14.0.0", version_name));
+}
+
+test "a package states its own version, and it must be the tag's" {
+    var out: [64]u8 = undefined;
+    try testing.expectEqualStrings("14.0.0", buildInfoVersion("{\n  \"app\": \"14.0.0\",\n  \"builtAt\": \"2026-11-11T00:00:00.000Z\"\n}\n", &out).?);
+    try testing.expect(buildInfoVersion("{\"builtAt\":\"x\"}", &out) == null);
+    try testing.expect(buildInfoVersion("not json", &out) == null);
+    try testing.expect(buildInfoVersion("{\"app\":14}", &out) == null);
+    const plist =
+        \\<plist version="1.0"><dict>
+        \\  <key>CFBundleIdentifier</key>
+        \\  <string>dev.hxddh.gobanstudio</string>
+        \\  <key>CFBundleShortVersionString</key>
+        \\  <string>14.0.0</string>
+        \\  <key>CFBundleVersion</key>
+        \\  <string>14.0.0</string>
+        \\</dict></plist>
+    ;
+    try testing.expectEqualStrings("14.0.0", plistVersion(plist).?);
+    try testing.expect(plistVersion("<key>CFBundleVersion</key><string>1</string>") == null);
+    try testing.expect(plistVersion("<key>CFBundleShortVersionString</key><integer>1</integer><string>2</string>") == null);
+    try testing.expect(versionIsTag("14.0.0", "v14.0.0"));
+    try testing.expect(versionIsTag("14.0", "v14.0.0"));
+    try testing.expect(versionIsTag("14.1.0-beta.1", "v14.1.0-beta.1"));
+    try testing.expect(!versionIsTag("13.0.0", "v14.0.0"));
+    try testing.expect(!versionIsTag("14.0.0", "v14.0.1"));
+    try testing.expect(!versionIsTag("14.0.0-rc.1", "v14.0.0"));
+    try testing.expect(!versionIsTag("", "v14.0.0"));
+    try testing.expect(!versionIsTag("0.0.0", "latest"));
+
+    // On disk, in the layout of the package (Windows layout here; the
+    // macOS one adds the Info.plist check).
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [path_cap]u8 = undefined;
+    const dir = try testTempDir(io, &tmp, &dir_buf);
+    var p: [path_cap]u8 = undefined;
+    const s = std.fs.path.sep;
+    const dist = try std.fmt.bufPrint(&p, "{s}{c}resources{c}frontend{c}dist", .{ dir, s, s, s });
+    try std.Io.Dir.cwd().createDirPath(io, dist);
+    var f: [path_cap]u8 = undefined;
+    const info = try std.fmt.bufPrint(&f, "{s}{c}build-info.json", .{ dist, s });
+    try testing.expect(!stagedVersionMatches(io, .windows_x64, dir, "v14.0.0"));
+    try writeTestFile(io, info, "{\"app\":\"14.0.0\",\"builtAt\":\"2026-11-11T00:00:00.000Z\"}\n");
+    try testing.expect(stagedVersionMatches(io, .windows_x64, dir, "v14.0.0"));
+    // An older build offered under a newer tag.
+    try testing.expect(!stagedVersionMatches(io, .windows_x64, dir, "v99.0.0"));
+
+    try testing.expectEqualStrings("GobanStudio.app", stagedRootName(.macos_arm64));
+    try testing.expectEqual(@as(usize, 2), stagedRootNames(.macos_x64).len);
+    try testing.expectEqualStrings("Goban Studio.app", stagedRootNames(.macos_x64)[1]);
+    try testing.expectEqualStrings("GobanStudio", stagedRootName(.windows_x64));
+}
+
+const TestSpawn = struct {
+    var jobs: [8]*Installer.Job = undefined;
+    var count: usize = 0;
+
+    fn hook(self: *Installer, job: *Installer.Job) void {
+        _ = self;
+        jobs[count] = job;
+        count += 1;
+    }
+};
+
+test "a stalled download continues on a new connection, a few times, then fails" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [path_cap]u8 = undefined;
+    const root = try testTempDir(io, &tmp, &dir_buf);
+
+    const inst = try testing.allocator.create(Installer);
+    defer testing.allocator.destroy(inst);
+    inst.init(io);
+    inst.platform = .windows_x64;
+    inst.spawn_hook = TestSpawn.hook;
+    TestSpawn.count = 0;
+
+    const gen = try inst.start(root, "v14.0.0", 1_000);
+    try testing.expectEqual(@as(usize, 1), TestSpawn.count);
+    const first = TestSpawn.jobs[0];
+    try testing.expect(inst.current(first));
+    // Bytes arrive: no stall.
+    try testing.expect(inst.progress(first, true, 500, 1000));
+    const t0 = inst.snapshot().last_activity_ms;
+    try testing.expect(!inst.checkStall(t0 + stall_timeout_ms - 1));
+    try testing.expectEqual(@as(usize, 1), TestSpawn.count);
+
+    // Silence: the first thread is replaced, the download goes on.
+    try testing.expect(!inst.checkStall(t0 + stall_timeout_ms));
+    try testing.expectEqual(@as(usize, 2), TestSpawn.count);
+    const second = TestSpawn.jobs[1];
+    var snap = inst.snapshot();
+    try testing.expectEqual(Phase.downloading, snap.phase);
+    try testing.expectEqual(gen, snap.gen);
+    try testing.expectEqual(@as(u32, 1), snap.retries);
+    try testing.expectEqual(@as(u64, 500), snap.received);
+    try testing.expect(!inst.current(first));
+    try testing.expect(inst.current(second));
+    // Same directory: the new thread finds the partial file.
+    try testing.expectEqualStrings(first.dir(), second.dir());
+    // The abandoned thread wakes up: it may not report or write, and when
+    // it ends it leaves the directory and the state alone.
+    try testing.expect(!inst.progress(first, true, 600, 1000));
+    try testing.expectEqual(@as(u64, 500), inst.snapshot().received);
+    inst.finish(first, error.Cancelled, "");
+    try testing.expect(fileExists(io, second.dir()));
+    try testing.expectEqual(Phase.downloading, inst.snapshot().phase);
+
+    // The watchdog starts counting again from the takeover.
+    const t1 = inst.snapshot().last_activity_ms;
+    try testing.expect(!inst.checkStall(t1 + stall_timeout_ms - 1));
+    var now = t1;
+    var n: u32 = 1;
+    while (n < max_stall_retries) : (n += 1) {
+        now += stall_timeout_ms;
+        try testing.expect(!inst.checkStall(now));
+        inst.finish(TestSpawn.jobs[TestSpawn.count - 2], error.Cancelled, "");
+    }
+    try testing.expectEqual(@as(usize, 1 + max_stall_retries), TestSpawn.count);
+    try testing.expectEqual(max_stall_retries, inst.snapshot().retries);
+    // Out of retries.
+    now += stall_timeout_ms;
+    try testing.expect(inst.checkStall(now));
+    snap = inst.snapshot();
+    try testing.expectEqual(Phase.failed, snap.phase);
+    try testing.expectEqualStrings("Stalled", snap.error_name);
+    // The last thread ends: nothing of the failed download is kept.
+    const last = TestSpawn.jobs[TestSpawn.count - 1];
+    var last_dir_buf: [path_cap]u8 = undefined;
+    const last_dir = try std.fmt.bufPrint(&last_dir_buf, "{s}", .{last.dir()});
+    inst.finish(last, error.Cancelled, "");
+    try testing.expect(!fileExists(io, last_dir));
+    try testing.expectEqual(@as(u32, 0), inst.running);
+
+    // Broken connections: bytes that arrived reset the count.
+    try testing.expectEqual(@as(u32, 1), nextFailureCount(0, false));
+    try testing.expectEqual(@as(u32, 3), nextFailureCount(2, false));
+    try testing.expectEqual(@as(u32, 1), nextFailureCount(3, true));
+    try testing.expect(helper_start_timeout_ms >= 20_000);
 }
 
 /// A stored (uncompressed) zip, for the extraction tests.
@@ -1648,7 +2114,8 @@ test "a verified Windows package is extracted; a hostile one is refused" {
     try extractZip(io, zip_path, out, "GobanStudio");
     var root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const root = try std.fmt.bufPrint(&root_buf, "{s}{c}GobanStudio", .{ out, std.fs.path.sep });
-    if (builtin.os.tag == .windows) try testing.expect(checkStaged(io, .windows_x64, root));
+    try testing.expect(checkStaged(io, .windows_x64, root));
+    try testing.expect(!checkStaged(io, .macos_arm64, root));
     var exe_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const exe = try std.fmt.bufPrint(&exe_buf, "{s}{c}bin{c}goban-studio.exe", .{ root, std.fs.path.sep, std.fs.path.sep });
     var head: [4096]u8 = undefined;
@@ -1726,4 +2193,59 @@ test "macOS: ditto unpacks a signed bundle that codesign and the checks accept" 
     // An app for the other CPU is refused.
     const other: Platform = if (platform == .macos_arm64) .macos_x64 else .macos_arm64;
     try testing.expect(!checkStaged(io, other, staged));
+}
+
+test "live (GOBAN_NET_LIVE=package): a published package is downloaded, verified, unpacked and checked" {
+    // Needs the network and about 16 MB: `GOBAN_NET_LIVE=package zig build
+    // test …`. The Windows package of a published release goes through the
+    // same thread the app runs (std.zip unpacks it on any system), through
+    // the environment's proxy when there is one.
+    var env = try testing.environ.createMap(testing.allocator);
+    defer env.deinit();
+    if (!std.mem.eql(u8, env.get("GOBAN_NET_LIVE") orelse "", "package")) return error.SkipZigTest;
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [path_cap]u8 = undefined;
+    const base = try testTempDir(io, &tmp, &dir_buf);
+    var root_buf: [path_cap]u8 = undefined;
+    const root = try std.fmt.bufPrint(&root_buf, "{s}{c}{s}", .{ base, std.fs.path.sep, staging_dir_name });
+
+    const inst = try testing.allocator.create(Installer);
+    defer testing.allocator.destroy(inst);
+    inst.init(io);
+    inst.platform = .windows_x64;
+    inst.setEnv(&env);
+    const tag = "v13.0.0";
+    const now = struct {
+        fn ms(clock_io: std.Io) i64 {
+            return std.Io.Timestamp.now(clock_io, .awake).toMilliseconds();
+        }
+    }.ms;
+    _ = try inst.start(root, tag, now(io));
+    const deadline = now(io) + 15 * 60 * 1000;
+    var last_report: i64 = 0;
+    while (true) {
+        _ = inst.checkStall(now(io));
+        const snap = inst.snapshot();
+        if (snap.phase == .ready or snap.phase == .failed or snap.phase == .cancelled) break;
+        if (now(io) - last_report > 5000) {
+            last_report = now(io);
+            std.debug.print("live: {s} {d} of {d} bytes, {d} retries\n", .{ @tagName(snap.phase), snap.received, snap.total, snap.retries });
+        }
+        try testing.expect(now(io) < deadline);
+        std.Io.sleep(io, .fromMilliseconds(200), .awake) catch {};
+    }
+    const snap = inst.snapshot();
+    std.debug.print("live: {s} {s}\n", .{ @tagName(snap.phase), snap.error_name });
+    try testing.expectEqual(Phase.ready, snap.phase);
+    try testing.expect(snap.received == snap.total and snap.total > 10 * 1024 * 1024);
+    var staged_buf: [path_cap]u8 = undefined;
+    const staged = inst.stagedPath(&staged_buf).?;
+    try testing.expect(checkStaged(io, .windows_x64, staged));
+    try testing.expect(stagedVersionMatches(io, .windows_x64, staged, tag));
+    // The same package offered as a later release is not that release.
+    try testing.expect(!stagedVersionMatches(io, .windows_x64, staged, "v99.0.0"));
+    try testing.expectEqual(Phase.idle, inst.cancel());
+    try testing.expect(!fileExists(io, staged));
 }

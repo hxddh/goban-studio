@@ -4,9 +4,10 @@
  * every game with its analysis is written and read back whole, however large.
  * The fake host keeps the same rules as store.zig writePath / readPath.
  */
-import { test, assert } from "./helpers.mjs";
-import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
-import { INSTALL_ERRORS, installFallsBack, installMessageKey } from "../../src/web/js/update.js";
+import { test, assert, fs, path, root } from "./helpers.mjs";
+import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, revealDataDir, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
+import { INSTALL_ERRORS, installFallsBack, installMessageKey, interpretInstallStatus } from "../../src/web/js/update.js";
+import * as Sign from "../signing-notes.mjs";
 
 function fakeHost() {
   const files = new Map();
@@ -176,4 +177,139 @@ await test("shell update: the v13 install refusals are explained, and the unfixa
   for (const code of ["NoSignature", "BadSignature", "NotNewer"]) assert.equal(installFallsBack(code), true, code);
   // Worth a retry: check again, or wait for the other helper.
   for (const code of ["NotChecked", "HelperBusy", "HelperNotStarted"]) assert.equal(installFallsBack(code), false, code);
+});
+
+await test("shell update: sums or a package of another version are a verification error, not a retry", () => {
+  for (const code of ["NoVersion", "VersionMismatch"]) {
+    assert.ok(INSTALL_ERRORS.includes(code), code);
+    assert.equal(installMessageKey(code), "update.verifyError", code);
+    assert.equal(installFallsBack(code), true, code);
+  }
+  // A download the host is continuing on a new connection is still a download.
+  const s = interpretInstallStatus({ ok: true, phase: "downloading", tag: "v99.0.0", received: 50, total: 100, retries: 2, canInstall: true, blocked: "" });
+  assert.equal(s.phase, "downloading");
+  assert.equal(s.retries, 2);
+  assert.equal(s.progress, 0.5);
+  // A host that does not report it, or reports nonsense: zero.
+  assert.equal(interpretInstallStatus({ ok: true, phase: "idle" }).retries, 0);
+  assert.equal(interpretInstallStatus({ ok: true, phase: "idle", retries: "x" }).retries, 0);
+  assert.equal(interpretInstallStatus(null).retries, 0);
+});
+
+await test("shell files: the data folder is shown by the host; the page names no path", async () => {
+  const calls = [];
+  const ok = await revealDataDir(async (command, payload) => {
+    calls.push({ command, payload });
+    return { ok: true, path: "C:\\Users\\a\\AppData\\Local\\dev.hxddh.gobanstudio\\Data\\data" };
+  });
+  assert.deepEqual(calls, [{ command: "studio.revealDataDir", payload: {} }]);
+  assert.deepEqual(ok, { ok: true, path: "C:\\Users\\a\\AppData\\Local\\dev.hxddh.gobanstudio\\Data\\data" });
+  // The folder could not be opened: the path is still there to show.
+  assert.deepEqual(await revealDataDir(async () => ({ ok: false, path: "/x/data" })), { ok: false, path: "/x/data", error: "Failed" });
+  assert.deepEqual(await revealDataDir(async () => ({ ok: false, error: "NoDataDir" })), { ok: false, path: "", error: "NoDataDir" });
+  // An older host without the command, and a bridge failure.
+  const older = await revealDataDir(async () => {
+    throw new Error("unknown command studio.revealDataDir");
+  });
+  assert.deepEqual(older, { ok: false, path: "", error: "unavailable" });
+  const broken = await revealDataDir(async () => {
+    throw new Error("boom");
+  });
+  assert.equal(broken.error, "Failed");
+  // The browser preview has no folder.
+  assert.deepEqual(await revealDataDir(), { ok: false, path: "", error: "unavailable" });
+  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+  assert.ok(main.includes('.{ .name = "studio.revealDataDir", .invoke = revealDataDir },'));
+  // The handler never reads a path from the page.
+  const handler = main.slice(main.indexOf("fn revealDataDir("), main.indexOf("fn spawnFolder("));
+  assert.match(handler, /_ = invocation;/);
+  assert.match(handler, /const dir = self\.store\.root\(\);/);
+  assert.doesNotMatch(handler, /payload/);
+});
+
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/g, "\n");
+
+await test("shell files: every text that says where the data is names the folder the app really uses", () => {
+  // src/paths.zig asks the SDK for the `.data` directory of this id; its
+  // Zig test pins what that is on macOS and Windows.
+  const paths = read("src/paths.zig");
+  assert.match(paths, /pub const bundle_id = "dev\.hxddh\.gobanstudio";/);
+  assert.ok(paths.includes('"/Users/a/Library/Application Support/dev.hxddh.gobanstudio"'));
+  assert.ok(paths.includes('"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\dev.hxddh.gobanstudio\\\\Data"'));
+  // The id is spelled once in the shell (tests aside).
+  for (const f of ["src/main.zig", "src/install.zig", "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
+    const code = read(f).split("// ------------------------------------------------------------ tests")[0].split("// ------------------------------------------------------------------ tests")[0];
+    assert.doesNotMatch(code, /"dev\.hxddh\.gobanstudio"/, `${f} takes the id from paths.zig`);
+  }
+  assert.equal((read("app.zon").match(/\.id = "([^"]+)"/) || [])[1], "dev.hxddh.gobanstudio");
+
+  const mac = read("packaging/README-macOS.txt");
+  const win = read("packaging/README-Windows.txt");
+  const storage = read("docs/storage.md");
+  assert.ok(mac.includes("~/Library/Application Support/dev.hxddh.gobanstudio/data"));
+  assert.ok(mac.includes("~/Library/Application Support/dev.hxddh.gobanstudio/models"));
+  assert.ok(win.includes("%LOCALAPPDATA%\\dev.hxddh.gobanstudio\\Data\\data"));
+  assert.ok(win.includes("dev.hxddh.gobanstudio\\Data\\models"));
+  assert.ok(storage.includes("`~/Library/Application Support/dev.hxddh.gobanstudio`"));
+  assert.ok(storage.includes("`%LOCALAPPDATA%\\dev.hxddh.gobanstudio\\Data`"));
+  // Nobody is told any more that their games are in the WebView2 folder,
+  // or to copy it when updating by hand.
+  for (const [name, text] of [["README-Windows.txt", win], ["apply-windows.ps1", read("src/updater/apply-windows.ps1")], ["storage.md", storage]]) {
+    assert.doesNotMatch(text, /(games|settings|progress)[^.]*\b(are stored|live)\b[^.]*WebView2/i, name);
+    assert.doesNotMatch(text, /copy that folder/i, name);
+  }
+  assert.match(win, /WebView2 that appears inside the app\nfolder belongs to the WebView2 browser component/);
+  // Uninstalling: what stays, and how to remove it.
+  for (const text of [mac, win]) {
+    assert.match(text, /^Uninstalling\n-+\n/m);
+    assert.match(text, /Your data and any downloaded networks stay/);
+  }
+  assert.match(mac, /to remove them as well, delete\n\n  ~\/Library\/Application Support\/dev\.hxddh\.gobanstudio\n/);
+  assert.match(win, /to remove them as well, delete\n\n  %LOCALAPPDATA%\\dev\.hxddh\.gobanstudio\n/);
+});
+
+await test("shell files: first launch of an unsigned Mac build is described for macOS 15, for both app names", () => {
+  const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
+  const devId = Sign.normalizeStatus("macos", { mode: "developer-id" });
+  const notarized = Sign.normalizeStatus("macos", { mode: "developer-id", notarized: true });
+  const mac = read("packaging/README-macOS.txt");
+  assert.deepEqual(Sign.APP_NAMES, ["Goban Studio.app", "GobanStudio.app"]);
+  for (const status of [adhoc, devId]) {
+    const readme = Sign.applyToReadme(mac, status);
+    // macOS 15 removed right-click → Open: the button in System Settings is the way.
+    assert.match(readme, /macOS 15 or later: open System Settings > Privacy & Security, scroll\n\s+down to Security, and click "Open Anyway" next to Goban Studio\./);
+    assert.match(readme, /macOS 14 or earlier: right-click \(or Control-click\) the app/);
+    assert.ok(readme.indexOf("macOS 15 or later") < readme.indexOf("macOS 14 or earlier"));
+    // The .dmg's app and the .zip's app have different names: a line for each, quoted.
+    assert.ok(readme.includes('     xattr -dr com.apple.quarantine "/Applications/Goban Studio.app"\n'));
+    assert.ok(readme.includes('     xattr -dr com.apple.quarantine "/Applications/GobanStudio.app"\n'));
+    const notes = Sign.firstLaunchText(status);
+    assert.match(notes, /macOS 15 or later go to System Settings → Privacy & Security → \*\*Open Anyway\*\*/);
+    assert.match(notes, /macOS 14 or earlier right-click the app → Open/);
+    assert.ok(notes.includes('`xattr -dr com.apple.quarantine "/Applications/Goban Studio.app"`'));
+    assert.ok(notes.includes("`GobanStudio.app`"), "the notes say the zip's app has another name");
+    assert.doesNotMatch(notes, /\n/, "one table cell");
+  }
+  const signed = Sign.applyToReadme(mac, notarized);
+  assert.doesNotMatch(signed, /Open Anyway|xattr/);
+  assert.doesNotMatch(Sign.firstLaunchText(notarized), /Open Anyway|xattr|right-click/);
+  // The disk image is for installing, not for running.
+  assert.match(mac, /drag "Goban Studio" onto the Applications folder beside\n\s+it/);
+  assert.match(mac, /GobanStudio\.app to Applications\. It is the same app under\n\s+either name\./);
+});
+
+await test("shell files: one instance per data folder is documented where the lock and inbox are", () => {
+  const zig = read("src/instance.zig");
+  assert.match(zig, /pub const lock_name = "instance\.lock";/);
+  assert.match(zig, /pub const inbox_name = "inbox";/);
+  const storage = read("docs/storage.md");
+  assert.ok(storage.includes("`<app data>/data/instance.lock`"));
+  assert.ok(storage.includes("`<app data>/data/inbox/`"));
+  // Neither is a store key, so the page never sees them listed.
+  const main = read("src/main.zig");
+  assert.match(main, /if \(!claimInstance\(&app_state, init, data_dir\)\) return;/);
+  assert.ok(main.indexOf("if (!claimInstance(&app_state, init, data_dir)) return;") < main.indexOf("app_state.store.init(init.io, data_dir);"), "before the store is opened");
+  assert.match(main, /if \(!by_helper and install_mod\.ownUpdateInProgress\(io\)\)/, "a launch during an update stays out of the helper's way");
+  for (const text of [read("packaging/README-macOS.txt"), read("packaging/README-Windows.txt")]) assert.doesNotMatch(text, /instance\.lock/, "an implementation detail, not in the user's README");
+  assert.match(read("packaging/README-Windows.txt"), /Only one copy runs at a time/);
 });

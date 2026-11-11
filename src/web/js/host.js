@@ -193,8 +193,12 @@ export async function openFileDialog(options = {}, call = invoke) {
 /**
  * Let the user choose where to save (`studio.saveFileDialog`).
  * `defaultName` must end in .sgf, .json or .png; the host adds that
- * extension when the user types a name without one. Resolves the path, or
- * null when cancelled or unavailable.
+ * extension when the user types a name without one — and when a file of
+ * that completed name already exists (the dialog never asked about it),
+ * the host returns the next free name ("game (2).sgf") instead of
+ * replacing it. So write to, and show, the path this resolves, not the
+ * name that was suggested. Resolves the path, or null when cancelled or
+ * unavailable.
  */
 export async function saveFileDialog(options = {}, call = invoke) {
   if (call === invoke && !hasNative()) return null;
@@ -211,6 +215,26 @@ export function revealPath(path) {
   try {
     global.zero.os.revealPath(path);
   } catch (_) {}
+}
+
+/**
+ * Show the folder that holds the player's settings, progress and games in
+ * Finder / Explorer (`studio.revealDataDir`). The host knows the folder;
+ * the page names no path. Resolves `{ ok: true, path }` when the folder
+ * was handed to the system, else `{ ok: false, path, error }` (`path` is
+ * "" when unknown; error "unavailable" without a host or on an older one,
+ * "NoDataDir" when the app has no data folder).
+ */
+export async function revealDataDir(call = invoke) {
+  if (call === invoke && !hasNative()) return { ok: false, path: "", error: "unavailable" };
+  try {
+    const reply = await call("studio.revealDataDir", {});
+    const path = reply && typeof reply.path === "string" ? reply.path : "";
+    if (reply && reply.ok === true) return { ok: true, path };
+    return { ok: false, path, error: String((reply && reply.error) || "Failed") };
+  } catch (e) {
+    return { ok: false, path: "", error: /unknown|not found|unsupported|no handler/i.test(String(e?.message || e)) ? "unavailable" : "Failed" };
+  }
 }
 
 export function onDropFiles(handler) {
@@ -399,8 +423,8 @@ function missingCommand(e) {
 /**
  * Where an update download / install stands (`studio.updateStatus`):
  *
- *   { ok: true, phase, tag, asset, platform, received, total, error,
- *     canInstall, blocked, justUpdated, installFailed }
+ *   { ok: true, phase, tag, asset, platform, received, total, retries,
+ *     error, canInstall, blocked, justUpdated, installFailed }
  *
  * phase: "idle" | "downloading" | "verifying" | "unpacking" | "ready" |
  *        "installing" | "failed" | "cancelled"
@@ -432,6 +456,10 @@ export async function updateStatus({ probe = false } = {}) {
  *
  *   { ok: true, phase: "ready", tag, asset }
  *   { ok: false, error }   see update.js INSTALL_ERRORS
+ *
+ * The host goes through the system's (or the environment's) HTTP proxy
+ * when one is set, and continues a download whose connection broke off or
+ * went silent from the bytes it already has (`retries` in the status).
  */
 export async function updateDownload(tag) {
   if (!hasNative()) return { ok: false, error: "unavailable" };
@@ -457,7 +485,9 @@ export async function updateCancel() {
 /**
  * Install the downloaded update (`studio.updateApply`): the host starts its
  * helper, answers `{ ok: true, phase: "installing" }` and quits; the helper
- * restarts the app. `{ ok: false, error }` otherwise (NotReady,
+ * restarts the app. The answer can take up to about 25 seconds (a cold
+ * PowerShell under a virus scanner): `updateStatus()` says "installing"
+ * from the first moment, so show that rather than a frozen button. `{ ok: false, error }` otherwise (NotReady,
  * ReadOnlyLocation, Translocated, NotPackaged, Helper, QuitFailed, …).
  */
 export async function updateApply() {

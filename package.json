@@ -9,7 +9,7 @@
     "build": "node scripts/bundle.mjs",
     "sync": "node scripts/sync-dist.mjs",
     "test": "node scripts/test.mjs",
-    "test:native": "zig build test -Dnative-sdk-path=\"$(npm root -g)/@native-sdk/cli\" -Dplatform=null --summary all",
+    "test:native": "zig build test -Dnative-sdk-path=node_modules/@native-sdk/cli -Dplatform=null --summary all",
     "verify": "npm test && npm run build && npm run sync",
     "package:macos": "bash scripts/package.sh",
     "release-check": "node scripts/release-check.mjs",
@@ -21,6 +21,7 @@
     "preact": "^10.29.8"
   },
   "devDependencies": {
+    "@native-sdk/cli": "0.11.0",
     "esbuild": "0.28.2",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.63.0",

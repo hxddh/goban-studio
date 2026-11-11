@@ -3,14 +3,6 @@ name: build-macos
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Existing release tag to upload to (optional)
-        required: false
-        default: ""
-      sdk_version:
-        description: "@native-sdk/cli version"
-        required: false
-        default: "0.11.0"
       runner:
         description: "macOS runner image: macos-15 (Apple Silicon) or macos-15-intel (Intel, for arch x64)"
         required: false
@@ -21,14 +13,6 @@ on:
         default: "arm64"
   workflow_call:
     inputs:
-      release_tag:
-        type: string
-        required: false
-        default: ""
-      sdk_version:
-        type: string
-        required: false
-        default: "0.11.0"
       runner:
         type: string
         required: false
@@ -70,8 +54,9 @@ jobs:
   build:
     runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 100
-    # Builds, tests and signs with a read-only token: nothing here writes
-    # to the repository (the upload job below does, when asked).
+    # Builds, tests and signs with a read-only token: nothing in this
+    # workflow writes to the repository. Packages reach a release only
+    # through release.yml, which checksums and signs them together.
     permissions:
       contents: read
     outputs:
@@ -144,23 +129,18 @@ jobs:
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
           test -n "$move"
           echo "KataGo answered: $move"
-      - name: install Native SDK CLI
-        # One pinned install, used by every native step below. Its install
-        # script fetches the `native` binary, so scripts stay on here.
-        env:
-          SDK_VERSION: ${{ inputs.sdk_version || '0.11.0' }}
+      - name: Native SDK from the lockfile
+        # `npm ci` above installed @native-sdk/cli and the `native` binary
+        # for this runner at the version and hashes in package-lock.json.
+        # Its install script (skipped by --ignore-scripts) is run here: it
+        # fetches the SDK's toolchain and checks every file against the
+        # manifest inside the package (scripts/native-sdk.mjs).
         run: |
           set -euo pipefail
-          # The install script downloads a helper from GitHub releases,
-          # which times out now and then (504): try up to four times.
-          for attempt in 1 2 3 4; do
-            if npm install -g "@native-sdk/cli@${SDK_VERSION}"; then break; fi
-            if [ "$attempt" = 4 ]; then exit 1; fi
-            echo "::warning::Native SDK install failed (attempt $attempt); retrying"
-            sleep $((attempt * 20))
-          done
-          echo "SDK_PATH=$(npm root -g)/@native-sdk/cli" >> "$GITHUB_ENV"
-          native --version
+          node scripts/native-sdk.mjs toolchain
+          echo "SDK_PATH=$(node scripts/native-sdk.mjs path)" >> "$GITHUB_ENV"
+          echo "$(npm root)/.bin" >> "$GITHUB_PATH"
+          node_modules/.bin/native --version
       - name: patch Native SDK (keep system menus around app menus)
         run: |
           # Idempotent; fails the build if the SDK source no longer has the
@@ -229,6 +209,12 @@ jobs:
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/content/book.json"
           # v9: the course, problems and classics past the start-up index (src/web/js/content.js)
           for f in course problems classics; do test -s "dist/GobanStudio.app/Contents/Resources/frontend/dist/content/$f.json"; done
+          # The in-app updater installs a package only if the package itself
+          # says it is the release's version (src/install.zig
+          # stagedVersionMatches): both places must carry package.json's.
+          version="$(node -p 'require("./package.json").version')"
+          test "$(node -p 'require(process.argv[1]).app' "$PWD/dist/GobanStudio.app/Contents/Resources/frontend/dist/build-info.json")" = "$version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/GobanStudio.app/Contents/Info.plist)" = "$version"
           codesign --verify --deep --strict dist/GobanStudio.app
           printf 'boardsize 19\nkata-set-rules japanese\ngenmove B\nquit\n' | \
             "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago" gtp \
@@ -314,8 +300,11 @@ jobs:
           fi
           # The README in the package says how this build was signed.
           node scripts/signing-notes.mjs readme packaging/README-macOS.txt "$status" > dist/README-macOS.txt
-          # The .zip is also what the in-app updater installs (v5): it must
-          # hold GobanStudio.app at its root.
+          # The .zip is also what the in-app updater installs: it must hold
+          # GobanStudio.app at its root, under exactly that name (every
+          # released app looks for it there; src/install.zig
+          # stagedRootNames). The .dmg shows the same app as
+          # "Goban Studio.app"; the README names both.
           ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app "dist/GobanStudio-macOS-${ARCH}.zip"
           zip -g -j "dist/GobanStudio-macOS-${ARCH}.zip" dist/README-macOS.txt
           unzip -Z1 "dist/GobanStudio-macOS-${ARCH}.zip" | grep -x 'GobanStudio.app/Contents/MacOS/goban-studio' > /dev/null
@@ -323,6 +312,9 @@ jobs:
           rm -rf dist/dmg/*
           ditto dist/GobanStudio.app "dist/dmg/Goban Studio.app"
           cp dist/README-macOS.txt dist/dmg/README-macOS.txt
+          # Drag the app onto this to install it (README-macOS.txt, step 1).
+          ln -s /Applications dist/dmg/Applications
+          test -L dist/dmg/Applications
           hdiutil create -volname "Goban Studio" -srcfolder dist/dmg -ov -format UDZO "dist/GobanStudio-macOS-${ARCH}.dmg"
           bash scripts/macos-sign.sh sign-dmg "dist/GobanStudio-macOS-${ARCH}.dmg"
           ls -lh dist
@@ -360,24 +352,3 @@ jobs:
         with:
           name: signing-status-macos${{ inputs.arch == 'x64' && '-x64' || '' }}
           path: dist/signing-macos${{ inputs.arch == 'x64' && '-x64' || '' }}.json
-
-  # Only a manual run with release_tag writes to the repository, from a job
-  # that runs none of the build's tools and holds no signing secret.
-  upload:
-    needs: build
-    if: ${{ inputs.release_tag != '' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      ARCH: ${{ inputs.arch || 'arm64' }}
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: GobanStudio-macOS-${{ inputs.arch || 'arm64' }}
-          path: dist
-      - name: upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$TAG" "dist/GobanStudio-macOS-${ARCH}.zip" "dist/GobanStudio-macOS-${ARCH}.dmg" --clobber --repo "$GITHUB_REPOSITORY"

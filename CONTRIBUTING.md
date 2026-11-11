@@ -26,39 +26,54 @@ allows fails there even if it works on your machine.
 ## Set up: the native shell (Zig + Native SDK)
 
 The shell needs **Zig 0.16.0** exactly (the SDK pins it) and
-**`@native-sdk/cli` 0.11.0**, patched by `scripts/patch-sdk.mjs` (it keeps
-the system menus on macOS; the script is idempotent and fails loudly if the
-SDK source changed).
+**`@native-sdk/cli` 0.11.0**. The SDK is a devDependency at that exact
+version, so `npm ci` installs it — and the `native` binary for your
+platform — with the hashes in `package-lock.json`; do not install it
+globally. It is patched by `scripts/patch-sdk.mjs` (it keeps the system
+menus on macOS; the script is idempotent and fails loudly if the SDK
+source changed).
 
 ```bash
-npm install -g @native-sdk/cli@0.11.0
-node scripts/patch-sdk.mjs                 # patches $(npm root -g)/@native-sdk/cli
+npm ci
+SDK="$(node scripts/native-sdk.mjs path)"   # node_modules/@native-sdk/cli, checked against the pin
+node scripts/patch-sdk.mjs "$SDK"
 ```
 
 ### Linux: tests and a compile with the null platform
 
 Linux has no desktop host, but the SDK's null platform compiles the whole
 shell and runs its unit tests without a window. This is what every pull
-request runs (`checks.yml`, job `native`); the `native` binary is not
-needed, so the install script can be skipped:
+request runs (`checks.yml`, job `native`); the `native` binary and the
+SDK's own toolchain are not needed, so `npm ci --ignore-scripts` is enough:
 
 ```bash
-npm install -g --ignore-scripts @native-sdk/cli@0.11.0
-node scripts/patch-sdk.mjs
+npm ci --ignore-scripts
 npm run test:native
-# = zig build test -Dnative-sdk-path="$(npm root -g)/@native-sdk/cli" -Dplatform=null --summary all
-zig build -Dnative-sdk-path="$(npm root -g)/@native-sdk/cli" -Dplatform=null
+# = zig build test -Dnative-sdk-path=node_modules/@native-sdk/cli -Dplatform=null --summary all
+zig build -Dnative-sdk-path=node_modules/@native-sdk/cli -Dplatform=null
 ```
 
-Expect one test to be skipped on Linux (it needs macOS's `codesign`).
+Expect three tests to be skipped on Linux: one needs macOS's `codesign`,
+the other two the network. `GOBAN_NET_LIVE=1 npm run test:native` runs the
+first (a small download from a published release, through `HTTPS_PROXY`
+if you have one, with a resume); `GOBAN_NET_LIVE=package` the second (the
+updater's own thread downloads, verifies and unpacks a published Windows
+package, about 16 MB).
 
 ### macOS and Windows: the real app
 
 ```bash
 npm run build && npm run sync
-native test --yes -Dnative-sdk-path="$(npm root -g)/@native-sdk/cli" -Dplatform=macos   # or windows
-zig build -Dnative-sdk-path="$(npm root -g)/@native-sdk/cli" -Doptimize=ReleaseSafe
+node scripts/native-sdk.mjs toolchain        # the SDK's own toolchain (its install script), hash-checked
+SDK="$(node scripts/native-sdk.mjs path)"
+npx native test --yes -Dnative-sdk-path="$SDK" -Dplatform=macos   # or windows
+zig build -Dnative-sdk-path="$SDK" -Doptimize=ReleaseSafe
 ```
+
+A pull request that touches `src/*.zig`, `src/*.m`, `src/updater/`,
+`build.zig`, `app.zon`, the workflows or the SDK pin also runs these on
+macOS and Windows (`checks.yml`, job `native-hosts`), so platform-specific
+code is compiled before it is merged.
 
 `scripts/package.sh` packages, installs KataGo and signs ad hoc on macOS.
 KataGo itself is not in the repository: the workflows build it (macOS) or

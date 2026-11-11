@@ -154,10 +154,11 @@ export default async function ({ test, assert, root }) {
       assert.ok(main.includes(`.{ .name = "${name}", .invoke = ${fn} },`), name);
     }
     assert.match(main, /test "every bridge command is registered once, with the same origins"/);
-    // The data root: beside models/, with a test override.
-    assert.match(main, /fn resolveDataDir\(/);
-    assert.match(main, /GOBAN_DATA_DIR/);
-    assert.match(main, /"\{s\}\{c\}data"/);
+    // The data root: beside models/, with a test override (src/paths.zig).
+    const paths = fs.readFileSync(path.join(root, "src/paths.zig"), "utf8").replace(/\r\n/g, "\n");
+    assert.match(paths, /pub fn dataDir\(/);
+    assert.match(paths, /override\(env_map, "GOBAN_DATA_DIR", out\) orelse child\(env_map, "data", out\)/);
+    assert.match(main, /paths_mod\.dataDir\(init\.environ_map, &data_dir_buf\)/);
     assert.match(main, /refAllDecls\(store_mod\)/);
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /test "store keys are validated strictly"/);
