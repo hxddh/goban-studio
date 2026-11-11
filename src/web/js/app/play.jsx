@@ -11,7 +11,8 @@ import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
-import { Board, Button, CountUp, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
+import { Board, Button, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
+import { ScoreCard } from "./score-card.jsx";
 import { NarrowFold, Toolbar } from "./chrome.jsx";
 import { ReviewView } from "./review.jsx";
 import { classicYear, colorName, moveNumbers, rankLabel } from "./game-view.js";
@@ -71,7 +72,8 @@ export function PlayView() {
       <div class={`workspace ${focus ? "focus" : ""} ${scoring ? "is-scoring" : ""} ${node.result ? "is-over" : ""}`}>
         <section class="stage" aria-label={t("nav.play")}>
           <Board model={model} onPlay={C.humanPlay} onHover={(v) => (v ? C.canPlayHere(v.x, v.y) : true)} />
-          {g.proposal && !scoring && !node.result && <ProposalBar />}
+          {g.proposal && !scoring && !node.result && !g.passAsk && <ProposalBar />}
+          {focus && g.passAsk && <PassAsk float />}
         </section>
         {!focus && <PlayPanel />}
       </div>
@@ -108,7 +110,25 @@ function ProposalBar() {
   );
 }
 
+/**
+ * A pass just played, in words: "You passed", "The computer passed",
+ * "Black passed" (a game between two people); "" otherwise.
+ */
+function passText(g) {
+  const last = g.game.current.move;
+  if (!last?.pass) return "";
+  if (g.opponent === "human") return t("play.passedBy", [colorName(last.color)]);
+  return t(last.color === g.humanColor ? "play.youPassed" : "play.theyPassed");
+}
+
+/** The status line: whose turn it is, after what a pass just played says. */
 function statusText(g) {
+  const passed = !g.scoring && !g.game.current.result ? passText(g) : "";
+  const now = turnText(g);
+  return passed ? `${passed} · ${now}` : now;
+}
+
+function turnText(g) {
   const game = g.game;
   if (g.scoring) return t("play.scoring");
   if (game.current.result) return C.resultText(game.current.result);
@@ -139,6 +159,35 @@ function FocusTools() {
       <IconButton icon="pass" label={t("common.pass")} onClick={C.requestPass} />
       <IconButton icon="undo" label={t("common.undo")} onClick={C.undo} />
       <IconButton icon="focus" label={t("play.exitFocus")} active onClick={C.toggleFocus} />
+    </div>
+  );
+}
+
+/**
+ * The pass waiting for its confirmation: in the panel (or over the board
+ * in focus mode, which has no panel). Its button takes the focus, and gives
+ * it back when the question goes.
+ */
+function PassAsk({ float = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const prev = document.activeElement;
+    ref.current?.querySelector(".btn.primary")?.focus({ preventScroll: true });
+    return () => {
+      if (prev?.isConnected) prev.focus?.({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <div class={`pass-ask enter-up ${float ? "float-bar" : ""}`} role="group" aria-label={t("play.passConfirm")} ref={ref}>
+      <p>{C.passAskText()}</p>
+      <div class="actions">
+        <Button kind="primary" size="sm" icon="pass" onClick={C.passNow}>
+          {t("common.pass")}
+        </Button>
+        <Button kind="ghost" size="sm" onClick={C.cancelPass}>
+          {t("common.cancel")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -325,7 +374,8 @@ function PlayPanel() {
         {g.pending && <TeachCard />}
         {g.scoring && <ScoringCard />}
         {over && !g.scoring && <ResultCard />}
-        {playing && !g.pending && (
+        {playing && g.passAsk && <PassAsk />}
+        {playing && !g.pending && !g.passAsk && (
           <div class="actions">
             <Button icon="pass" onClick={C.requestPass} disabled={!myTurn || g.thinking}>
               {t("common.pass")}
@@ -336,12 +386,13 @@ function PlayPanel() {
             <MoreMenu
               id="play-more"
               items={[
+                { icon: "redo", label: t("common.redo"), kbd: `${SHIFT}${MOD}Z`, onClick: C.redo, disabled: !C.canRedo() },
                 { icon: "bulb", label: t("common.hint"), kbd: `${SHIFT}${MOD}H`, onClick: C.askHint, disabled: !myTurn || g.thinking },
                 { icon: "chart", label: t("play.reviewSoFar"), onClick: C.reviewCurrentGame, disabled: game.mainLine().length < 2 },
                 { icon: "check", label: t("play.countNow"), onClick: C.acceptCount, disabled: game.moveNumber < game.size * 2 },
                 "-",
                 { icon: "save", label: g.saved ? t("play.saveAgain") : t("play.save"), onClick: () => C.saveToLibrary(), disabled: game.moveNumber === 0 },
-                { icon: "download", label: t("common.exportSgf"), onClick: () => C.exportSGF() },
+                { icon: "share", label: t("common.exportSgf"), onClick: () => C.exportSGF() },
                 { icon: "focus", label: t("play.focus"), kbd: `${MOD}.`, onClick: C.toggleFocus },
                 "-",
                 { icon: "flag", label: t("common.resign"), onClick: C.requestResign, danger: true },
@@ -366,55 +417,11 @@ function PlayPanel() {
 
 function ScoringCard() {
   const g = state.game;
-  const sc = g.scoring;
-  const s = sc.score;
-  const pending = sc.source === "pending";
   return (
-    <section class="card score-card enter-up" aria-live="polite">
-      <h2>{t(s.method === "area" ? "score.titleArea" : "score.title")}</h2>
-      <p class="muted">{pending ? t("score.judging") : sc.source === "katago" ? t("score.engineMarked") : t("score.manual")}</p>
+    <ScoreCard sc={g.scoring} komi={g.game.komi} onConfirm={C.confirmScore} onCancel={C.resumePlay}>
       <FirstCountNote />
-      <div class="score-pair">
-        <div>
-          <Stone color={BLACK} size={14} />
-          <strong>
-            <CountUp value={pending ? 0 : s.black} format={formatPoints} />
-          </strong>
-          <span class="score-detail">{lines(s.method === "area" ? t("score.detailArea", [s.blackStones, s.blackTerritory]) : t("score.detail", [s.blackTerritory, s.blackPrisoners]))}</span>
-        </div>
-        <div>
-          <Stone color={WHITE} size={14} />
-          <strong>
-            <CountUp value={pending ? 0 : s.white} format={formatPoints} />
-          </strong>
-          <span class="score-detail">
-            {lines(
-              s.method === "area"
-                ? s.handicapCompensation > 0
-                  ? t("score.detailAreaHandicap", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi), s.handicapCompensation])
-                  : t("score.detailAreaKomi", [s.whiteStones, s.whiteTerritory, formatPoints(s.komi)])
-                : t("score.detailKomi", [s.whiteTerritory, s.whitePrisoners, formatPoints(s.komi ?? g.game.komi)]),
-            )}
-          </span>
-        </div>
-      </div>
-      {!pending && s.seki?.length > 0 && <p class="fine">{t(s.method === "area" ? "score.sekiArea" : "score.sekiTerritory")}</p>}
-      {!pending && <p class="score-result enter-fade">{C.resultText(s.result)}</p>}
-      <div class="actions">
-        <Button kind="primary" onClick={C.confirmScore} disabled={pending}>
-          {t("score.confirm")}
-        </Button>
-        <Button kind="ghost" onClick={C.resumePlay}>
-          {t("score.resume")}
-        </Button>
-      </div>
-    </section>
+    </ScoreCard>
   );
-}
-
-/** "a · b · c" → one fact per line. */
-function lines(text) {
-  return text.split(" · ").map((x) => <i>{x}</i>);
 }
 
 /**
@@ -429,6 +436,7 @@ function ResultCard() {
       <span class="eyebrow">{t("play.gameOver")}</span>
       <strong class="result-big">{headline}</strong>
       {headline !== C.resultText(g.game.current.result) && <span class="muted">{C.resultText(g.game.current.result)}</span>}
+      {C.unratedReason(g) && <span class="fine unrated-note">{C.unratedReason(g)}</span>}
       <div class="actions center">
         <Button kind="primary" icon="chart" onClick={() => C.openPostGame(g, { inPlace: false })}>
           {t("play.reviewGame")}

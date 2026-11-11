@@ -71,3 +71,20 @@ await test("play explorer: book moves, out of the book, back/forward, reset and 
   X.closeExplorer();
   assert.equal(state.play.explorer, null);
 });
+
+await test("play explorer: a row says nothing that is noise: no loss within half a point, no win rate for the book's good moves, no visits unless a search is running", async () => {
+  const { X } = await bundle(['export * as X from "./src/web/js/app/explorer-ctl.js";']);
+  assert.equal(X.LOSS_NOISE, 0.5);
+  // A book move within the noise: only what kind of move it is.
+  assert.deepEqual(X.candidateShows({ source: "book", loss: 0.1, winrate: 0.49, visits: 400, tag: "joseki" }), { loss: null, winrate: false, visits: false });
+  assert.deepEqual(X.candidateShows({ source: "book", loss: 0, winrate: 0.5, visits: 0, tag: "joseki" }), { loss: null, winrate: false, visits: false });
+  assert.deepEqual(X.candidateShows({ source: "book", loss: 0.49, winrate: 0.5, visits: 0 }), { loss: null, winrate: false, visits: false });
+  // A move that costs something: what it costs, and the win rate that goes with it.
+  assert.deepEqual(X.candidateShows({ source: "book", loss: 4.46, winrate: 0.31, visits: 400, tag: "mistake" }), { loss: 4.5, winrate: true, visits: false });
+  assert.deepEqual(X.candidateShows({ source: "book", loss: 0.5, winrate: 0.47, visits: 0 }), { loss: 0.5, winrate: true, visits: false });
+  // Live candidates: the search's numbers mean something, but never "0 visits".
+  assert.deepEqual(X.candidateShows({ source: "live", loss: 0, winrate: 0.55, visits: 120 }), { loss: null, winrate: true, visits: true });
+  assert.deepEqual(X.candidateShows({ source: "live", loss: 2, winrate: 0.4, visits: 0 }), { loss: 2, winrate: true, visits: false });
+  assert.deepEqual(X.candidateShows({ source: "book", loss: null, winrate: undefined, visits: 0 }), { loss: null, winrate: false, visits: false });
+});
+

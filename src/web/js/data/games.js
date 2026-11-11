@@ -106,9 +106,22 @@ function entryOf(file) {
     finishedAt: file.finishedAt ?? null,
     source: file.source ?? null,
     meta: isObject(file.meta) ? file.meta : {},
-    review: r ? { v: r.v ?? null, confidence: r.confidence ?? null, lineKey: r.lineKey ?? null } : null,
+    review: r ? { v: r.v ?? null, confidence: r.confidence ?? null, lineKey: r.lineKey ?? null, swing: swingOf(r) } : null,
     analyzed: Array.isArray(file.analysis) && file.analysis.length > 0,
   };
+}
+
+/**
+ * The biggest swing of a stored review, for the history's row: { index,
+ * loss } of the costliest key moment KataGo found, or null (no review, the
+ * offline estimate, or no moment with a loss).
+ */
+function swingOf(review) {
+  if (review.swing && Number.isFinite(review.swing.index) && Number.isFinite(review.swing.loss)) return { index: review.swing.index, loss: review.swing.loss };
+  if (review.confidence !== "high" || !Array.isArray(review.moments)) return null;
+  let top = null;
+  for (const mo of review.moments) if (Number.isFinite(mo?.loss) && Number.isFinite(mo?.index) && mo.loss > 0 && (!top || mo.loss > top.loss)) top = { index: mo.index, loss: Math.round(mo.loss * 2) / 2 };
+  return top;
 }
 
 const validEntry = (e) => isObject(e) && typeof e.id === "string" && ID.test(e.id) && isObject(e.meta);
@@ -192,6 +205,7 @@ function entryRecord(e) {
 function withInfo(rec, e, loaded) {
   rec.reviewV = e.review?.v ?? null;
   rec.reviewConfidence = e.review?.confidence ?? null;
+  rec.swing = e.review?.swing ?? null;
   rec.analyzed = !!e.analyzed;
   rec.loaded = loaded;
   return rec;
@@ -460,6 +474,51 @@ export function filterGames(games, { kind = "all", query = "" } = {}) {
     if (!q) return true;
     return [g.name, g.playerBlack, g.playerWhite].some((v) => String(v || "").toLowerCase().includes(q));
   });
+}
+
+/** How the list can be ordered. */
+export const SORTS = ["newest", "oldest", "result"];
+
+/** 0 won, 1 lost, 2 anything else (a draw, a game between two people, an imported record), for the "result" order. */
+function resultRank(g) {
+  if (g.source === "import" || g.opponent !== "ai" || !/^[BW]\+/i.test(g.result || "")) return 2;
+  return /^B/i.test(g.result) === (g.humanColor !== -1) ? 0 : 1;
+}
+
+/**
+ * Order a list of records: "newest" (most recently changed first, as
+ * listGames gives them), "oldest", or "result" (your wins, then your
+ * losses, then the rest; newest first within each). Returns a new array.
+ */
+export function sortGames(games, sort = "newest") {
+  const byNew = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
+  const out = [...games];
+  if (sort === "oldest") return out.sort((a, b) => byNew(b, a));
+  if (sort === "result") return out.sort((a, b) => resultRank(a) - resultRank(b) || byNew(a, b));
+  return out.sort(byNew);
+}
+
+/**
+ * The history in its two groups: games left unfinished (isUnfinished), and
+ * everything else (finished games, imported records, boards saved from the
+ * free board). Each keeps the order it came in.
+ */
+export function groupGames(games) {
+  const unfinished = [];
+  const finished = [];
+  for (const g of games) (isUnfinished(g) ? unfinished : finished).push(g);
+  return { unfinished, finished };
+}
+
+/** Delete several games for good (an import taken back, the unfinished games cleared). Returns how many went. */
+export function deleteGames(ids) {
+  let n = 0;
+  for (const id of ids || []) {
+    if (!id || !ID.test(String(id)) || !index().has(id)) continue;
+    deleteGame(id);
+    n++;
+  }
+  return n;
 }
 
 /* ---------------------------------------------------- the game on the board */

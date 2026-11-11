@@ -305,7 +305,7 @@ export default async function ({ test, assert, root }) {
       assert.ok(PM.implOpponent("L:10k", { size: 9, handicap: 2 }) < PM.implOpponent("L:10k", { size: 9 }));
       const src = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
       assert.match(src, /const impl = g\.played \|\| Engine\.resolveOpponent\(/);
-      assert.match(src, /opponent: implOpponent\(impl, \{ size, handicap \}\)/);
+      assert.match(src, /const opponent = implOpponent\(impl, \{ size, handicap \}\)/);
     });
   } finally {
     globalThis.zero = savedHost;

@@ -183,6 +183,23 @@ export function explorerCandidates(e = explorerState()) {
   return out;
 }
 
+/** Below this many points a loss is noise: the move is as good as the best one, and its row says only what kind of move it is. */
+export const LOSS_NOISE = 0.5;
+
+/**
+ * What a candidate's row says beside its tag, so that nothing on it is
+ * noise: { loss, winrate, visits }. `loss` is the points lost to one
+ * decimal, or null within LOSS_NOISE; `winrate` whether the win rate is
+ * worth showing (a live candidate, or a move that loses something: the
+ * book's good moves all sit within a point of 50%); `visits` whether the
+ * search count is (a live search with visits; never "0").
+ */
+export function candidateShows(c) {
+  const loss = c?.loss != null && c.loss >= LOSS_NOISE ? Math.round(c.loss * 10) / 10 : null;
+  const live = c?.source === "live";
+  return { loss, winrate: (live || loss != null) && Number.isFinite(c?.winrate), visits: live && c.visits > 0 };
+}
+
 /** Black's win rate and score lead for the position, from book or live. */
 export function explorerEval(e = explorerState()) {
   if (!e) return null;

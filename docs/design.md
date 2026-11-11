@@ -176,28 +176,87 @@ group per screen region.
   rows: stone, name, level, captures, clock), status (one line), actions
   (Pass, Undo, More), the move list (fills the rest), never empty space.
   Game facts (size, komi, handicap, time) live in the toolbar subtitle.
-* **Review (v9: also the post-game review).** When a game ends, its board
+  *More* holds Redo, Hint, Review so far, Count, Save, Export SGF, Focus
+  mode and Resign. ← and → do nothing during a game: looking back is
+  *Review so far*, chosen from the menu, and that review's one primary is
+  *Back to the game*.
+* **Undo, redo and the unrated game.** Undo takes back the player's move
+  with the computer's reply to it; Redo (the menu, ⇧⌘Z) plays the same
+  moves again, the reply included, until a new move is played. An undo
+  that is redone leaves no trace. The first undo or hint of a rated game
+  says once, in an info toast, that the game will not be rated; the result
+  card and the review's result line then say why in one phrase ("Not
+  rated: you took back moves").
+* **Passing.** No sheet. The first pass of a game is asked in the panel,
+  where the actions were: one sentence, *Pass* (the primary, focused) and
+  *Cancel*; Esc or a move on the board takes the question away, and the
+  shortcut pressed again confirms it. Later passes are played at once: the
+  status line says who passed ("You passed · …") and Undo takes it back.
+  A pass that answers a pass ends the game, so it is asked the same way;
+  the count is then one step away, and *Resume play* in the count undoes
+  it. In focus mode (no panel) the question floats over the board.
+* **The count.** The board shows the count itself: a small square of each
+  side's colour on every point of its territory, dead stones faded; a
+  click on a group marks it dead or alive. The card beside it has both
+  totals with what they are made of, the result, one line saying what the
+  board shows, *Confirm* (the primary) and *Resume play*. After a game
+  that was counted, the review's result line has a small menu with *Count
+  again*: the same card over the final position, with *Confirm the new
+  count* and *Cancel*; the panel's own primary is hidden meanwhile. The
+  new result replaces the stored one and the game's rating step (never a
+  second step); a rated game can be counted again only until another game
+  on that board size is rated.
+* **Review (also the post-game review).** When a game ends, its board
   turns into its review on the same page; a game opened from the history
   opens in the same view. Board left, panel right: the result line (the
-  result, the game's facts, the change of the estimate), then the balance
-  chart (the hero) and the analysis line; below them three tabs
-  (segmented control): *Analysis* (up to three key moments, each
-  expandable into its explained line, and variations; an offline estimate
-  shows its turning points only, without a loss or a better move),
-  *Summary* (the game in three phases — only when KataGo analysed the
-  game) and *Notes* (comment, marks, variation tree). A key moment of a
+  result, the game's facts, the change of the estimate or why the game
+  was not rated), then the balance chart (the hero) and the analysis line;
+  below them three tabs (segmented control): *Analysis* (up to three key
+  moments, each expandable into its explained line, and variations; an
+  offline estimate shows its turning points only, without a loss or a
+  better move), *Summary* (the game in three phases — only when KataGo
+  analysed the game) and *Notes* (comment, marks, variation tree, and two
+  small Undo / Redo buttons for the edits). A key moment of a
   KataGo-analysed game of your own has *Try again*: the board goes to the
   position before it and the panel shows one card with KataGo's verdict
-  (no primary in it). Tools (live analysis, territory, export image,
-  Export SGF) are icon buttons in the toolbar; the one primary action is
-  *New game* after a game you just played, *Play from here* otherwise. A
-  record opens on its final position and moves to the first key moment
-  when the analysis is there, unless the player has already moved. A
-  classic opens on its famous move when it has one written for it; under
-  its note, those moves are rows in the key-moment style (stone, title,
-  move number and point on the right), the note shown only for the move on
-  the board. v12: written moves only — the v11 rows made from KataGo's
-  swings ("about 5 points lost") read as noise and were removed.
+  (no primary in it). The one primary action is *New game* after a game
+  you just played, *Back to the game* in "Review so far", *Continue* for
+  an unfinished game looked at from the Library, *Play from here*
+  otherwise. A record opens on its final position and moves to the first
+  key moment when the analysis is there, unless the player has already
+  moved. A classic opens on its famous move when it has one written for
+  it; under its note, those moves are rows in the key-moment style (stone,
+  title, move number and point on the right), the note shown only for the
+  move on the board.
+* **Review: a line being tried.** A stone played on the review board is
+  not an edit: it starts a line being tried, and one quiet bar in the
+  panel says so — "Trying a variation · Keep · Discard" (accent-soft, the
+  variation bar's look). ← and → stay inside the line, from the position
+  it left to its last move; Esc, Discard or moving anywhere else returns
+  to that position and drops it. Keep makes it a variation of the record,
+  saved at once. A line that was not kept is never saved. Outside a line
+  ← and → follow the main line (or the kept variation the board is in).
+* **Review: edits can be undone.** Comments, marks, clearing marks,
+  keeping, promoting and deleting a variation go through one edit history:
+  ⌘Z / ⇧⌘Z while a review is on screen (in a game ⌘Z is still "undo
+  move"), and the two buttons in *Notes*. Removing something is not
+  confirmed: it happens, and a toast says "Variation deleted · Undo" or
+  "Marks cleared · Undo". A comment is written when its box loses the
+  focus and when the app quits, not only on a timer.
+* **Review: the toolbar.** Icon-only tools, each with its own picture and
+  its name shown under it on hover (after a third of a second) and on
+  keyboard focus (at once), on the inverse of the page like a toast: live
+  analysis (sparkle), territory (eye), export image (a picture), Export
+  SGF (an arrow out of a box), close (×). Importing is a third picture (an
+  arrow into a tray), used by the Library's Import.
+* **The free board.** *Open board* in the Library's toolbar opens an
+  empty board in the review's layout: Black and White alternate, a stone
+  is the record itself (no line being tried), stepping back and playing
+  elsewhere makes a variation, ⌘Z takes a stone back. The panel: what it
+  is in one line, the size (9 / 13 / 19, while the board is empty), the
+  position's estimate when live analysis is on, notes and the tree. One
+  primary: *Save to Library* (then *Play from here*). A saved board is a
+  row of the Library named "Free board"; it is not a game to continue.
 * **Today.** The app opens here. A date and a greeting; one hero — the
   game in progress or the suggested game — with the page's one primary
   button; one row for today's practice (the next row of the path, done of
@@ -269,6 +328,49 @@ group per screen region.
   10–12 problems, the toolbar saying which one; its result is a
   difficulty and the ranks it is meant for ("You start at Level 2
   (≈ 18–14 kyu)").
+* **Library.** The toolbar holds *Open board* (quiet), *Import SGF* and a
+  small menu beside it (Choose files…, Paste SGF). One column, no tabs, no
+  primary, three sections:
+  *My games* — first the games left unfinished, a group of their own under
+  a small heading (three rows, then *Show all*; each row says *Continue*
+  in the accent colour, and its menu has *Look at it*, Export SGF and
+  Delete; with more than three, a quiet *Clear unfinished games…* at the
+  heading's right, which asks first); then the finished games and records
+  as compact rows with a thumbnail (the first eight until *Show all*).
+  From six games on, one line above the list has the filter chips, the
+  search field and the order (newest, oldest, by result). A row says the
+  title (the opponent, or the record's name), then on one line when
+  ("Today", "Yesterday", "3 days ago" within the week, then the date), the
+  board, the moves, who played when the title does not say, and — quietly,
+  for a game KataGo analysed — its biggest swing; the result on the right.
+  *Openings and joseki* — its own titled section with one line saying
+  what it is, and two rows: the whole board, the corner.
+  *Classics* — four, then all 20.
+  A game or classic opens its review in the Library; Esc or the Library
+  again comes back to the list. The player's games are analysed in the
+  background by themselves; a row says so only while it is being analysed.
+* **Importing.** One record opens in the review. Several files (picked,
+  or dropped on the window) are all imported and the Library stays on
+  screen: one toast, "Imported 5 games", with *Undo*. A file with several
+  games opens a sheet that lists them (players or "Problem 12", date,
+  board, moves, result), fifty to a page, each row opening its game, with
+  *Import all* as the primary (asked first above fifty). ⌘V on the list,
+  or *Paste SGF*, imports a record from the clipboard. Whatever the import
+  has to say is all shown: one warning in the toast itself; more, or files
+  that could not be read, behind the toast's *Details* — a sheet listing
+  each with its file's name, with *Undo import*.
+* **The opening explorer.** Board left, panel right; the book's
+  continuations carry letters on the board and head the rows of the
+  panel. A row says what kind of move it is, and what it loses only when
+  that is half a point or more; the win rate only for a move that loses
+  something or a live candidate; the search count only while a live
+  search runs, never "0". A balance within half a point reads "about
+  even".
+* **The sidebar's status line.** Above Settings, only when there is
+  something to say: an update ready to install, an update or a network
+  being downloaded ("Downloading 42%"), or an update to download. One
+  quiet row with a small accent icon; a click opens the Settings pane that
+  handles it.
 * **A topic.** A grid of positions, grouped by difficulty (the first
   group with something unsolved is open; its header says done of total).
   A tile is the problem's corner of the board, drawn sharp at any size:
@@ -298,13 +400,6 @@ group per screen region.
   the primary button of a finished problem or drill too (also with the
   board focused). A lesson step with its own goal says it in the goal
   line.
-* **Library (v12; v9–v11 Play's home).** Toolbar holds Import. One
-  column, no tabs, no primary: your games as compact rows with a
-  thumbnail (filter and search only once the list is long; the first eight
-  until *Show all*), the classics (four, then all 20), and one row that
-  opens the opening explorer. A game or classic opens its review in the
-  Library; Esc or the Library again comes back to the list. The player's games are analysed in the background by
-  themselves; a row says so only while it is being analysed.
 * **Settings.** A wide sheet with two panes: a source list on the left
   (arrow keys move through it) and one pane on the right. No pane is
   taller than the sheet — at 1200 × 800, in four languages, with larger
@@ -340,19 +435,20 @@ group per screen region.
   handicap, komi and rules under *More options*, whose closed row sums
   them up.
 
-* **Unfinished games (v13).** Nothing replaces a game in progress
-  silently. A game with at least one move of the player's and no result
-  that New game, *Play from here* (a review, the explorer), onboarding or
-  continuing another game would replace is first saved to the Library,
-  where its row says *Unfinished*, and a toast says so. Opening it there
-  continues it — the same record, opponent, colour, clock and rating
-  setting — instead of opening its review; finishing it fills in that
-  record. An unfinished game is not rated, does not count in the week, and
-  is not analysed in the background until it is finished. This was chosen
-  over a confirmation sheet ("Replace the game in progress?"): saving costs
-  the player nothing and never interrupts, and a game saved by mistake is
-  one Delete away. (Explicitly saved games without a result behave the
-  same way.)
+* **Unfinished games.** Nothing replaces a game in progress silently. A
+  game without a result that New game, *Play from here* (a review, the
+  explorer), onboarding or continuing another game would replace is first
+  saved to the Library, in its group of unfinished games, and a toast says
+  so. It takes two moves of the player's to be kept: a single stray click
+  does not make a row. Opening its row continues it — the same record,
+  opponent, colour, clock and rating setting; *Look at it* in the row's
+  menu opens it in the review instead, without touching the game on the
+  board. Finishing it fills in that record. An unfinished game is not
+  rated, does not count in the week, and is not analysed in the background
+  until it is finished. This was chosen over a confirmation sheet
+  ("Replace the game in progress?"): saving costs the player nothing and
+  never interrupts, and a game saved by mistake is one Delete away.
+  (Explicitly saved games without a result behave the same way.)
 * **Safe state (v13).** When the app's own files cannot be read it shows
   one card in place of the app (no onboarding): what could not be read,
   *Retry* (the one primary, focused), *Continue read-only*, and *Start

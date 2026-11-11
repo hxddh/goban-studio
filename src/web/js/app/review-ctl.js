@@ -7,6 +7,14 @@
  * (comments, marks, variations), and trying a key moment again from the
  * position before it, judged by KataGo.
  *
+ * Edits are deliberate. A stone played on the review board starts a draft
+ * (review.draft): a line being tried, shown as such, that Keep adds to the
+ * record as a variation and Discard (or Esc, or moving elsewhere) drops; a
+ * draft is never saved. Comments, marks, kept and deleted variations go
+ * through an edit history (reviewUndo / reviewRedo). A free board
+ * (meta.free: an empty board for placing stones, openFreeBoard) is the
+ * exception: its stones are the record itself.
+ *
  * A saved game's analysis is stored once, in its file (play/analysis.js);
  * a review left before its pass is done hands the rest to the background
  * for your own games. Edits to a saved game are written back to its file.
@@ -17,12 +25,13 @@ import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
 import { saveSettings } from "../data/settings.js";
-import { addMistake, recordMistake } from "../model/player.js";
+import { addMistake, estimate, recordGame, recordMistake } from "../model/player.js";
+import { canRerate, rerateGame } from "../model/rerate.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeBinaryFile } from "../host.js";
 import { state, update, toast, announce } from "./store.js";
-import { back, canGoBack, changeProfile, remember, isRestoring, persistLive, resumeLive } from "./ctl-core.js";
+import { back, canGoBack, changeProfile, remember, isRestoring, persistLive, resultText, resumeLive } from "./ctl-core.js";
 import { describeMistakes, lossesOf } from "./explain.js";
 import { buildReview, drillOf, judgeTry, keyMovesOf as keyMistakes, reviewFits, tryMoments } from "../play/review-model.js";
 import { analyzeLine, isOwnGame, knownPoints, notePoints, queueAnalysis, storeAnalysis, storedAnalysis, takeOver, visitsFor } from "../play/analysis.js";
@@ -165,6 +174,12 @@ export function openReview(game, meta = {}) {
     edits: { dirty: false, savedAt: 0, target: null },
     // A key moment tried again (tryAgain), or null.
     trial: null,
+    // A line being tried on the board: { from, head } (the position it left, its first move), or null.
+    draft: null,
+    // The edits made in this review, for undo and redo.
+    history: { undo: [], redo: [] },
+    // A finished game counted again: { dead, score, source, token }, or null.
+    recount: null,
     // v6: records open on the final position and move to the first key
     // moment once the analysis is there, unless the player has moved.
     autoJump: !!meta.autoJump,
@@ -194,7 +209,9 @@ export function openReview(game, meta = {}) {
     s.sheet = null;
     s.menu = null;
   });
-  if (!points) analyzeReview(review, { existing });
+  // A free board has no game to analyse: the position on it is looked at live.
+  if (meta.free && !points) review.autoJump = false;
+  else if (!points) analyzeReview(review, { existing });
   else {
     if (review.autoJump) jumpToFirst(review);
     // A stored review older than this model, or none: write it again.
@@ -247,6 +264,7 @@ function handOver(r) {
 export function closeReview() {
   const r = state.review;
   if (!r) return;
+  leaveModes(r);
   settleLive(r);
   saveEdits(r);
   if (r.source === "current" && state.game?.game === r.game && r.game.mainLine().at(-1).result) {
@@ -275,6 +293,7 @@ export function closeReview() {
  */
 export function dropReview(r = state.review, { resume = true } = {}) {
   if (!r) return;
+  leaveModes(r);
   settleLive(r);
   saveEdits(r);
   stopReviewWork(r);
@@ -377,18 +396,28 @@ export function gotoNode(node) {
   if (!r || !node) return;
   r.autoJump = false;
   r.trial = null;
-  r.game.goto(node.id);
+  // Moving anywhere outside the line being tried drops it; a recount is left.
+  if (r.draft && !inDraft(r, node)) dropDraft(r);
+  r.recount = null;
+  r.game.goto(node);
   r.variation = null;
   update();
   startLive();
 }
 
+/**
+ * ← / →: one move back or on. They follow the main line (or the kept
+ * variation the board is in); while a line is being tried they stay inside
+ * it, from the position it left to its last move.
+ */
 export function reviewStep(delta) {
   const r = state.review;
   if (!r) return;
+  const d = r.draft;
   let node = r.game.current;
-  if (delta < 0) for (let k = 0; k < -delta && node.parent; k++) node = node.parent;
-  else for (let k = 0; k < delta && node.children[0]; k++) node = node.children[0];
+  const next = (n) => (d && n === d.from ? d.head : n.children[0]);
+  if (delta < 0) for (let k = 0; k < -delta && node.parent && !(d && node === d.from); k++) node = node.parent;
+  else for (let k = 0; k < delta && next(node); k++) node = next(node);
   gotoNode(node);
 }
 
@@ -419,11 +448,13 @@ export function branchPoints() {
 export function reviewPlay(x, y) {
   const r = state.review;
   if (!r) return;
+  if (r.recount) return recountToggle(x, y);
   if (r.trial) return tryMove(x, y);
   if (r.markTool) return toggleMark(r.markTool, x, y);
   const cur = r.game.current;
   const existing = cur.children.find((c) => c.move && !c.move.pass && c.move.x === x && c.move.y === y);
   if (existing) return gotoNode(existing);
+  const before = r.game.mainLine();
   const res = r.game.play(x, y);
   if (!res.ok) {
     toast(t("error." + (res.reason || "illegal")), "warn");
@@ -431,18 +462,201 @@ export function reviewPlay(x, y) {
   }
   Audio.stone(false);
   r.variation = null;
+  r.autoJump = false;
+  const node = r.game.current;
+  if (r.meta.free) {
+    // A free board: the stone is part of the record at once.
+    const index = cur.children.indexOf(node);
+    record(r, { kind: "move", at: cur, atRedo: node, undo: () => detach(r, cur, node), redo: () => attach(cur, node, index) });
+    edited(r, { mainBefore: before });
+  } else {
+    if (!r.draft) {
+      r.draft = { from: cur, head: node };
+      announce(t("review.draft"));
+    }
+    update();
+  }
+  startLive();
+}
+
+/* ---------------------------------------------- trying a variation */
+
+/** `node` is in the line being tried (or the position it left). */
+function inDraft(r, node) {
+  const d = r.draft;
+  if (!d) return false;
+  if (node === d.from) return true;
+  for (let n = node; n; n = n.parent) if (n === d.head) return true;
+  return false;
+}
+
+/** Take `node` (a child of `parent`) out of the tree; the board steps out of it. */
+function detach(r, parent, node) {
+  let inside = false;
+  for (let n = r.game.current; n; n = n.parent) if (n === node) inside = true;
+  parent.children = parent.children.filter((c) => c !== node);
+  if (inside) r.game.goto(parent);
+}
+
+function attach(parent, node, index) {
+  if (parent.children.includes(node)) return;
+  parent.children.splice(Math.max(0, Math.min(index, parent.children.length)), 0, node);
+}
+
+/** Drop the line being tried, without a word (moving elsewhere, leaving the review). */
+function dropDraft(r) {
+  const d = r?.draft;
+  if (!d) return;
+  r.draft = null;
+  detach(r, d.from, d.head);
+}
+
+/** Leaving the review, or starting something else in it: nothing half done stays (the line tried, a recount). */
+function leaveModes(r) {
+  dropDraft(r);
+  r.recount = null;
+}
+
+/** Discard the line being tried (Esc, the bar's Discard): back to the position it left. */
+export function discardDraft() {
+  const r = state.review;
+  const d = r?.draft;
+  if (!d) return false;
+  dropDraft(r);
+  r.game.goto(d.from);
+  r.variation = null;
+  announce(t("review.draftDiscarded"));
   update();
   startLive();
+  return true;
+}
+
+/**
+ * Whether the line being tried can be kept. Not from the last move of a
+ * game still in play: the game goes on from there, and a move tried at
+ * that point never becomes part of it (settleLive).
+ */
+export function draftKeepable(r = state.review) {
+  return !!r?.draft && !(r.live0 && r.draft.from === r.live0.end);
+}
+
+/** Keep the line being tried: it becomes a variation of the record (and is saved with it). */
+export function keepDraft() {
+  const r = state.review;
+  const d = r?.draft;
+  if (!d || !draftKeepable(r)) return false;
+  r.draft = null;
+  const index = d.from.children.indexOf(d.head);
+  record(r, { kind: "keep", at: d.from, atRedo: d.head, undo: () => detach(r, d.from, d.head), redo: () => attach(d.from, d.head, index) });
+  edited(r);
+  announce(t("review.draftKept"));
+  return true;
+}
+
+/* ------------------------------------------------- the edit history */
+
+const HISTORY_MAX = 200;
+
+function record(r, entry) {
+  const h = r.history;
+  h.undo.push(entry);
+  if (h.undo.length > HISTORY_MAX) h.undo.shift();
+  h.redo = [];
+  return entry;
+}
+
+export function canUndoEdit(r = state.review) {
+  return !!r && (!!r.draft || r.history.undo.length > 0);
+}
+export function canRedoEdit(r = state.review) {
+  return !!r && !r.draft && r.history.redo.length > 0;
+}
+
+/** Show where an edit was undone or redone, when that node is still in the tree. */
+function showNode(r, node) {
+  if (!node) return;
+  for (let n = node; n; n = n.parent) {
+    if (n === r.game.root) {
+      r.game.goto(node);
+      r.variation = null;
+      return;
+    }
+    if (!n.parent || !n.parent.children.includes(n)) return;
+  }
+}
+
+function applyHistory(r, entry, dir) {
+  const before = r.game.mainLine();
+  if (dir < 0) entry.undo();
+  else entry.redo();
+  showNode(r, dir < 0 ? entry.at : entry.atRedo || entry.at);
+  if (entry.kind === "comment") entry.open = false;
+  edited(r, { mainBefore: before });
+  startLive();
+}
+
+/**
+ * Undo the last edit of this review (⌘Z): a comment, a mark, marks
+ * cleared, a variation kept, promoted or deleted, a stone of a free board.
+ * While a line is being tried it takes back that line's last move.
+ */
+export function reviewUndo() {
+  const r = state.review;
+  if (!r || r.trial || r.recount) return false;
+  if (r.draft) {
+    const d = r.draft;
+    const cur = r.game.current;
+    if (cur === d.from || cur === d.head) return discardDraft();
+    detach(r, cur.parent, cur);
+    update();
+    startLive();
+    return true;
+  }
+  const entry = r.history.undo.pop();
+  if (!entry) return false;
+  r.history.redo.push(entry);
+  applyHistory(r, entry, -1);
+  announce(t("edit.undone"));
+  return true;
+}
+
+/** Redo the edit last undone (⇧⌘Z). */
+export function reviewRedo() {
+  const r = state.review;
+  if (!r || r.trial || r.recount || r.draft) return false;
+  const entry = r.history.redo.pop();
+  if (!entry) return false;
+  r.history.undo.push(entry);
+  applyHistory(r, entry, 1);
+  announce(t("edit.redone"));
+  return true;
+}
+
+/** Take one edit back from a toast's Undo, wherever it is in the history. */
+function revert(r, entry) {
+  if (state.review !== r) return;
+  const h = r.history;
+  const i = h.undo.indexOf(entry);
+  if (i < 0) return;
+  if (i === h.undo.length - 1 && !r.draft) return void reviewUndo();
+  h.undo.splice(i, 1);
+  applyHistory(r, entry, -1);
+}
+
+/** "Deleted · Undo": the toast of an edit that removed something. */
+function undoToast(r, entry, message) {
+  toast(message, "info", { key: "review-edit", replace: true, action: { label: t("common.undoAction"), run: () => revert(r, entry) } });
 }
 
 /** Remove the variation the board is in (back to its branch point). */
 export function deleteVariation() {
   const r = state.review;
   if (!r || onMainLine()) return;
+  if (r.draft) return void discardDraft();
   const main = new Set(r.game.mainLine().map((n) => n.id));
   let n = r.game.current;
   while (n.parent && !main.has(n.parent.id)) n = n.parent;
-  deleteBranch(n);
+  if (deleteBranch(n)) undoToast(r, r.history.undo.at(-1), t("review.variationDeleted"));
 }
 
 /* ------------------------------------------------- the review model */
@@ -486,6 +700,11 @@ function editTarget(r) {
 
 let saveTimer = 0;
 
+// Quitting (or anything else that writes everything out) takes the last words of a comment with it.
+store.onFlush?.(() => {
+  if (state.review?.edits?.dirty) saveEdits(state.review);
+});
+
 function edited(r, { mainBefore = null } = {}) {
   r.edits = { ...r.edits, dirty: true, target: editTarget(r) };
   if (mainBefore) realign(r, mainBefore);
@@ -510,11 +729,28 @@ function saveRecord(id, game) {
 
 /**
  * Write pending edits now (they are otherwise saved 0.4 s after the last
- * one, and when the review closes). Returns true when something was saved.
+ * one, when the comment box loses the focus, when the review closes, and
+ * before the store writes everything out: quitting). Returns true when
+ * something was saved.
  */
 export function saveEdits(r = state.review) {
   clearTimeout(saveTimer);
   if (!r?.edits?.dirty) return false;
+  // A line being tried is not part of the record: it is left out of what is written.
+  const d = r.draft;
+  if (d && d.from.children.includes(d.head)) {
+    const kids = d.from.children;
+    d.from.children = kids.filter((c) => c !== d.head);
+    try {
+      return writeEdits(r);
+    } finally {
+      d.from.children = kids;
+    }
+  }
+  return writeEdits(r);
+}
+
+function writeEdits(r) {
   const target = editTarget(r);
   if (target === "record") {
     if (!Games.getGame(r.meta.recordId)) return false;
@@ -577,10 +813,37 @@ export function setComment(text, node = null) {
   const r = state.review;
   if (!r) return false;
   const n = nodeOf(r, node);
-  if (!n || (n.comment || "") === String(text ?? "")) return false;
+  const before = n?.comment || "";
+  const after = String(text ?? "");
+  if (!n || before === after) return false;
   r.game.setComment(n, text);
+  // One spell of typing in a comment is one step of the history.
+  const top = r.history.undo.at(-1);
+  if (top?.kind === "comment" && top.node === n && top.open) top.after = after;
+  else {
+    const e = record(r, { kind: "comment", node: n, at: n, before, after, open: true });
+    e.undo = () => r.game.setComment(n, e.before);
+    e.redo = () => r.game.setComment(n, e.after);
+  }
   edited(r);
   return true;
+}
+
+/** The comment box lost the focus: what was typed is one finished edit, and is written now. */
+export function commitComment() {
+  const r = state.review;
+  if (!r) return;
+  const top = r.history.undo.at(-1);
+  if (top?.kind === "comment") top.open = false;
+  saveEdits(r);
+  update();
+}
+
+const copyMarks = (n) => (n.marks || []).map((m) => ({ ...m }));
+
+function recordMarks(r, n, before) {
+  const after = copyMarks(n);
+  return record(r, { kind: "marks", at: n, undo: () => (n.marks = before.map((m) => ({ ...m }))), redo: () => (n.marks = after.map((m) => ({ ...m }))) });
 }
 
 /**
@@ -598,7 +861,10 @@ export function toggleMark(kind, x = null, y = null, text = null) {
     return null;
   }
   if (!MARK_KINDS.includes(kind)) return null;
-  const mark = r.game.toggleMark(r.game.current, x, y, kind, text);
+  const n = r.game.current;
+  const before = copyMarks(n);
+  const mark = r.game.toggleMark(n, x, y, kind, text);
+  recordMarks(r, n, before);
   edited(r);
   return mark;
 }
@@ -615,8 +881,11 @@ export function clearMarks(node = null) {
   const r = state.review;
   const n = r && nodeOf(r, node);
   if (!n?.marks?.length) return false;
+  const before = copyMarks(n);
   n.marks = [];
+  const entry = recordMarks(r, n, before);
   edited(r);
+  undoToast(r, entry, t("edit.marksCleared"));
   return true;
 }
 
@@ -631,8 +900,12 @@ export function deleteBranch(node = null) {
   const n = nodeOf(r, node);
   if (!n?.parent) return false;
   const before = r.game.mainLine();
+  const cur = r.game.current;
+  const from = n.parent;
+  const index = from.children.indexOf(n);
   const parent = r.game.deleteNode(n);
   if (!parent) return false;
+  record(r, { kind: "delete", at: cur, atRedo: from, undo: () => attach(from, n, index), redo: () => detach(r, from, n) });
   edited(r, { mainBefore: before });
   // The cursor was inside the deleted branch: show the branch point.
   if (r.game.current === parent) gotoNode(parent);
@@ -644,8 +917,14 @@ export function promoteVariation(node = null) {
   const r = state.review;
   if (!r) return false;
   const n = nodeOf(r, node);
+  // A line being tried that is made the main line is kept first.
+  if (r.draft && n && inDraft(r, n) && n !== r.draft.from) keepDraft();
   const before = r.game.mainLine();
+  // The order of the children along its path, to put back on undo.
+  const orders = [];
+  for (let c = n; c?.parent; c = c.parent) orders.push([c.parent, c.parent.children.slice()]);
   if (!n || !r.game.promoteVariation(n)) return false;
+  record(r, { kind: "promote", at: n, undo: () => orders.forEach(([p, kids]) => (p.children = kids.slice())), redo: () => r.game.promoteVariation(n) });
   edited(r, { mainBefore: before });
   return true;
 }
@@ -671,7 +950,7 @@ export function stopLive() {
 export function startLive() {
   stopLive();
   const r = state.review;
-  if (!r || r.trial || !state.settings.liveAnalysis || !state.engine.available) {
+  if (!r || r.trial || r.recount || !state.settings.liveAnalysis || !state.engine.available) {
     if (r) r.live = null;
     return;
   }
@@ -737,6 +1016,7 @@ export function showVariation(km, kind) {
   const r = state.review;
   if (!r) return;
   r.trial = null;
+  leaveModes(r);
   r.game.goto(r.game.mainLine()[km.index - 1].id);
   const color = km.move.color;
   let moves = [];
@@ -771,6 +1051,7 @@ export function showStory(km, line, step = 0) {
   const steps = km?.story?.[line];
   if (!r || !steps?.length) return;
   r.trial = null;
+  leaveModes(r);
   const upto = Math.max(0, Math.min(steps.length - 1, step));
   r.game.goto(r.game.mainLine()[km.index - 1].id);
   const moves = steps
@@ -866,6 +1147,7 @@ export function tryAgain(index) {
   const line = r.game.mainLine();
   const node = line[index - 1];
   stopLive();
+  leaveModes(r);
   r.variation = null;
   r.markTool = null;
   r.autoJump = false;
@@ -972,6 +1254,179 @@ export function closeTrial() {
   r.focus = tr.index;
   update();
   startLive();
+}
+
+/* ------------------------------------------------------ count again */
+
+/** A result reached by counting ("B+3.5", "Draw"): not a resignation, time or forfeit. */
+const counted = (result) => !!result && (/^draw$/i.test(result) || result === "0" || /^[BW]\+\d/.test(result));
+
+/**
+ * "Count again" is offered for a game of your own that ended by counting.
+ * A rated game only while its rating step can be replaced: nothing on that
+ * board size was rated after it (model/rerate.js canRerate).
+ */
+export function canRecount(r = state.review) {
+  if (!r || r.meta.classic || r.meta.free || !ownGame(r)) return false;
+  if (!counted(r.game.mainLine().at(-1).result)) return false;
+  const id = recordIdOf(r);
+  const rec = id ? Games.getGame(id) : null;
+  if (!rec) return false;
+  if (rec.opponent !== "ai") return true;
+  const known = state.profile.games.some((g) => g.id === String(id));
+  return !known || canRerate(state.profile, id, rec.rateBase || null);
+}
+
+/** Open the count of the finished game again: KataGo marks the dead stones, the player corrects them. */
+export async function startRecount() {
+  const r = state.review;
+  if (!canRecount(r)) return;
+  stopLive();
+  r.trial?.ctl?.abort();
+  r.trial = null;
+  leaveModes(r);
+  r.variation = null;
+  r.markTool = null;
+  r.autoJump = false;
+  const game = r.game;
+  const node = game.mainLine().at(-1);
+  game.goto(node);
+  const token = {};
+  r.recount = { dead: [], score: game.score([]), source: "pending", token };
+  update();
+  let dead = { stones: [], source: "manual" };
+  try {
+    dead = await Engine.deadStones(game, { node, signal: r.ctl.signal });
+  } catch (_) {
+    /* marked by hand */
+  }
+  if (state.review !== r || r.recount?.token !== token || game.current !== node) return;
+  r.recount = { dead: dead.stones, score: game.score(dead.stones), source: dead.source, token };
+  update();
+}
+
+/** A click on a stone during the recount: its chain is dead, or alive again. */
+export function recountToggle(x, y) {
+  const r = state.review;
+  const rc = r?.recount;
+  if (!rc || rc.source === "pending") return;
+  const board = r.game.current.board;
+  if (!board.get([x, y])) return;
+  const chain = board.getChain([x, y]).map(([cx, cy]) => ({ x: cx, y: cy }));
+  const isDead = rc.dead.some((d) => d.x === x && d.y === y);
+  let dead = rc.dead.filter((d) => !chain.some((c) => c.x === d.x && c.y === d.y));
+  if (!isDead) dead = dead.concat(chain);
+  r.recount = { ...rc, dead, score: r.game.score(dead) };
+  update();
+}
+
+export function cancelRecount() {
+  const r = state.review;
+  if (!r?.recount) return false;
+  r.recount = null;
+  update();
+  startLive();
+  return true;
+}
+
+/**
+ * The new count stands: the game's result is replaced (in its record, and
+ * for the game on the board), and so is what the game did to the strength
+ * estimate: its rating step is taken back and made again from the new
+ * result, never added a second time.
+ */
+export function confirmRecount() {
+  const r = state.review;
+  const rc = r?.recount;
+  if (!rc || rc.source === "pending") return false;
+  const end = r.game.mainLine().at(-1);
+  const result = rc.score.result;
+  r.recount = null;
+  if (result === end.result) {
+    toast(t("recount.same"));
+    update();
+    startLive();
+    return false;
+  }
+  end.result = result;
+  r.edits = { ...r.edits, dirty: true };
+  saveEdits(r);
+  const id = recordIdOf(r);
+  const rec = id ? Games.getGame(id) : null;
+  const me = r.meta.humanColor ?? null;
+  if (rec && rec.opponent === "ai" && me != null) {
+    const won = /^[BW]\+/.test(result) ? result.startsWith("B") === (me > 0) : null;
+    const size = r.game.size;
+    const now = Date.now();
+    const base = rec.rateBase || null;
+    const known = state.profile.games.some((g) => g.id === String(id));
+    if (known) changeProfile((p) => rerateGame(p, id, { won, result, opponent: base?.opponent, base }));
+    else if (base?.eligible && won !== null) {
+      // Not recorded when it ended (a draw then): it is rated now, as a game just finished.
+      changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: r.game.mainLine().length - 1, color: me, handicap: base.handicap || 0, opponent: base.opponent, undos: rec.undos || 0, hints: rec.hints || 0 }));
+    }
+    const mine = state.profile.games.find((g) => g.id === String(id));
+    // The estimate before this game and after it, as the result line shows it.
+    const from = base?.entry ? estimate({ ...state.profile, rating: { ...state.profile.rating, [size]: base.entry } }, { size, now }) : null;
+    const after = estimate(state.profile, { size, now });
+    const rating = mine?.rating && from && after ? { before: { r: from.r, rank: from.rank, pm: from.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } } : null;
+    Games.patchGame(id, { rating });
+    if (state.game?.game === r.game) {
+      state.game.ratingChange = rating;
+      state.game.ratingDelta = mine?.rating?.delta ?? null;
+    }
+  }
+  // The stored review names the result: it is made again from the analysis at hand.
+  refreshModel(r);
+  persist(r);
+  toast(t("recount.updated", [resultText(result)]), "success");
+  update();
+  startLive();
+  return true;
+}
+
+/* ----------------------------------------------------- a free board */
+
+/**
+ * An empty board to place stones on (the Library's "Open board"): a review
+ * with no game behind it. Black and White alternate; stepping back and
+ * playing elsewhere makes a variation; Save to Library keeps it as a record.
+ */
+export function openFreeBoard(size = 19) {
+  const n = [9, 13, 19].includes(Number(size)) ? Number(size) : 19;
+  openReview(new Game({ size: n }), { source: "free", free: true, space: "library", back: "library" });
+}
+
+/** The free board on screen has no stone yet (its size can still be chosen). */
+export function freeBoardEmpty(r = state.review) {
+  return !!r?.meta.free && !r.meta.recordId && r.game.root.children.length === 0;
+}
+
+/** Another size for the free board, while it is empty. */
+export function setFreeBoardSize(size) {
+  const r = state.review;
+  if (!freeBoardEmpty(r) || r.game.size === Number(size)) return;
+  const n = [9, 13, 19].includes(Number(size)) ? Number(size) : 19;
+  stopLive();
+  r.game = new Game({ size: n });
+  r.points = [null];
+  r.live = null;
+  r.history = { undo: [], redo: [] };
+  update();
+  startLive();
+}
+
+/** Keep the free board in the Library; from then on its edits are saved like any record's. */
+export function saveFreeBoard() {
+  const r = state.review;
+  if (!r?.meta.free || r.meta.recordId) return null;
+  const rec = Games.saveGame(r.game, { source: "board" });
+  r.source = "record";
+  r.meta = { ...r.meta, recordId: rec.id };
+  r.edits = { dirty: false, savedAt: Date.now(), target: "record" };
+  toast(t("toast.saved"), "success");
+  update();
+  return rec;
 }
 
 /* ---------------------------------------------------------- export */

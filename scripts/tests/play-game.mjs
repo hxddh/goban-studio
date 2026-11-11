@@ -170,10 +170,11 @@ export default async function ({ test, assert, root }) {
       assert.deepEqual(g.game.current.children, []);
       assert.equal(g.game.current.comment, "what if?", "the comment is kept");
       assert.equal(loadSGF(A.Lib.loadCurrent().sgf).game.mainLine().length, 4, "the saved game has no extra moves");
-      // A variation tried earlier in the game stays, as before.
+      // A variation tried earlier in the game stays once it is kept.
       Play.reviewCurrentGame();
       Review.reviewGoto(1);
       Review.reviewPlay(7, 7);
+      Review.keepDraft();
       // Back, as the app does it (controller.js restore drops the review).
       A.setRestorer(() => state.review && Review.dropReview());
       Review.closeReview();

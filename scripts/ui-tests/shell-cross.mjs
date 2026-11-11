@@ -77,7 +77,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
       await inspect(page, "explorer (corner)");
       await page.keyboard.press("Escape");
-      await page.click(".collection-row >> nth=0");
+      await page.click(".home-classics .collection-row >> nth=0");
       await page.waitForSelector(".review-layer .chart");
       const rtabs = await page.locator(".review-tabs button").count();
       for (let i = 0; i < rtabs; i++) {
@@ -99,7 +99,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       }
       for (let i = 0; i < 2; i++) {
         await page.keyboard.press("Control+Shift+P");
-        await page.click(".sheet-foot .btn.primary");
+        await page.click(".pass-ask .btn.primary");
       }
       await page.waitForSelector(".score-card");
       await page.click(".score-card .btn.primary");

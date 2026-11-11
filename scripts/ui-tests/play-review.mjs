@@ -256,7 +256,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     }
     for (let i = 0; i < 2; i++) {
       await page.keyboard.press("Control+Shift+P");
-      await page.click(".sheet-foot .btn.primary");
+      await page.click(".pass-ask .btn.primary");
     }
     await page.waitForSelector(".score-card");
     await page.click(".score-card .btn.primary");
@@ -281,7 +281,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const page = await fresh();
     await onboard(page, 1);
     await page.keyboard.press("Control+4");
-    await page.click(".collection-row >> nth=0");
+    await page.click(".home-classics .collection-row >> nth=0");
     await page.waitForSelector(".classic-moments .key-move");
     const first = await page.evaluate(() => {
       const c = window.__state.review.meta.classic;

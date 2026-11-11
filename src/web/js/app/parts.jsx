@@ -217,7 +217,8 @@ export function MoreMenu({ id, items, label }) {
     // for every menu closed within the same tick.) The click that opened the
     // menu has already had its pointerdown, so it does not close it.
     document.addEventListener("pointerdown", close);
-    ref.current?.querySelector("[role=menuitem]")?.focus();
+    // The first item that can be chosen (a disabled first item cannot take the focus).
+    ref.current?.querySelector("[role=menuitem]:not([disabled])")?.focus();
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   const onKey = (e) => {

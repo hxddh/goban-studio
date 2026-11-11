@@ -12,7 +12,7 @@ import { useEffect } from "preact/hooks";
 import { t } from "../i18n.js";
 import * as Host from "../host.js";
 import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeOpenFiles } from "../host.js";
-import { state, update, useAppState, toast } from "./store.js";
+import { state, update, useAppState } from "./store.js";
 import { CrashProbe, ErrorBoundary, TaskNotice, Toasts, crashRender, installErrorHandlers } from "./feedback.jsx";
 import { matchShortcut, menuKey } from "./shortcuts.js";
 import { expose } from "./debug.js";
@@ -92,10 +92,11 @@ function Shell({ s }) {
         id="file-input"
         type="file"
         accept=".sgf,application/x-go-sgf"
+        multiple
         hidden
         onChange={(e) => {
-          const f = e.currentTarget.files?.[0];
-          if (f) C.importFromFile(f);
+          const files = [...(e.currentTarget.files || [])];
+          if (files.length) C.importFiles(files);
           e.currentTarget.value = "";
         }}
       />
@@ -110,6 +111,11 @@ function onBoard() {
   return C.boardShown();
 }
 
+/** A review is what the space on screen shows. */
+function reviewOnScreen() {
+  return !!state.review && (state.review.meta.space || "play") === state.space;
+}
+
 /** One table of commands for keyboard, native menus and the page. */
 const COMMANDS = {
   "app.settings": () => C.openSheet("settings"),
@@ -119,7 +125,9 @@ const COMMANDS = {
   "file.import": () => C.pickImport(),
   "file.export": () => (C.playReviewing() || state.review ? C.exportSGF(state.review.game, state.review.meta.name) : C.exportSGF()),
   "game.pass": () => onBoard() && C.requestPass(),
-  "game.undo": () => (state.space === "learn" ? C.undoProblemMove() : onBoard() ? C.undo() : null),
+  // In a review on screen ⌘Z takes back an edit of the record; in a game, a move.
+  "game.undo": () => (reviewOnScreen() ? C.reviewUndo() : state.space === "learn" ? C.undoProblemMove() : onBoard() ? C.undo() : null),
+  "game.redo": () => (reviewOnScreen() ? C.reviewRedo() : onBoard() ? C.redo() : null),
   "game.hint": () => (onBoard() ? C.askHint() : state.space === "learn" ? C.problemHint() : null),
   "game.resign": () => onBoard() && C.requestResign(),
   "game.review": () => C.reviewCurrentGame(),
@@ -158,6 +166,7 @@ function menuSpec() {
         { separator: true },
         { label: t("common.pass"), command: "game.pass", ...menuKey("game.pass") },
         { label: t("common.undo"), command: "game.undo" },
+        { label: t("common.redo"), command: "game.redo" },
         { label: t("common.hint"), command: "game.hint", ...menuKey("game.hint") },
         { label: t("play.reviewSoFar"), command: "game.review", ...menuKey("game.review") },
         { label: t("play.save"), command: "game.save", ...menuKey("game.save") },
@@ -218,7 +227,10 @@ function onKeyDown(e) {
     if (state.sheet) return C.closeSheet();
     if (state.game?.ghost) return C.clearGhost();
     if (C.clearProblemGhost()) return;
+    if (C.boardShown() && C.cancelPass()) return;
+    if (state.review?.recount) return C.cancelRecount();
     if (state.review?.trial) return C.closeTrial();
+    if (state.review?.draft) return C.discardDraft();
     if (state.review?.variation) {
       state.review.variation = null;
       return update();
@@ -272,12 +284,7 @@ function onKeyDown(e) {
     }
     if (e.key === "Home") return C.explorerReset();
   }
-  // ← in a live game steps back into review of that game.
-  if (!reviewing && onBoard() && e.key === "ArrowLeft" && !e.target.closest("canvas") && state.game?.game.mainLine().length > 1) {
-    e.preventDefault();
-    C.reviewCurrentGame();
-    return C.reviewStep(-1);
-  }
+  // (← and → do nothing during a game: looking back is "Review so far", chosen from the menu.)
   // (Not the Enter that confirms an input method's candidate.)
   if (state.space === "learn" && state.learn.view === "lesson" && e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && !e.target.closest("button, canvas")) {
     const cur = state.learn.lesson?.cur;
@@ -289,15 +296,24 @@ function onKeyDown(e) {
 /* ---------------------------------------------------------- native events */
 
 async function drainOpenFiles() {
-  const paths = await takeOpenFiles();
-  for (const path of paths) if (/\.sgf$/i.test(path)) await C.importFromPath(path);
+  const paths = (await takeOpenFiles()).filter((path) => /\.sgf$/i.test(path));
+  if (paths.length) await C.importPaths(paths);
 }
 
+/** Files dropped on the window or opened with the app: every .sgf among them is imported. */
 function importPaths(detail) {
   const paths = normalizePaths((detail && detail.paths) || detail);
-  const sgf = paths.find((p) => /\.sgf$/i.test(p));
-  if (sgf) C.importFromPath(sgf);
-  else if (paths.length) toast(t("library.onlySgf"), "warn");
+  if (paths.length) C.importPaths(paths);
+}
+
+/** ⌘V on the Library's list (not in a field, a sheet, a review or the explorer): an SGF on the clipboard is imported. */
+function onPaste(e) {
+  if (state.space !== "library" || state.sheet || state.review || state.play.explorer) return;
+  if (e.target?.closest?.("input, select, textarea")) return;
+  const text = e.clipboardData?.getData("text") || "";
+  if (!text.trim()) return;
+  e.preventDefault();
+  C.pasteSGF(text);
 }
 
 export async function start() {
@@ -318,6 +334,7 @@ export async function start() {
     document.getElementById("root"),
   );
   document.addEventListener("keydown", onKeyDown);
+  document.addEventListener("paste", onPaste);
   installKeys();
   // Mouse back/forward buttons move through history.
   window.addEventListener("mouseup", (e) => {
@@ -356,11 +373,10 @@ export async function start() {
   });
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => {
-    const f = e.dataTransfer?.files?.[0];
-    if (!f) return;
+    const files = [...(e.dataTransfer?.files || [])];
+    if (!files.length) return;
     e.preventDefault();
-    if (/\.sgf$/i.test(f.name)) C.importFromFile(f);
-    else toast(t("library.onlySgf"), "warn");
+    C.importFiles(files);
   });
 }
 

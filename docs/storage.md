@@ -78,6 +78,17 @@ most 8 MB and moves over the bridge in chunks of 384 KB; the host writes a
 temporary file and renames it over the target, so a file is never half
 written.
 
+A game file's `source` is `"game"` (played here; with no result it is an
+unfinished game, which its row continues), `"import"` (an SGF opened,
+pasted or dropped) or `"board"` (a free board saved from the Library's
+*Open board*). A finished game against the computer that could be rated
+keeps `meta.rateBase`: `{ size, entry, history, opponent, handicap,
+eligible }` — the strength estimate's state on that board size before the
+game, and the opponent's measured strength — so that counting the game
+again can replace its rating step instead of adding one
+(`model/rerate.js`). Older games have none: a rated one among them cannot
+be counted again.
+
 ## Boot reads only what the first screens need
 
 `store.open({ lazy: ["games/", "backups/"] })` lists every key but reads
@@ -89,9 +100,10 @@ game first), a backup.
 The history, Today's last three games, the player's level and the
 background analysis's choice of games read `games-index.json`: one entry
 per game with the file's times, source and `meta` (size, moves, result,
-names, thumbnail, opponent, rating …), the review's version and confidence,
-and whether an analysis is stored. Every save, patch and delete keeps it
-up to date. At boot `initIndex` checks it against the listed game files:
+names, thumbnail, opponent, rating …), the review's version and confidence
+and its biggest swing (the move and the points of the costliest key moment,
+for the game's row), and whether an analysis is stored. Every save, patch
+and delete keeps it up to date. At boot `initIndex` checks it against the listed game files:
 a file the index does not know (or a missing index, as after an upgrade
 from v12) is read once and added; an entry without a file is dropped. With
 300 games and an index, boot reads `settings.json`, `profile.json`,

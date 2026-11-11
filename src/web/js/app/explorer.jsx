@@ -18,14 +18,20 @@ const pct = (w) => `${Math.round(w * 100)}%`;
 
 /** "B+0.5" style balance in words: "Black ahead by 0.5". */
 function balance(score) {
+  if (Math.abs(score) < X.LOSS_NOISE) return t("explorer.even");
   const who = score >= 0 ? t("common.black") : t("common.white");
   return t("play.evalText", [who, formatPoints(Math.round(Math.abs(score) * 2) / 2)]);
 }
 
-function lossText(loss) {
-  if (loss == null) return "";
-  const v = Math.round(loss * 10) / 10;
-  return v <= 0.05 ? t("explorer.best") : t("explorer.loss", [v.toFixed(1)]);
+/** "loses 1.2", or "" for a move within the noise (explorer-ctl candidateShows). */
+function lossText(c) {
+  const { loss } = X.candidateShows(c);
+  return loss == null ? "" : t("explorer.loss", [loss.toFixed(1)]);
+}
+
+/** A move's kind and what it costs, when it costs something: "Joseki", "Mistake · loses 4.5". */
+function kindText(mode, c) {
+  return [tagLabel(mode, c.tag), lossText(c)].filter(Boolean).join(" · ");
 }
 
 function tagLabel(mode, tag) {
@@ -129,9 +135,7 @@ function ExplorerPanel({ cands }) {
         </p>
         {verdict && (
           <p class={`explorer-verdict tag-${verdict.tag || "none"}`} data-tag={verdict.tag || "none"}>
-            {verdict.tag
-              ? t("explorer.lastMove", [X.pointLabel(node.move.x, node.move.y), tagLabel(mode, verdict.tag), lossText(verdict.loss)])
-              : t("explorer.lastMoveUnknown", [X.pointLabel(node.move.x, node.move.y)])}
+            {verdict.tag ? t("explorer.lastMoveKind", [X.pointLabel(node.move.x, node.move.y), kindText(mode, verdict)]) : t("explorer.lastMoveUnknown", [X.pointLabel(node.move.x, node.move.y)])}
           </p>
         )}
         {ev && Number.isFinite(ev.winrate) && (
@@ -152,7 +156,9 @@ function ExplorerPanel({ cands }) {
         <section class="explorer-cands">
           <h2 class="slot-title">{t(hit ? "explorer.continuations" : "explorer.liveCandidates")}</h2>
           <ol class="group explorer-list">
-            {cands.filter((c) => !c.image).map((c) => (
+            {cands.filter((c) => !c.image).map((c) => {
+              const shows = X.candidateShows(c);
+              return (
               <li>
                 <button
                   type="button"
@@ -160,7 +166,7 @@ function ExplorerPanel({ cands }) {
                   data-tag={c.tag}
                   data-in-book={c.inBook ? "1" : "0"}
                   onClick={() => X.explorerPlay(c.x, c.y)}
-                  aria-label={`${c.label} ${X.pointLabel(c.x, c.y)} · ${tagLabel(mode, c.tag)} · ${lossText(c.loss)}`}
+                  aria-label={`${c.label} ${X.pointLabel(c.x, c.y)} · ${kindText(mode, c)}`}
                 >
                   <span class={`explorer-letter ${c.tag}`}>{c.label}</span>
                   <span class="explorer-main">
@@ -168,17 +174,18 @@ function ExplorerPanel({ cands }) {
                       {X.pointLabel(c.x, c.y)}
                       {!X.isLocal(mode, c.x, c.y) && <span class="fine"> · {t("explorer.elsewhere")}</span>}
                     </strong>
-                    <span class="fine">
-                      {tagLabel(mode, c.tag)} · {lossText(c.loss)}
+                    <span class="fine">{kindText(mode, c)}</span>
+                  </span>
+                  {(shows.winrate || shows.visits) && (
+                    <span class="explorer-num">
+                      {shows.winrate && pct(c.winrate)}
+                      {shows.visits && <span class="fine">{t("explorer.visits", [c.visits])}</span>}
                     </span>
-                  </span>
-                  <span class="explorer-num">
-                    {pct(c.winrate)}
-                    <span class="fine">{t("explorer.visits", [c.visits])}</span>
-                  </span>
+                  )}
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ol>
         </section>
       )}

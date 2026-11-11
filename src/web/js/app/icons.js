@@ -61,6 +61,11 @@ export const ICONS = {
   save: `<path d="M3.75 5.25a1.5 1.5 0 0 1 1.5-1.5h7.5l3.5 3.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M7 3.75v3.5h5M6.5 16.25v-4.5h7v4.5"/>`,
   download: `<path d="M10 3.5v9.25"/><path d="M6 8.75l4 4 4-4"/><path d="M4 16.5h12"/>`,
   upload: `<path d="M10 13V3.75"/><path d="M6 7.75l4-4 4 4"/><path d="M4 16.5h12"/>`,
+  // Records in and out: import (into the tray), export (out of the box), a picture, the clipboard.
+  tray: `<path d="M10 3.25v8.5"/><path d="M6.75 8.5 10 11.75l3.25-3.25"/><path d="M3.5 11.5v3.25a1.75 1.75 0 0 0 1.75 1.75h9.5a1.75 1.75 0 0 0 1.75-1.75V11.5"/>`,
+  share: `<path d="M10 12V3.25"/><path d="M6.75 6.25 10 3l3.25 3.25"/><path d="M6.5 8.75H5.25A1.75 1.75 0 0 0 3.5 10.5v4.75A1.75 1.75 0 0 0 5.25 17h9.5a1.75 1.75 0 0 0 1.75-1.75V10.5a1.75 1.75 0 0 0-1.75-1.75H13.5"/>`,
+  image: `<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="7.25" cy="8" r="1.25"/><path d="M3.5 14.5l4-4 3 3 2.25-2.25 3.75 3.75"/>`,
+  clipboard: `<rect x="4.5" y="4" width="11" height="13" rx="2"/><path d="M7.75 4v-.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V4"/><path d="M7.5 9h5M7.5 12h3.5"/>`,
   trash: `<path d="M3.5 5.5h13"/><path d="M7.75 5.5V4.25a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V5.5"/><path d="M5.25 5.5l.75 10.1a1.5 1.5 0 0 0 1.5 1.4h5a1.5 1.5 0 0 0 1.5-1.4l.75-10.1"/><path d="M8.5 8.75v5M11.5 8.75v5"/>`,
   edit: `<path d="M12.6 4.15a1.6 1.6 0 0 1 2.25 0l1 1a1.6 1.6 0 0 1 0 2.25L7.25 16H4v-3.25z"/><path d="M11 5.75l3.25 3.25"/>`,
   search: `<circle cx="8.75" cy="8.75" r="5.25"/><path d="M12.6 12.6l3.9 3.9"/>`,

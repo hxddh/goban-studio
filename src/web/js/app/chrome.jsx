@@ -10,6 +10,7 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
+import { StatusChip } from "./status-chip.jsx";
 
 /** How each space looks in the sidebar; which spaces there are, and their order, is controller.js SPACES (v13: one list). */
 const SPACE_LOOK = {
@@ -98,7 +99,7 @@ export function Sidebar() {
         ))}
       </ul>
       <div class="sb-foot">
-        {/* status chip */}
+        <StatusChip />
         <button type="button" class="sb-item" title={`${t("nav.settings")} (${MOD},)`} onClick={() => C.openSheet("settings")}>
           <Icon name="gear" size={18} />
           <span>{t("nav.settings")}</span>
