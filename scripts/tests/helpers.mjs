@@ -78,6 +78,9 @@ export async function bundle(lines) {
     format: "esm",
     platform: "neutral",
     mainFields: ["module", "main"],
+    // As scripts/bundle.mjs, so a test can call a component and look at what it renders.
+    jsx: "automatic",
+    jsxImportSource: "preact",
     loader: { ".json": "json" },
     write: false,
     logLevel: "error",

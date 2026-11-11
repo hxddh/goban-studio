@@ -1,7 +1,7 @@
 /**
  * Core: the rules — moves, captures, ko, suicide, scoring under the three rulesets, seki, marks and the game tree.
  */
-import { test, BLACK, DEFAULT_RULES, EMPTY, Game, MESSAGES, RULESETS, SEKI_BOARD_CLOSED, WALLS, WHITE, assert, branchedGame, coordLabel, defaultKomi, findSeki, formatPoints, fromRows, handicapCompensation, loadSGF, newGame, normalizeRules, root, setup, t, territoryMap, treeLayout } from "./helpers.mjs";
+import { test, BLACK, DEFAULT_RULES, EMPTY, Game, MESSAGES, RULESETS, SEKI_BOARD_CLOSED, WALLS, WHITE, assert, branchedGame, coordLabel, defaultKomi, findSeki, formatPoints, fromRows, handicapCompensation, loadSGF, newGame, normalizeRules, setup, territoryMap, treeLayout } from "./helpers.mjs";
 
 await test("coordinates skip I and count rows from the bottom", () => {
   assert.equal(coordLabel(0, 0, 19), "A19");

@@ -1,7 +1,7 @@
 /**
  * Learn: playing problems — the endgame questions and the problem window.
  */
-import { test, PROBLEMS, assert, bundle, root, settled, sleepMs } from "./helpers.mjs";
+import { test, PROBLEMS, assert, bundle, sleepMs } from "./helpers.mjs";
 
 await test("learn problems: a tight problem window widens towards the open side", async () => {
   const { windowOf } = await import("../../src/web/js/board.js");

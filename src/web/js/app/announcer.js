@@ -18,7 +18,6 @@
 import { useEffect } from "preact/hooks";
 import { t } from "../i18n.js";
 import * as A from "../a11y.js";
-import * as S from "../solver.js";
 import { state, announce } from "./store.js";
 import * as C from "./controller.js";
 

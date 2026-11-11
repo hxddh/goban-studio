@@ -20,7 +20,7 @@
  * review, hints and scoring use it. Every optional path falls back to the
  * shipped network when its process cannot answer.
  */
-import { BLACK, WHITE, EMPTY } from "./rules.js";
+import { BLACK, EMPTY } from "./rules.js";
 import * as KataGo from "./katago.js";
 import { chooseMove as chooseLocal, evaluate as evaluateLocal } from "./ai.js";
 import { scheduler } from "./scheduler.js";
@@ -81,7 +81,6 @@ async function searchQ(game, opts = {}) {
   const analysis = await scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal, preemptible: KataGo.canCancel(), status });
   return { analysis, cancelled: status.cancelled || !!signal?.aborted };
 }
-const analyzeQ = (game, opts = {}) => searchQ(game, opts).then((r) => r.analysis);
 
 /**
  * An analysis search on the analysis engine (the stronger network when it is

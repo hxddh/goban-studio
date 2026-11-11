@@ -988,7 +988,7 @@ export async function exportReviewImage() {
   const day = new Date(date || Date.now()).toISOString().slice(0, 10);
   const filename = `goban-studio-review-${day}.png`;
   const blob = await renderReviewPNG(model, { date, rating: reviewRating(r) });
-  if (!blob) return toast(t("report.exportFailed"), "warn");
+  if (!blob) return toast(t("report.exportFailed"), "error");
   // v13: in the app a failed write is an error, never a download link (a WebView ignores those).
   if (hasNative()) {
     if (!hasFileDialogs()) return toast(t("report.exportFailed"), "error", 6000);
@@ -997,7 +997,7 @@ export async function exportReviewImage() {
     const chosen = normalizePaths(path)[0];
     if (chosen && (await writeBinaryFile(chosen, new Uint8Array(await blob.arrayBuffer())))) {
       revealPath(chosen);
-      toast(t("report.exported"));
+      toast(t("report.exported"), "success");
     } else toast(t("report.exportFailed"), "error", 6000);
     return;
   }
@@ -1009,7 +1009,7 @@ export async function exportReviewImage() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast(t("report.exported"));
+  toast(t("report.exported"), "success");
 }
 
 export { loadSGF };

@@ -2,7 +2,7 @@
  * Core: the engine — the offline opponent, KataGo replies and the bridge, the calibrated ladder and human-style moves.
  */
 import { implOpponent, thetaToGoR } from "../../src/web/js/model/player.js";
-import { test, BLACK, DEFAULT_SETTINGS, EMPTY, Game, HUMAN_VISITS, S, SAMPLE_INFO, STRENGTHS, STRONG_VISIT_SCALE, WHITE, analyse, analysisEngine, anchorMap, assert, beginnerMove, calibrated, chooseMove, defaultKomi, egfExpected, egfNats, empty, enginePayload, fitBT, fs, goRLabel, humanMoveFromAnalysis, humanRequest, humanStyleParams, installed, katagoRules, loadSGF, moveFromAnalysis, mulberry32, newGame, parse, parseInfo, parseVertex, path, pickCandidate, positionPayload, profileGoR, rankParts, root, scaledVisits, setup, suggestHandicap, wilson } from "./helpers.mjs";
+import { test, BLACK, DEFAULT_SETTINGS, EMPTY, Game, HUMAN_VISITS, SAMPLE_INFO, STRENGTHS, STRONG_VISIT_SCALE, WHITE, analyse, analysisEngine, anchorMap, assert, beginnerMove, calibrated, chooseMove, defaultKomi, egfExpected, egfNats, enginePayload, fitBT, fs, goRLabel, humanMoveFromAnalysis, humanRequest, humanStyleParams, installed, katagoRules, loadSGF, moveFromAnalysis, mulberry32, newGame, parseInfo, parseVertex, path, pickCandidate, positionPayload, profileGoR, rankParts, root, scaledVisits, suggestHandicap, wilson } from "./helpers.mjs";
 
 await test("rules: KataGo is told the game's rules", async () => {
   // Async (structured) payload.

@@ -10,6 +10,7 @@ command prints its own exact numbers.
 
 | Gate | Command | Pull request (`checks.yml`) | Release (`release.yml`) |
 | --- | --- | --- | --- |
+| Static checks | `npm run lint` | Node 24 and 26 | — |
 | Unit and data tests | `npm test` | Node 24 and 26 | macOS arm64, macOS x64, Windows |
 | Content gate | `npm run release-check` | yes | every platform build, twice (before and after the frontend build) |
 | Interface tests | `npm run ui-test` | Chromium on Linux | — (the packaged app has its own checks below) |

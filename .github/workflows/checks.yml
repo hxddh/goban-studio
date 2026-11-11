@@ -34,6 +34,9 @@ jobs:
       # platform binary through its optional dependency; the Native SDK's
       # toolchain is only needed by the platform builds).
       - run: npm ci --ignore-scripts
+      # Static checks first (eslint.config.js): an undefined name or an
+      # unused variable fails here, before anything runs.
+      - run: npm run lint
       - run: npm test
       - run: npm run release-check
       - run: npm run build

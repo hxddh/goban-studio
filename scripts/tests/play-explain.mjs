@@ -1,7 +1,7 @@
 /**
  * Play: reading a game — atari, what a mistake cost and where, its kind, and the stories told about it.
  */
-import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, fs, keyOf, lossSource, mv, narrate, parse, path, race, root, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
+import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, fs, keyOf, lossSource, mv, narrate, parse, path, root, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
 
 await test("atari detection finds chains with one liberty", () => {
   const b = empty(9);

@@ -22,6 +22,10 @@
   --good-soft: rgba(46, 125, 79, 0.1);
   --bad: #b3402c;
   --bad-soft: rgba(179, 64, 44, 0.09);
+  --on-bad: #ffffff; /* text on a --bad fill: 5.7:1 */
+  /* Toasts sit on the inverse of the page (--text); their marks need the other theme's signal colours. */
+  --inv-good: #6cc08f;
+  --inv-warn: #e3b04b;
   --board: #e4cb9a;
   --thumb-board: #e4cb9a;
   --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.08), 0 2px 4px rgba(60, 40, 12, 0.06), 0 24px 48px -24px rgba(60, 40, 12, 0.35);
@@ -88,6 +92,9 @@
   --good-soft: rgba(108, 192, 143, 0.13);
   --bad: #e58a74;
   --bad-soft: rgba(229, 138, 116, 0.13);
+  --on-bad: #1b1a17; /* 6.8:1 on the lighter dark-theme --bad (white was 2.6:1) */
+  --inv-good: #2e7d4f;
+  --inv-warn: #8a5a00;
   --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.7);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px -16px rgba(0, 0, 0, 0.7);
@@ -126,6 +133,11 @@ h1, h2, h3 { font-weight: 600; }
 button { font: inherit; color: inherit; }
 input, select, textarea { font: inherit; color: inherit; }
 input[type="text"], input[type="search"], textarea { user-select: text; -webkit-user-select: text; }
+/* Reading content can be selected and copied (lesson text, notes and
+ * comments, the About pane, error cards, toasts); controls and the board
+ * cannot. :where() keeps this weaker than the rule for buttons below. */
+:where(p, dd, .lesson-text, .feedback, .note, .quiet-note, .about, .takeaways, .game-summary, .try-verdict, .safe-card, .error-card, .toast-text, .task-notice) { user-select: text; -webkit-user-select: text; }
+button, button *, canvas, .btn, [role="menuitem"], [role="tab"], [role="radio"] { user-select: none; -webkit-user-select: none; }
 ol, ul { margin: 0; padding: 0; list-style: none; }
 strong { font-weight: 600; }
 kbd { font: 500 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; background: var(--fill); color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -204,7 +216,8 @@ kbd { font: 500 11px/1 var(--font); padding: 3px 6px; border-radius: 4px; backgr
 .btn.ghost:hover:not(:disabled) { background: var(--fill); color: var(--text); }
 .btn.danger { background: transparent; border-color: transparent; color: var(--bad); }
 .btn.danger:hover:not(:disabled) { background: var(--bad-soft); }
-.btn.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.danger-solid { background: var(--bad); border-color: var(--bad); color: var(--on-bad); }
+.btn.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 88%, var(--text)); }
 
 .icon-btn {
   display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--r-1);
@@ -596,11 +609,42 @@ button.group-row:hover { background: var(--fill); }
 .choice span { font: var(--t-small); color: var(--text-3); }
 .ob-foot { margin-top: var(--s-4); }
 
-/* toasts */
-.toasts { position: fixed; left: 50%; bottom: var(--s-5); transform: translateX(-50%); z-index: 70; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); pointer-events: none; }
-.toast { padding: 8px 14px; border-radius: 8px; background: var(--text); color: var(--on-primary); font: 500 13px/18px var(--font); box-shadow: var(--shadow-pop); animation: toast-in var(--dur-2) var(--ease-out); }
-.toast.warn { background: var(--bad); color: #fff; }
+/* toasts (app/feedback.jsx): four tones; each can be clicked, closed, and carry one action */
+.toasts { position: fixed; left: 50%; bottom: var(--s-5); transform: translateX(-50%); z-index: 70; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); width: max-content; max-width: min(560px, calc(100vw - var(--s-7))); pointer-events: none; }
+.toast { display: flex; align-items: center; gap: var(--s-2); max-width: 100%; padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3); border-radius: var(--r-2); background: var(--text); color: var(--on-primary); font: 500 13px/18px var(--font); box-shadow: var(--shadow-pop); animation: toast-in var(--dur-2) var(--ease-out); }
+/* A plain message lets clicks through to the board under it; its buttons, and a toast that asks for something, take the pointer. */
+.toast button, .toast.error, .toast.has-action { pointer-events: auto; }
+.toast-text { padding: var(--s-1) 0; min-width: 0; overflow-wrap: anywhere; }
+.toast.success > .icon { color: var(--inv-good); }
+.toast.warning > .icon { color: var(--inv-warn); }
+.toast.error { background: var(--bad); color: var(--on-bad); }
+.toast-action { flex: none; height: 28px; margin-left: var(--s-1); padding: 0 var(--s-2); border: 0; border-radius: var(--r-1); background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; font: 600 13px/18px var(--font); cursor: pointer; }
+.toast-action:hover { background: color-mix(in srgb, currentColor 26%, transparent); }
+.dismiss-btn { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-1); background: none; color: inherit; opacity: 0.75; cursor: pointer; }
+.dismiss-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+.toast :focus-visible { outline-color: currentColor; outline-offset: 0; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* a task in progress or failed (store.js runTask), above the page */
+.task-notice { display: flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: 36px; padding: var(--s-1) var(--s-4); background: var(--fill); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); }
+.task-notice.error { background: var(--bad-soft); }
+.task-notice.error > .icon { color: var(--bad); }
+.task-notice .link { font: inherit; font-weight: 500; color: var(--text); }
+.loading-line { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); font: var(--t-small); }
+.spinner { flex: none; display: inline-block; border: 2px solid var(--line-2); border-top-color: var(--text-2); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* the error card (parts.jsx ErrorCard): a page or a section that could not be shown */
+.error-page { display: grid; place-items: center; height: 100%; padding: var(--s-6); }
+.error-page.whole { position: fixed; inset: 0; background: var(--bg); }
+.error-card { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); width: min(440px, 100%); padding: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); text-align: center; }
+.error-card > .icon { color: var(--bad); }
+.error-text { display: flex; flex-direction: column; gap: var(--s-1); }
+.error-text strong { font: var(--t-head); }
+.error-text p { font: var(--t-read); color: var(--text-2); }
+.error-card.compact { flex-direction: row; justify-content: space-between; width: 100%; padding: var(--s-3) var(--s-4); background: var(--bad-soft); border-color: transparent; text-align: left; }
+.error-card.compact .error-text p { font: var(--t-body); color: var(--text); }
+.error-line { color: var(--bad); }
 
 .enter-up { animation: enter-up var(--dur-3) var(--ease-out) both; }
 .enter-fade { animation: fade-in var(--dur-3) var(--ease-out) both; }
@@ -628,7 +672,9 @@ button.group-row:hover { background: var(--fill); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  .spinner { animation: none !important; }
 }
+:root[data-motion="reduced"] .spinner { animation: none; }
 :root[data-motion="reduced"] .place, :root[data-motion="reduced"] .enter-up, :root[data-motion="reduced"] .panel-state { animation: none; }
 .update-row > span { flex: 1; }
 .shape-chips .chip { height: 32px; padding: 0 12px; gap: 8px; font-size: 13px; }
@@ -824,6 +870,7 @@ button.group-row:hover { background: var(--fill); }
   .chip.on, .segmented button.on, .preset.on, .lang-grid button.on, .mark-btn.on, .seg-mini button.on, .settings-tab.on, .sb-item.on, .icon-btn.on, .story button.on, .key-move.on {
     outline: 2px solid Highlight; outline-offset: -2px; color: HighlightText; background: Highlight; forced-color-adjust: none;
   }
-  .menu, .sheet, .card, .toast { border: 1px solid CanvasText; }
+  .menu, .sheet, .card, .toast, .error-card, .task-notice { border: 1px solid CanvasText; }
+  .toast-action, .dismiss-btn { border: 1px solid ButtonText; }
   .board-frame { outline: 1px solid CanvasText; }
 }

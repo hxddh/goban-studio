@@ -86,11 +86,19 @@ run.
 
 | What | Command | Notes |
 | --- | --- | --- |
+| Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code. No warnings are allowed; fix the code rather than disabling a rule |
 | Unit and data tests | `npm test` | Node only, about a minute. `node scripts/test.mjs play-,learn-` runs only files whose names contain those |
 | Content gate | `npm run release-check` | counts, four languages, pins and versions |
 | Interface tests | `npm run build && npm run sync && npm run ui-test` | Chromium via Playwright (`npx playwright install chromium` once). `UI_ONLY=<text>` runs matching checks |
 | Visual baselines | `npm run ui-update` | only after an intended visual change; look at every changed picture and commit it |
 | Zig tests | `npm run test:native` | Linux null platform, see above |
+
+A new sheet or menu must be added to `scripts/ui-tests/shell-sheets.mjs`,
+which opens every one of them (it reads the kinds from the source and
+fails until the new one is listed). A new keyboard shortcut goes in the
+one table, `src/web/js/app/shortcuts.js`; toasts, loading states and error
+cards come from the shared pieces described at the top of
+`src/web/js/app/parts.jsx`.
 
 Write a test for every behaviour change, in the area's file
 (`scripts/tests/{core,data,model,play,learn,shell}-*.mjs`,

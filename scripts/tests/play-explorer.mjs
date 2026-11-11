@@ -1,7 +1,7 @@
 /**
  * Play: the opening explorer controller.
  */
-import { test, BLACK, assert, bundle, empty, loadSGF, root, setup } from "./helpers.mjs";
+import { test, BLACK, assert, bundle } from "./helpers.mjs";
 
 await test("play explorer: book moves, out of the book, back/forward, reset and play from here", async () => {
   const { X, state, P, PM, loadSGF, store } = await bundle([

@@ -8,19 +8,36 @@ import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { APP_VERSION } from "../version.js";
 import * as U from "../update.js";
 import * as Models from "../models.js";
-import { state, update } from "./store.js";
+import { state, toast, update } from "./store.js";
 import * as C from "./controller.js";
 import { rankLabel } from "./play.jsx";
 import { estimateLabel } from "./estimate-label.js";
 import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Switch } from "./parts.jsx";
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
+import { shortcutRows } from "./shortcuts.js";
+import { CrashProbe, ErrorBoundary } from "./feedback.jsx";
+
+/** Every kind of sheet: `state.sheet.kind` → its component. */
+const SHEETS = { newGame: NewGameSheet, settings: SettingsSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet };
+export const SHEET_KINDS = Object.keys(SHEETS);
+
+/** A sheet that cannot render closes itself and says so; the app behind it stays usable. */
+function sheetFailed() {
+  update({ sheet: null });
+  toast(t("error.sheet"), "error", { key: "sheet" });
+}
 
 export function Sheets() {
   const sheet = state.sheet;
   if (!sheet) return null;
-  const map = { newGame: NewGameSheet, settings: SettingsSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet };
-  const Comp = map[sheet.kind];
-  return Comp ? <Comp {...sheet} /> : null;
+  const Comp = SHEETS[sheet.kind];
+  if (!Comp) return null;
+  return (
+    <ErrorBoundary resetKey={sheet} fallback={null} onError={sheetFailed}>
+      <CrashProbe at="sheet" />
+      <Comp {...sheet} />
+    </ErrorBoundary>
+  );
 }
 
 function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelledBy, class: cls = "" }) {
@@ -639,22 +656,8 @@ function Onboarding({ step = 0 }) {
 /* -------------------------------------------------------------- shortcuts */
 
 function ShortcutsSheet() {
-  const rows = [
-    [`${MOD}N`, t("common.newGame")],
-    [`${MOD}Z`, t("common.undo")],
-    [`${SHIFT}${MOD}P`, t("common.pass")],
-    [`${SHIFT}${MOD}H`, t("common.hint")],
-    [`${MOD}.`, t("play.focus")],
-    [`${MOD},`, t("nav.settings")],
-    [`${MOD}1 – 4`, `${t("nav.today")} / ${t("nav.play")} / ${t("nav.learn")} / ${t("nav.library")}`],
-    [`${MOD}[  ${MOD}]`, t("shortcuts.history")],
-    ["← →", t("shortcuts.browse")],
-    ["Enter", t("shortcuts.continue")],
-    ["Tab · ↑↓←→ · Space", t("shortcuts.board")],
-    ["Esc", t("shortcuts.close")],
-    [`${MOD}/`, t("shortcuts.title")],
-    ...a11yKeyRows(MOD),
-  ];
+  // The same table the key handler matches against (shortcuts.js).
+  const rows = [...shortcutRows({ mod: MOD, shift: SHIFT, t }), ...a11yKeyRows(MOD)];
   const groups = [
     [null, rows],
     [t("a11y.keysTitle"), boardKeyRows()],
@@ -738,9 +741,10 @@ function RenameSheet({ id, name }) {
     C.renameRecord(id, value.trim());
     update({ sheet: null });
   };
+  const title = t("library.rename");
   return (
     <Modal
-      title={t("library.rename")}
+      title={title}
       footer={
         <>
           <Button kind="ghost" onClick={C.closeSheet}>
@@ -759,9 +763,16 @@ function RenameSheet({ id, name }) {
         value={value}
         onFocus={(e) => e.currentTarget.select()}
         maxLength={120}
-        aria-label={title || t("library.rename")}
+        aria-label={title}
         onInput={(e) => setValue(e.currentTarget.value)}
-        onKeyDown={(e) => e.key === "Enter" && save()}
+        onKeyDown={(e) => {
+          // Enter saves, but not the Enter that confirms an input method's candidate.
+          if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+          // (Prevented: the focus goes back to the menu's button as the sheet
+          // closes, and the same key press would open the menu again.)
+          e.preventDefault();
+          save();
+        }}
       />
     </Modal>
   );

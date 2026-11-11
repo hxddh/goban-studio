@@ -103,8 +103,6 @@ export function ReviewView() {
 
 function reviewHeading(r) {
   const meta = r.meta;
-  const line = r.game.mainLine();
-  const result = line[line.length - 1].result;
   const space = meta.space || "play";
   const crumbs = [{ label: t(space === "learn" ? "nav.learn" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");

@@ -1,7 +1,7 @@
 /**
  * Core: the content — the classic games, the course (beginner, intermediate, advanced) and the endgame problems.
  */
-import { test, CLASSICS, COURSE, LANG_IDS, PROBLEMS, S, assert, execFileSync, fs, loadSGF, parse, path, root, t } from "./helpers.mjs";
+import { test, CLASSICS, COURSE, LANG_IDS, PROBLEMS, S, assert, execFileSync, fs, loadSGF, path, root } from "./helpers.mjs";
 
 await test("all 20 classic games parse and carry four-language notes", () => {
   assert.equal(CLASSICS.length, 20);

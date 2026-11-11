@@ -18,8 +18,8 @@ import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.j
 import { detectLang, setLang, t, tn } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, readFileBytes, readTextFile } from "../host.js";
-import { CLASSICS, preload as preloadContent, withContent } from "../content.js";
-import { state, update, toast } from "./store.js";
+import { CLASSICS, onContentWait, preload as preloadContent, withContent } from "../content.js";
+import { state, update, toast, dismissToastKey, runTask } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
 import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, ponder, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
@@ -47,9 +47,13 @@ export { CLASSICS, formatPoints };
 
 /* ---------------------------------------------------------------- boot */
 
+/** The files a write or removal last failed on (reset by whoever wants to name them). */
+let failedKeys = [];
+
 /** A file that could not be read or written: one toast, however many failed. */
 function storeError(e) {
   console.error("store:", e);
+  if (e.key && (e.op === "write" || e.op === "remove") && !failedKeys.includes(e.key)) failedKeys.push(e.key);
   const read = e.op === "read" || e.op === "list";
   toast(t(read ? "store.readFailed" : "store.writeFailed"), "error", 5000, { key: "store" });
 }
@@ -129,6 +133,9 @@ async function waitForBridge(ms = 1500) {
  */
 export async function boot() {
   store.setErrorHandler(storeError);
+  // A click that needs a content part not here yet shows that it is loading,
+  // and says so when it could not be loaded (content.js, store.js runTask).
+  onContentWait((part, load) => runTask("content:" + part, load, { label: t("task.loading"), error: t("task.contentFailed") }));
   if (isPackaged() && !hasNative() && !(await waitForBridge())) {
     const lang = detectLang();
     setLang(lang);
@@ -165,7 +172,7 @@ export async function boot() {
   state.ready = true;
   update();
   const note = takeNote();
-  if (note) toast(t("v13.note." + note), note === "restorePartial" ? "warn" : "info", 7000);
+  if (note) toast(t("v13.note." + note), note === "restorePartial" ? "warning" : "success", 7000);
   // Lesson steps, problem bodies and classic records follow on idle
   // (content.js). Nothing on screen reads them before it is opened, and
   // what opens them waits for them, so their arrival renders nothing.
@@ -207,13 +214,18 @@ export function continueReadOnly() {
 export async function resetDamaged() {
   const p = state.storeProblem;
   if (!p?.resettable) return false;
+  update((s) => (s.storeProblem = { ...s.storeProblem, resetFailed: null }));
   store.discardHeld();
   for (const f of p.failed) store.block(f.key, false);
   store.setReadOnly(false);
+  failedKeys = [];
   for (const f of p.failed) store.remove(f.key);
   const ok = await store.flush();
   if (!ok) {
     store.setReadOnly(true);
+    // Say which files are still there (the screen shows it: app/safety.jsx).
+    const left = failedKeys.length ? failedKeys : p.failed.map((f) => f.key);
+    update((s) => (s.storeProblem = { ...s.storeProblem, resetFailed: left }));
     return false;
   }
   reloadApp();
@@ -354,11 +366,18 @@ export function restore(loc) {
 /* ---------------------------------------------------- the games' history */
 
 export function openRecord(id) {
-  // v13: a game's file is read when it is opened.
+  // A game's file is read when it is opened: a slow read shows that it is
+  // loading, and one that fails says so and offers Retry (store.js runTask).
   if (!Games.isLoaded(id)) {
-    return Games.loadGame(id).then((rec) => {
-      if (rec) openRecord(id);
-    });
+    const load = async () => {
+      const rec = await Games.loadGame(id);
+      // The task says what failed, with Retry: the store's own toast would say it twice.
+      if (!rec) dismissToastKey("store");
+      // (Inside the task, so a Retry that works opens the game too.)
+      else openRecord(id);
+      return rec;
+    };
+    return runTask("game:" + id, load, { label: t("task.openingGame"), error: t("task.gameFailed"), failed: (rec) => !rec });
   }
   const rec = Games.getGame(id);
   if (!rec) return;
@@ -386,18 +405,31 @@ function showClassic(id) {
     changeProfile((p) => recordClassic(p, c.id, Date.now()));
     openReview(game, { source: "classic", classic: c, classicId: c.id, startAt: (c.moments?.find((m) => m.title) ?? c.moments?.[0])?.index, autoJump: !c.moments?.length, space: "library", back: "library" });
   } catch (e) {
+    console.error("classic open failed", e);
     toast(t("library.importError"), "error");
   }
 }
 
+/**
+ * Delete a game from the Library: it goes at once, and a toast offers Undo
+ * for a few seconds (data/games.js trashGame). The file is deleted when the
+ * toast goes, when another game is deleted, and before the app quits.
+ */
 export function deleteRecord(id) {
-  confirmAction({
-    title: t("library.deleteConfirm"),
-    confirm: t("common.delete"),
-    danger: true,
-    onConfirm: () => {
-      Games.deleteGame(id);
-      update();
+  if (!Games.trashGame(id)) return;
+  update();
+  toast(t("library.deleted"), "info", {
+    key: "game-deleted",
+    replace: true,
+    action: {
+      label: t("common.undoAction"),
+      run: () => {
+        if (Games.restoreGame(id)) update();
+      },
+    },
+    // Gone without Undo: the delete is final (unless a newer delete already made it so).
+    onClose: (reason) => {
+      if (reason !== "action" && Games.trashedGame() === id) Games.commitTrash();
     },
   });
 }
@@ -427,7 +459,7 @@ export async function importSGFText(text, name = "goban-studio.sgf") {
     update({ sheet: null });
   }
   openReview(game, { source: "record", recordId: rec.id, name: rec.name, space: "library", back: "library", autoJump: true });
-  if (warnings.length) toast(warnings[0], "warn");
+  if (warnings.length) toast(warnings[0], "warning");
 }
 
 /** A record under rules the app cannot score names those rules. */
@@ -496,7 +528,7 @@ function reloadAfterRestore(note) {
 
 /** Pick a backup file, say what it holds, and replace everything on confirm. */
 export async function importBackup() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
   let text = null;
   if (hasNative() && hasFileDialogs()) {
     const files = await openFileDialog({ title: t("backup.import"), allowMultiple: false });
@@ -523,7 +555,7 @@ export async function importBackup() {
 /** Check a backup document and, on confirm, restore it (importBackup once the file is read). */
 export function offerRestore(doc) {
   const c = checkBackup(doc);
-  if (!c.ok) return toast(restoreError(c.error), "warn");
+  if (!c.ok) return toast(restoreError(c.error), "error");
   confirmAction({
     title: t("backup.confirmTitle"),
     body: tn("backup.confirmFiles", c.summary.games, [c.summary.games, c.summary.keys]) + " " + t("v13.restore.safety"),
@@ -536,7 +568,7 @@ export function offerRestore(doc) {
 /** Restore `doc` now: a snapshot of what is there first, then the backup, then a reload. */
 export async function restoreNow(doc) {
   const r = await restoreDoc(store, doc);
-  if (!r.ok) return toast(restoreError(r.error), "warn");
+  if (!r.ok) return toast(restoreError(r.error), "error");
   reloadAfterRestore(r.written ? "restored" : "restorePartial");
 }
 
@@ -547,8 +579,8 @@ export function restoreSnapshot() {
 
 /** Put back what was there before the last restore (Settings). */
 export function undoRestore() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
-  if (!latestSnapshot(store)) return toast(restoreError("noSnapshot"), "warn");
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
+  if (!latestSnapshot(store)) return toast(restoreError("noSnapshot"), "error");
   confirmAction({
     title: t("v13.undoRestore.title"),
     body: t("v13.undoRestore.body"),
@@ -560,22 +592,30 @@ export function undoRestore() {
 
 export async function undoRestoreNow() {
   const r = await undoRestoreDoc(store);
-  if (!r.ok) return toast(restoreError(r.error), "warn");
+  if (!r.ok) return toast(restoreError(r.error), "error");
   reloadAfterRestore(r.written ? "undone" : "restorePartial");
 }
 
 export function clearData() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warn");
+  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
   confirmAction({
     title: t("settings.clearConfirm"),
     body: t("settings.clearBody"),
     confirm: t("common.delete"),
     danger: true,
-    onConfirm: async () => {
-      for (const key of store.list("")) store.remove(key);
-      if (await store.flush()) reloadApp();
-    },
+    onConfirm: () => clearDataNow(),
   });
+}
+
+/** Remove every stored file, then start afresh; a file that could not be removed is named, with Retry. */
+export async function clearDataNow() {
+  failedKeys = [];
+  for (const key of store.list("")) store.remove(key);
+  if (await store.flush()) return reloadApp();
+  const left = failedKeys.length ? failedKeys : store.pending();
+  const name = left.length > 1 ? t("clear.failedMore", [left[0], left.length - 1]) : left[0] || "";
+  dismissToastKey("store");
+  toast(t("clear.failed", [name]), "error", { key: "clear", replace: true, action: { label: t("common.retry"), run: () => clearDataNow() } });
 }
 
 /* ----------------------------------------------------------- onboarding */

@@ -72,7 +72,6 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 
 let failures = 0;
 let count = 0;
-const results = [];
 // UI_ONLY=<text>: run only the checks whose name contains it (to chase one check).
 const ONLY = process.env.UI_ONLY || "";
 async function check(name, fn) {

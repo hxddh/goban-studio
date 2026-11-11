@@ -76,7 +76,7 @@ await test("model move rank: the host call needs the humanPolicy capability; wit
   delete globalThis.zero;
   assert.equal(await humanMoveProbabilities(g, BLACK, ["rank_10k"]), null, "no host");
   const calls = [];
-  globalThis.zero = { on: () => () => {}, invoke: async (command, payload) => {
+  globalThis.zero = { on: () => () => {}, invoke: async (command) => {
     calls.push(command);
     if (command === "studio.katagoStatus") return { available: true, async: true, stream: true, models: true };
     return { ok: true, moves: [] };

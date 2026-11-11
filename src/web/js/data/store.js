@@ -7,6 +7,7 @@
  *   store.put(key, value)     set now; written ~300 ms later (debounced per key)
  *   store.remove(key)         delete now; removed ~300 ms later
  *   await store.flush()       write everything pending now (quit, tests)
+ *   store.onFlush(fn)         fn() first, at every flush
  *
  * Keys are relative paths of `[a-z0-9_-]+` segments separated by `/`,
  * ending in `.json`: settings.json, profile.json, current.json,
@@ -282,6 +283,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
   /** key → the number of the latest operation queued on it (newest wins). */
   const gen = new Map();
   let seq = 0;
+  /** Functions run at the start of every flush (onFlush). */
+  const flushHooks = new Set();
   let handler = onError;
   let opened = null;
   let openReport = { listFailed: false, failed: [] };
@@ -428,6 +431,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       }
       throw f;
     }
+    // Read after all (an earlier read of it had failed): it can be written again.
+    blocked.delete(key);
     // A put or remove made meanwhile (it took the key off `disk`) is newer than the disk.
     if (disk.has(key)) {
       mem.set(key, r.value);
@@ -648,8 +653,26 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       held.clear();
     },
 
+    /**
+     * Run `fn()` at the start of every flush: what a module holds back in
+     * memory on purpose (data/games.js: a delete that can still be undone)
+     * is made final before everything is written out. Returns the function
+     * that stops it.
+     */
+    onFlush(fn) {
+      flushHooks.add(fn);
+      return () => flushHooks.delete(fn);
+    },
+
     /** Write everything pending now; true when all of it reached the disk (held writes are not pending). */
     async flush() {
+      for (const fn of [...flushHooks]) {
+        try {
+          fn();
+        } catch (e) {
+          report("write", "", e);
+        }
+      }
       const keys = new Set([...pending.keys(), ...chain.keys()]);
       const results = await Promise.all([...keys].map((k) => run(k)));
       return results.every(Boolean) && pending.size === 0;

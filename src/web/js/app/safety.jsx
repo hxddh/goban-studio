@@ -91,6 +91,12 @@ export function StoreProblem() {
           ))}
         </ul>
       )}
+      {p.resetFailed && (
+        // Start over could not remove a file: which one, and that it can be tried again.
+        <p class="error-line" role="alert" data-safe="reset-failed">
+          {t("safe.resetFailed", [p.resetFailed.map(fileName).join(t("list.comma"))])}
+        </p>
+      )}
       <p class="muted">{t("v13.safe.nothingWritten")}</p>
       {p.resettable && <p class="fine">{t("v13.safe.resetHelp")}</p>}
     </Screen>

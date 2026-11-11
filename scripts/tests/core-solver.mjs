@@ -1,7 +1,7 @@
 /**
  * Core: the problem solver — life and death, ladders, nets, snapbacks, ko, seki, capturing races and the endgame counting model.
  */
-import { test, BLACK, EG_DOUBLE, EG_HANE, PROBLEMS, RACE, S, SEKI, WHITE, assert, egLine, egPuzzle, empty, execFileSync, libertiesAt, localCorrect, path, race, replay, results, root } from "./helpers.mjs";
+import { test, BLACK, EG_DOUBLE, EG_HANE, PROBLEMS, RACE, S, SEKI, WHITE, assert, egLine, egPuzzle, execFileSync, libertiesAt, localCorrect, path, race, root } from "./helpers.mjs";
 
 await test("the solver proves classic shapes: straight three dies, straight four lives", () => {
   const straight3 = S.createPuzzle({ goal: "kill", diagram: [". . . O X ,", "o O O O X ,", "X X X X X ,", ", , , , , ,"] });
