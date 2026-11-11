@@ -345,8 +345,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
       assert(allIn(after).length === 0, `with the move list open: ${allIn(after).join("; ")}`);
       // A wide window shows the list as before, with no disclosure.
       await page.setViewportSize({ width: 1200, height: 800 });
+      // The open fold already holds the list: wait for the fold itself to go.
+      await page.waitForSelector(".narrow-fold", { state: "detached", timeout: 3000 }).catch(() => assert(false, "a disclosure in a wide window"));
       await page.waitForSelector(".panel .moves");
-      assert((await page.locator(".narrow-fold").count()) === 0, "a disclosure in a wide window");
       assert(page.errors.length === 0, page.errors.join("; "));
       await page.close();
       return `board ${Math.round(board)} px`;
