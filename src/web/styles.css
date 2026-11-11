@@ -681,8 +681,9 @@ button.group-row:hover { background: var(--fill); }
   .stage { min-height: 0; padding: var(--s-3); }
   .panel { border-left: 0; border-top: 1px solid var(--line); max-height: min(46vh, 360px); gap: var(--s-3); padding: var(--s-3) var(--s-4); }
   /* The toolbar already names the place. */
-  .panel > .panel-title h1, .panel > .panel-title > .eyebrow { display: none; }
-  .panel > .panel-title:not(:has(> :not(h1):not(.eyebrow))) { display: none; }
+  /* A problem's heading is its goal, which stays; a title the toolbar already shows goes. */
+  .panel > .panel-title h1:not(.goal), .panel > .panel-title > .eyebrow { display: none; }
+  .panel > .panel-title:not(:has(> :not(h1:not(.goal)):not(.eyebrow))) { display: none; }
   .players { flex-direction: row; }
   .player { flex: 1; min-width: 0; height: 44px; }
   .player + .player { border-top: 0; border-left: 1px solid var(--line); }

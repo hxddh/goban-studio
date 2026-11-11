@@ -103,6 +103,7 @@ await test("every key in the string table is used by the interface", () => {
     "newGame.", // sheets.jsx PRESETS: "newGame." + quick | medium | full
     "phase.", // summary.js PHASES
     "phaseIn.",
+    "practice.status.", // practice.jsx: a tile's status (new, tried, solved, due, mastered)
     "problem.endgame.", // content/problems.js: `problem.endgame.${k}.title` / `.hint`
     "settings.volume.", // sheets.jsx: the volume levels
     "shape.", // content: the classic shapes
