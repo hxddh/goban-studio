@@ -1,5 +1,5 @@
 /**
- * v9: the course, the problems and the classic games, loaded in two steps.
+ * The course, the problems and the classic games, loaded in two steps.
  *
  * The first screen only needs what lists and plans read: the course's
  * units and lesson titles, each problem's id, topic, theme and shape, its
@@ -59,16 +59,49 @@ export function ready(part) {
   return pending[part];
 }
 
-/** f() at once when `part` is here; otherwise once it has arrived. */
+/**
+ * How a wait for a part is shown. `wait(part, load)` runs `load()` (a
+ * promise of the part) and resolves with true once the part is here, or
+ * with anything else when it could not be loaded and nobody asked again.
+ * The app sets it at boot (app/controller.js: a "loading" notice once the
+ * wait is slow, an error with Retry when it fails; Retry calls load again).
+ * Without one a part that fails to load is only logged.
+ */
+let waiter = null;
+export function onContentWait(fn) {
+  waiter = typeof fn === "function" ? fn : null;
+}
+
+/**
+ * f() at once when `part` is here; otherwise once it has arrived. What
+ * asked for it is something the player did, so the wait and a failure are
+ * shown (onContentWait); a Retry that succeeds runs f() then.
+ */
 export function withContent(part, fn) {
   if (have.has(part)) return fn();
-  return ready(part).then(fn, () => undefined);
+  let out;
+  const load = () =>
+    ready(part).then(() => {
+      // Each successful load (the first, or a retry) carries on with what
+      // was asked. An error in f is f's own, not a failure to load: it is
+      // thrown on, outside this promise.
+      try {
+        out = fn();
+      } catch (e) {
+        setTimeout(() => {
+          throw e;
+        }, 0);
+      }
+      return true;
+    });
+  const wait = waiter ? Promise.resolve(waiter(part, load)) : load();
+  return wait.then(() => out, () => undefined);
 }
 
 /**
  * Load every part on idle, one after the other (started once at boot).
  * `onArrive(part)` runs after each part is merged, so a view that showed
- * the index alone (Learn's path reads problem titles) can draw again.
+ * the index alone (Practice's path reads problem titles) can draw again.
  */
 export function preload(onArrive = () => {}) {
   if (have.size === PARTS.length || typeof window === "undefined") return;

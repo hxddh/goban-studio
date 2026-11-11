@@ -4,13 +4,14 @@
  * reviews).
  */
 import { store } from "../data/store.js";
-import { saveSettings } from "../data/settings.js";
-import { estimate } from "../model/player.js";
-import { setLang, t } from "../i18n.js";
-import { setSound } from "../audio.js";
+import { defaultRulesOf, saveSettings } from "../data/settings.js";
+import { estimate } from "../model/level.js";
+import { hasLang, loadLang, setLang, t } from "../i18n.js";
+import * as Audio from "../audio.js";
+import { applyBoardTheme } from "../theme.js";
 import { state, update } from "./store.js";
 
-/* ----------------------------------------------- v13: the game in play */
+/* ----------------------------------------------- The game in play */
 
 /*
  * What the review (review-ctl.js) needs of the game in play: write it, and
@@ -60,6 +61,11 @@ export function playerRankNow() {
   return e.games > 0 ? e.rank : state.settings.playerRank ?? 30;
 }
 
+/** The rules a new game uses unless its sheet says otherwise: the player's choice, else those of the interface language. */
+export function defaultRules() {
+  return defaultRulesOf(state.settings);
+}
+
 export const tx = (obj) => (obj ? obj[state.settings.lang] ?? obj.en ?? obj.zh ?? "" : "");
 
 export function applyAppearance() {
@@ -68,7 +74,9 @@ export function applyAppearance() {
   const dark = s.appearance === "dark" || (s.appearance === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
-  root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
+  root.dataset.text = s.largeText ? "large" : "normal"; // A11y
+  // The board's colours follow the theme and the board style (theme.js).
+  applyBoardTheme({ style: s.boardStyle });
 }
 
 export function setSetting(key, value) {
@@ -76,9 +84,17 @@ export function setSetting(key, value) {
     s.settings = { ...s.settings, [key]: value };
   });
   saveSettings(store, state.settings);
-  if (key === "lang") setLang(value);
-  if (key === "sound") setSound(value);
-  if (key === "appearance" || key === "largeText") applyAppearance();
+  if (key === "lang") {
+    setLang(value);
+    // A language not read yet (i18n.js loadLang) shows as soon as its strings are there.
+    if (!hasLang(value)) loadLang(value).then((ok) => ok && state.settings.lang === value && (syncMenus(), update()));
+  }
+  if (key === "volume") {
+    Audio.setLevel(value);
+    // The new volume, heard at once (nothing when it is off).
+    Audio.stone();
+  }
+  if (key === "appearance" || key === "largeText" || key === "boardStyle") applyAppearance();
   if (key === "lang" || key === "focus" || key === "coords" || key === "numbers" || key === "liveAnalysis" || key === "showEval" || key === "largeText") syncMenus();
 }
 
@@ -133,12 +149,12 @@ export function setRestorer(fn) {
   restorer = fn;
 }
 
-export function locationNow() {
-  const p = state.learn;
+function locationNow() {
+  const p = state.practice;
   const r = state.review;
   return {
     space: state.space,
-    learn: {
+    practice: {
       view: p.view,
       topic: p.topic,
       theme: p.theme || null,
@@ -148,7 +164,7 @@ export function locationNow() {
       problemId: p.problem?.def?.id || null,
       mistakeId: p.mistake?.m?.id || null,
       daily: !!p.daily,
-      captureFrom: p.capture?.from || null, // v8
+      captureFrom: p.capture?.from || null,
     },
     play: { ...state.play },
     review: r

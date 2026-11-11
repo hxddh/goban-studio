@@ -1,16 +1,57 @@
 /**
- * Strings of Play (docs/v9.md, "Two spaces"): its home, the suggested
- * game and your level, and trying a key moment of the post-game review
- * again. messages.js merges every area file into MESSAGES.
+ * Strings of a game in progress: the game panel, new game, clocks, counting
+ * and the result, teaching games and the free board.
+ * messages.js merges every area file into MESSAGES; a key prefix lives in
+ * exactly one file.
  */
 import { m } from "./m.js";
 
 export const PLAY = {
+  "play.panel": m("对局信息", "Game", "대국 정보", "対局情報"),
+  "play.players": m("对局双方", "Players", "대국자", "対局者"),
+  "play.you": m("你", "You", "나", "あなた"),
+  "play.offlineEngine": m("离线引擎", "Offline engine", "오프라인 엔진", "オフラインエンジン"),
+  "play.offlineNote": m("浏览器预览没有 KataGo：9 路用 Moka，其他用简易引擎，棋力明显偏弱。桌面版全部使用 KataGo。", "The browser preview has no KataGo: 9×9 uses Moka and other sizes a simple engine, both clearly weaker. The desktop app uses KataGo on every size.", "브라우저 미리보기에는 KataGo가 없습니다. 9줄은 Moka, 그 외는 간단한 엔진을 쓰며 기력이 확실히 약합니다. 데스크톱 앱은 모든 판에서 KataGo를 씁니다.", "ブラウザ版プレビューにはKataGoがありません。9路はMoka、ほかは簡易エンジンで、明らかに弱くなります。デスクトップ版はすべての碁盤でKataGoを使います。"),
+  "play.yourTurn": m("轮到你", "Your move", "내 차례", "あなたの番"),
+  "play.theirTurn": m("对手思考", "Opponent's move", "상대 차례", "相手の番"),
+  "play.toPlay": m("{0}方落子", "{0} to play", "{0} 차례", "{0}番"),
+  "play.thinking": m("思考中…", "Thinking…", "생각 중…", "考慮中…"),
+  "play.hintThinking": m("正在找好点…", "Finding a good move…", "좋은 수를 찾는 중…", "好手を探しています…"),
+  "play.scoring": m("数目", "Counting", "계가", "整地"),
+  "play.captures": m("提子", "Captures", "따낸 돌", "アゲハマ"),
+  "play.capturesN": m("提 {0}", "{0} captured", "따냄 {0}", "アゲハマ {0}"),
+  "play.computerPassed": m("对手停了一手。你也停一手就进入数目。", "The opponent passed. Pass too to count the game.", "상대가 패스했습니다. 나도 패스하면 계가합니다.", "相手がパスしました。あなたもパスすると整地に入ります。"),
+  "play.passConfirm": m("停一手？", "Pass this turn?", "패스할까요?", "パスしますか？"),
+  "play.resignConfirm": m("确定认输？", "Resign this game?", "이 대국을 기권할까요?", "投了しますか？"),
+  "play.hintAt": m("可以考虑 {0}", "Consider {0}", "{0} 자리를 생각해 보세요", "{0}を考えてみましょう"),
+  "play.hintPass": m("这里停一手也可以。", "Passing is fine here.", "여기서는 패스해도 됩니다.", "ここはパスでかまいません。"),
+  "play.reviewSoFar": m("复盘到此", "Review so far", "여기까지 복기", "ここまで検討"),
+  "play.save": m("保存到棋谱", "Save to library", "기보에 저장", "棋譜に保存"),
+  "play.saveAgain": m("更新棋谱", "Update in library", "기보 업데이트", "棋譜を更新"),
+  "play.focus": m("专注模式", "Focus mode", "집중 모드", "集中モード"),
+  "play.exitFocus": m("退出专注模式", "Exit focus mode", "집중 모드 종료", "集中モードを終了"),
+  "play.komiN": m("贴 {0} 目", "Komi {0}", "덤 {0}", "コミ{0}目"),
+  "play.handicapN": m("让 {0} 子", "{0} handicap", "{0}점 접바둑", "{0}子局"),
+  "play.moveN": m("{0} 手", "{0} moves", "{0}수", "{0}手"),
+  "play.gameOver": m("对局结束", "Game over", "대국 종료", "終局"),
+  "play.reviewGame": m("回看这盘", "Review this game", "이 대국 복기", "この対局を検討"),
+  "play.playAgain": m("再来一局", "Play again", "한 판 더", "もう一局"),
+  "play.proposeCount": m("棋局看起来已经结束了。数目吗？", "The game looks finished. Count it?", "대국이 끝난 것 같습니다. 계가할까요?", "終局のようです。整地しますか？"),
+  "play.countNow": m("数目", "Count", "계가", "整地する"),
+  "play.keepPlaying": m("继续下", "Keep playing", "계속 두기", "続ける"),
+  "play.computerResigned": m("电脑认输了。", "The computer resigned.", "컴퓨터가 기권했습니다.", "コンピュータが投了しました。"),
+  "play.timeUp": m("时间到了。", "Time is up.", "시간이 다 됐습니다.", "時間切れです。"),
+  "play.clock": m("剩余时间", "Time left", "남은 시간", "残り時間"),
+  "play.evalLabel": m("形势", "Balance", "형세", "形勢"),
+  "play.evalText": m("{0}领先约 {1} 目", "{0} ahead by about {1}", "{0}이 약 {1}집 앞섬", "{0}が約{1}目リード"),
+  "play.moveList": m("手顺", "Moves", "수순", "手順"),
+  "play.peek": m("在复盘中查看这一手", "Look at this move in review", "복기에서 이 수 보기", "検討でこの手を見る"),
+  "play.confirmHint": m("再点一次同一个点落子，Esc 取消。", "Click the same point again to play. Esc cancels.", "같은 곳을 한 번 더 누르면 둡니다. Esc로 취소.", "同じ点をもう一度クリックで着手。Escで取消。"),
   // Before the first move: one quiet line; the link opens the keyboard shortcuts.
   "play.firstMove": m("点击棋盘落子。", "Click the board to play.", "바둑판을 눌러 돌을 놓으세요.", "盤をクリックして打ちます。"),
   "play.keys": m("快捷键", "Keyboard shortcuts", "단축키", "ショートカット"),
   "play.suggest.title": m("推荐一盘", "Suggested game", "추천 대국", "おすすめの対局"),
-  "play.suggest.game": m("{0} 路 · 对 {1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
+  "play.suggest.game": m("{0} 路 · 对手{1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
   "play.suggest.handicap": m("让 {0} 子", "{0} handicap stones", "{0}점 접바둑", "{0}子局"),
   "play.suggest.even": m("分先", "Even game", "호선", "互先"),
   "play.suggest.because": m("练练本周重点：{0}", "works on this week's focus: {0}", "이번 주 집중 연습: {0}", "今週の重点の練習：{0}"),
@@ -20,66 +61,96 @@ export const PLAY = {
   "play.suggest.other": m("或者下一盘 {0} 路", "Or a {0}×{0} game", "또는 {0}줄 한 판", "または{0}路で一局"),
   "play.home.level": m("你的棋力", "Your level", "나의 기력", "あなたの棋力"),
   "play.home.levelGames": m("根据 {0} 盘对局估计", "estimated from {0} games", "대국 {0}판으로 추정", "{0}局の対局から推定"),
-  "gameSummary.practise": m("练这类题 →", "Practise these →", "이 유형 연습하기 →", "この形を練習 →"),
   "play.home.allClassics": m("全部 {0} 局名局", "All {0} classics", "명국 {0}판 모두 보기", "名局 {0} 局をすべて表示"),
   "play.home.showAll": m("显示全部 {0} 盘", "Show all {0}", "전체 {0}판 보기", "全{0}局を表示"),
   "play.home.explorer": m("布局与定式", "Openings and joseki", "포석과 정석", "布石と定石"),
-
-  // Trying a key moment again, on the board, judged by KataGo.
-  "try.again": m("再下一次", "Try again", "다시 두기", "打ち直す"),
-  "try.title": m("第 {0} 手 · 再下一次", "Move {0}: try again", "{0}수째 · 다시 두기", "{0}手目 · 打ち直し"),
-  "try.prompt": m("轮到{0}：在棋盘上找一手更好的棋。", "{0} to play: find a better move on the board.", "{0} 차례: 바둑판에서 더 좋은 수를 찾아보세요.", "{0}番：盤上でより良い手を探してください。"),
-  "try.judging": m("KataGo 正在判断这一手…", "KataGo is judging the move…", "KataGo가 이 수를 판단하는 중…", "KataGoがこの手を判定しています…"),
-  "try.good": m("好棋！和 KataGo 的最佳一手相差不到 2 目。", "Good move: within 2 points of KataGo's best.", "좋은 수입니다. KataGo의 최선과 2집 이내입니다.", "好手です。KataGoの最善手との差は2目以内です。"),
-  "try.bad": m("这手约损 {0} 目，KataGo 认为 {1} 更好。", "This loses about {0} points; KataGo prefers {1}.", "이 수는 약 {0}집 손해입니다. KataGo의 추천은 {1}입니다.", "この手は約{0}目の損です。KataGoは{1}を推します。"),
-  "try.next": m("下一个关键时刻", "Next moment", "다음 결정적 순간", "次の勝負どころ"),
-  "try.done": m("回到复盘", "Back to the review", "복기로 돌아가기", "検討に戻る"),
-  "try.stop": m("不下了", "Stop", "그만두기", "やめる"),
-  "review.noTurningPoints": m("粗略估计里看不出明显的转折点。", "The rough estimate shows no clear turning point.", "대략적인 추정으로는 뚜렷한 전환점이 보이지 않습니다.", "大まかな推定では、はっきりした分かれ目は見えません。"),
-  "try.noJudge": m("KataGo 没有回应，这一手没有计入。", "KataGo did not answer; this try was not counted.", "KataGo가 응답하지 않아 이번 수는 반영되지 않았습니다.", "KataGoが応答しなかったため、この手は記録されませんでした。"),
-  // About this book: {0} positions, {1} the network, {2} visits per position, {3} KataGo's version, {4} the date it was made.
-  "explorer.aboutBuild": m(
-    "共 {0} 个局面。网络：{1}；每个局面 {2} 次访问；KataGo {3}；生成于 {4}。",
-    "{0} positions. Network: {1}; {2} visits per position; KataGo {3}; made {4}.",
-    "모두 {0}개 국면. 네트워크: {1}; 국면마다 {2}회 탐색; KataGo {3}; {4} 생성.",
-    "全{0}局面。ネットワーク：{1}、局面ごとに{2}回の探索、KataGo {3}、{4}作成。",
-  ),
-  // Corner joseki: the board zooms to the upper-right corner; the toggle shows the whole board.
-  "explorer.zoomCorner": m("放大右上角", "Zoom to the corner", "우상귀 확대", "右上隅を拡大"),
-  "explorer.zoomWhole": m("显示整个棋盘", "Show the whole board", "판 전체 보기", "盤全体を表示"),
-
-  // Named lines (v7), whole board.
-  "explorer.name.whole.san-san": m("三三", "3-3 point", "삼삼", "三々"),
-  "explorer.name.whole.high-chinese": m("高中国流", "High Chinese opening", "높은 중국류", "高い中国流"),
-  "explorer.name.whole.komoku-star": m("小目·星位", "3-4 point and star point", "소목·화점", "小目・星"),
-  "explorer.name.whole.star-early-33": m("早点三三", "Early 3-3 invasion", "이른 삼삼 침입", "早い三々入り"),
-  // Named lines (v7), corner joseki.
-  "explorer.name.corner.star-knight-response": m("星位·小飞挂·小飞应", "Star point, knight's move response", "화점 날일자 걸침·날일자 받기", "星・小ゲイマガカリ・小ゲイマ受け"),
-  "explorer.name.corner.star-attach": m("星位·小飞挂·托", "Star point, attachment against the approach", "화점 날일자 걸침·붙임", "星・小ゲイマガカリ・ツケ"),
-  "explorer.name.corner.star-one-space-low-pincer": m("星位·一间低夹", "Star point, one-space low pincer", "화점 한 칸 낮은 협공", "星・一間挟み"),
-  "explorer.name.corner.star-one-space-high-pincer": m("星位·一间高夹", "Star point, one-space high pincer", "화점 한 칸 높은 협공", "星・一間高挟み"),
-  "explorer.name.corner.star-two-space-low-pincer": m("星位·二间低夹", "Star point, two-space low pincer", "화점 두 칸 낮은 협공", "星・二間挟み"),
-  "explorer.name.corner.star-pincer-33": m("星位·夹击后点三三", "Star point, 3-3 invasion after the pincer", "화점 협공 후 삼삼 침입", "星・挟みに三々入り"),
-  "explorer.name.corner.star-33-block": m("星位·点三三·挡", "Star point, 3-3 invasion, block", "화점 삼삼 침입·막기", "星・三々入り・オサエ"),
-  "explorer.name.corner.star-33-hane": m("星位·点三三·扳", "Star point, 3-3 invasion, hane", "화점 삼삼 침입·젖힘", "星・三々入り・ハネ"),
-  "explorer.name.corner.star-33-joseki": m("点三三定式", "3-3 invasion joseki", "삼삼 침입 정석", "三々入りの定石"),
-  "explorer.name.corner.komoku-attach-draw-back": m("小目·小飞挂·托退", "3-4 point, attach and draw back", "소목 붙여 물러서기", "小目・ツケヒキ"),
-  "explorer.name.corner.komoku-high-approach-attach": m("小目·一间高挂·托", "3-4 point, high approach, attachment underneath", "소목 한 칸 높은 걸침·밑붙임", "小目・一間高ガカリ・下ツケ"),
-  // The report's phase table, named for screen readers: {0} is Black or White.
-  "report.phasesOf": m("{0}的三个阶段", "The three phases for {0}", "{0}의 세 단계", "{0}の三つの局面"),
-  // A game between two people: whose mistakes become drills.
-  // Background analyses (play/analysis.js), as a job names them.
-  "sched.job.game": m("正在分析你与电脑（{0}）的对局", "Analysing your game against {0}", "컴퓨터({0})와 둔 대국을 분석하는 중", "コンピュータ（{0}）との対局を解析中"),
-  "sched.job.report": m("正在分析一盘棋", "Analysing a game", "대국을 분석하는 중", "対局を解析中"),
-  "sched.job.review": m("正在复盘这盘棋", "Reviewing the game", "대국을 복기하는 중", "対局を検討中"),
-  "sched.job.batch": m("正在分析你的对局（第 {0} 盘，共 {1} 盘）", "Analysing your games — {0} of {1}", "내 대국 분석 중 ({1}판 중 {0}번째)", "あなたの対局を解析中（{1}局中{0}局目）"),
-  // Play's history: the row being analysed.
-  "sched.row.progress": m("正在分析… {0}%", "Analysing… {0}%", "분석 중… {0}%", "解析中… {0}%"),
-  // The post-game review: the change of the strength estimate.
-  "sched.report.rating": m("棋力 {0} → {1}（±{2}）", "Strength {0} → {1} (±{2})", "기력 {0} → {1} (±{2})", "棋力 {0} → {1}（±{2}）"),
-  "sched.report.ratingSame": m("棋力 {0}（±{1}），没有变化", "Strength {0} (±{1}), unchanged", "기력 {0} (±{1}), 변동 없음", "棋力 {0}（±{1}）、変わらず"),
-  "teach.bodyWhy": m("这一手可能损失约 {0} 目——{1}。", "This move may cost about {0} points — {1}.", "이 수는 약 {0}집 손해일 수 있습니다. {1}", "この手は約{0}目損かもしれません。{1}"),
   "play.hintWhy": m("可以考虑 {0}——{1}。", "Consider {0} — {1}.", "{0} 자리를 생각해 보세요. {1}", "{0}を考えてみましょう。{1}"),
+  "play.youPassed": m("你停了一手", "You passed", "패스했습니다", "パスしました"),
+  "play.theyPassed": m("电脑停了一手", "The computer passed", "컴퓨터가 패스했습니다", "コンピューターがパスしました"),
+  "play.passedBy": m("{0}棋停了一手", "{0} passed", "{0:이/가} 패스했습니다", "{0}がパスしました"),
+  "play.passAsk": m("停一手？双方连续停一手，对局就结束并开始数目。", "Pass this turn? When both players pass in a row, the game ends and is counted.", "패스할까요? 두 사람이 연속으로 패스하면 대국이 끝나고 계가합니다.", "パスしますか？両者が続けてパスすると終局し、整地に入ります。"),
+  "play.passAskEndsAi": m("电脑刚停了一手。你也停一手，对局就结束并开始数目。", "The computer just passed. If you pass too, the game ends and is counted.", "컴퓨터가 방금 패스했습니다. 나도 패스하면 대국이 끝나고 계가합니다.", "コンピューターがパスしました。あなたもパスすると終局し、整地に入ります。"),
+  "play.passAskEnds": m("{0}棋刚停了一手。你也停一手，对局就结束并开始数目。", "{0} just passed. If you pass too, the game ends and is counted.", "{0:이/가} 방금 패스했습니다. 나도 패스하면 대국이 끝나고 계가합니다.", "{0}がパスしました。あなたもパスすると終局し、整地に入ります。"),
+  "play.unratedNow": m("这盘用了悔棋或提示，不计入棋力。", "This game will not be rated: you took back a move or used a hint.", "무르기나 힌트를 써서 이 대국은 기력에 반영되지 않습니다.", "待ったかヒントを使ったので、この対局は棋力に反映されません。"),
+  "play.unrated.undos": m("未计入棋力：你悔过棋", "Not rated: you took back moves", "기력 미반영: 수를 물렀습니다", "棋力に未反映：待ったをしました"),
+  "play.unrated.hints": m("未计入棋力：你用过提示", "Not rated: you used hints", "기력 미반영: 힌트를 사용했습니다", "棋力に未反映：ヒントを使いました"),
+  "play.unrated.both": m("未计入棋力：你悔过棋，也用过提示", "Not rated: you took back moves and used hints", "기력 미반영: 수를 무르고 힌트도 사용했습니다", "棋力に未反映：待ったをし、ヒントも使いました"),
+  // The computer could not move (app/play-ctl.js computerFailed, play.jsx).
+  "play.engineFailed": m(
+    "电脑这一手没能走出来。",
+    "The computer couldn't make its move.",
+    "컴퓨터가 수를 두지 못했습니다.",
+    "コンピューターが着手できませんでした。",
+  ),
+  "play.retryMove": m("重试", "Retry", "다시 시도", "再試行"),
+  // Plural forms (i18n.js tn): the base key is the "other" form; only
+  // English has a separate "one". The other languages repeat the base
+  // string (they never pick "one"), so the review sheet shows a full row.
+  "play.moveN.one": m("{0} 手", "{0} move", "{0}수", "{0}手"),
+  "play.home.levelGames.one": m("根据 {0} 盘对局估计", "estimated from {0} game", "대국 {0}판으로 추정", "{0}局の対局から推定"),
+
+  "newGame.board": m("棋盘", "Board", "바둑판", "碁盤"),
+  "newGame.quick": m("快棋 · 约 10 分钟", "Quick · ~10 min", "속기 · 약 10분", "早碁 · 約10分"),
+  "newGame.medium": m("约 25 分钟", "~25 min", "약 25분", "約25分"),
+  "newGame.full": m("标准棋盘 · 约 1 小时", "Standard · ~1 hr", "표준 · 약 1시간", "標準 · 約1時間"),
+  "newGame.opponent": m("对手", "Opponent", "상대", "相手"),
+  "newGame.computer": m("电脑", "Computer", "컴퓨터", "コンピュータ"),
+  "newGame.twoPlayers": m("两人对局", "Two players", "2인 대국", "二人で対局"),
+  "newGame.strength": m("棋力", "Strength", "기력", "棋力"),
+  "newGame.yourColor": m("你执", "You play", "내 돌", "あなたの石"),
+  "newGame.random": m("随机", "Random", "무작위", "ランダム"),
+  "newGame.offline": m("浏览器预览没有 KataGo，电脑会比所选棋力弱。", "Without KataGo (browser preview) the computer is weaker than the level shown.", "KataGo가 없는 브라우저 미리보기에서는 표시된 기력보다 약합니다.", "KataGoのないブラウザ版では、表示より弱くなります。"),
+  "newGame.suggested": m("按你的棋力，建议让 {0} 子。可以在“更多选项”里修改。", "Suggested for your level: {0} handicap stones. Change it under More options.", "기력에 맞춰 {0}점 접바둑을 권합니다. 추가 옵션에서 바꿀 수 있습니다.", "棋力差から{0}子局をおすすめします。詳細設定で変更できます。"),
+  "newGame.advanced": m("更多选项", "More options", "추가 옵션", "詳細設定"),
+  "newGame.advancedSummary": m("让子 {0} · 贴目 {1}", "Handicap {0} · komi {1}", "접바둑 {0} · 덤 {1}", "置き石 {0} · コミ {1}"),
+  "newGame.start": m("开始", "Start", "시작", "開始"),
+  "newGame.time": m("用时", "Clock", "시간", "持ち時間"),
+  "newGame.fromRating": m("对手棋力按你的棋力自动推荐。", "The opponent's strength follows your rating.", "상대 기력은 내 기력에 맞춰 추천합니다.", "相手の棋力はあなたの棋力から推奨しています。"),
+  "newGame.size": m("{0} 路", "{0}×{0}", "{0}줄", "{0}路"),
+
+  "time.none": m("不计时", "No clock", "시간 없음", "時間なし"),
+  "time.move30": m("每手 30 秒", "30 s per move", "한 수 30초", "一手30秒"),
+  "time.byoyomi": m("10 分 + 3×30 秒", "10 min + 3×30 s", "10분 + 3×30초", "10分 + 3×30秒"),
+
+  "result.points": m("{0}胜 {1} 目", "{0} wins by {1}", "{0} {1}집 승", "{0}の{1}目勝ち"),
+  "result.resign": m("{0}中盘胜", "{0} wins by resignation", "{0} 불계승", "{0}の中押し勝ち"),
+  "result.time": m("{0}超时胜", "{0} wins on time", "{0} 시간승", "{0}の時間切れ勝ち"),
+  "result.youWon": m("你赢了", "You won", "이겼습니다", "あなたの勝ち"),
+  "result.youLost": m("这盘输了", "You lost this one", "이번 판은 졌습니다", "この対局は負けです"),
+
+  "score.title": m("数目", "Counting", "계가", "整地"),
+  "score.judging": m("正在判断死活…", "Judging dead stones…", "사석을 판단하는 중…", "死に石を判定しています…"),
+  "score.engineMarked": m("KataGo 已标出死子。点一块棋可以改。", "KataGo marked the dead stones. Click a group to change it.", "KataGo가 사석을 표시했습니다. 돌을 눌러 바꿀 수 있습니다.", "KataGoが死に石を示しました。石をタップすると変更できます。"),
+  "score.manual": m("点死掉的棋子，把它们标为死子。", "Click the dead groups to mark them.", "죽은 돌을 눌러 사석으로 표시하세요.", "死んでいる石をクリックして死に石にします。"),
+  "score.detail": m("地 {0} · 提子 {1}", "Territory {0} · captures {1}", "집 {0} · 사석 {1}", "地 {0} · アゲハマ {1}"),
+  "score.detailKomi": m("地 {0} · 提子 {1} · 贴 {2}", "Territory {0} · captures {1} · komi {2}", "집 {0} · 사석 {1} · 덤 {2}", "地 {0} · アゲハマ {1} · コミ {2}"),
+  "score.confirm": m("确认结果", "Accept result", "결과 확인", "結果を確定"),
+  "score.resume": m("继续下", "Keep playing", "계속 두기", "対局を続ける"),
+  "score.titleArea": m("数子", "Counting", "계가", "計算"),
+  "score.detailArea": m("棋子 {0} · 地 {1}", "Stones {0} · territory {1}", "돌 {0} · 집 {1}", "石 {0} · 地 {1}"),
+  "score.detailAreaKomi": m("棋子 {0} · 地 {1} · 贴 {2}", "Stones {0} · territory {1} · komi {2}", "돌 {0} · 집 {1} · 덤 {2}", "石 {0} · 地 {1} · コミ {2}"),
+  "score.detailAreaHandicap": m("棋子 {0} · 地 {1} · 贴 {2} · 让子补偿 {3}", "Stones {0} · territory {1} · komi {2} · handicap {3}", "돌 {0} · 집 {1} · 덤 {2} · 치석 보상 {3}", "石 {0} · 地 {1} · コミ {2} · 置き石の補正 {3}"),
+  "score.sekiTerritory": m("双活中的空点不算地。", "Points inside a seki are not territory.", "빅 안의 빈 점은 집이 아닙니다.", "セキの中の空点は地になりません。"),
+  "score.sekiArea": m("双活的棋子和眼位都算，公气双方都不算。", "Stones in seki and their eyes count; the shared liberties count for neither side.", "빅의 돌과 눈은 세고, 공동 공배는 어느 쪽도 세지 않습니다.", "セキの石とその眼は数え、内ダメはどちらにも数えません。"),
+  "score.legend": m("棋盘上的小方块是双方的地，变淡的棋子是死子。", "On the board, small squares mark each side's territory and faded stones are dead.", "바둑판의 작은 네모는 양쪽의 집이고, 흐려진 돌은 사석입니다.", "盤上の小さな四角は双方の地、薄くなった石は死に石です。"),
+
+  "recount.again": m("重新数目", "Count again", "다시 계가하기", "整地をやり直す"),
+  "recount.title": m("重新数目", "Counting again", "다시 계가", "整地のやり直し"),
+  "recount.confirm": m("确认新结果", "Confirm the new count", "새 결과 확정", "新しい結果を確定"),
+  "recount.same": m("结果没有变化", "The result is unchanged", "결과는 그대로입니다", "結果は変わりません"),
+  "recount.updated": m("结果已更新：{0}", "Result updated: {0}", "결과를 고쳤습니다: {0}", "結果を更新しました：{0}"),
+
+  "teach.title": m("要再想想吗？", "Think again?", "다시 생각해 볼까요?", "考え直しますか？"),
+  "teach.body": m("这一手可能损失约 {0} 目。", "This move may cost about {0} points.", "이 수는 약 {0}집 손해일 수 있습니다.", "この手は約{0}目損かもしれません。"),
+  "teach.warn": m("这一手可能损失约 {0} 目", "This move may cost about {0} points", "이 수는 약 {0}집 손해일 수 있습니다", "この手は約{0}目損かもしれません"),
+  "teach.takeBack": m("撤回再想", "Take it back", "물리고 다시 생각", "戻して考える"),
+  "teach.showBetter": m("看更好的位置", "Show a better point", "더 좋은 곳 보기", "より良い点を見る"),
+  "teach.keep": m("就这样下", "Keep it", "그대로 두기", "このまま打つ"),
+  "teach.note": m("指导棋模式：撤回不计入悔棋。可以在设置中关闭。", "Teaching mode: taking it back doesn't count as an undo. Turn it off in Settings.", "지도 모드: 물려도 무르기로 세지 않습니다. 설정에서 끌 수 있습니다.", "指導碁モード：戻しても待ったに数えません。設定でオフにできます。"),
+  "teach.paused": m("等你决定", "Waiting for you", "선택을 기다리는 중", "あなたの判断待ち"),
+  "teach.inAtari": m("小心：你的棋子被打吃了", "Careful: your stones are in atari", "조심하세요: 내 돌이 단수입니다", "注意：あなたの石がアタリです"),
+  "teach.canCapture": m("对方有棋子只剩一口气", "One of the opponent's groups is in atari", "상대 돌이 단수입니다", "相手の石がアタリです"),
+  "teach.bodyWhy": m("这一手可能损失约 {0} 目——{1}。", "This move may cost about {0} points — {1}.", "이 수는 약 {0}집 손해일 수 있습니다. {1}", "この手は約{0}目損かもしれません。{1}"),
 
   // Why the move may cost points (the punishing line, or where the points went).
   "why.warn.selfAtari": m("{0}棋马上可以把它提掉", "{0} can capture it at once", "{0}이 바로 따낼 수 있습니다.", "{0}にすぐ取られます。"),
@@ -93,7 +164,6 @@ export const PLAY = {
   "why.warn.escapes": m("{1} 的{0}棋得以脱险", "{0}'s stones at {1} get away", "{1}의 {0} 돌이 살아납니다.", "{1}の{0}石が助かります。"),
   "why.warn.cut": m("{0}棋可以在 {1} 切断", "{0} can cut at {1}", "{0}이 {1}에서 끊을 수 있습니다.", "{0}に{1}で切られます。"),
   "why.warn.slow": m("这里已经定型，别处还有更大的地方", "this area is already settled, and there is more to gain elsewhere", "이곳은 이미 정리되었고, 다른 곳이 더 큽니다.", "ここはもう決まっています。他にもっと大きい所があります。"),
-
   // Why the hinted move is good (what the move itself does).
   "why.hint.capture1": m("可以提掉一子", "it captures a stone", "한 점을 따냅니다.", "一子を取れます。"),
   "why.hint.capture": m("可以提掉 {0} 子", "it captures {0} stones", "{0}점을 따냅니다.", "{0}子を取れます。"),
@@ -106,4 +176,27 @@ export const PLAY = {
   "why.hint.cut": m("把{0}棋分断", "it cuts {0} apart", "{0} 돌을 끊어 놓습니다.", "{0}を切り離します。"),
   "why.hint.atari": m("可以打吃", "it puts stones in atari", "상대 돌을 단수로 몹니다.", "相手の石をアタリにします。"),
   "why.hint.corner": m("占据空角", "it takes an empty corner", "빈 귀를 차지합니다.", "空き隅を占めます。"),
+
+  "tip.opening.1": m("开局先占角：角上最容易围空，星位和小目都是好点。", "Start in the corners: they are the easiest place to make territory. The 4-4 and 3-4 points are good first moves.", "포석은 귀부터: 귀가 집을 짓기 가장 쉽습니다. 화점과 소목이 좋은 첫 수입니다.", "布石はまず隅から。隅は地を作りやすく、星と小目がよい第一手です。"),
+  "tip.opening.2": m("占完角，再沿边拆开或守角；中腹最后再说。", "After the corners, approach, enclose or extend along the sides; the centre comes last.", "귀를 차지한 뒤에는 걸치거나 굳히고 변으로 벌립니다. 중앙은 마지막입니다.", "隅を打ったら、カカリ・シマリ・辺への開きへ。中央は最後です。"),
+  "tip.opening.3": m("对方逼近时先看自己的棋是否安全，再找大场。", "When the opponent comes close, check your own groups are safe before taking the next big point.", "상대가 다가오면 내 돌이 안전한지 먼저 살핀 뒤 큰 자리를 찾으세요.", "相手が近づいてきたら、まず自分の石の安全を確かめてから大場を探しましょう。"),
+
+  // The first 9×9 game, after the life basics.
+  "firstGame.play": m("下第一盘 9 路棋", "Play your first 9×9 game", "첫 9줄 대국 두기", "はじめての9路盤で打つ"),
+  "firstGame.invite": m("对手是最温和的电脑，指导棋模式开着。", "Against the gentlest computer, in teaching mode.", "가장 순한 컴퓨터와 지도 모드로 둡니다.", "いちばんやさしいコンピュータと、指導碁モードで打ちます。"),
+
+  // The first count, once.
+  "firstCount.note": m(
+    "双方连续停一手，对局就结束了。逃不掉的棋子是死子，要从棋盘上拿掉；点一块棋可以改它的死活。分数比的是双方围住的地，白棋后下，所以另加贴目。",
+    "The game ends when both players pass in a row. Stones that cannot escape are dead and come off the board; tap a group to mark it dead or alive. The score compares the points each side surrounds, and White adds komi for playing second.",
+    "두 사람이 연달아 패스하면 대국이 끝납니다. 살아날 수 없는 돌은 사석이 되어 판에서 들어내며, 돌 무리를 누르면 사석 여부를 바꿀 수 있습니다. 점수는 양쪽이 둘러싼 집을 비교하고, 백은 나중에 두므로 덤을 더합니다.",
+    "二人が続けてパスすると終局です。逃げられない石は死に石で盤から取り除き、石のかたまりをタップすると死活を切り替えられます。点数は双方が囲んだ地を比べ、白は後から打つのでコミを足します。",
+  ),
+
+  // A free board.
+  "board.open": m("摆棋", "Open board", "빈 바둑판", "自由に並べる"),
+  "board.free": m("自由摆棋", "Free board", "자유 바둑판", "自由盤"),
+  "board.freeHelp": m("在棋盘上随意落子，黑白交替。退回几手再下别处，就是一个变化。", "Place stones freely; Black and White alternate. Step back and play elsewhere to make a variation.", "바둑판에 자유롭게 돌을 놓으세요. 흑과 백이 번갈아 놓입니다. 몇 수 되돌아가 다른 곳에 두면 변화가 됩니다.", "盤に自由に石を置けます。黒と白が交互です。数手戻って別の所に打つと変化になります。"),
+  "board.size": m("棋盘大小", "Board size", "바둑판 크기", "盤の大きさ"),
+  "board.save": m("保存到棋谱", "Save to Library", "기보에 저장", "棋譜に保存"),
 };

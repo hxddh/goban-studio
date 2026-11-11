@@ -1,5 +1,5 @@
 /**
- * Shell: the macOS update helper's lock and "started" marker (v13), run for
+ * Shell: the macOS update helper's lock and "started" marker, run for
  * real with /bin/sh against a fake installation. Everything after the
  * marker needs macOS (ditto, open) and is covered by scripts/test-updater.mjs
  * on the release runners; here the copy step simply fails, which must

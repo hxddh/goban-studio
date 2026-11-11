@@ -11,13 +11,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function until(fn, ms = 8000, what = "condition") {
-  const end = Date.now() + ms;
-  while (!fn()) {
-    if (Date.now() > end) throw new Error("timed out waiting for " + what);
-    await sleep(5);
-  }
-}
 
 export default async function ({ test, assert, root }) {
   const { createScheduler, LANES, anySignal } = await import("../../src/web/js/scheduler.js");
@@ -46,7 +39,7 @@ export default async function ({ test, assert, root }) {
     all.push(s.search(slow(log, "move"), { lane: "move" }));
     assert.equal(s.snapshot().running, "background");
     const out = await Promise.all(all);
-    // v8: the move pre-empts the running background search, which runs again.
+    // The move pre-empts the running background search, which runs again.
     assert.deepEqual(log, ["bg0", "move", "look", "live", "bg0", "bg1", "bg2", "bg3", "bg4"]);
     assert.equal(out[0], "bg0", "the pre-empted background search still resolves its value");
   });
@@ -180,7 +173,7 @@ export default async function ({ test, assert, root }) {
     const src = (f) => fs.readFileSync(path.join(root, f), "utf8");
     const engine = src("src/web/js/engine.js");
     assert.doesNotMatch(engine, /function queued\(/);
-    for (const f of ["src/web/js/app/review-ctl.js", "src/web/js/app/play-ctl.js", "src/web/js/play/analysis.js"]) {
+    for (const f of ["src/web/js/app/review-position.js", "src/web/js/app/review-analysis.js", "src/web/js/app/review-nav.js", "src/web/js/app/review-edit.js", "src/web/js/app/review-insight.js", "src/web/js/app/review-try.js", "src/web/js/app/review-session.js", "src/web/js/app/review-board.js", "src/web/js/app/game-session.js", "src/web/js/app/game-end.js", "src/web/js/app/game-turn.js", "src/web/js/app/game-start.js", "src/web/js/play/analysis.js"]) {
       assert.doesNotMatch(src(f), /\.cancelled\b|summaryToken/, f);
     }
   });

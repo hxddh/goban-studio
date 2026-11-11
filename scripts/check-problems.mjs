@@ -14,13 +14,13 @@
  * life from the start, the answer ends in a position sekiInfo() calls seki)
  * and carry the "seki" theme; every "seki" theme problem has that goal. A
  * `shape` must name an entry of SHAPES (a classic textbook shape) with a
- * four-language name. The stored grade in problem-grades.json (v13: the human
+ * four-language name. The stored grade in problem-grades.json (the human
  * difficulty score of grade-problems.mjs and its features) must match a fresh
  * measurement. Across problems: no two share a position under the 8 board
  * symmetries (and colour swap); no theme makes up more than 40% of any grade;
  * the whole check stays within its time budget and no single problem is slow.
  *
- * Endgame problems (v6, goal "endgame", topic "endgame") are proved by the
+ * Endgame problems (goal "endgame", topic "endgame") are proved by the
  * solver's counting mode instead: the region is sealed, every count is exact
  * (no unsettled end can change it), the best move beats passing, there are
  * one to three correct first moves, and the stored `answer` and `margin`
@@ -38,7 +38,7 @@ import { GOALS as SOLVER_GOALS, createPuzzle, outsideReach, parseDiagram, valida
 import { GRADES_FILE, gradeProblem } from "./grade-problems.mjs";
 
 const TOPICS = new Set(["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"]);
-// v6: the themes of endgame problems (and of no other).
+// The themes of endgame problems (and of no other).
 const ENDGAME_THEMES = new Set(["hane-connect", "sente-gote", "reverse-sente", "double-sente", "monkey-jump", "endgame-compare", "deiri"]);
 const GOALS = new Set(SOLVER_GOALS);
 const LANGS = ["zh", "en", "ko", "ja"];

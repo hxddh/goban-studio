@@ -3,7 +3,7 @@
  *
  * Every practice problem in Goban Studio is checked by this module, in the
  * test suite and live in the app. A problem is a small position plus a goal
- * (capture, save, kill, live). Endgame problems (v6, goal "endgame") are
+ * (capture, save, kill, live). Endgame problems (goal "endgame") are
  * counted instead: see the counting section at the end of this file. The solver searches every reply inside the
  * problem's area, so:
  *
@@ -176,7 +176,7 @@ export function parseDiagram(rows) {
  * `replay`: a problem's region is its '.' points. With `replay` (the
  * default) the points of the diagram's stones join it once they are
  * captured, as on a real board (throw back in, retake, fill an eye).
- * `replay: false` keeps the pre-v4 model, where a captured point stays out
+ * `replay: false` is the simpler model, where a captured point stays out
  * of play; it exists only for experiments, and the problem and course checks
  * reject it, because an answer that needs a captured point to stay empty can
  * be refuted on a real board (see docs/problems-audit.md).
@@ -480,7 +480,7 @@ function posKey(st) {
 }
 
 /**
- * v13: the positions already played on a real line (a solution line, a
+ * The positions already played on a real line (a solution line, a
  * learner's attempt) before `st`, as posKeys. A search started from a
  * position on such a line treats them as part of its path, so positional
  * superko forbids recreating them exactly as it would in the game; without
@@ -650,11 +650,6 @@ function keyInfo(pz, board, keyIdx) {
     }
   }
   return { captured: false, minLibs, libs, libMin, chains, enemies, libSum };
-}
-
-/** Fewest liberties among the key chains (0 when a key stone is gone). */
-function keyLiberties(pz, board, keyIdx) {
-  return keyInfo(pz, board, keyIdx).minLibs;
 }
 
 /**
@@ -925,14 +920,14 @@ class Search {
     // history problem): it is returned but not stored, so another line that
     // reaches this position reads it afresh.
     //
-    // v13: once the node budget has run out, every unfinished subtree
+    // Once the node budget has run out, every unfinished subtree
     // answers "the attacker does not win", so an inexact result computed
     // after that point is an artefact of the budget, not of the depth: it
     // is returned (marked inexact) but never stored, or a later search with
     // budget left would read it back as a depth-limited result. Inexact
     // results stored before the budget ran out are depth-limited only.
     //
-    // v13: only a result that rests on no repetition at all is stored
+    // Only a result that rests on no repetition at all is stored
     // (dep === Infinity). Storing results whose repetition was found at
     // this very ply (dep === ply) let a position's value depend on the
     // order the search reached it: life-vital-20 proved one correct move as
@@ -998,7 +993,7 @@ export function solveFirstMoves(pz, budget = 600000, { deadline = Infinity } = {
   let nodes = 0;
   let exact = true;
   for (const m of moves) {
-    // v7 (problem import): a wall-clock limit; the result is then inexact.
+    // A wall-clock limit; the result is then inexact.
     if (Date.now() > deadline) {
       exact = false;
       return { correct: correct.map((i) => pointOf(pz, i)), tried: moves.length, nodes, exact, timedOut: true };
@@ -1013,14 +1008,23 @@ export function solveFirstMoves(pz, budget = 600000, { deadline = Infinity } = {
 
 /**
  * The learner's result from `st` with best play: "win" (unconditional),
- * "ko" (the learner gets a ko, i.e. wins only with enough ko threats) or
- * "loss". Independent of the problem's `ko` option.
+ * "ko" (the learner gets a ko, i.e. wins only with enough ko threats),
+ * "loss", or "unknown" when the search ran out of depth or nodes before it
+ * could prove one of them (a guess is never reported as a result).
+ * Independent of the problem's `ko` option. `budget` is the node limit of
+ * each search (the default when omitted).
  */
-export function outcome(pz, st) {
+export function outcome(pz, st, { budget } = {}) {
   if (pz.counting) return countStatus(pz, st) === "lost" ? "loss" : "win";
-  if (userWins(pz, st, undefined, false).win) return "win";
-  if (userWins(pz, st, undefined, true).win) return "ko";
-  return "loss";
+  const plain = userWins(pz, st, budget, false);
+  if (plain.exact && plain.win) return "win";
+  // As ko master the learner can only do better: a proved loss there is a
+  // loss outright, and a proved win there is a ko once the plain search
+  // has proved that there is no unconditional win.
+  const master = userWins(pz, st, budget, true);
+  if (!master.exact) return "unknown";
+  if (!master.win) return "loss";
+  return plain.exact ? "ko" : "unknown";
 }
 
 /**
@@ -1036,7 +1040,7 @@ export function reply(pz, st) {
   const keyIdx = keyIndices(pz);
   if (terminal(pz, st, keyIdx)) return null;
   const moves = candidates(pz, st, keyIdx);
-  // v13: only a proved loss is a refutation; an inexact one is unknown.
+  // Only a proved loss is a refutation; an inexact one is unknown.
   const loses = (r) => r.exact && !r.win;
   for (const m of moves) {
     if (loses(userWins(pz, m.next))) return { ...pointOf(pz, m.i), refutes: true };
@@ -1077,7 +1081,7 @@ export function status(pz, st) {
   const term = terminal(pz, st, keyIdx);
   const attackGoal = pz.userColor === pz.attacker;
   if (term) return (term > 0) === attackGoal ? "won" : "lost";
-  // v13: only proved results decide; an inexact search (out of depth or
+  // Only proved results decide; an inexact search (out of depth or
   // nodes) leaves the problem open.
   const wins = (r) => r.exact && r.win;
   const loses = (r) => r.exact && !r.win;
@@ -1229,13 +1233,29 @@ export function validate(pz, { maxCorrect = 3, first = null, line = null } = {})
 
 export { PASS };
 
-/** The learner's winning moves from `st` (learner to move). For hints. */
-export function winningMoves(pz, st) {
-  if (pz.counting) return countWinningMoves(pz, st);
+/**
+ * The learner's winning moves from `st` (learner to move). For hints.
+ *
+ * Only proved wins are listed: a move whose search ran out of depth or
+ * nodes is left out, since showing it as the answer would be a guess. The
+ * returned array has `exact` false when that happened to any candidate, so
+ * an empty list with `exact` false means "not known", not "no winning
+ * move". `budget` is the node limit of each search (the default when
+ * omitted).
+ */
+export function winningMoves(pz, st, { budget } = {}) {
+  if (pz.counting) {
+    const moves = countWinningMoves(pz, st);
+    moves.exact = true;
+    return moves;
+  }
   const keyIdx = keyIndices(pz);
   const out = [];
+  out.exact = true;
   for (const m of candidates(pz, st, keyIdx)) {
-    if (userWins(pz, m.next).win) out.push(pointOf(pz, m.i));
+    const r = userWins(pz, m.next, budget);
+    if (!r.exact) out.exact = false;
+    else if (r.win) out.push(pointOf(pz, m.i));
   }
   return out;
 }
@@ -1391,7 +1411,7 @@ export function signMap(pz, st) {
 /* -------------------------------------------------------------- counting */
 
 /**
- * Counting mode (v6): endgame problems, `goal: "endgame"`.
+ * Counting mode: endgame problems, `goal: "endgame"`.
  *
  * The solver proves an endgame answer by exact minimax counting of the
  * local position under Japanese counting: the score is territory plus
@@ -1925,7 +1945,7 @@ export function countValue(pz, st, bias = 0) {
  * Is Black's value from `st` independent of how unsettled ends are scored?
  * Returns { value, exact }.
  */
-export function countExact(pz, st) {
+function countExact(pz, st) {
   const r = countValue(pz, st);
   // No unsettled end was ever read: nothing to prove.
   if (!pz._sawUnsettled) return { ...r, exact: true };

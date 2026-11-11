@@ -362,3 +362,103 @@ SGF：
 B5：真实 learnPath，定级三级，回忆率 85%，60 天
   每天 3 道复习 + 2 道新题；待复习积压：第 15 天 10，第 30 天 17，第 60 天 54
 ```
+
+---
+
+## v14 落实情况
+
+记录日期：2026-11-11 · 对象：v14.0.0。以上各节是 v13 评审的原文，没有改动；本节只记录 §4 的建议在 v14 里做到了哪一步。“已做”指代码已合并并有测试；“部分”指只做了其中一段，表里写明缺的是哪一段；“未做”写明原因。行号以 v14.0.0 的代码为准。
+
+验证结果（本地，Node 24）：`npm run lint` 零警告；`npm test` 585 项；`npm run ui-test` 141 项；Zig 测试 72 项通过、3 项在 Linux 上跳过；`release-check` 通过（23 单元 · 104 课 · 377 步 · 543 题 · 20 名局）。
+
+先说三件没有照建议做的事：
+
+1. **没有先发 v13.0.1。** §4.0 的修复直接并进了 v14.0.0。
+2. **§4.4 的三项发布闸门一项都没有做。** 仍然没有真人测试、强棋手审阅、母语审校和读屏实测。
+3. **版本号没有按建议定为 v14.0.0-beta**，而是 v14.0.0；发布说明的“Known limits”第一条写明了“未经真人验证”。
+
+### §4.0 修错
+
+| 项 | 状态 | 依据或原因 |
+| --- | --- | --- |
+| B1 重命名；每个面板和菜单项的行为测试 | 已做 | `scripts/ui-tests/shell-sheets.mjs`：从源码读出全部面板种类和菜单项，漏列一个就失败 |
+| B2 全死数地 | 已做 | `rules.js`；`scripts/tests/core-rules.mjs`，三种规则 |
+| B3 中国流 | 部分 | 课程改为 Q16–Q3–R9（高 Q9），`scripts/make-book.mjs` 的表也已改，布局库里的错误标签已删（`core-book.mjs`）。**布局库没有用 KataGo 重建**，所以库里没有真正的中国流；**没有请强棋手过目**（`docs/lesson-audit.md` 列出了等待复核的四步） |
+| B4 做题水平按首见结果 | 已做 | `model/player.js` 的 `first`、`solvingLevel`；`model-progress.mjs` 模拟 18 级玩家 60 天不漂移 |
+| B5 复习优先于新题 | 已做 | `learnPath`：积压超过 3 道时复习可占满当天，每天至多 12 道；`model-progress.mjs` 60 天模拟积压有界；`docs/plan.md` 已按实际行为重写 |
+| B6 取消不计入强网络失败 | 已做 | `engine.js`（真正的失败休息 2 分钟后重试）；`core-engine-cancel.mjs` |
+| B7 用过悔棋或提示的对局不计分并说明 | 已做 | `recordGame` 的 `assisted`；`play.unrated.*` 四语言；`model-player.mjs` |
+| “中盘”（13 路）；macOS 首启与 Windows 数据位置说明 | 已做 | 新对局面板文案；`packaging/README-*.txt`、`scripts/signing-notes.mjs`、`docs/storage.md`；`shell-files.mjs` 核对路径 |
+| 错误边界 | 已做 | `app/feedback.jsx`、`parts.jsx` 的 `ErrorBoundary`、`ErrorCard`；`shell-sheets.mjs`“errors”一项 |
+
+### §4.1 易用
+
+| 项 | 状态 | 依据或原因 |
+| --- | --- | --- |
+| A 签名与公证 | 未做 | 需要仓库所有者办理 Apple Developer ID 和 Azure Trusted Signing；后者的工作流步骤也还没写（`docs/signing.md`）。v14 的包仍是 ad-hoc 签名（macOS）和未签名（Windows） |
+| A Windows 安装包 | 未做 | 仍是 zip；没有开始菜单、卸载和 WebView2 检查，`.sgf` 关联仍要手敲一条命令；WebView2 配置目录仍在应用文件夹里（里面没有用户数据） |
+| A DMG | 部分 | 有“应用程序”替身（`build-macos.yml`、`package.sh`）。没有背景图，也没有“移到应用程序”的首启提示 |
+| A 单实例 | 已做，未真机验证 | `src/instance.zig`（锁加收件箱）；Zig 单测在三个平台上通过。没有人在真实的 Mac 或 PC 上试过 |
+| A 代理、续传、进度、常驻标记 | 部分 | `src/net.zig`：环境变量、macOS 系统代理、Windows 注册表，HTTP CONNECT 隧道，Range 续传；侧栏状态行显示“正在下载 / 可以更新”（`app/status-chip.jsx`）。不支持 SOCKS 和 PAC；替换应用的那几秒仍然没有画面；系统代理的读取没有真机验证 |
+| A 打开数据文件夹；卸载后留下什么 | 已做，未真机验证 | 设置 → 数据（`studio.revealDataDir`）；两份包内 README 的“Uninstalling”一节 |
+| B 引导后落在“今天” | 已做 | `app/first-run.js`；`shell-first-run.mjs` |
+| B 中文默认中国规则；繁体中文 | 部分 | 新用户的规则随界面语言（`data/settings.js` `rulesForLang`；`shell-settings.mjs`），老用户保持原样。**没有繁体中文** |
+| B 9 路到 19 路之间加 13 路 | 已做 | `suggestedSize`；`shell-first-run.mjs`、`play-suggest.mjs` |
+| B 定级全错提前结束 | 已做 | `placementFloored`：前四题全错即止；`learn-placement.mjs` |
+| C 提示条重做；删除改为撤销 | 已做 | `app/store.js` `toast`、`feedback.jsx`；`data/games.js` `trashGame`；`shell-feedback.mjs` |
+| C 试下“保留 / 丢弃”；注释和标记可撤销；对局中 ← 不进复盘 | 已做 | `review-ctl.js` 的编辑历史；`play-edits.mjs`、界面测试 `play-edits.mjs` |
+| C 确认后可以重新数 | 部分 | `model/rerate.js`。只对 v14 起下完的对局有效，而且同一棋盘大小上之后不能已有计分的对局；v14 之前计过分的对局不能重数 |
+| C 未下完的对局单独一组 | 已做 | 棋谱页；`play-unfinished.mjs` |
+| C 悔棋后可以重做 | 已做 | `play-ctl.js`；⇧⌘Z 在 `app/shortcuts.js` |
+| C 离线引擎会停手、不填眼 | 已做 | `ai.js`；`core-ai.mjs` |
+| C SGF：合集、FF[3]、猜编码、粘贴、多文件 | 已做 | `sgf.js` `loadSGF`、`countGames`；`core-sgf-files.mjs`、`play-import.mjs`。猜编码对很短的名字可能猜错，会给出警告 |
+| C 懒加载的加载和重试状态 | 已做 | `parts.jsx` 的 `useAsync`、`Loading`；`shell-sheets.mjs`“dead clicks”两项 |
+
+### §4.2 精致
+
+| 项 | 状态 | 依据或原因 |
+| --- | --- | --- |
+| A 题型页改为局面网格并标状态 | 已做 | `learn/tile.jsx`、`catalog.jsx`；`learn-progress.mjs` |
+| A 题目标题不剧透 | 已做 | 解出前只显示目标，解出后显示名字 |
+| A 今日路径合并同类，理由具体 | 已做 | `learn/path.jsx`；界面测试 `learn-path.mjs` |
+| A 待复习数量；每日 3 / 5 / 10 | 已做 | `reviewLoad`；`settings.dailySize` |
+| A 级别名 | 已做 | 界面上是“难度 1–5”加对应的级位区间（`grade.band`） |
+| A 课程步骤拆短；目标栏用这一步自己的话 | 部分 | 18 个过长的步骤已拆开或删减，现在共 377 步；目标栏用了 `stepGoalText`。测试守住的上限是每步 170 个汉字（`course-steps.mjs`），不是评审建议的 120；没有逐步配图 |
+| B 等级分曲线、已掌握、四周点阵、里程碑、不显示 0 | 已做 | `app/today.jsx`；`ratingHistory`、`masteryByTheme`、`practiceDays`、`milestones`；`model-progress.mjs` |
+| C 深色棋盘、缩略图、音量、高对比棋盘 | 已做 | `theme.js` `boardPalette`、`thumb.js`、`audio.js`；`shell-board.mjs` |
+| D 两个“棋力”合一；每页不滚动；模型下载独立成组 | 已做 | 设置分七页；界面测试 `shell-settings.mjs` 在 1200×800、四语言、大字号下检查不滚动 |
+| D 图标语义；工具栏提示文字 | 已做 | `app/icons.js`；复盘工具栏 |
+| D 文案通改 | 部分 | 数据安全提示改为三句式，“练习”统一，去掉“我们”，没用到的字符串已删并有测试守住（`shell-strings.mjs`）。评审整理的 17 条没有逐条核对；新增的日文、韩文是开发者写的，没有母语者看过 |
+| D 课文、解说可以选中复制 | 已做 | `styles.css` 的 `user-select` 规则；`shell-sheets.mjs` 最后一项 |
+| E 名局每局至少 3 处解说；“猜下一手” | 部分 | 新增 4 处（吐血之局 3 处，AlphaGo 对李世石第 4 局第 79 手 1 处），现在 5 局共 9 处。**其余 15 局仍只有总评**；没有做“猜下一手”。新解说没有经强棋手审阅 |
+| E 题库补上限 | 未做 | 题库仍是 543 题，上限约 5 级，首见一律黑先。按“每道新题先经强棋手审阅”的原则，没有审阅人就不加 |
+| E 提示写到局面上 | 未做 | 仍是按题型的模板 |
+
+### §4.3 优雅
+
+| 项 | 状态 | 依据或原因 |
+| --- | --- | --- |
+| A ESLint、Prettier、`checkJs` | 部分 | ESLint 零警告，进了 `checks.yml`（`no-undef`、`no-unused-vars`、`react-hooks/rules-of-hooks`）。**没有 Prettier，没有 `jsconfig` 和类型检查** |
+| A 面板、菜单、设置页的行为测试；替换 grep 式测试 | 部分 | 前一半已做（`shell-sheets.mjs`、`shell-settings.mjs`）。读源码文本的旧测试大多还在 |
+| A 调试句柄不进生产；求解器移到 Worker | 部分 | `app/debug.js`：句柄只在测试下存在。求解器仍在主线程 |
+| B 按领域分层；store 切片；拆大控制器；去掉 `export *` | 部分 | `controller.js` 只剩 54 行具名转出；`play-ctl`、`review-ctl`、`model/player.js`、`sheets.jsx` 各拆成若干不超过约 550 行的模块，旧路径只留转出；导入环 2 → 0，`data/` 不再引用 `app/`（`shell-structure.mjs` 守住）。**store 仍是一个全局对象、整树重渲染**；`review.jsx`、`practice-ctl.js` 等 7 个文件仍超过 600 行 |
+| C `learn` → `practice`；合并 `v13-*.js`；删考古注释 | 已做 | 空间 id、目录、测试文件和样式类都叫 `practice`；文案按区域分成 6 个文件，每个键前缀只在一个文件里，40 个 `v13.*` 键按含义改名（`shell-strings.mjs` 守住）；带版本号的注释从 691 行减到 164 行，剩下的是存储格式版本这类事实 |
+| C README 重写；`design.md`、`usability.md` 更新 | 已做 | README 只写现状，`release-check` 核对其中的数量并拒绝按版本写的标题；`design.md` §7 按现在的界面重写；`usability.md` 的任务已更新，并在标题里写明测试没有做过 |
+| D 样式表重建；令牌覆盖率 | 已做 | `styles.css` 按 18 个固定顺序的分区重排，仍是一个文件；间距 72% → 95%、圆角 66% → 94%、阴影和层级 100%，`:root` 之外不再写颜色；`shell-styles.mjs` 守住覆盖率，并核对 `design.md` 的令牌表与样式表逐值一致 |
+| D 深色 `--bad` 配对；英文界面里的日文人名 | 部分 | 加了 `--on-bad` 等令牌，深色下约 6.8:1。棋谱行和复盘标题里含假名或谚文的人名带上了语言标记；只有汉字的人名无法判断，仍按界面语言的字体 |
+| E 合并 JSON 写入器；抽出下载代码；拆 `main.zig` | 部分 | `src/json.zig`、`src/net.zig`、`src/paths.zig`、`src/instance.zig`。`main.zig` 仍有约 2400 行 |
+| E 签名绑定版本；密钥进受保护的 environment；演练不签名 | 已做，待所有者配置 | `SHA256SUMS` 里的 `VERSION` 行、`install.zig` `sumsBinding`、解包后核对 `build-info.json`；`release.yml` 的 `sign` 作业（`shell-ci.mjs` 守住）。**密钥还没有生成，`release-signing` 环境要由所有者创建**，所以本版的更新仍只有校验和 |
+| E Native SDK 进 lockfile；去掉 `upload` 侧门 | 已做 | `package.json` 精确版本加 lockfile 哈希，`scripts/native-sdk.mjs`；两个构建工作流不再有 `upload` 作业 |
+| E 改动壳层的 PR 在 macOS 和 Windows 上编译并跑单测 | 已做 | `checks.yml` 的 `native-hosts` 作业；它已经查出过一个只在 Windows 上失败的测试 |
+
+### §4.4 发布闸门
+
+| 项 | 状态 | 原因 |
+| --- | --- | --- |
+| 5 + 5 人可用性测试 | 未做 | 开发环境里找不到也观察不了真人。协议里的过时任务已改好，随时可以执行（`docs/usability.md`） |
+| 强棋手通读 v13 新单元和名局解说 | 未做 | 没有审阅人。v14 改过的中国流和新增的 4 处名局解说同样没有人看过 |
+| 中、日、韩母语审校；VoiceOver 和 NVDA 实测 | 未做 | 没有审校人；`docs/l10n/README.md` 的审校记录仍是空的。读屏只有 Chromium 里的自动检查 |
+
+### 小结
+
+§4.0 的九项里八项已做，B3 做了一半。§4.1 和 §4.2 里凡是只靠代码就能完成的，大多已做；没做的集中在三类：要所有者出面的（证书、签名密钥、安装包），要真人参与的（§4.4 全部，以及依赖强棋手的内容扩充），和 §4.3 B–D 的结构重构。评审对 v14 的定位是“精致、易用”要由真人来验证，这一点 v14 没有做到，发布说明如实写了。

@@ -2,7 +2,7 @@
  * Core: the engine — the offline opponent, KataGo replies and the bridge, the calibrated ladder and human-style moves.
  */
 import { implOpponent, thetaToGoR } from "../../src/web/js/model/player.js";
-import { test, BLACK, DEFAULT_SETTINGS, EMPTY, Game, HUMAN_VISITS, S, SAMPLE_INFO, STRENGTHS, STRONG_VISIT_SCALE, WHITE, analyse, analysisEngine, anchorMap, assert, beginnerMove, calibrated, chooseMove, defaultKomi, egfExpected, egfNats, empty, enginePayload, fitBT, fs, goRLabel, humanMoveFromAnalysis, humanRequest, humanStyleParams, installed, katagoRules, loadSGF, moveFromAnalysis, mulberry32, newGame, parse, parseInfo, parseVertex, path, pickCandidate, positionPayload, profileGoR, rankParts, root, scaledVisits, setup, suggestHandicap, wilson } from "./helpers.mjs";
+import { test, BLACK, DEFAULT_SETTINGS, EMPTY, Game, HUMAN_VISITS, SAMPLE_INFO, STRENGTHS, STRONG_VISIT_SCALE, WHITE, analyse, analysisEngine, anchorMap, assert, beginnerMove, calibrated, chooseMove, defaultKomi, egfExpected, egfNats, enginePayload, fitBT, fs, goRLabel, humanMoveFromAnalysis, humanRequest, humanStyleParams, installed, katagoRules, loadSGF, moveFromAnalysis, mulberry32, newGame, parseInfo, parseVertex, path, pickCandidate, positionPayload, profileGoR, rankParts, root, scaledVisits, suggestHandicap, wilson } from "./helpers.mjs";
 
 await test("rules: KataGo is told the game's rules", async () => {
   // Async (structured) payload.
@@ -44,7 +44,7 @@ await test("rules: KataGo is told the game's rules", async () => {
   }
 });
 
-await test("a host without the async command cannot search: no synchronous fallback (v13)", async () => {
+await test("a host without the async command cannot search: no synchronous fallback", async () => {
   const commands = [];
   globalThis.zero = {
     invoke: async (command) => {
@@ -103,7 +103,7 @@ await test("the strength ladder keeps strong levels exact and weak levels inside
   // White's point of view flips the score lead: K10 is White's best here.
   assert.deepEqual(pickCandidate(analysis, WHITE, { ...calibrated("2d"), temp: 0 }), { x: 3, y: 15 });
   assert.equal(new Set(STRENGTHS.map((s) => s.id)).size, STRENGTHS.length);
-  // One stone per rank of the rank the opponent plays at (v9: a number, the measured rank shown).
+  // One stone per rank of the rank the opponent plays at (a number, the measured rank shown).
   assert.equal(suggestHandicap(25, 18, 19), 7);
   assert.equal(suggestHandicap(15, 12, 19), 3);
   assert.equal(suggestHandicap(10, 12, 19), 0);
@@ -352,7 +352,7 @@ await test("every level has a valid human SL profile, in ladder order", () => {
     return m[2] === "k" ? -Number(m[1]) : Number(m[1]);
   };
   let prev = -Infinity;
-  // v7: beginner moves fall up the ladder within each style (the search
+  // Beginner moves fall up the ladder within each style (the search
   // style at 5k needs its own to play at the level, docs/strength.md v7).
   const prevBlunder = { raw: Infinity, search: Infinity };
   for (const s of STRENGTHS) {
@@ -374,7 +374,7 @@ await test("every level has a valid human SL profile, in ladder order", () => {
   assert.equal(humanRequest({ profile: "rank_10k", style: "bogus" }).humanStyle, "raw");
   assert.deepEqual(enginePayload({ engine: "human", profile: "rank_12k", humanStyle: "search" }), { engine: "human", profile: "rank_12k", humanStyle: "search" });
   assert.deepEqual(enginePayload({ engine: "strong", profile: "x" }), { engine: "strong" });
-  // The standard engine sends exactly the v4 request.
+  // The standard engine adds nothing to the request.
   assert.deepEqual(enginePayload({}), {});
 });
 
@@ -437,7 +437,7 @@ await test("strength: the calibration fit can hold the measured ladder and place
 
 await test("strength: human-style and stronger-network labels follow the measurement", async () => {
   const E = await import("../../src/web/js/engine.js");
-  // v7 values (docs/strength.md, v7); v9 shows each implementation's own
+  // Values (docs/strength.md, v7): each implementation shows its own
   // measured rank: human-style 2d measured 7 dan, the stronger network 8.
   assert.equal(E.implLabel("HL:1k"), 1);
   assert.equal(E.implLabel("HL:2d"), -6);

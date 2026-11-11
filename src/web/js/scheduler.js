@@ -1,5 +1,5 @@
 /**
- * v7: the engine scheduler. Every KataGo search the app makes goes through
+ * The engine scheduler. Every KataGo search the app makes goes through
  * one of these lanes, highest first:
  *
  *   move         the computer's move, and a hint the player is waiting on
@@ -12,7 +12,7 @@
  * One search runs at a time (the host's KataGo serves one request; a new one
  * would supersede the running one). When a search ends, the next one comes
  * from the highest lane that has work queued, so nothing new from a lower
- * lane starts while higher work waits. v8: a computer's move (the move
+ * lane starts while higher work waits. A computer's move (the move
  * lane) also pre-empts a background search that is already running: that
  * search is stopped and goes back to the front of its lane, and its caller
  * simply gets the result of the second run (a report keeps the positions it
@@ -24,7 +24,12 @@
  *   search(fn, { lane, signal })   queue one search; fn(signal) runs when its
  *                                  turn comes. Resolves fn's value, or null
  *                                  when the signal aborts first (a queued
- *                                  search then never runs).
+ *                                  search then never runs). A caller that
+ *                                  must tell "cancelled" from "the engine
+ *                                  gave nothing" passes `status: {}`: its
+ *                                  `cancelled` is set to true when the
+ *                                  search was stopped by its signal, by
+ *                                  cancelLanes or by cancelAll.
  *   ownerSignal(owner)             the signal of a named owner ("game:3",
  *                                  "review:2", "reports", …). Everything
  *                                  started with it stops on cancelOwner.
@@ -50,7 +55,7 @@ const laneIndex = (lane) => {
  * Abort `target` (an AbortController) when any of `signals` aborts.
  * Returns the function that detaches the listeners again.
  */
-export function linkSignals(target, signals) {
+function linkSignals(target, signals) {
   const offs = [];
   for (const s of signals) {
     if (!s) continue;
@@ -147,7 +152,7 @@ export function createScheduler() {
     });
   }
 
-  /** v8: stop a running background search for a move; it runs again later. */
+  /** Stop a running background search for a move; it runs again later. */
   function preempt() {
     const e = running;
     if (!e || e.lane !== LANES.length - 1 || !e.preemptible || e.preempted || !e.run) return;
@@ -157,11 +162,17 @@ export function createScheduler() {
   }
 
   /** Queue one search. See the file comment. */
-  function search(fn, { lane = "background", signal = null, preemptible = true } = {}) {
+  function search(fn, { lane = "background", signal = null, preemptible = true, status = null } = {}) {
     const li = laneIndex(lane);
     return new Promise((resolve, reject) => {
-      if (signal?.aborted) return resolve(null);
+      if (signal?.aborted) {
+        if (status) status.cancelled = true;
+        return resolve(null);
+      }
       const ctl = new AbortController();
+      // Whatever stops the entry (the caller's signal, cancelLanes,
+      // cancelAll) aborts this controller; a pre-emption does not.
+      if (status) ctl.signal.addEventListener("abort", () => (status.cancelled = true), { once: true });
       const entry = { lane: li, fn, ctl, resolve, reject, state: "queued", unlink: () => {}, preemptible, preempted: false, run: null };
       ctl.signal.addEventListener(
         "abort",

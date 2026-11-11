@@ -1,7 +1,8 @@
 /**
- * Core: the problem solver — life and death, ladders, nets, snapbacks, ko, seki, capturing races and the endgame counting model.
+ * Core: the problem solver — life and death, ladders, nets, snapbacks, ko, seki, capturing races and
+ * the endgame counting model; a search cut short by its node budget is unknown, never a result.
  */
-import { test, BLACK, EG_DOUBLE, EG_HANE, PROBLEMS, RACE, S, SEKI, WHITE, assert, egLine, egPuzzle, empty, execFileSync, libertiesAt, localCorrect, path, race, replay, results, root } from "./helpers.mjs";
+import { test, BLACK, EG_DOUBLE, EG_HANE, PROBLEMS, RACE, S, SEKI, WHITE, assert, egLine, egPuzzle, execFileSync, libertiesAt, localCorrect, path, race, root } from "./helpers.mjs";
 
 await test("the solver proves classic shapes: straight three dies, straight four lives", () => {
   const straight3 = S.createPuzzle({ goal: "kill", diagram: [". . . O X ,", "o O O O X ,", "X X X X X ,", ", , , , , ,"] });
@@ -328,4 +329,83 @@ await test("endgame: the monkey jump is the large knight's slide from the second
   const first = rows.length - 1;
   assert.equal(m.y, first);
   assert.equal(rows[second][m.x - 3], "X", "a black second-line stone a large knight's move away");
+});
+
+await test("the solver never reports a search cut short by its budget as a result", () => {
+  const diagram = [". . . . . . . . .", ". . . . . . . . .", ". . . . . . . . .", ". . X o . . . . .", ". . . X X . . . .", ". . . . . . . . ."];
+  const pz = S.createPuzzle({ goal: "capture", diagram });
+  const st = S.initialState(pz);
+  // With the default budget the ladder is read out: one winning move, proved.
+  const full = S.winningMoves(pz, st);
+  assert.deepEqual([...full], [{ x: 3, y: 2 }]);
+  assert.equal(full.exact, true);
+  assert.equal(S.outcome(pz, st), "win");
+  // With a budget of a few nodes nothing can be proved: no move is offered
+  // as the answer and the outcome is unknown, not a win or a loss.
+  const tiny = S.createPuzzle({ goal: "capture", diagram });
+  const none = S.winningMoves(tiny, S.initialState(tiny), { budget: 3 });
+  assert.deepEqual([...none], []);
+  assert.equal(none.exact, false);
+  assert.equal(S.outcome(tiny, S.initialState(tiny), { budget: 3 }), "unknown");
+  // The tiny searches left nothing behind that a full search would trust.
+  assert.deepEqual([...S.winningMoves(tiny, S.initialState(tiny))], [{ x: 3, y: 2 }]);
+  assert.equal(S.outcome(tiny, S.initialState(tiny)), "win");
+  // A position the learner has lost is still a proved loss.
+  const wrong = S.play(pz, st, S.indexOf(pz, 4, 3));
+  const after = S.play(pz, wrong, S.indexOf(pz, 3, 2));
+  assert.equal(S.outcome(pz, after), "loss");
+  const cold = S.createPuzzle({ goal: "capture", diagram });
+  const lost = S.play(cold, S.play(cold, S.initialState(cold), S.indexOf(cold, 4, 3)), S.indexOf(cold, 3, 2));
+  assert.equal(S.outcome(cold, lost, { budget: 1 }), "unknown");
+});
+
+/* ------------------------------------------------- searches cut short by the node budget */
+
+const LADDER = [". . . . . . . . .", ". . . . . . . . .", ". . . . . . . . .", ". . X o . . . . .", ". . . X X . . . .", ". . . . . . . . ."];
+
+await test("solver: a search out of nodes stores nothing inexact, and a later full search is unaffected", () => {
+  const pz = S.createPuzzle({ goal: "capture", diagram: LADDER });
+  const st = S.initialState(pz);
+  const right = S.play(pz, st, S.indexOf(pz, 3, 2));
+  const tiny = S.attackerWins(pz, right, 3);
+  assert.equal(tiny.exact, false);
+  // Every node the tiny search left was cut short by the budget: none of its
+  // results may be read back later as a (depth-limited) result.
+  for (const tt of Object.values(pz._tt)) for (const e of tt.values()) assert.equal(e.exact, true);
+  // Tiny searches from every first move, then the real proof: the same
+  // answer as on a fresh puzzle.
+  for (let x = 0; x < pz.size; x++) {
+    for (let y = 0; y < pz.size; y++) {
+      const n = S.play(pz, st, S.indexOf(pz, x, y));
+      if (n) for (const budget of [2, 7, 40]) S.attackerWins(pz, n, budget);
+    }
+  }
+  const fresh = S.createPuzzle({ goal: "capture", diagram: LADDER });
+  const a = S.solveFirstMoves(pz);
+  const b = S.solveFirstMoves(fresh);
+  assert.equal(a.exact, true);
+  assert.deepEqual(a.correct, b.correct);
+  assert.deepEqual(a.correct, [{ x: 3, y: 2 }]);
+});
+
+await test("solver: reply() and status() treat an inexact search as open, not as a win or a loss", () => {
+  const pz = S.createPuzzle({ goal: "capture", diagram: LADDER });
+  // Too shallow to read the ladder out: every search is inexact.
+  pz.maxDepth = 2;
+  const st = S.initialState(pz);
+  const right = S.play(pz, st, S.indexOf(pz, 3, 2));
+  assert.equal(S.attackerWins(pz, right, 1000).exact, false);
+  // The learner (to move) has not lost: the search simply does not know.
+  assert.equal(S.status(pz, st), "open");
+  // After the right move the opponent answers, and nothing is decided.
+  assert.equal(S.status(pz, right), "open");
+  const r = S.reply(pz, right);
+  assert.ok(r, "the opponent still answers");
+  assert.equal(r.refutes, false, "an unproved line is not a refutation");
+  // With the full depth the same positions are proved as before.
+  const full = S.createPuzzle({ goal: "capture", diagram: LADDER });
+  const st2 = S.initialState(full);
+  const wrong = S.play(full, st2, S.indexOf(full, 4, 3));
+  assert.equal(S.reply(full, wrong).refutes, true);
+  assert.equal(S.status(full, S.play(full, st2, S.indexOf(full, 3, 2))), "open");
 });

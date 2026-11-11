@@ -20,7 +20,11 @@
 //!     before that rename.
 //!   * A stopped or failed download keeps its `.part`; the next download
 //!     resumes it with an HTTP Range request (and starts over when the
-//!     server ignores the range).
+//!     server ignores the range). A connection that breaks off mid-file is
+//!     retried a few times by the same download, continuing where it
+//!     stopped.
+//!   * Requests go through the proxy the environment or the system names
+//!     (net.zig), and follow redirects only to GitHub's download hosts.
 //!   * Free space is checked before the transfer starts (macOS, Windows).
 //!
 //! Threads: one short-lived thread per download. The UI thread reads the
@@ -33,6 +37,8 @@
 //! download from `idleMs` and the player can cancel and retry.
 const std = @import("std");
 const builtin = @import("builtin");
+const json = @import("json.zig");
+const net = @import("net.zig");
 
 pub const Kind = enum(u2) { human = 0, strong = 1 };
 pub const kind_count = 2;
@@ -98,6 +104,8 @@ pub const disk_margin_bytes: u64 = 64 * 1024 * 1024;
 /// Threads that may still be running (cancelled, stalled) before a new
 /// download is refused with `Busy`.
 const max_running: u32 = 4;
+/// Broken connections in a row (without a byte) before a download fails.
+const max_network_retries: u32 = 4;
 const chunk_bytes = 256 * 1024;
 const user_agent = "GobanStudio-model-download";
 
@@ -122,9 +130,9 @@ pub const Manager = struct {
     lock: std.Io.Mutex = .init,
     dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     dir_len: usize = 0,
-    /// Tests behind a proxy: use the environment's proxy settings. The app
-    /// leaves this null (no proxy, like the update check).
-    proxy_env: ?*std.process.Environ.Map = null,
+    /// Where the proxy settings are read from (net.zig); set once by
+    /// `main`. Null: always connect directly.
+    env: ?*const std.process.Environ.Map = null,
 
     // --- guarded by `lock`
     slots: [kind_count]Slot = [_]Slot{.{}} ** kind_count,
@@ -418,16 +426,26 @@ pub const Manager = struct {
         _ = self.progress(kind, gen, offset);
 
         if (offset < s.size) {
-            var client: std.http.Client = .{ .allocator = allocator, .io = self.io };
-            defer client.deinit();
-            var arena: std.heap.ArenaAllocator = .init(allocator);
-            defer arena.deinit();
-            if (self.proxy_env) |env| client.initDefaultProxies(arena.allocator(), env) catch {};
-            self.transfer(&client, kind, gen, file, chunk, &offset, &hasher) catch |err| {
-                var outcome = Outcome.fail(transferErrorName(err), offset);
-                outcome.failed.detail = @errorName(err);
-                return outcome;
-            };
+            // Through the proxy the environment or the system names, if any.
+            var session: net.Session = undefined;
+            session.init(allocator, self.io, self.env, "github.com");
+            defer session.deinit();
+            var failures: u32 = 0;
+            while (true) {
+                const before = offset;
+                self.transfer(&session, kind, gen, file, chunk, &offset, &hasher) catch |err| {
+                    // A connection that broke off: ask for the rest, a few
+                    // times, as long as this is still the live attempt.
+                    if (err == error.Network) {
+                        failures = if (offset > before) 1 else failures + 1;
+                        if (failures <= max_network_retries and self.waitRetry(kind, gen, net.retryDelayMs(failures))) continue;
+                    }
+                    var outcome = Outcome.fail(transferErrorName(err), offset);
+                    outcome.failed.detail = @errorName(err);
+                    return outcome;
+                };
+                break;
+            }
         }
 
         if (!self.setStatus(kind, gen, .verifying)) return Outcome.fail("Cancelled", offset);
@@ -453,10 +471,52 @@ pub const Manager = struct {
         return .ready;
     }
 
-    /// GET (or resume) the pinned URL into `file` from `offset.*`.
+    /// Sleep `ms` before a retry, in short steps. False: cancelled.
+    fn waitRetry(self: *Manager, kind: Kind, gen: u64, ms: i64) bool {
+        var left = ms;
+        while (left > 0) : (left -= 250) {
+            if (!self.setStatus(kind, gen, .downloading)) return false;
+            std.Io.sleep(self.io, .fromMilliseconds(250), .awake) catch {};
+        }
+        return self.setStatus(kind, gen, .downloading);
+    }
+
+    /// Where a transfer's bytes go: the `.part`, written (and hashed) only
+    /// while this is the live attempt.
+    const PartSink = struct {
+        manager: *Manager,
+        kind: Kind,
+        gen: u64,
+        file: std.Io.File,
+        offset: *u64,
+        hasher: *std.crypto.hash.sha2.Sha256,
+
+        fn sinkWrite(context: *anyopaque, bytes: []const u8, at: u64) anyerror!void {
+            const ctx: *PartSink = @ptrCast(@alignCast(context));
+            try ctx.manager.writeChunk(ctx.kind, ctx.gen, ctx.file, bytes, at);
+            ctx.hasher.update(bytes);
+            ctx.offset.* = at + bytes.len;
+        }
+
+        fn sinkRestart(context: *anyopaque) anyerror!void {
+            const ctx: *PartSink = @ptrCast(@alignCast(context));
+            try ctx.manager.truncate(ctx.kind, ctx.gen, ctx.file);
+            ctx.offset.* = 0;
+            ctx.hasher.* = std.crypto.hash.sha2.Sha256.init(.{});
+        }
+
+        fn sinkProgress(context: *anyopaque, received: u64, total: u64) bool {
+            _ = total;
+            const ctx: *PartSink = @ptrCast(@alignCast(context));
+            return ctx.manager.progress(ctx.kind, ctx.gen, received);
+        }
+    };
+
+    /// GET (or resume) the pinned URL into `file` from `offset.*`, which
+    /// follows the bytes as they are stored.
     fn transfer(
         self: *Manager,
-        client: *std.http.Client,
+        session: *net.Session,
         kind: Kind,
         gen: u64,
         file: std.Io.File,
@@ -465,53 +525,21 @@ pub const Manager = struct {
         hasher: *std.crypto.hash.sha2.Sha256,
     ) !void {
         const s = spec(kind);
-        var range_buf: [64]u8 = undefined;
-        const range = try std.fmt.bufPrint(&range_buf, "bytes={d}-", .{offset.*});
-        const resume_headers = [_]std.http.Header{.{ .name = "range", .value = range }};
-        const uri = try std.Uri.parse(s.url);
-        var req = try client.request(.GET, uri, .{
-            .keep_alive = false,
-            .redirect_behavior = @enumFromInt(5),
-            .headers = .{
-                .user_agent = .{ .override = user_agent },
-                .accept_encoding = .omit,
-            },
-            // Kept across the redirect to GitHub's asset host.
-            .extra_headers = if (offset.* > 0) &resume_headers else &.{},
-        });
-        defer req.deinit();
-        try req.sendBodiless();
-        var redirect_buf: [8 * 1024]u8 = undefined;
-        var response = try req.receiveHead(&redirect_buf);
-        const status = @intFromEnum(response.head.status);
-        if (status == 416 and offset.* == s.size) return;
-        if (status == 200) {
-            if (offset.* > 0) {
-                // The server ignored the range: start over.
-                try self.truncate(kind, gen, file);
-                offset.* = 0;
-                hasher.* = std.crypto.hash.sha2.Sha256.init(.{});
-            }
-            if (response.head.content_length) |len| {
-                if (len != s.size) return error.SizeMismatch;
-            }
-        } else if (status == 206) {
-            if (!contentRangeMatches(response.head, offset.*, s.size)) return error.SizeMismatch;
-        } else return error.HttpStatus;
-        if (response.head.content_encoding != .identity) return error.HttpStatus;
-
-        var transfer_buf: [64]u8 = undefined;
-        const reader = response.reader(&transfer_buf);
-        while (true) {
-            const n = reader.readSliceShort(chunk) catch return error.Network;
-            if (n == 0) break;
-            if (offset.* + n > s.size) return error.SizeMismatch;
-            try self.writeChunk(kind, gen, file, chunk[0..n], offset.*);
-            hasher.update(chunk[0..n]);
-            offset.* += n;
-            if (!self.progress(kind, gen, offset.*)) return error.Cancelled;
-        }
-        if (offset.* != s.size) return error.Network;
+        var ctx: PartSink = .{ .manager = self, .kind = kind, .gen = gen, .file = file, .offset = offset, .hasher = hasher };
+        const stored = try net.fetch(session, .{
+            .url = s.url,
+            .user_agent = user_agent,
+            .offset = offset.*,
+            .expected_size = s.size,
+            .max_bytes = s.size,
+        }, .{
+            .context = &ctx,
+            .write = PartSink.sinkWrite,
+            .restart = PartSink.sinkRestart,
+            .progress = PartSink.sinkProgress,
+        }, chunk);
+        offset.* = stored;
+        if (stored != s.size) return error.Network;
     }
 };
 
@@ -534,33 +562,16 @@ fn transferErrorName(err: anyerror) []const u8 {
         error.WriteFailed => "WriteFailed",
         error.SizeMismatch => "SizeMismatch",
         error.HttpStatus => "HttpStatus",
-        error.TooManyHttpRedirects => "HttpStatus",
+        error.BadRedirect, error.NoAsset, error.TooLarge => "HttpStatus",
         error.OutOfMemory => "OutOfMemory",
         else => "Network",
     };
 }
 
 /// `Content-Range: bytes <offset>-<size-1>/<size>`.
-fn contentRangeMatches(head: std.http.Client.Response.Head, offset: u64, size: u64) bool {
-    var it = head.iterateHeaders();
-    while (it.next()) |h| {
-        if (!std.ascii.eqlIgnoreCase(h.name, "content-range")) continue;
-        return parseContentRange(h.value, offset, size);
-    }
-    return false;
-}
-
 pub fn parseContentRange(value: []const u8, offset: u64, size: u64) bool {
-    const v = std.mem.trim(u8, value, " \t");
-    if (!std.mem.startsWith(u8, v, "bytes ")) return false;
-    const rest = v["bytes ".len..];
-    const dash = std.mem.indexOfScalar(u8, rest, '-') orelse return false;
-    const slash = std.mem.indexOfScalar(u8, rest, '/') orelse return false;
-    if (slash < dash) return false;
-    const first = std.fmt.parseInt(u64, rest[0..dash], 10) catch return false;
-    const last = std.fmt.parseInt(u64, rest[dash + 1 .. slash], 10) catch return false;
-    const total = std.fmt.parseInt(u64, rest[slash + 1 ..], 10) catch return false;
-    return first == offset and total == size and last + 1 == size;
+    const range = net.parseContentRange(value) orelse return false;
+    return range.first == offset and range.total == size and range.last + 1 == size;
 }
 
 fn nowMs(io: std.Io) i64 {
@@ -641,32 +652,26 @@ pub fn freeBytes(io: std.Io, path: []const u8) ?u64 {
 /// `{"human":{...},"strong":{...},"dir":"…"}` for `studio.modelStatus`.
 pub fn statusJson(self: *Manager, out: []u8) ?[]const u8 {
     var n: usize = 0;
-    if (!append(out, &n, "{\"available\":")) return null;
-    if (!append(out, &n, if (self.dir_len > 0) "true" else "false")) return null;
+    if (!json.append(out, &n, "{\"available\":")) return null;
+    if (!json.appendBool(out, &n, self.dir_len > 0)) return null;
     for (specs) |s| {
         const snap = self.snapshot(s.kind);
-        const part = std.fmt.bufPrint(out[n..], ",\"{s}\":{{\"status\":\"{s}\",\"bytes\":{d},\"total\":{d},\"idleMs\":{d},\"needed\":{d},\"name\":\"{s}\",\"error\":\"{s}\",\"detail\":\"{s}\"}}", .{
-            @tagName(s.kind),
-            @tagName(snap.status),
-            snap.bytes,
-            snap.total,
-            snap.idle_ms,
-            snap.needed,
-            s.name,
-            snap.error_name,
-            snap.detail,
-        }) catch return null;
-        n += part.len;
+        const ok = json.append(out, &n, ",") and
+            json.appendString(out, &n, @tagName(s.kind)) and
+            json.append(out, &n, ":{\"status\":") and
+            json.appendString(out, &n, @tagName(snap.status)) and
+            json.append(out, &n, ",\"bytes\":") and json.appendInt(out, &n, snap.bytes) and
+            json.append(out, &n, ",\"total\":") and json.appendInt(out, &n, snap.total) and
+            json.append(out, &n, ",\"idleMs\":") and json.appendInt(out, &n, snap.idle_ms) and
+            json.append(out, &n, ",\"needed\":") and json.appendInt(out, &n, snap.needed) and
+            json.append(out, &n, ",\"name\":") and json.appendString(out, &n, s.name) and
+            json.append(out, &n, ",\"error\":") and json.appendString(out, &n, snap.error_name) and
+            json.append(out, &n, ",\"detail\":") and json.appendString(out, &n, snap.detail) and
+            json.append(out, &n, "}");
+        if (!ok) return null;
     }
-    if (!append(out, &n, "}")) return null;
+    if (!json.append(out, &n, "}")) return null;
     return out[0..n];
-}
-
-fn append(buf: []u8, n: *usize, text: []const u8) bool {
-    if (n.* + text.len > buf.len) return false;
-    @memcpy(buf[n.*..][0..text.len], text);
-    n.* += text.len;
-    return true;
 }
 
 // ------------------------------------------------------------------ tests
@@ -722,8 +727,8 @@ test "scan reports ready, partial and corrupt files; remove clears them" {
     try std.testing.expect(!m.isReady(.human));
 
     var json_buf: [2048]u8 = undefined;
-    const json = statusJson(m, &json_buf).?;
-    try std.testing.expect(std.mem.indexOf(u8, json, "\"strong\":{\"status\":\"partial\",\"bytes\":10,") != null);
+    const status_text = statusJson(m, &json_buf).?;
+    try std.testing.expect(std.mem.indexOf(u8, status_text, "\"strong\":{\"status\":\"partial\",\"bytes\":10,") != null);
 
     try m.remove(.human);
     try m.remove(.strong);

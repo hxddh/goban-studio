@@ -28,7 +28,7 @@ import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 import { humanMoveProbabilities } from "../katago.js";
 import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
-import { recordGame } from "../model/player.js";
+import { recordGame } from "../model/record.js";
 import { changeProfile } from "../app/ctl-core.js";
 
 /* ---------------------------------------------------------- one pass */
@@ -103,7 +103,7 @@ function recordOf(id) {
 }
 
 /** The player's colour in a record (null: two people, or an imported game). */
-export const humanColorOf = (rec) => (rec?.opponent === "ai" ? (rec.humanColor === -1 ? -1 : 1) : null);
+const humanColorOf = (rec) => (rec?.opponent === "ai" ? (rec.humanColor === -1 ? -1 : 1) : null);
 
 /** A game played here (not imported), long enough to analyse. */
 export function isOwnGame(rec) {
@@ -150,13 +150,13 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
   if (humanColor != null && resultOf(game) && !now.rec.learned && points.every((p) => p.source === "katago")) {
     learnFromGame({ game, points, humanColor, recordId });
   }
-  // v13: the second reading of the player's strength, from their own moves.
+  // The second reading of the player's strength, from their own moves.
   // Finished games only: an unfinished game in the library is never read for strength.
   if (humanColor != null && resultOf(game) && !now.rec.unfinished && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
   return model;
 }
 
-/* -------------------------------------- v13: your moves, read by rank */
+/* -------------------------------------- Your moves, read by rank */
 
 /**
  * After a finished game's analysis, with the human-style model installed
@@ -166,7 +166,7 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
  * and in the player model, where it is only a weak prior (player.js
  * applyMoveRank). Resolves the reading, or null when it cannot be made.
  */
-export async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
+async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
   if (!recordId || !Engine.installed().human) return null;
   const rows = await humanMoveProbabilities(game, humanColor, PROFILES.map((p) => p.id), { signal });
   const reading = rows && rankFromLikelihoods(rows);
@@ -203,7 +203,7 @@ export function takeOver(recordId) {
 
 /**
  * Cheap check without parsing the game: an own finished game whose stored
- * review is missing or old. Works on the index's record too (v13: the game
+ * review is missing or old. Works on the index's record too (the game
  * file need not be read; data/games.js reviewV, reviewConfidence,
  * analyzed). A game left unfinished is not analysed until it is finished.
  */
@@ -241,7 +241,7 @@ export function queueAnalysis(recordId, { owner = "games", signal = null, hidden
     rec = found.rec;
     run = (me) => analyse(recordId, found.game, humanColorOf(rec), me, rec.analysis);
   } else {
-    // v13: the game's file is not read yet; the index says whether it needs
+    // The game's file is not read yet; the index says whether it needs
     // an analysis, and the job reads the file first.
     rec = Games.getGame(recordId);
     if (!rec || (!any && !isOwnGame(rec)) || !wantsAnalysis(rec)) return null;
@@ -397,7 +397,7 @@ export function resumeBatch() {
 }
 
 /** How long after launch the quiet pass over older games starts. */
-export const AUTO_DELAY_MS = 20000;
+const AUTO_DELAY_MS = 20000;
 let autoTimer = null;
 
 /**

@@ -16,7 +16,7 @@
  * `review` the post-game review built from it (play/review-model.js), so
  * both live with their game and go when it goes.
  *
- * v13: the game files are read only when one is needed (the store opens
+ * The game files are read only when one is needed (the store opens
  * `games/` lazily); the history, Today and the background analysis read
  * the index, which every save and delete keeps up to date and initIndex
  * rebuilds from the files when it is missing or behind. getGame answers at
@@ -30,6 +30,9 @@
  * history are kept apart; a game in progress that is replaced is saved to
  * the history as unfinished (app/play-ctl.js parkCurrent) and opening it
  * continues it.
+ *
+ * Deleting from the Library can be undone for a few seconds: see
+ * trashGame, restoreGame and commitTrash below.
  */
 import { store as appStore } from "./store.js";
 import { CURRENT_KEY, GAMES_PREFIX, INDEX_KEY, STORE_V } from "./migrate.js";
@@ -51,7 +54,7 @@ const idOfKey = (key) => {
   return ID.test(id) ? id : null;
 };
 
-export function newId() {
+function newId() {
   return Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e6).toString(36);
 }
 
@@ -76,7 +79,7 @@ export function describeGame(game) {
     handicap: game.handicap,
     moves: Math.max(0, game.mainLine().length - 1),
     result: game.mainLine().at(-1)?.result || game.current.result || null,
-    date: game.date instanceof Date ? game.date.toISOString() : String(game.date),
+    date: game.dateText || (game.date instanceof Date && !Number.isNaN(game.date.getTime()) ? game.date.toISOString() : ""),
     playerBlack: game.playerBlack,
     playerWhite: game.playerWhite,
     thumb: thumbnail(game),
@@ -103,9 +106,22 @@ function entryOf(file) {
     finishedAt: file.finishedAt ?? null,
     source: file.source ?? null,
     meta: isObject(file.meta) ? file.meta : {},
-    review: r ? { v: r.v ?? null, confidence: r.confidence ?? null, lineKey: r.lineKey ?? null } : null,
+    review: r ? { v: r.v ?? null, confidence: r.confidence ?? null, lineKey: r.lineKey ?? null, swing: swingOf(r) } : null,
     analyzed: Array.isArray(file.analysis) && file.analysis.length > 0,
   };
+}
+
+/**
+ * The biggest swing of a stored review, for the history's row: { index,
+ * loss } of the costliest key moment KataGo found, or null (no review, the
+ * offline estimate, or no moment with a loss).
+ */
+function swingOf(review) {
+  if (review.swing && Number.isFinite(review.swing.index) && Number.isFinite(review.swing.loss)) return { index: review.swing.index, loss: review.swing.loss };
+  if (review.confidence !== "high" || !Array.isArray(review.moments)) return null;
+  let top = null;
+  for (const mo of review.moments) if (Number.isFinite(mo?.loss) && Number.isFinite(mo?.index) && mo.loss > 0 && (!top || mo.loss > top.loss)) top = { index: mo.index, loss: Math.round(mo.loss * 2) / 2 };
+  return top;
 }
 
 const validEntry = (e) => isObject(e) && typeof e.id === "string" && ID.test(e.id) && isObject(e.meta);
@@ -145,6 +161,7 @@ function saveIndex() {
  * written again when it changed. Returns the number of game files read.
  */
 export async function initIndex() {
+  commitTrash();
   indexes.delete(store);
   const stored = store.get(INDEX_KEY);
   const games = stored && isObject(stored.games) ? stored.games : null;
@@ -188,6 +205,7 @@ function entryRecord(e) {
 function withInfo(rec, e, loaded) {
   rec.reviewV = e.review?.v ?? null;
   rec.reviewConfidence = e.review?.confidence ?? null;
+  rec.swing = e.review?.swing ?? null;
   rec.analyzed = !!e.analyzed;
   rec.loaded = loaded;
   return rec;
@@ -201,6 +219,9 @@ function readFile(id) {
 function writeFile(file) {
   const out = file.v === STORE_V ? file : { ...file, v: STORE_V };
   store.put(gameKey(out.id), out);
+  // A game held for an undo stays out of the index (a change that was
+  // waiting for its file lands in the file alone).
+  if (trashed(out.id)) return;
   const e = entryOf(out);
   if (e) index().set(out.id, e);
   saveIndex();
@@ -261,7 +282,7 @@ export function listGames() {
 
 /** A game's record: whole when its file is read, else the index's (sgf null, `loaded` false). */
 export function getGame(id) {
-  if (!id || !ID.test(String(id))) return null;
+  if (!id || !ID.test(String(id)) || trashed(id)) return null;
   if (!unread(id)) return toRecord(readFile(id));
   const e = index().get(id);
   return e ? entryRecord(e) : null;
@@ -274,7 +295,7 @@ export function isLoaded(id) {
 
 /** Read a game's file; its whole record, or null (missing, or unreadable: the store said so). */
 export async function loadGame(id) {
-  if (!id || !ID.test(String(id))) return null;
+  if (!id || !ID.test(String(id)) || trashed(id)) return null;
   try {
     await store.load(gameKey(id));
   } catch (_) {
@@ -315,6 +336,8 @@ export function saveGame(game, { id = null, name = "", source = "game", keepPlac
     if (file.meta.result && !hadResult && !file.finishedAt) file.finishedAt = now;
     return file;
   };
+  // Saving over a game that is waiting for its undo: the delete happens first.
+  if (id && trashed(id)) commitTrash();
   if (id && store.has(gameKey(id))) return change(id, apply);
   const file = apply(null);
   writeFile(file);
@@ -328,7 +351,7 @@ export function saveGame(game, { id = null, name = "", source = "game", keepPlac
  * and the moves (saveGame) are not patched.
  */
 export function patchGame(id, patch) {
-  if (!id || !ID.test(String(id)) || !store.has(gameKey(id))) return null;
+  if (!id || !ID.test(String(id)) || trashed(id) || !store.has(gameKey(id))) return null;
   const packed = { ...(patch || {}) };
   if (packed.analysis != null) packed.analysis = packAnalysis(packed.analysis);
   return change(id, (f) => {
@@ -352,9 +375,85 @@ export function renameGame(id, name) {
 
 export function deleteGame(id) {
   if (!id || !ID.test(String(id))) return;
+  if (trashed(id)) trash.delete(store);
   const known = store.has(gameKey(id));
   if (known) store.remove(gameKey(id));
   if (index().delete(id) || known) saveIndex();
+}
+
+/* ------------------------------------------------- delete, with an undo */
+
+/*
+ * A delete the player can take back (the Library's "Deleted · Undo").
+ *
+ *   trashGame(id)      the game leaves the list at once; its file stays
+ *   restoreGame(id)    put it back exactly as it was (file and index entry)
+ *   commitTrash()      delete the file for good
+ *
+ * One game is held at a time, in memory only: trashing another commits the
+ * one before, and so does writing everything out (the app does that before
+ * it quits, a backup or a restore: app/controller.js). While it is held
+ * the game is gone for every reader (listGames, getGame, loadGame) and
+ * cannot be patched; saving a game under its id commits the delete first.
+ * Should the app die before the commit, the file is still there and the
+ * next start lists the game again (initIndex): an undo, never a loss.
+ */
+
+/** store → { id, entry, at }: the game held, and where it was in the index. */
+const trash = new WeakMap();
+/** Stores whose flush commits the trash. */
+const hooked = new WeakSet();
+const trashed = (id) => trash.get(store)?.id === id;
+
+/** The id of the game held for an undo, or null. */
+export function trashedGame() {
+  return trash.get(store)?.id ?? null;
+}
+
+/** Take a game out of the history, keeping its file for restoreGame. Returns its id, or null when there is no such game. */
+export function trashGame(id) {
+  if (!id || !ID.test(String(id))) return null;
+  commitTrash();
+  const m = index();
+  const entry = m.get(id);
+  if (!entry) return null;
+  trash.set(store, { id, entry, at: [...m.keys()].indexOf(id) });
+  // Writing everything out (quit, a backup) makes the delete final.
+  if (!hooked.has(store) && typeof store.onFlush === "function") {
+    const st = store;
+    st.onFlush(() => commitTrashOf(st));
+    hooked.add(st);
+  }
+  m.delete(id);
+  saveIndex();
+  return id;
+}
+
+/** Put the held game back: the same index entry in the same place; its file was never touched. */
+export function restoreGame(id) {
+  const held = trash.get(store);
+  if (!held || held.id !== id) return false;
+  trash.delete(store);
+  const m = index();
+  const entries = [...m];
+  entries.splice(Math.min(held.at, entries.length), 0, [held.id, held.entry]);
+  m.clear();
+  for (const [k, v] of entries) m.set(k, v);
+  saveIndex();
+  return true;
+}
+
+/** Delete the held game's file for good. Returns the id deleted, or null when nothing was held. */
+export function commitTrash() {
+  return commitTrashOf(store);
+}
+
+function commitTrashOf(st) {
+  const held = trash.get(st);
+  if (!held) return null;
+  trash.delete(st);
+  if (st.has(gameKey(held.id))) st.remove(gameKey(held.id));
+  return held.id;
 }
 
 /**
@@ -375,6 +474,51 @@ export function filterGames(games, { kind = "all", query = "" } = {}) {
     if (!q) return true;
     return [g.name, g.playerBlack, g.playerWhite].some((v) => String(v || "").toLowerCase().includes(q));
   });
+}
+
+/** How the list can be ordered. */
+export const SORTS = ["newest", "oldest", "result"];
+
+/** 0 won, 1 lost, 2 anything else (a draw, a game between two people, an imported record), for the "result" order. */
+function resultRank(g) {
+  if (g.source === "import" || g.opponent !== "ai" || !/^[BW]\+/i.test(g.result || "")) return 2;
+  return /^B/i.test(g.result) === (g.humanColor !== -1) ? 0 : 1;
+}
+
+/**
+ * Order a list of records: "newest" (most recently changed first, as
+ * listGames gives them), "oldest", or "result" (your wins, then your
+ * losses, then the rest; newest first within each). Returns a new array.
+ */
+export function sortGames(games, sort = "newest") {
+  const byNew = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
+  const out = [...games];
+  if (sort === "oldest") return out.sort((a, b) => byNew(b, a));
+  if (sort === "result") return out.sort((a, b) => resultRank(a) - resultRank(b) || byNew(a, b));
+  return out.sort(byNew);
+}
+
+/**
+ * The history in its two groups: games left unfinished (isUnfinished), and
+ * everything else (finished games, imported records, boards saved from the
+ * free board). Each keeps the order it came in.
+ */
+export function groupGames(games) {
+  const unfinished = [];
+  const finished = [];
+  for (const g of games) (isUnfinished(g) ? unfinished : finished).push(g);
+  return { unfinished, finished };
+}
+
+/** Delete several games for good (an import taken back, the unfinished games cleared). Returns how many went. */
+export function deleteGames(ids) {
+  let n = 0;
+  for (const id of ids || []) {
+    if (!id || !ID.test(String(id)) || !index().has(id)) continue;
+    deleteGame(id);
+    n++;
+  }
+  return n;
 }
 
 /* ---------------------------------------------------- the game on the board */

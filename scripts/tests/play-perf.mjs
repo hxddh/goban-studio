@@ -1,5 +1,5 @@
 /**
- * Play, v13 performance: a clock tick re-renders the clocks only (not the
+ * Play, performance: a clock tick re-renders the clocks only (not the
  * app and its board), and the board reads its font once per language,
  * text size and appearance instead of on every model update.
  */

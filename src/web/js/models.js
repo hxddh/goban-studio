@@ -1,5 +1,5 @@
 /**
- * Optional KataGo networks (v5): the pure logic and the host calls.
+ * Optional KataGo networks: the pure logic and the host calls.
  *
  * Goban Studio is complete offline with the small network it ships. In
  * Settings the player may download two more, and only then does the app
@@ -39,7 +39,7 @@ export const MODELS = Object.freeze({
 });
 
 /** No progress for this long while downloading: show "stalled". */
-export const STALL_MS = 30_000;
+const STALL_MS = 30_000;
 /** How often the controller polls while a download runs. */
 export const POLL_MS = 500;
 

@@ -39,7 +39,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("core book: deeper and broader than v6", () => {
+  await test("core book: deep and broad enough", () => {
     const whole = book.trees.whole;
     const corner = book.trees.corner;
     assert.ok(whole.nodes.length >= 2000, `whole ${whole.nodes.length}`);
@@ -102,7 +102,7 @@ export default async function ({ test, assert, root }) {
       // The closed sides keep the frame and the grid inside the canvas.
       assert.ok(g.ox + 18 * cell + cell * 0.5 <= w && g.oy - cell * 0.5 >= 0, `${w}×${h}: grid outside`);
     }
-    // Whole boards are unchanged by the v7 margins.
+    // Whole boards are unchanged by the margins.
     const a = geom({ size: 19, view: null, showCoords: true }, 600, 600);
     assert.ok(Math.abs(a.ox - (600 - a.cell * 18) / 2) < 1e-9);
   });

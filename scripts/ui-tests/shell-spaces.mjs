@@ -1,5 +1,5 @@
 /**
- * Shell: the four spaces in the browser (v12) — Today, Play, Practice and
+ * Shell: the four spaces in the browser — Today, Play, Practice and
  * Library (and Settings); Today leads with one hero, Play is the board,
  * Practice has the path and the catalog, the Library the games;
  * everything survives a reload through the store, and a write that fails
@@ -14,8 +14,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     const items = await page.locator(".sidebar .sb-list .sb-item").allInnerTexts();
     assert(JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(["Today", "Play", "Practice", "Library"]), `sidebar: ${items.join(", ")}`);
     assert((await page.locator(".sidebar .sb-foot .sb-item").innerText()).trim() === "Settings", "Settings below");
-    // Onboarding ("I know the rules") opened the board; Play again stays on it.
-    assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "onboarding opens the board");
+    // The first game ("I know the rules", started from Today's hero) is on the board; Play again stays on it.
+    assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "the first game is on the board");
     await page.click(".sidebar .sb-item >> nth=1");
     assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "Play again: the board");
     // Today: the suggested game before any move, one primary.
@@ -35,14 +35,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
     // Practice: the path, one primary (start it), then the course and the problems on the same page.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Practice");
-    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".learn-home .catalog")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
-    assert((await page.locator(".learn-home .units").count()) === 1 && (await page.locator(".learn-home .topic-row").count()) === 8, "the course and the topics are on the page");
+    assert(await page.evaluate(() => document.querySelector(".practice-path").compareDocumentPosition(document.querySelector(".practice-home .catalog")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
+    assert((await page.locator(".practice-home .units").count()) === 1 && (await page.locator(".practice-home .topic-row").count()) === 8, "the course and the topics are on the page");
     // The Library: your games, the classics, the explorer, Import SGF.
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .collection-row");
-    assert((await page.locator(".library-home [data-explorer]").count()) === 1, "the explorer row");
+    assert((await page.locator(".library-home .home-explorer [data-explorer]").count()) === 2, "the explorer's rows: the whole board and the corner");
+    assert(await page.evaluate(() => !!(document.querySelector(".home-explorer").compareDocumentPosition(document.querySelector(".home-classics")) & Node.DOCUMENT_POSITION_FOLLOWING)), "the explorer has its own section, before the classics");
     assert((await page.locator(".btn.primary:visible").count()) === 0, "no primary in the Library");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
@@ -54,7 +55,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await clickPoint(page, 4, 4);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
     await page.keyboard.press("Control+3");
-    await page.click(".learn-path .btn.primary");
+    await page.click(".practice-path .btn.primary");
     await page.waitForSelector(".steps");
     await page.waitForFunction(() => !!localStorage.getItem("goban9:current.json"), null, { timeout: 3000 });
     const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("goban9:")).sort());

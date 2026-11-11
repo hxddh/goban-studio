@@ -4,7 +4,7 @@
  * text and dark mode — so one feature cannot quietly break another (the
  * problem window and the screen-reader keys were such a pair).
  *
- * For each combination it visits Play's home, Learn's home (the path and
+ * For each combination it visits Play's home, Practice's home (the path and
  * the catalog), a problem, the history of games, the explorer (both
  * modes), a classic in review (every tab), a finished game's post-game
  * review (every tab), and every Settings pane, and checks: the audit, no raw string keys on screen, no
@@ -58,12 +58,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForSelector(".today .hero");
       await inspect(page, "Today");
       await page.keyboard.press("Control+3");
-      await page.waitForSelector(".learn-path");
+      await page.waitForSelector(".practice-path");
       await page.waitForSelector(".catalog .topic-row");
       await inspect(page, "Practice");
       await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
-      await page.waitForFunction(() => window.__state.learn.view === "problem");
+      await page.waitForFunction(() => window.__state.practice.view === "problem");
       await inspect(page, "problem");
 
       // The Library, the explorer in both modes, a classic in review.
@@ -77,7 +77,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForFunction(() => window.__state.explorer?.mode === "corner");
       await inspect(page, "explorer (corner)");
       await page.keyboard.press("Escape");
-      await page.click(".collection-row >> nth=0");
+      await page.click(".home-classics .collection-row >> nth=0");
       await page.waitForSelector(".review-layer .chart");
       const rtabs = await page.locator(".review-tabs button").count();
       for (let i = 0; i < rtabs; i++) {
@@ -99,7 +99,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       }
       for (let i = 0; i < 2; i++) {
         await page.keyboard.press("Control+Shift+P");
-        await page.click(".sheet-foot .btn.primary");
+        await page.click(".pass-ask .btn.primary");
       }
       await page.waitForSelector(".score-card");
       await page.click(".score-card .btn.primary");

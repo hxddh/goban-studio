@@ -1,30 +1,84 @@
 /**
  * Window chrome (docs/design.md §3, §7): the sidebar with the four spaces
- * (v12: Today, Play, Practice, Library) and Settings,
+ * (Today, Play, Practice, Library) and Settings,
  * and the toolbar every place starts with — back/forward, breadcrumbs and
  * title, then the place's own actions. On macOS the toolbar shares its row
  * with the traffic lights and drags the window.
  */
+import { useEffect, useState } from "preact/hooks";
 import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
+import { StatusChip } from "./status-chip.jsx";
 
-/** How each space looks in the sidebar; which spaces there are, and their order, is controller.js SPACES (v13: one list). */
+/** How each space looks in the sidebar; which spaces there are, and their order, is spaces.js SPACES (one list). */
 const SPACE_LOOK = {
   today: { icon: "today", key: "nav.today" },
   play: { icon: "play", key: "nav.play" },
-  learn: { icon: "practice", key: "nav.learn" },
+  practice: { icon: "practice", key: "nav.practice" },
   library: { icon: "library", key: "nav.library" },
 };
 export const SPACES = C.SPACES.map((id) => ({ id, ...SPACE_LOOK[id] }));
+
+/**
+ * The app's mark, drawn in the board's colours (the CSS variables theme.js
+ * sets), so it dims with the board in the dark theme and follows the
+ * high-contrast style.
+ */
+export function Mark({ size = 18 }) {
+  return (
+    <svg class="sb-mark" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+      <rect class="mark-board" width="64" height="64" rx="14.5" />
+      <path class="mark-line" d="M20.5 3V61M3 20.5H61M43.5 3V61M3 43.5H61" />
+      <circle class="mark-black" cx="20.5" cy="20.5" r="10.5" />
+      <circle class="mark-white" cx="43.5" cy="43.5" r="10.5" />
+    </svg>
+  );
+}
+
+/** Narrow windows (the board's panel is a bar under the board): styles.css uses the same width. */
+const NARROW_QUERY = "(max-width: 860px)";
+
+/** Whether the window is narrow now; follows resizes. */
+function useNarrow() {
+  const mq = typeof matchMedia === "function" ? matchMedia(NARROW_QUERY) : null;
+  const [narrow, setNarrow] = useState(!!mq?.matches);
+  useEffect(() => {
+    if (!mq) return;
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener?.("change", on);
+    on();
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return narrow;
+}
+
+/**
+ * Something a narrow window keeps behind a disclosure (the move list
+ * under the game bar): in a wide window its children as they are, in a
+ * narrow one a closed row with `label` that opens them.
+ */
+export function NarrowFold({ label, children }) {
+  const narrow = useNarrow();
+  const [open, setOpen] = useState(false);
+  if (!narrow) return children;
+  return (
+    <div class={`narrow-fold ${open ? "open" : ""}`}>
+      <button type="button" class="disclosure" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name={open ? "down" : "next"} size={14} /> {label}
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
 export function Sidebar() {
   return (
     <nav class="sidebar" aria-label={t("nav.main")}>
       <div class="sb-top" data-drag>
         <span class="sb-brand">
-          <img class="sb-mark" src="assets/brand.svg" width="18" height="18" alt="" />
+          <Mark size={18} />
           <span>Goban Studio</span>
         </span>
       </div>
@@ -45,6 +99,7 @@ export function Sidebar() {
         ))}
       </ul>
       <div class="sb-foot">
+        <StatusChip />
         <button type="button" class="sb-item" title={`${t("nav.settings")} (${MOD},)`} onClick={() => C.openSheet("settings")}>
           <Icon name="gear" size={18} />
           <span>{t("nav.settings")}</span>
@@ -59,7 +114,7 @@ export function Sidebar() {
  * current place (list pages leave it out and show a large title instead);
  * children are the actions, right-aligned — at most one primary.
  */
-export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) {
+export function Toolbar({ crumbs = [], title, titleLang = null, sub, children, class: cls = "" }) {
   return (
     <header class={`toolbar ${cls}`} data-drag>
       <div class="tb-nav">
@@ -75,7 +130,7 @@ export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) 
             <Icon name="next" size={12} />
           </>
         ))}
-        {title && <h1>{title}</h1>}
+        {title && <h1 lang={titleLang || undefined}>{title}</h1>}
         {sub && <span class="tb-sub">{sub}</span>}
       </div>
       <div class="tb-actions">{children}</div>

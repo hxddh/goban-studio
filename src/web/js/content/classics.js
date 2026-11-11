@@ -86,6 +86,53 @@ export const CLASSICS = [
       "ko": "1835년 혼인보 조와 대 아카보시 인테쓰. 대국 후 인테쓰가 피를 토해 \"토혈의 대국\"이라 불리며, 조와의 묘수가 전해집니다.",
       "ja": "1835年、本因坊丈和対赤星因徹。対局後に因徹が吐血したことから「吐血の局」と呼ばれ、丈和の妙手が語り継がれています。"
     },
+    "moments": [
+      {
+        "index": 68,
+        "title": {
+          "zh": "丈和三妙手之一",
+          "en": "The first of Jowa's three moves",
+          "ko": "조와의 세 묘수, 첫 번째",
+          "ja": "丈和の三妙手・その一"
+        },
+        "note": {
+          "zh": "这盘棋以丈和的“三妙手”闻名：第68、70、80手。这是第一手。白棋没有去应黑棋刚才在边上的一手，而是在左边黑子的下方、二路上落子。",
+          "en": "This game is famous for Jowa's three brilliant moves: 68, 70 and 80. This is the first. White does not answer Black's last move on the edge, and plays on the second line of the left side instead, beneath Black's stones.",
+          "ko": "이 대국은 조와의 ‘세 묘수’, 곧 68수, 70수, 80수로 유명합니다. 그 첫 번째입니다. 백은 흑이 방금 가장자리에 둔 수에 받지 않고, 왼쪽 변 흑돌 아래 2선에 둡니다.",
+          "ja": "この碁は丈和の「三妙手」、68手・70手・80手で知られます。その一つ目です。白は黒が端に打った直前の手に受けず、左辺の黒石の下、二線に打ちました。"
+        }
+      },
+      {
+        "index": 70,
+        "title": {
+          "zh": "三妙手之二",
+          "en": "The second",
+          "ko": "세 묘수, 두 번째",
+          "ja": "三妙手・その二"
+        },
+        "note": {
+          "zh": "黑棋在左边应了一手，白棋接着从中腹一侧、在黑子的斜上方落子。左边这块黑棋的里面和外面，现在各有一颗白子。",
+          "en": "Black has answered on the left, and White now plays from the centre side, diagonally above Black's stones. The black group on the left has a white stone beneath it and one outside it.",
+          "ko": "흑이 왼쪽에서 받자, 백은 이어서 중앙 쪽, 흑돌의 대각선 위에 둡니다. 왼쪽 흑돌들의 아래와 바깥에 백돌이 하나씩 놓였습니다.",
+          "ja": "黒が左辺で受けると、白は続いて中央側、黒石の斜め上に打ちました。左辺の黒の一団は、下と外に白石を一つずつ抱えることになります。"
+        }
+      },
+      {
+        "index": 80,
+        "title": {
+          "zh": "三妙手之三",
+          "en": "The third",
+          "ko": "세 묘수, 세 번째",
+          "ja": "三妙手・その三"
+        },
+        "note": {
+          "zh": "第三手看上去很平常：白棋在右边向上长了一路，正对着上方两颗黑子之间的空隙。",
+          "en": "The third looks plain: on the right side White extends one point upward, facing the gap between Black's two stones above.",
+          "ko": "세 번째는 평범해 보입니다. 백이 오른쪽에서 위로 한 칸 뻗어, 위쪽 두 흑돌 사이의 틈을 마주합니다.",
+          "ja": "三つ目は平凡に見えます。白は右辺で上へ一路伸び、上の黒二子の間のすき間に向かいました。"
+        }
+      }
+    ],
     "sgf": "(;\nEV[Blood-vomiting game]\nPB[Akaboshi Intetsu]\nBR[7d]\nPW[Honinbo Jowa]\nWR[Meijin]\nKM[0]\nRE[W+R]\nDT[1835-08-13,15,18,21]\nJD[Tenpō 6-7-19,21,24,27]\nPC[Home of Lord Matsudaira of Suo]\nGC[Last move played: day 1: 59, day 2: 99, day 3: 172, day 4: 246]\n\n;B[cp];W[pq];B[qd];W[ed];B[oc];W[eq];B[qo];W[qk];B[qi];W[op]\n;B[iq];W[dn];B[ep];W[dp];B[do];W[dq];B[co];W[eo];B[fp];W[cq]\n;B[bq];W[br];B[cm];W[gr];B[hp];W[en];B[bp];W[ck];B[dl];W[dk]\n;B[el];W[gn];B[cr];W[dr];B[bs];W[fq];B[go];W[ar];B[hn];W[gm]\n;B[hm];W[gl];B[ek];W[hl];B[di];W[io];B[ho];W[fo];B[ch];W[cd]\n;B[lq];W[pn];B[gc];W[qn];B[dc];W[cc];B[ec];W[cf];B[il];W[gp]\n;B[nq];W[ic];B[fd];W[lc];B[bg];W[bf];B[af];W[bi];B[dj];W[eh]\n;B[fj];W[qg];B[oi];W[qe];B[pd];W[nf];B[ok];W[pk];B[ol];W[pj]\n;B[rn];W[rm];B[qq];W[qr];B[rr];W[qp];B[rq];W[pr];B[rp];W[po]\n;B[pp];W[mp];B[qm];W[pm];B[np];W[mq];B[mo];W[lp];B[lo];W[kp]\n;B[no];W[nr];B[or];W[qp];B[mr];W[ro];B[pi];W[lr];B[ns];W[ip]\n;B[jr];W[hq];B[jn];W[ko];B[kq];W[kn];B[jm];W[km];B[ik];W[mk]\n;B[mm];W[ir];B[jq];W[kk];B[mi];W[nm];B[ml];W[ki];B[lj];W[lk]\n;B[kj];W[jj];B[kl];W[ll];B[lm];W[oj];B[mg];W[jl];B[jk];W[nj]\n;B[ni];W[im];B[in];W[jo];B[kl];W[js];B[ks];W[jl];B[im];W[is]\n;B[kl];W[ei];B[ej];W[jl];B[hr];W[hs];B[kl];W[cn];B[bn];W[jl]\n;B[gs];W[fs];B[kl];W[hi];B[ij];W[jl];B[ls];W[ji];B[hj];W[oe]\n;B[kg];W[jg];B[gi];W[nc];B[jf];W[nb];B[re];W[if];B[je];W[hd]\n;B[fe];W[gf];B[ff];W[fg];B[gg];W[gh];B[hg];W[fi];B[gj];W[ig]\n;B[hh];W[hf];B[ii];W[rf];B[pe];W[pf];B[le];W[kd];B[ad];W[kh]\n;B[qf];W[ef];B[de];W[qe];B[ld];W[lg];B[kc];W[jd];B[qf];W[db]\n;B[eb];W[qe];B[jb];W[od];B[ib];W[mf];B[qf];W[jp];B[kr];W[qe]\n;B[lf];W[kf];B[qf];W[hc];B[qe];W[hb];B[pg];W[og];B[of];W[cg]\n;B[bh];W[pf];B[ph];W[bb];B[da];W[cb];B[fh];W[ac];B[eg];W[bd]\n;B[ob];W[oa];B[of];W[mh];B[rj];W[kl])"
   },
   {
@@ -429,6 +476,21 @@ export const CLASSICS = [
           "en": "Lee Sedol wedges into the centre. AlphaGo had not foreseen it and went wrong over the next moves; this was the only game it lost in the match.",
           "ko": "이세돌이 중앙에 끼워 넣습니다. 알파고는 이 수를 예상하지 못했고 이어지는 몇 수에서 연달아 실수했습니다. 다섯 판 중 알파고가 진 유일한 대국입니다.",
           "ja": "李世乭が中央に割り込みます。AlphaGo はこの手を読めておらず、続く数手で崩れました。五番勝負で AlphaGo が負けた唯一の一局です。"
+        }
+      },
+      {
+        "index": 79,
+        "title": {
+          "zh": "失误的应手",
+          "en": "The wrong answer",
+          "ko": "잘못된 응수",
+          "ja": "誤った応手"
+        },
+        "note": {
+          "zh": "AlphaGo 在挖的斜下方应了一手。DeepMind 的哈萨比斯赛后说，这一手就是失误，而 AlphaGo 直到大约第 87 手才意识到。",
+          "en": "AlphaGo answers diagonally below the wedge. Demis Hassabis of DeepMind said after the game that this move was the mistake, and that AlphaGo only came to see it around move 87.",
+          "ko": "알파고는 끼운 돌의 대각선 아래에서 받았습니다. 딥마인드의 데미스 허사비스는 대국 후, 이 수가 실수였고 알파고는 87수쯤에야 그것을 알아차렸다고 밝혔습니다.",
+          "ja": "AlphaGo は割り込みの斜め下に受けました。DeepMind のデミス・ハサビスは対局後、この手が失着で、AlphaGo がそれに気づいたのは87手目あたりだったと述べています。"
         }
       }
     ],

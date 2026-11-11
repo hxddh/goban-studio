@@ -4,7 +4,8 @@
  * estimate).
  */
 import { t } from "../i18n.js";
-import { estimate, rankParts } from "../model/player.js";
+import { estimate } from "../model/level.js";
+import { rankParts } from "../model/ladder.js";
 
 /** A rank (kyu 30…1, 1 dan = 0, 2 dan = -1 …) as shown: "≈ 12 kyu", "≈ 4 dan". */
 export function rankText(rank) {

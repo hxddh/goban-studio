@@ -1,7 +1,8 @@
 /**
  * Play: reading a game — atari, what a mistake cost and where, its kind, and the stories told about it.
  */
-import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, fs, keyOf, lossSource, mv, narrate, parse, path, race, root, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
+import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, keyOf, lossSource, mv, narrate, parse, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
+import { REVIEW } from "../../src/web/js/messages/review.js";
 
 await test("atari detection finds chains with one liberty", () => {
   const b = empty(9);
@@ -264,7 +265,7 @@ await test("describeMistakes: attribution, theme and both stories for each key m
   assert.equal(km.index, 3); // Black's 6,2 let White take the corner
   assert.equal(km.move.color, 1);
   assert.equal(km.attribution.kind, "group-died");
-  assert.ok(km.source && km.source.kind === "group", "legacy source kept for the v3 view");
+  assert.ok(km.source && km.source.kind === "group", "the source is kept for the views");
   assert.equal(km.story.summary.key, "story.sum.groupDied");
   assert.ok(km.story.better.length >= 3 && km.story.better.length <= 6);
   assert.deepEqual(km.story.better[0].move, { x: 2, y: 0 });
@@ -314,8 +315,6 @@ await test("story text is complete in all four languages", () => {
   setLang("en");
   assert.equal(storyText({ key: "story.capture", params: [{ key: "common.white" }, 3] }), "White captures 3 stones");
   assert.equal(storyText(null), "");
-  // The v4 strings sit in one block.
-  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
-  const block = src.slice(src.indexOf("// v4 review"), src.indexOf("// end v4 review"));
-  for (const k of Object.keys(MESSAGES).filter((k) => k.startsWith("story.") || k.startsWith("lossKind."))) assert.ok(block.includes(`"${k}"`), k);
+  // The story's strings sit with the review's.
+  for (const k of Object.keys(MESSAGES).filter((k) => k.startsWith("story.") || k.startsWith("lossKind."))) assert.ok(REVIEW[k], k);
 });

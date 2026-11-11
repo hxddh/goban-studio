@@ -1,5 +1,5 @@
 /**
- * Say truthfully how a release was signed (v4).
+ * Say truthfully how a release was signed.
  *
  * Each platform build writes a signing status file (dist/signing-macos.json,
  * dist/signing-windows.json) describing what actually happened:
@@ -13,16 +13,32 @@
  *
  *   node scripts/signing-notes.mjs status macos|windows <mode> [--notarized|--timestamped] > status.json
  *   node scripts/signing-notes.mjs notes <notes.md> <signing-macos.json> <signing-windows.json> [<signing-macos-x64.json>] > out.md
- *
- * v5: with the Intel Mac status (fourth file) the table gains a
- * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
  *   node scripts/signing-notes.mjs readme <README-*.txt> <signing-*.json> > out.txt
+ *
+ * With the Intel Mac status (the fourth file) the table has a
+ * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const QUARANTINE = "xattr -dr com.apple.quarantine /Applications/Goban\\ Studio.app";
+/**
+ * The app has two names: "Goban Studio.app" in the .dmg and
+ * "GobanStudio.app" in the .zip (the name the in-app updater looks for in
+ * the package; src/install.zig stagedRootNames). Any command we print has
+ * to work for the copy the reader has.
+ */
+export const APP_NAMES = ["Goban Studio.app", "GobanStudio.app"];
+export const QUARANTINE = APP_NAMES.map((name) => `xattr -dr com.apple.quarantine "/Applications/${name}"`);
+
+/**
+ * How to open an app macOS cannot verify. macOS 15 removed the
+ * right-click > Open shortcut: the only way is the button in System
+ * Settings, which appears after a first attempt to open the app.
+ */
+const OPEN_ANYWAY_NOTES =
+  "Open it once and close the warning, then: on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open.";
+const QUARANTINE_NOTES = `If macOS still blocks it: \`${QUARANTINE[0]}\` (the app from the \`.zip\` is named \`${APP_NAMES[1]}\`).`;
 
 export function normalizeStatus(platform, value) {
   const s = value && typeof value === "object" ? value : {};
@@ -41,8 +57,8 @@ export function normalizeStatus(platform, value) {
 export function firstLaunchText(status) {
   if (status.platform === "macos") {
     if (status.mode === "developer-id" && status.notarized) return "Signed with a Developer ID and **notarized by Apple**. Open it like any other app.";
-    if (status.mode === "developer-id") return `Signed with a Developer ID, **not notarized**. Right-click the app → Open once. If macOS still blocks it: \`${QUARANTINE}\``;
-    return `Ad-hoc signed, **not notarized**. Right-click the app → Open once. If macOS still blocks it: \`${QUARANTINE}\``;
+    if (status.mode === "developer-id") return `Signed with a Developer ID, **not notarized**. ${OPEN_ANYWAY_NOTES} ${QUARANTINE_NOTES}`;
+    return `Ad-hoc signed, **not notarized**. ${OPEN_ANYWAY_NOTES} ${QUARANTINE_NOTES}`;
   }
   if (status.mode === "authenticode") return "**Authenticode-signed.** SmartScreen may still ask while the certificate builds reputation: More info → Run anyway. WebView2 is preinstalled on Windows 10/11.";
   return "**Not Authenticode-signed.** If SmartScreen appears, choose More info → Run anyway. WebView2 is preinstalled on Windows 10/11.";
@@ -89,15 +105,25 @@ export function applyToNotes(notes, macos, windows, macosIntel = null) {
 
 /* ------------------------------------------------- README in the package */
 
+/** README-macOS.txt: the steps for an app macOS cannot verify. */
+const README_OPEN_ANYWAY = `
+     macOS 15 or later: open System Settings > Privacy & Security, scroll
+     down to Security, and click "Open Anyway" next to Goban Studio.
+
+     macOS 14 or earlier: right-click (or Control-click) the app, choose
+     Open, then confirm Open.
+
+   You only need to do this once. If macOS still blocks it, run the line
+   for your copy in Terminal:
+
+${QUARANTINE.map((line) => `     ${line}`).join("\n")}
+`;
+
 /** The paragraphs in packaging/README-*.txt that describe an unsigned build. */
 export const README_UNSIGNED = {
-  macos: `2. This build is ad-hoc signed, not notarized. On first launch macOS may
-   say it cannot verify the app. Right-click the app, choose Open, then
-   confirm Open. You only need to do this once.
-   If macOS still blocks it, run:
-
-     ${QUARANTINE}
-`,
+  macos: `2. This build is ad-hoc signed, not notarized, so the first time you open
+   it macOS says it cannot verify the app. Close that message, then:
+${README_OPEN_ANYWAY}`,
   windows: `This build is not Authenticode-signed. Windows SmartScreen may show
 "Windows protected your PC"; choose "More info" and then "Run anyway".
 `,
@@ -111,13 +137,10 @@ export function readmeText(status) {
 `;
     }
     if (status.mode === "developer-id") {
-      return `2. This build is signed with a Developer ID but not notarized. On first
-   launch macOS may say it cannot verify the app. Right-click the app,
-   choose Open, then confirm Open. You only need to do this once.
-   If macOS still blocks it, run:
-
-     ${QUARANTINE}
-`;
+      return `2. This build is signed with a Developer ID but not notarized, so the
+   first time you open it macOS says it cannot verify the app. Close
+   that message, then:
+${README_OPEN_ANYWAY}`;
     }
     return README_UNSIGNED.macos;
   }

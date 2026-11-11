@@ -1,14 +1,14 @@
 /**
- * The intermediate course (v5): units 9–15 (v13 adds ko fighting and judging
- * the position), appended to the beginner course
+ * The intermediate course: units 9–15 (ko fighting and judging
+ * the position among them), appended to the beginner course
  * in ./course.js. Same step schema (read / place / problem; see course.js).
- * v6 adds two lessons to the fighting unit: the leaning attack and sabaki.
+ * Adds two lessons to the fighting unit: the leaning attack and sabaki.
  *
  * Opening and joseki steps are drawn on a 19×19 board: a whole-board
  * diagram shows the whole board, a smaller diagram in a corner shows a
  * window around it (the app frames the diagram's '.' points, its stones,
  * its marks and every accept point). Joseki diagrams number the moves of
- * the sequence with label marks. v13: endgame steps are endgame problems
+ * the sequence with label marks. Endgame steps are endgame problems
  * on sealed sides of a 19×19 board, counted exactly by the solver; the ko
  * and judgement units (14–15) play on closed 9×9 games.
  *
@@ -127,14 +127,14 @@ const J33_MIRROR = win(9, 9, [[3, 3], [2, 3], [4, 2], [5, 1]], [[2, 2], [3, 2], 
 /* --------------------------------------------------------- endgame boards */
 
 /*
- * v13: the endgame unit is rebuilt on closed positions. Every interactive
+ * The endgame unit is rebuilt on closed positions. Every interactive
  * step is an endgame problem (goal "endgame"): a stretch of the lower side
  * where the walls are settled and only the boundary is open, counted
  * exactly by the solver's counting mode (Japanese counting, see solver.js),
  * so the best move, its margin and every value in the text are proved by
  * scripts/check-course.mjs. ':' points are territory that is counted but
- * never played. The v5 boards were a few stones on an open 9×9, where
- * KataGo's best move was an invasion the lesson was not about
+ * never played. A few stones on an open 9×9 would not do: there
+ * KataGo's best move is an invasion the lesson is not about
  * (docs/lesson-audit.md).
  */
 
@@ -279,7 +279,7 @@ function egBoard(diagram, marks = [], stones = []) {
 /* ------------------------------------------------------ ko and judgement boards */
 
 /*
- * v13: the ko and judgement units are played on finished-looking 9×9 games
+ * The ko and judgement units are played on finished-looking 9×9 games
  * (the walls of unit 8's game, every area closed), so a place step's answer
  * is the move that matters on the whole board, not a local idea on an empty
  * board. The problem steps are proved by the solver on the whole 9×9.
@@ -305,16 +305,17 @@ const KO_FRESH_ROWS = KO_ROWS;
 const KO_ANSWERED_ROWS = { ...KO_ROWS, 1: ". . . . X O O . .", 2: ". . . X X X O . ." };
 // A dead white stone inside Black's area: attacking it is no threat.
 const KO_DEAD_STONE_ROWS = { ...KO_ROWS, 6: ". O . X X O . . ." };
-// Black has retaken (White's (4, 4) is gone) and White has played elsewhere: Black connects at (4, 4).
+// Black has taken the fresh ko at (5, 4) (White's (4, 4) is gone) and White, without a threat,
+// has played elsewhere, at (7, 7): one stone each since KO_FRESH_ROWS. Black connects at (4, 4).
 const KO_CONNECT = [
   ". . . . X O . . .",
-  ". . . . X O O . .",
-  ". . . X X X O . .",
+  ". . . . X O . . .",
+  ". . . X X . O . .",
   ". . . X X O O . .",
   ". . . X . x O . .",
   ". . . X X O . . .",
   ". . . X X O . . .",
-  ". . . . X O . . .",
+  ". . . . X O . O .",
   ". . . . X O . . .",
 ];
 // Black's retake at (5, 4) left White's (5, 5) in atari: capturing it at (6, 5) ends the ko.
@@ -1204,7 +1205,7 @@ export const INTERMEDIATE = [
             ),
             board: J33_MIRROR,
             toMove: BLACK,
-            // v8: E16 (the other cutting point, between the hane and the block) is as good (KataGo).
+            // E16 (the other cutting point, between the hane and the block) is as good (KataGo).
             accept: pts([5, 2], [5, 3], [4, 3]),
             success: L("方向不同，道理一样。", "A different direction, the same reasoning.", "방향은 달라도 이치는 같습니다.", "向きが違っても、理屈は同じです。"),
             wrong: L(
@@ -1703,10 +1704,10 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "三角标记的点：黑棋下在这里打吃白子，白棋必须粘；白棋下在这里打吃黑子，黑棋必须粘。对双方都是先手，叫双先。双先不花代价就能得利，通常要早下。但先手之所以是先手，是因为对方不应就亏得更多；别处有更大的后手时，对方会不应而去下大的。后面“官子的大小”一课会比较。",
-              "The marked point: if Black plays there, a white stone is in atari and White must connect; if White plays there, a black stone is in atari and Black must connect. It is sente for both sides: double sente. Double sente gains points and costs nothing, so it is usually played early. But a move is sente only because ignoring it costs more; when a bigger gote move is left elsewhere, the opponent will ignore it and take the big move. The lesson on the size of endgame moves compares them.",
-              "세모 표시한 점은 흑이 두면 백 한 점이 단수가 되어 백이 이어야 하고, 백이 두면 흑 한 점이 단수가 되어 흑이 이어야 합니다. 양쪽 모두에게 선수, 곧 양선수입니다. 양선수는 대가 없이 이득을 보므로 보통 일찍 둡니다. 하지만 선수가 선수인 것은 받지 않으면 더 손해이기 때문입니다. 다른 곳에 더 큰 후수가 남아 있으면 상대는 받지 않고 큰 곳을 둡니다. '끝내기의 크기' 강의에서 비교합니다.",
-              "三角印の点は、黒が打てば白一子がアタリで白が継がなければならず、白が打てば黒一子がアタリで黒が継がなければなりません。双方にとって先手、つまり両先手です。両先手は損なく得をするので、ふつう早めに打ちます。ただし先手が先手なのは、受けないともっと損をするからです。他にもっと大きい後手が残っていれば、相手は受けずに大きい所に回ります。「ヨセの大きさ」の課で比べます。",
+              "三角标记的点：黑棋下在这里打吃白子，白棋必须粘；白棋下在这里打吃黑子，黑棋必须粘。对双方都是先手，叫双先。双先不花代价就能得利，通常要早下。但先手之所以是先手，是因为对方不应就亏得更多；别处有更大的后手时，对方会不应而去下大的。",
+              "The marked point: if Black plays there, a white stone is in atari and White must connect; if White plays there, a black stone is in atari and Black must connect. It is sente for both sides: double sente. It gains points at no cost, so it is usually played early. But a move is sente only because ignoring it costs more: with a bigger gote move left elsewhere, the opponent will ignore it and take that.",
+              "세모 표시한 점은 흑이 두면 백 한 점이 단수가 되어 백이 이어야 하고, 백이 두면 흑 한 점이 단수가 되어 흑이 이어야 합니다. 양쪽 모두에게 선수, 곧 양선수입니다. 양선수는 대가 없이 이득을 보므로 보통 일찍 둡니다. 하지만 선수가 선수인 것은 받지 않으면 더 손해이기 때문입니다. 다른 곳에 더 큰 후수가 남아 있으면 상대는 받지 않고 큰 곳을 둡니다.",
+              "三角印の点は、黒が打てば白一子がアタリで白が継がなければならず、白が打てば黒一子がアタリで黒が継がなければなりません。双方にとって先手、つまり両先手です。両先手は損なく得をするので、ふつう早めに打ちます。ただし先手が先手なのは、受けないともっと損をするからです。他にもっと大きい後手が残っていれば、相手は受けずに大きい所に回ります。",
             ),
             board: egBoard(EG_DOUBLE, [{ x: 6, y: 3, type: "triangle" }]),
           },
@@ -1741,10 +1742,10 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "算一手棋的大小（出入计算）：先让黑棋在这里先下，双方都走最好的应法，数出结果；再让白棋先下，再数一次。两次的差就是这一手值的目数。图中的一路扳粘，黑先比白先多2目，所以值2目，后手。有的书把后手官子除以二（见合计算，这里是1目），先手官子不除；两种算法比较大小的结论一样。本应用一律用出入，所以记住：目数相同，先手大约顶得上两倍的后手。",
-              "To count a move (deiri counting), let Black play here first, with the best answers on both sides, and count; then let White play first and count again. The difference is what the move is worth. The first-line hane and connection here gives Black 2 points more when Black plays first, so it is worth 2 points, in gote. Some books halve gote moves (miai counting: 1 point here) and leave sente moves whole; both ways compare moves the same. This app always uses the full difference, so remember: for the same count, a sente move is worth about twice a gote move.",
-              "한 수의 크기를 세는 법(출입 계산): 흑이 먼저 여기에 두고 양쪽이 최선으로 받은 결과를 세고, 다음에 백이 먼저 둔 결과를 셉니다. 두 결과의 차이가 그 수의 크기입니다. 그림의 1선 젖혀 잇기는 흑이 먼저 두면 2집이 많으니 후수 2집입니다. 어떤 책은 후수 끝내기를 반으로 나누고(미아이 계산, 여기서는 1집) 선수 끝내기는 그대로 둡니다. 어느 쪽으로 세어도 크기 비교의 결론은 같습니다. 이 앱은 언제나 출입 차이를 쓰므로, 같은 집수라면 선수가 후수의 두 배쯤 된다고 기억하세요.",
-              "一手の大きさの数え方（出入り計算）：黒が先にここに打ち、双方最善に応じた結果を数え、次に白が先に打った結果を数えます。その差が手の大きさです。図の一線のハネツギは黒が先に打つと2目多いので、後手2目です。後手のヨセを半分にし（見合い計算、ここでは1目）、先手のヨセはそのままにする本もありますが、大きさを比べた結論は同じです。このアプリはいつも出入りの差を使うので、同じ目数なら先手は後手の倍くらいの価値があると覚えておきましょう。",
+              "算一手棋的大小（出入计算）：先让黑棋在这里先下，双方都走最好的应法，数出结果；再让白棋先下，再数一次。两次的差就是这一手值的目数。图中的一路扳粘，黑先比白先多2目，所以值2目，后手。",
+              "To count a move (deiri counting), let Black play here first, with the best answers on both sides, and count; then let White play first and count again. The difference is what the move is worth. The first-line hane and connection here gives Black 2 points more when Black plays first, so it is worth 2 points, in gote.",
+              "한 수의 크기를 세는 법(출입 계산): 흑이 먼저 여기에 두고 양쪽이 최선으로 받은 결과를 세고, 다음에 백이 먼저 둔 결과를 셉니다. 두 결과의 차이가 그 수의 크기입니다. 그림의 1선 젖혀 잇기는 흑이 먼저 두면 2집이 많으니 후수 2집입니다.",
+              "一手の大きさの数え方（出入り計算）：黒が先にここに打ち、双方最善に応じた結果を数え、次に白が先に打った結果を数えます。その差が手の大きさです。図の一線のハネツギは黒が先に打つと2目多いので、後手2目です。",
             ),
             board: egBoard(EG_HANE, [{ x: 5, y: 3, type: "triangle" }]),
           },
@@ -1758,6 +1759,16 @@ export const INTERMEDIATE = [
             ),
             problem: egValue(EG_HANE, 2, [1, 2, 3, 4]),
             success: L("2目，后手。", "2 points, in gote.", "후수 2집입니다.", "後手2目です。"),
+          },
+          {
+            kind: "read",
+            text: L(
+              "有的书把后手官子除以二（见合计算，这个扳粘就是1目），先手官子不除；两种算法比较大小的结论一样。本应用一律用出入，所以记住：目数相同，先手大约顶得上两倍的后手。",
+              "Some books halve gote moves (miai counting: this hane would be 1 point) and leave sente moves whole; both ways compare moves the same. This app always uses the full difference, so remember: for the same count, a sente move is worth about twice a gote move.",
+              "어떤 책은 후수 끝내기를 반으로 나누고(미아이 계산, 이 젖혀 잇기는 1집) 선수 끝내기는 그대로 둡니다. 어느 쪽으로 세어도 크기 비교의 결론은 같습니다. 이 앱은 언제나 출입 차이를 쓰므로, 같은 집수라면 선수가 후수의 두 배쯤 된다고 기억하세요.",
+              "後手のヨセを半分にし（見合い計算、このハネツギなら1目）、先手のヨセはそのままにする本もありますが、大きさを比べた結論は同じです。このアプリはいつも出入りの差を使うので、同じ目数なら先手は後手の倍くらいの価値があると覚えておきましょう。",
+            ),
+            board: egBoard(EG_HANE, [{ x: 5, y: 3, type: "triangle" }]),
           },
           {
             kind: "problem",
@@ -1790,12 +1801,12 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "官子大致分三级：大官子（十目以上，比如救回被切断的子、三路的大边界），中官子（几目，比如二路扳粘），小官子（一两目，比如一路扳粘和冲），最后是单官。比大小时，先手和双先要看后续：对方不应时你能得到的，如果比别处最大的后手还小，对方就会脱先。所以小小的双先并不总是最先下。图中右边两颗黑子被切断了，救回来是十几目的后手，比左边2目的双先（三角）大得多。",
-              "Endgame moves come roughly in three sizes: big (ten points or more, such as rescuing stones that have been cut off, or a large border on the third line), middle (a few points, such as a second-line hane), and small (one or two points, such as first-line hanes and pushes); neutral points come last. When you compare, look at what a sente or double sente move threatens: if what you would gain when the opponent ignores it is smaller than the biggest gote move elsewhere, the opponent will ignore it. So a small double sente does not always come first. On the right, two black stones have been cut off; rescuing them is a gote move worth well over ten points, far more than the 2-point double sente on the left (triangle).",
-              "끝내기는 대략 세 가지 크기로 나뉩니다. 큰 끝내기(10집 이상, 예를 들어 끊긴 돌을 살리는 수나 3선의 큰 경계), 중간 크기의 끝내기(몇 집, 예를 들어 2선 젖혀 잇기), 작은 끝내기(1~2집, 예를 들어 1선 젖혀 잇기와 밀기), 그리고 마지막이 공배입니다. 크기를 비교할 때 선수와 양선수는 그 뒤를 봐야 합니다. 상대가 받지 않을 때 내가 얻는 것이 다른 곳의 가장 큰 후수보다 작으면 상대는 받지 않습니다. 그래서 작은 양선수가 언제나 먼저는 아닙니다. 그림 오른쪽에서 흑 두 점이 끊겼습니다. 이를 살리는 수는 10집이 훨씬 넘는 후수로, 왼쪽의 2집짜리 양선수(세모)보다 훨씬 큽니다.",
-              "ヨセはおおよそ三つの大きさに分かれます。大ヨセ（10目以上。切り離された石を助ける手や三線の大きな境界など）、中くらいのヨセ（数目。二線のハネツギなど）、小ヨセ（1、2目。一線のハネツギや押しなど）、そして最後がダメです。大きさを比べるときは、先手や両先手の後を見ます。相手が受けなかったときに得られるものが他の一番大きい後手より小さければ、相手は受けません。だから小さな両先手がいつも一番先とは限りません。図の右では黒二子が切り離されています。これを助けるのは10目を大きく超える後手で、左の2目の両先手（三角）よりずっと大きいのです。",
+              "官子大致分三级：大官子（十目以上，比如救回被切断的子、三路的大边界），中官子（几目，比如二路扳粘），小官子（一两目，比如一路扳粘和冲），最后是单官。图中右边两颗黑子（圆圈）被切断了，救回来是十几目的后手，属于大官子。",
+              "Endgame moves come roughly in three sizes: big (ten points or more, such as rescuing stones that have been cut off, or a large border on the third line), middle (a few points, such as a second-line hane), and small (one or two points, such as first-line hanes and pushes); neutral points come last. On the right, two black stones (circles) have been cut off: rescuing them is a big gote move, well over ten points.",
+              "끝내기는 대략 세 가지 크기로 나뉩니다. 큰 끝내기(10집 이상, 예를 들어 끊긴 돌을 살리는 수나 3선의 큰 경계), 중간 크기의 끝내기(몇 집, 예를 들어 2선 젖혀 잇기), 작은 끝내기(1~2집, 예를 들어 1선 젖혀 잇기와 밀기), 그리고 마지막이 공배입니다. 그림 오른쪽에서 흑 두 점(동그라미)이 끊겼습니다. 이를 살리는 수는 10집이 훨씬 넘는 후수, 곧 큰 끝내기입니다.",
+              "ヨセはおおよそ三つの大きさに分かれます。大ヨセ（10目以上。切り離された石を助ける手や三線の大きな境界など）、中くらいのヨセ（数目。二線のハネツギなど）、小ヨセ（1、2目。一線のハネツギや押しなど）、そして最後がダメです。図の右では黒二子（丸）が切り離されています。これを助けるのは10目を大きく超える後手で、大ヨセです。",
             ),
-            board: egBoard(EG_DOUBLE_CUT, [{ x: 5, y: 3, type: "triangle" }, { x: 11, y: 3, type: "circle" }, { x: 11, y: 4, type: "circle" }]),
+            board: egBoard(EG_DOUBLE_CUT, [{ x: 11, y: 3, type: "circle" }, { x: 11, y: 4, type: "circle" }]),
           },
           {
             kind: "problem",
@@ -1807,6 +1818,16 @@ export const INTERMEDIATE = [
             ),
             problem: egMove(EG_DOUBLE_CUT, [[12, 3]], 5),
             success: L("救回两颗子：大的后手比小的双先重要。", "The two stones are back: a big gote move beats a small double sente.", "두 점을 살렸습니다. 큰 후수가 작은 양선수보다 중요합니다.", "二子を助けました。大きい後手は小さい両先手より大事です。"),
+          },
+          {
+            kind: "read",
+            text: L(
+              "先手和双先，要对方真的非应不可才能先下。看它的后续：对方不应时你能得到的，如果比别处最大的后手还小，对方就会脱先。所以左边2目的双先（三角）要让位给救子。",
+              "A sente or double sente move comes first only if the opponent really has to answer. Look at what it threatens: if what you would gain when it is ignored is smaller than the biggest gote move elsewhere, the opponent will ignore it. That is why the 2-point double sente on the left (triangle) had to wait for the rescue.",
+              "선수나 양선수는 상대가 정말 받아야 할 때만 먼저입니다. 그 뒤를 보세요. 상대가 받지 않을 때 내가 얻는 것이 다른 곳의 가장 큰 후수보다 작으면 상대는 받지 않습니다. 그래서 왼쪽의 2집짜리 양선수(세모)는 돌을 살리는 수 다음이었습니다.",
+              "先手や両先手が先になるのは、相手が本当に受けなければならないときだけです。その後を見ましょう。相手が受けなかったときに得られるものが他の一番大きい後手より小さければ、相手は受けません。だから左の2目の両先手（三角）は、石を助ける手の後でした。",
+            ),
+            board: egBoard(EG_DOUBLE_CUT, [{ x: 5, y: 3, type: "triangle" }]),
           },
           {
             kind: "problem",
@@ -1828,12 +1849,12 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "日本规则：双方停一手以后拿掉死子，提子填进对方的地，再数目。单官不算目，但也要填完。有的单官很特别：图中三角的单官，黑棋填了，白棋那颗子就被打吃，白棋必须在自己地里补一手（补棋），少一目；圆圈的单官填不填都一样。所以收单官时，先填会逼对方补棋的那个。中国规则用数子法，每个单官都算一个子，见“数子法”一课。",
-              "Under Japanese rules, after both players pass, dead stones are removed, prisoners are placed in the opponent's territory, and territory is counted. Neutral points are worth nothing, but they are all filled. Some are special: if Black fills the marked neutral point (triangle), a white stone is in atari and White must add a defensive stone inside its own territory, which costs a point; filling the circled one changes nothing. So fill the neutral point that forces a defensive move first. Chinese rules use area scoring, where every neutral point is worth a point; see the lesson on area scoring.",
-              "일본 규칙에서는 두 사람이 패스한 뒤 사석을 들어내고, 따낸 돌을 상대 집에 메운 다음 계가합니다. 공배는 집이 아니지만 모두 메웁니다. 특별한 공배도 있습니다. 세모 표시한 공배를 흑이 메우면 백 한 점이 단수가 되어 백은 자기 집 안에 손질을 해야 하고, 한 집이 줄어듭니다. 동그라미 공배는 메워도 아무 일이 없습니다. 그러니 손질을 강요하는 공배부터 메우세요. 중국 규칙은 계자(수 세기)로, 공배 하나하나가 한 점입니다. '계자' 강의를 보세요.",
-              "日本ルールでは、双方パスの後、死に石を取り上げ、アゲハマを相手の地に埋めて整地します。ダメは目になりませんが、すべて詰めます。特別なダメもあります。三角印のダメを黒が詰めると白一子がアタリになり、白は自分の地の中に手入れが必要で一目減ります。丸印のダメは詰めても何も起きません。だから、手入れを強いるダメから詰めましょう。中国ルールは計子で、ダメも一つ一目になります。「計子」の課を見てください。",
+              "日本规则：双方停一手以后拿掉死子，提子填进对方的地，再数目。单官不算目，但也要填完。中国规则用数子法，每个单官都算一个子，见“数子法”一课。",
+              "Under Japanese rules, after both players pass, dead stones are removed, prisoners are placed in the opponent's territory, and territory is counted. Neutral points are worth nothing, but they are all filled. Chinese rules use area scoring, where every neutral point is worth a point; see the lesson on area scoring.",
+              "일본 규칙에서는 두 사람이 패스한 뒤 사석을 들어내고, 따낸 돌을 상대 집에 메운 다음 계가합니다. 공배는 집이 아니지만 모두 메웁니다. 중국 규칙은 계자(수 세기)로, 공배 하나하나가 한 점입니다. '계자' 강의를 보세요.",
+              "日本ルールでは、双方パスの後、死に石を取り上げ、アゲハマを相手の地に埋めて整地します。ダメは目になりませんが、すべて詰めます。中国ルールは計子で、ダメも一つ一目になります。「計子」の課を見てください。",
             ),
-            board: egBoard(EG_DEFENCE, [{ x: 4, y: 2, type: "triangle" }, { x: 10, y: 2, type: "circle" }]),
+            board: egBoard(EG_DEFENCE, [{ x: 4, y: 2, type: "circle" }, { x: 10, y: 2, type: "circle" }]),
           },
           {
             kind: "problem",
@@ -1845,6 +1866,15 @@ export const INTERMEDIATE = [
             ),
             problem: egMove(EG_ONE_POINT, [[3, 3]], 1),
             success: L("一目也是目，单官放到最后。", "A point is a point; neutral points come last.", "한 집도 집입니다. 공배는 마지막입니다.", "一目も目のうち。ダメは最後です。"),
+          },
+          {
+            kind: "read",
+            text: L(
+              "有的单官很特别：填上以后，对方的子被打吃，对方必须在自己地里补一手（补棋），少一目。普通的单官填不填都一样。所以收单官时，先填会逼对方补棋的那个。",
+              "Some neutral points are special. Filling one can put an enemy stone in atari, so that the opponent must add a defensive stone inside their own territory, which costs them a point; filling an ordinary one changes nothing. So fill the neutral point that forces a defensive move first.",
+              "특별한 공배도 있습니다. 메우면 상대 돌이 단수가 되어, 상대가 자기 집 안에 손질을 해야 하고 한 집이 줄어드는 공배입니다. 보통의 공배는 메워도 아무 일이 없습니다. 그러니 손질을 강요하는 공배부터 메우세요.",
+              "特別なダメもあります。詰めると相手の石がアタリになり、相手は自分の地の中に手入れが必要で一目減る、というダメです。ふつうのダメは詰めても何も起きません。だから、手入れを強いるダメから詰めましょう。",
+            ),
           },
           {
             kind: "problem",
@@ -2081,7 +2111,7 @@ export const INTERMEDIATE = [
           },
         ],
       },
-      // v6: leaning attack and sabaki. The tactical steps are proved by the
+      // Leaning attack and sabaki. The tactical steps are proved by the
       // solver; the claims about the stones gained by leaning were checked
       // too (without them, the capture fails).
       {
@@ -2206,7 +2236,7 @@ export const INTERMEDIATE = [
       },
     ],
   },
-  /* ======================================================== UNIT 14 (v13) */
+  /* ======================================================== UNIT 14 */
   {
     id: "ko-fighting",
     level: "intermediate",
@@ -2332,10 +2362,10 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "开劫之前先数劫材：双方各有几个对方必须应的劫材？劫材多的一方打得赢，劫材少的一方最好别开劫，或者先去消掉对方的劫材。这里的劫还没开始，黑棋有上边的切断（圆圈）一个劫材，白棋一个也没有，黑棋可以放心提（三角）。还有一种劫叫缓气劫：要提的子还有一口外气，必须先紧一口气才能提。紧气要多花一手，等于少了一个劫材，所以缓气劫对需要紧气的一方很不利。",
-              "Before starting a ko, count threats: how many threats the opponent must answer does each side have? The side with more threats wins the ko; the side with fewer should not start it, or should first remove the opponent's threats. Here the ko has not started: Black has one threat, the cut at the top (circle), and White has none, so Black can take (triangle) with confidence. There is also the approach ko: the stone you want to capture still has an outside liberty, so you must fill that liberty before you can take. The extra move is like being one threat short, so an approach ko is a heavy handicap for the side that must approach.",
-              "패를 걸기 전에 팻감을 세세요. 상대가 받아야 하는 팻감이 양쪽에 몇 개씩 있습니까? 팻감이 많은 쪽이 패를 이기고, 적은 쪽은 패를 걸지 않거나 먼저 상대의 팻감을 없애는 것이 좋습니다. 여기서는 아직 패가 시작되지 않았습니다. 흑은 위쪽 끊기(동그라미)라는 팻감이 하나 있고 백은 하나도 없으니, 흑은 안심하고 따낼(세모) 수 있습니다. 늘어진 패라는 것도 있습니다. 따내려는 돌에 바깥 활로가 하나 더 있어서, 먼저 그 활로를 메워야 따낼 수 있는 패입니다. 한 수를 더 써야 하니 팻감이 하나 모자란 것과 같아서, 메워야 하는 쪽이 크게 불리합니다.",
-              "コウを仕掛ける前にコウダテを数えましょう。相手が受けなければならないコウダテが、それぞれいくつあるでしょうか。コウダテの多い方がコウに勝ち、少ない方は仕掛けないか、先に相手のコウダテを消しておくのがよいのです。ここではコウはまだ始まっていません。黒には上の切り（丸）というコウダテが一つあり、白には一つもないので、黒は安心して取れます（三角）。ヨセコウというコウもあります。取りたい石にもう一つ外側の呼吸点があり、先にそれをふさがないと取れないコウです。一手余計にかかるのはコウダテが一つ足りないのと同じで、詰める側がたいへん不利です。",
+              "开劫之前先数劫材：双方各有几个对方必须应的劫材？劫材多的一方打得赢，劫材少的一方最好别开劫，或者先去消掉对方的劫材。这里的劫还没开始，黑棋有上边的切断（圆圈）一个劫材，白棋一个也没有，黑棋可以放心提（三角）。",
+              "Before starting a ko, count threats: how many threats the opponent must answer does each side have? The side with more threats wins the ko; the side with fewer should not start it, or should first remove the opponent's threats. Here the ko has not started: Black has one threat, the cut at the top (circle), and White has none, so Black can take (triangle) with confidence.",
+              "패를 걸기 전에 팻감을 세세요. 상대가 받아야 하는 팻감이 양쪽에 몇 개씩 있습니까? 팻감이 많은 쪽이 패를 이기고, 적은 쪽은 패를 걸지 않거나 먼저 상대의 팻감을 없애는 것이 좋습니다. 여기서는 아직 패가 시작되지 않았습니다. 흑은 위쪽 끊기(동그라미)라는 팻감이 하나 있고 백은 하나도 없으니, 흑은 안심하고 따낼(세모) 수 있습니다.",
+              "コウを仕掛ける前にコウダテを数えましょう。相手が受けなければならないコウダテが、それぞれいくつあるでしょうか。コウダテの多い方がコウに勝ち、少ない方は仕掛けないか、先に相手のコウダテを消しておくのがよいのです。ここではコウはまだ始まっていません。黒には上の切り（丸）というコウダテが一つあり、白には一つもないので、黒は安心して取れます（三角）。",
             ),
             board: { ...b9(KO_FRESH_ROWS), marks: [{ x: 5, y: 4, type: "triangle" }, { x: 5, y: 2, type: "circle" }] },
           },
@@ -2368,6 +2398,15 @@ export const INTERMEDIATE = [
             ),
             problem: { goal: "save", size: 9, diagram: KO_CONNECT },
             success: L("劫粘掉了。劫材多，劫就是你的。", "The ko is over. More threats, and the ko was yours.", "패를 이었습니다. 팻감이 많으면 패는 내 것입니다.", "コウを解消しました。コウダテが多ければ、コウは自分のものです。"),
+          },
+          {
+            kind: "read",
+            text: L(
+              "还有一种劫叫缓气劫：要提的子还有一口外气，必须先紧一口气才能提。紧气要多花一手，等于少了一个劫材，所以缓气劫对需要紧气的一方很不利。",
+              "There is also the approach ko: the stone you want to capture still has an outside liberty, so you must fill that liberty before you can take. The extra move is like being one threat short, so an approach ko is a heavy handicap for the side that must approach.",
+              "늘어진 패라는 것도 있습니다. 따내려는 돌에 바깥 활로가 하나 더 있어서, 먼저 그 활로를 메워야 따낼 수 있는 패입니다. 한 수를 더 써야 하니 팻감이 하나 모자란 것과 같아서, 메워야 하는 쪽이 크게 불리합니다.",
+              "ヨセコウというコウもあります。取りたい石にもう一つ外側の呼吸点があり、先にそれをふさがないと取れないコウです。一手余計にかかるのはコウダテが一つ足りないのと同じで、詰める側がたいへん不利です。",
+            ),
           },
         ],
       },
@@ -2410,7 +2449,7 @@ export const INTERMEDIATE = [
       },
     ],
   },
-  /* ======================================================== UNIT 15 (v13) */
+  /* ======================================================== UNIT 15 */
   {
     id: "judgement",
     level: "intermediate",
@@ -2430,7 +2469,7 @@ export const INTERMEDIATE = [
             kind: "read",
             text: L(
               "形势判断就是在棋局中途数地。先数已经围好的地：这里左边黑地30目，右边白地24目，再给白棋加上贴目6目半。只剩下边一处一路扳粘没下。黑棋扳到的话，黑31目对白24目加6目半，黑胜半目；白棋扳到的话，黑30目对白25目加6目半，白胜1目半。这一手决定胜负。",
-              "Judging the position means counting in the middle of the game. First count the territory that is already closed: here Black has 30 points on the left, White 24 on the right, and White gets 6.5 points of komi. Only the first-line hane and connection at the bottom is left. If Black plays it, Black has 31 against White's 24 + 6.5: Black wins by half a point. If White plays it, Black has 30 against 25 + 6.5: White wins by 1.5. This one move decides the game.",
+              "Judging the position means counting in the middle of the game. First count the territory that is already closed: Black has 30 points on the left, White 24 on the right plus 6.5 points of komi. Only the first-line hane and connection at the bottom is left. If Black plays it, it is 31 against 24 + 6.5: Black wins by half a point. If White plays it, 30 against 25 + 6.5: White wins by 1.5. This one move decides the game.",
               "형세 판단은 대국 중에 집을 세는 것입니다. 먼저 이미 다 지은 집을 셉니다. 여기서는 왼쪽 흑집이 30집, 오른쪽 백집이 24집이고, 백은 덤 6집 반을 받습니다. 아래쪽 1선 젖혀 잇기 하나만 남았습니다. 흑이 두면 흑 31집 대 백 24집+6집 반으로 흑의 반집승, 백이 두면 흑 30집 대 백 25집+6집 반으로 백의 1집 반 승입니다. 이 한 수가 승부를 가릅니다.",
               "形勢判断とは、対局の途中で地を数えることです。まず、もう囲い終わった地を数えます。ここでは左の黒地が30目、右の白地が24目で、白にはコミ6目半があります。残っているのは下の一線のハネツギだけです。黒が打てば黒31目対白24目＋6目半で黒の半目勝ち、白が打てば黒30目対白25目＋6目半で白の1目半勝ちです。この一手が勝負を決めます。",
             ),
@@ -2483,10 +2522,10 @@ export const INTERMEDIATE = [
           {
             kind: "read",
             text: L(
-              "数完地以后再决定怎么下。领先时不需要冒险：补好自己的毛病，让对方没有翻盘的机会，多抢一两目不如稳稳当当。落后时则相反，按部就班地收官只会输得少一点，要找能改变局面的一手：攻击对方的弱棋，或者吃掉切断你的子。贴目也要算进去：中国规则贴7目半，日本、韩国规则贴6目半。",
-              "Decide how to play after you have counted. When you are ahead there is no need to take risks: mend your weaknesses and leave the opponent no way back; it is better than grabbing a point or two more. When you are behind it is the other way round: ordinary endgame moves only make you lose by less, so look for a move that changes the game, such as an attack on a weak group or capturing stones that cut you. Count komi in as well: 7.5 points under Chinese rules, 6.5 under Japanese and Korean rules.",
-              "집을 세고 나서 어떻게 둘지 정합니다. 앞서고 있다면 모험할 필요가 없습니다. 자기 약점을 보강해서 상대에게 역전의 기회를 주지 마세요. 한두 집 더 버는 것보다 낫습니다. 뒤지고 있다면 반대입니다. 평범한 끝내기로는 덜 지는 것뿐이니, 상대의 약한 돌을 공격하거나 끊고 있는 돌을 잡는 것처럼 판을 바꿀 수를 찾으세요. 덤도 셈에 넣으세요. 중국 규칙은 7집 반, 일본·한국 규칙은 6집 반입니다.",
-              "数え終わってから打ち方を決めます。リードしているなら冒険は要りません。自分の弱点を補強して、相手に逆転の機会を与えないことです。一、二目多く取るよりそのほうがよいのです。遅れているなら逆です。ふつうのヨセでは負けが少し減るだけなので、相手の弱い石を攻める、切っている石を取るといった、局面を変える手を探しましょう。コミも数に入れます。中国ルールは7目半、日本・韓国ルールは6目半です。",
+              "数完地以后再决定怎么下。领先时不需要冒险：补好自己的毛病，让对方没有翻盘的机会，多抢一两目不如稳稳当当。落后时则相反，按部就班地收官只会输得少一点，要找能改变局面的一手：攻击对方的弱棋，或者吃掉切断你的子。",
+              "Decide how to play after you have counted. When you are ahead there is no need to take risks: mend your weaknesses and leave the opponent no way back; it is better than grabbing a point or two more. When you are behind it is the other way round: ordinary endgame moves only make you lose by less, so look for a move that changes the game, such as an attack on a weak group or capturing stones that cut you.",
+              "집을 세고 나서 어떻게 둘지 정합니다. 앞서고 있다면 모험할 필요가 없습니다. 자기 약점을 보강해서 상대에게 역전의 기회를 주지 마세요. 한두 집 더 버는 것보다 낫습니다. 뒤지고 있다면 반대입니다. 평범한 끝내기로는 덜 지는 것뿐이니, 상대의 약한 돌을 공격하거나 끊고 있는 돌을 잡는 것처럼 판을 바꿀 수를 찾으세요.",
+              "数え終わってから打ち方を決めます。リードしているなら冒険は要りません。自分の弱点を補強して、相手に逆転の機会を与えないことです。一、二目多く取るよりそのほうがよいのです。遅れているなら逆です。ふつうのヨセでは負けが少し減るだけなので、相手の弱い石を攻める、切っている石を取るといった、局面を変える手を探しましょう。",
             ),
           },
           {
@@ -2521,7 +2560,7 @@ export const INTERMEDIATE = [
             kind: "read",
             text: L(
               "落后的一方，普通的官子赢不回来。先数清楚差多少，再在棋盘上找能弥补差距的地方：对方没补的断点、气紧的子、还没活干净的棋。找到了就果断下，没有把握时也要选能把局面搅乱的下法，而不是安安静静输掉。",
-              "When you are behind, ordinary endgame moves will not win the game back. First count how far behind you are, then look for something on the board that can make up the difference: a cutting point the opponent has not mended, stones short of liberties, a group that is not quite alive. When you find it, play it without hesitation; even when you are not sure, choose a move that makes the game complicated rather than losing quietly.",
+              "When you are behind, ordinary endgame moves will not win the game back. First count how far behind you are, then look for something that can make up the difference: a cutting point the opponent has not mended, stones short of liberties, a group that is not quite alive. When you find it, play it without hesitation; when you are not sure, still choose a move that complicates the game rather than losing quietly.",
               "뒤지고 있는 쪽은 평범한 끝내기로는 따라잡을 수 없습니다. 먼저 얼마나 뒤지는지 정확히 세고, 그 차이를 메울 수 있는 곳을 판에서 찾으세요. 상대가 보강하지 않은 끊는 점, 활로가 모자란 돌, 아직 완전히 살지 않은 돌입니다. 찾으면 망설이지 말고 두세요. 확신이 없을 때도 조용히 지기보다 판을 복잡하게 만드는 수를 고르세요.",
               "遅れている側は、ふつうのヨセでは追いつけません。まずどれだけ遅れているかをきちんと数え、その差を埋められる所を盤上で探しましょう。相手が補強していない切りの点、呼吸点の少ない石、まだ完全には生きていない石です。見つけたら迷わず打ちましょう。確信がなくても、静かに負けるより局面を複雑にする手を選ぶことです。",
             ),

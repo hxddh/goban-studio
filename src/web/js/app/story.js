@@ -1,5 +1,5 @@
 /**
- * v4 review: turning an engine line into a short story.
+ * Review: turning an engine line into a short story.
  *
  * `simulate()` plays a line on a real board (rules.js / @sabaki/go-board, so
  * captures and ko are the rules' own) and records the plain facts of every
@@ -90,7 +90,7 @@ export function eyes(signMap, color, ch = chains(signMap)) {
 }
 
 /** Number of eyes of the group made of `start` chains and everything linked to them through shared eyes. */
-export function groupEyes(signMap, color, start, ch = chains(signMap), eyeList = eyes(signMap, color, ch)) {
+function groupEyes(signMap, color, start, ch = chains(signMap), eyeList = eyes(signMap, color, ch)) {
   const group = new Set(start);
   if (!group.size) return 0;
   const counted = new Set();

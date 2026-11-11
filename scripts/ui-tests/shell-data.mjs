@@ -1,5 +1,5 @@
 /**
- * Shell, v13 data safety in the browser (docs/storage.md): a settings file
+ * Shell, data safety in the browser (docs/storage.md): a settings file
  * that cannot be read puts the app in its safe state (no onboarding,
  * nothing written, Retry / Continue read-only / Start over, the damaged
  * file copied aside first); a game in progress replaced by New game waits
@@ -37,7 +37,7 @@ function failingExportHost() {
         delete window.__files[p.key];
         return true;
       }
-      // The save dialog is the host's own command (v13); the write then fails.
+      // The save dialog is the host's own command; the write then fails.
       if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
       if (command === "studio.writeTextFile") {
         window.__writes.push(p.path);
@@ -73,7 +73,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click("[data-safe=readonly]");
     await page.waitForSelector(".safe-banner");
     await page.keyboard.press("Control+2");
-    // v13: no game is made up at launch; Play's home offers the suggested game.
+    // No game is made up at launch; Play's home offers the suggested game.
     await page.click(".play-home .hero .btn.primary");
     await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 10);
     await clickPoint(page, 3, 3);
@@ -98,8 +98,16 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await fresh();
     await onboard(page, 1);
     await page.waitForFunction(() => window.__state.play.view === "game" && window.__board?.geom?.cell > 10);
-    await clickPoint(page, 2, 2);
-    await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
+    // Two moves of the player's (a single stray click is not kept), each answered by the computer.
+    for (let k = 1; k <= 2; k++) {
+      const p = await page.evaluate(() => {
+        const g = window.__state.game.game;
+        for (const [x, y] of [[2, 2], [6, 6], [2, 6], [6, 2], [4, 4]]) if (g.canPlay(x, y).ok) return [x, y];
+        return null;
+      });
+      await clickPoint(page, ...p);
+      await page.waitForFunction((n) => window.__state.game.game.moveNumber >= n && !window.__state.game.thinking && window.__state.game.game.turn === window.__state.game.humanColor, 2 * k, { timeout: 20000 });
+    }
     const before = await page.evaluate(() => window.__state.game.game.mainLine().length);
     // New game: two players on 9×9.
     await page.keyboard.press("Control+n");
@@ -110,8 +118,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForFunction(() => window.__state.toasts.some((t) => /unfinished/.test(t.message)));
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .game-row");
-    const row = await page.textContent(".library-home .game-row");
-    assert(row.includes("Unfinished"), row);
+    // It is in the Library's group of unfinished games, and its row continues it.
+    assert((await page.textContent(".unfinished-group .slot-title")).trim() === "Unfinished", "the unfinished group");
+    const row = await page.textContent(".unfinished-group .game-row");
+    assert(row.includes("Continue"), row);
     await page.click(".library-home .game-row");
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game" && window.__state.game.recordId);
     const now = await page.evaluate(() => ({ len: window.__state.game.game.mainLine().length, opponent: window.__state.game.opponent }));
@@ -162,8 +172,19 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click('[data-pane="data"]');
     await page.click("[data-undo-restore]");
     await Promise.all([page.waitForNavigation(), page.click(".sheet-foot .btn.primary")]);
-    await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /before the last restore/.test(t.message)));
+    await page.waitForFunction(() => window.__state?.ready && window.__state.toasts.some((t) => /Undone\. Your data is as it was before the restore/.test(t.message)));
     assert(await page.evaluate(() => localStorage.getItem("goban9:marker.json") === "{}"), "undo put it back");
+    // The undo kept a copy of what it replaced, so it is offered again (an undo can be undone)…
+    const snaps = await page.evaluate(() => [...new Set(Object.keys(localStorage).map((k) => /^goban9:backups\/pre-restore-(\d+)\//.exec(k)?.[1]).filter(Boolean))]);
+    assert(snaps.length === 1, `one snapshot is kept, the undo's own: ${snaps}`);
+    await page.keyboard.press("Control+,");
+    await page.click('[data-pane="data"]');
+    await page.waitForSelector("[data-undo-restore]");
+    assert((await page.textContent(".settings-pane")).includes("30 days"), "the row says how long the copy is kept");
+    // …until a new backup is exported: the player then holds a newer copy.
+    await Promise.all([page.waitForEvent("download"), page.click(".settings-group .btn >> text=Export backup")]);
+    await page.waitForSelector("[data-undo-restore]", { state: "detached" });
+    await page.waitForFunction(() => !Object.keys(localStorage).some((k) => k.startsWith("goban9:backups/")), null, { timeout: 3000 });
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

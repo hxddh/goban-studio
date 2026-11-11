@@ -1,10 +1,10 @@
 /**
- * v13: versions of the stored files and the steps between them
+ * Versions of the stored files and the steps between them
  * (docs/storage.md, "Versions and migrations").
  *
  * Every file the data layer owns carries its format version as `v`:
  * settings.json, current.json, games-index.json and games/<id>.json. v9 to
- * v12 wrote them without one and in the same format, so a file without `v`
+ * Wrote them without one and in the same format, so a file without `v`
  * is a v9 file. A file is brought to STORE_V one step at a time
  * (MIGRATIONS[n] turns version n into n + 1) when it is read: when the
  * store opens or loads it (data/store.js `migrate`), and for every file of
@@ -14,12 +14,12 @@
  *
  * profile.json is the player model's (model/player.js): its `v` is
  * PROFILE_V and normalizeProfile moves it on; here it is only refused when
- * it is newer than that. Other keys (the learn session, the update state,
+ * it is newer than that. Other keys (the practice session, the update state,
  * the analysis queue) belong to their modules, which check them.
  */
 import { NewerVersionError } from "./store.js";
 import { packAnalysis } from "./pack.js";
-import { PROFILE_V } from "../model/player.js";
+import { PROFILE_V } from "../model/rating.js";
 
 /** The format this version writes. */
 export const STORE_V = 13;
@@ -33,7 +33,7 @@ export const INDEX_KEY = "games-index.json";
 export const GAMES_PREFIX = "games/";
 
 /** Keys whose files carry the store's version. */
-export function versioned(key) {
+function versioned(key) {
   return key === SETTINGS_KEY || key === CURRENT_KEY || key === INDEX_KEY || (key.startsWith(GAMES_PREFIX) && key.endsWith(".json"));
 }
 
@@ -58,7 +58,7 @@ export const MIGRATIONS = {
 };
 
 /** The version a stored value says it is (LEGACY_V when it says nothing usable). */
-export function versionOf(value) {
+function versionOf(value) {
   const v = value?.v;
   return Number.isInteger(v) && v >= LEGACY_V ? v : LEGACY_V;
 }

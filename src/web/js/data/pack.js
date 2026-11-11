@@ -1,5 +1,5 @@
 /**
- * v13: an analysis as it is kept in a game's file (docs/storage.md).
+ * An analysis as it is kept in a game's file (docs/storage.md).
  *
  * KataGo gives every position an ownership map (one number per point:
  * 361 on 19×19). Stored for every position that was about 0.5 MB a game;
@@ -19,12 +19,12 @@
  * overlay of a stored game falls back to the board's influence there.
  * Packing is idempotent.
  */
-import { settledShare } from "../app/summary.js";
+import { settledShare } from "../ownership.js";
 
 /** Positions whose maps are kept: the two around each of this many biggest score swings. */
-export const KEEP_SWINGS = 12;
+const KEEP_SWINGS = 12;
 /** A smaller change of the score is not a key moment. */
-export const MIN_SWING = 1;
+const MIN_SWING = 1;
 
 const isMap = (own) => !!own && typeof own === "object" && typeof own.length === "number" && own.length > 0;
 const round3 = (v) => Math.round(v * 1000) / 1000;

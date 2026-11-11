@@ -186,6 +186,30 @@ pub fn fixSavePath(path: []const u8, wanted_ext: []const u8, out: []u8) ?[]const
     return if (allowedName(fixed)) fixed else null;
 }
 
+/// A name beside `path` that no file has yet: `path` itself when it is
+/// free, else "<name> (2)<ext>", "(3)" … Used when the app, not the save
+/// dialog, completed the file name, so nobody was asked about replacing
+/// the file of that name. Null when a hundred are taken.
+pub fn freeSavePath(io: std.Io, path: []const u8, out: []u8) ?[]const u8 {
+    if (!pathExists(io, path)) return path;
+    const ext = allowedExtension(baseName(path)) orelse return null;
+    const stem = path[0 .. path.len - ext.len];
+    const tail = path[path.len - ext.len ..];
+    var n: usize = 2;
+    while (n < 100) : (n += 1) {
+        const candidate = std.fmt.bufPrint(out, "{s} ({d}){s}", .{ stem, n, tail }) catch return null;
+        if (!allowedName(candidate)) return null;
+        if (!pathExists(io, candidate)) return candidate;
+    }
+    return null;
+}
+
+fn pathExists(io: std.Io, path: []const u8) bool {
+    if (!std.fs.path.isAbsolute(path)) return false;
+    std.Io.Dir.accessAbsolute(io, path, .{}) catch |err| return err != error.FileNotFound;
+    return true;
+}
+
 // ------------------------------------------------------------------ tests
 
 const testing = std.testing;
@@ -273,4 +297,40 @@ test "a save path without the app's extension gets the suggested one" {
     try testing.expect(fixSavePath("/tmp/.profile", ".sgf", &buf) == null);
     try testing.expect(fixSavePath("C:\\x\\con", ".sgf", &buf) == null);
     try testing.expect(fixSavePath("relative", ".sgf", &buf) == null);
+}
+
+test "a completed save name never replaces a file nobody was asked about" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir_len = try tmp.dir.realPath(io, &dir_buf);
+    const dir = dir_buf[0..dir_len];
+    const sep = std.fs.path.sep;
+    var typed_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const typed = try std.fmt.bufPrint(&typed_buf, "{s}{c}game", .{ dir, sep });
+    var fixed_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    var free_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    var want_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+
+    // The user typed "game"; nothing is called game.sgf yet.
+    const fixed = fixSavePath(typed, ".sgf", &fixed_buf).?;
+    try testing.expect(fixed.len != typed.len);
+    try testing.expectEqualStrings(fixed, freeSavePath(io, fixed, &free_buf).?);
+
+    // There is a game.sgf (the dialog only asked about "game").
+    try tmp.dir.writeFile(io, .{ .sub_path = "game.sgf", .data = "(;GM[1])" });
+    const second = freeSavePath(io, fixed, &free_buf).?;
+    try testing.expectEqualStrings(try std.fmt.bufPrint(&want_buf, "{s}{c}game (2).sgf", .{ dir, sep }), second);
+    try testing.expect(allowedName(second));
+    try tmp.dir.writeFile(io, .{ .sub_path = "game (2).sgf", .data = "x" });
+    try testing.expectEqualStrings(try std.fmt.bufPrint(&want_buf, "{s}{c}game (3).sgf", .{ dir, sep }), freeSavePath(io, fixed, &free_buf).?);
+    // The kept file is untouched.
+    var read_buf: [16]u8 = undefined;
+    try testing.expectEqualStrings("(;GM[1])", try tmp.dir.readFile(io, "game.sgf", &read_buf));
+
+    // A name the user typed in full was the dialog's to ask about: it is
+    // returned as it is, and main.zig does not call this at all.
+    const full = try std.fmt.bufPrint(&typed_buf, "{s}{c}game.sgf", .{ dir, sep });
+    try testing.expectEqualStrings(full, fixSavePath(full, ".sgf", &fixed_buf).?);
 }

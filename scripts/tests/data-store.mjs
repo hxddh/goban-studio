@@ -1,5 +1,5 @@
 /**
- * Data: the v9 store (src/web/js/data/store.js), backups (data/backup.js)
+ * Data: the store (src/web/js/data/store.js), backups (data/backup.js)
  * and the host's file commands (src/store.zig, src/main.zig). The host is a
  * fake with the same rules as store.zig: strict keys, chunks of at most
  * CHUNK_BYTES that must arrive in order, a rename on the last one, and the
@@ -131,7 +131,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(!S.validKey("a".repeat(196) + ".json"));
     for (const p of ["", "games", "games/"]) assert.ok(S.validPrefix(p), p);
     for (const p of ["/", "../", "games//", "/games/", "con/", "nul"]) assert.ok(!S.validPrefix(p), p);
-    // v13: Windows device names, as a file or a folder, like store.zig.
+    // Windows device names, as a file or a folder, like store.zig.
     for (const k of ["con.json", "nul.json", "aux.json", "prn.json", "com1.json", "lpt9.json", "games/con.json", "con/x.json", "games/lpt1.json"]) assert.ok(!S.validKey(k), k);
     for (const k of ["console.json", "com.json", "com0.json", "com10.json", "lpt.json", "nul-1.json", "auxiliary.json"]) assert.ok(S.validKey(k), k);
     for (const n of ["con", "CON", "Con", "NUL.txt", "COM9", "LPT9.json", "con.tar.gz", "con ", "aux .json"]) assert.ok(S.isDeviceName(n), n);
@@ -148,16 +148,17 @@ export default async function ({ test, assert, root }) {
 
   await test("data store: the host registers the four file commands, with Zig tests", () => {
     const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
-    // v13: one command table; the registry and the policies are built from
+    // One command table; the registry and the policies are built from
     // it (and a Zig test checks every name is unique).
     for (const [name, fn] of [["studio.storeRead", "storeRead"], ["studio.storeWrite", "storeWrite"], ["studio.storeList", "storeList"], ["studio.storeRemove", "storeRemove"]]) {
       assert.ok(main.includes(`.{ .name = "${name}", .invoke = ${fn} },`), name);
     }
     assert.match(main, /test "every bridge command is registered once, with the same origins"/);
-    // The data root: beside models/, with a test override.
-    assert.match(main, /fn resolveDataDir\(/);
-    assert.match(main, /GOBAN_DATA_DIR/);
-    assert.match(main, /"\{s\}\{c\}data"/);
+    // The data root: beside models/, with a test override (src/paths.zig).
+    const paths = fs.readFileSync(path.join(root, "src/paths.zig"), "utf8").replace(/\r\n/g, "\n");
+    assert.match(paths, /pub fn dataDir\(/);
+    assert.match(paths, /override\(env_map, "GOBAN_DATA_DIR", out\) orelse child\(env_map, "data", out\)/);
+    assert.match(main, /paths_mod\.dataDir\(init\.environ_map, &data_dir_buf\)/);
     assert.match(main, /refAllDecls\(store_mod\)/);
     const zig = fs.readFileSync(path.join(root, "src/store.zig"), "utf8");
     assert.match(zig, /test "store keys are validated strictly"/);

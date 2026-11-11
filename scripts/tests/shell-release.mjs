@@ -1,7 +1,7 @@
 /**
  * Shell: release — the static page, updates, signing notes, screenshots, the tour, the updater and the optional networks.
  */
-import { test, APP_VERSION, BLACK, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, bundle, fs, loadSettings, normalizeSettings, path, root, sleep, t } from "./helpers.mjs";
+import { test, APP_VERSION, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, fs, normalizeSettings, path, root, t } from "./helpers.mjs";
 
 await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
@@ -40,7 +40,7 @@ await test("design tokens meet the contrast rules in docs/design.md (light and d
 
 await test("removing a network retries while the engine is busy, without blocking", async () => {
   let calls = 0;
-  const invoke = async (cmd) => {
+  const invoke = async () => {
     calls++;
     return calls < 3 ? { ok: false, error: "Busy", models: {} } : { ok: true, models: {} };
   };
@@ -168,8 +168,6 @@ await test("the native update commands are fixed to this repository", () => {
   assert.match(html, /connect-src 'self'/);
   const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8").replace(/\r\n/g, "\n");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
@@ -208,6 +206,47 @@ await test("release notes and package READMEs say how the build was really signe
   }
 });
 
+await test("this version's release notes fit the release workflow, and the README describes the present", () => {
+  const read = (file) => fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/g, "\n");
+  const tag = `v${APP_VERSION}`;
+  // The preflight of release.yml: the tag is v + package.json's version, and its notes file exists.
+  assert.equal(JSON.parse(read("package.json")).version, APP_VERSION);
+  const notes = read(`.github/release-notes/${tag}.md`);
+  assert.ok(notes.startsWith(`# Goban Studio ${tag}\n`), "the notes are titled with the tag");
+  // The assemble job rewrites the block between the markers with what the builds did, and nothing else.
+  assert.equal(notes.split("<!-- first-launch -->").length, 2, "one first-launch block");
+  assert.ok(notes.indexOf("## Download and first launch") < notes.indexOf("<!-- first-launch -->"));
+  const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
+  const out = Sign.applyToNotes(notes, adhoc, Sign.normalizeStatus("windows", {}), adhoc);
+  assert.match(out, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg` or `\.zip` \| Ad-hoc signed, \*\*not notarized\*\*/);
+  assert.match(out, /\| Windows \(x64\) \| `GobanStudio-Windows-x64\.zip` \| \*\*Not Authenticode-signed\.\*\*/);
+  assert.doesNotMatch(out, /See the package README/, "the placeholder cells are replaced");
+  const outside = (text) => text.replace(/<!-- first-launch -->[\s\S]*?<!-- \/first-launch -->/, "");
+  assert.equal(outside(out), outside(notes), "the rest of the notes is published as written");
+  // What is not done is said last, and plainly.
+  const sections = [...notes.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
+  assert.equal(sections.at(-1), "Known limits");
+  const limits = notes.slice(notes.indexOf("## Known limits"));
+  for (const said of [/Not checked by people/, /not code-signed/, /no Windows installer/i, /not been tried by hand/, /opening book/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
+
+  // The README: the app as it is, the user's half before the developer's, the real release command.
+  const readme = read("README.md");
+  assert.doesNotMatch(readme, /^#+ .*\bv\d+\b/m, "no heading tells a version's story");
+  assert.doesNotMatch(readme, /\bv\d+(\.\d+)* (adds|is|keeps|brings|reads)\b/, "no version narration");
+  assert.ok(readme.indexOf("## Download and first launch") < readme.indexOf("# For developers"));
+  assert.ok(readme.indexOf("# For developers") < readme.indexOf("## Architecture"));
+  assert.ok(readme.includes(`gh workflow run release.yml --ref main -f tag=${tag}`), "the release command is this version's");
+  assert.match(readme, /release-signing/);
+  // Where the data is: the folders the shell really uses (src/paths.zig, checked against docs/storage.md in shell-files.mjs).
+  const storage = read("docs/storage.md");
+  for (const folder of ["~/Library/Application Support/dev.hxddh.gobanstudio", "%LOCALAPPDATA%\\dev.hxddh.gobanstudio\\Data"]) {
+    assert.ok(readme.includes(folder) && storage.includes(folder) && notes.includes(folder), folder);
+  }
+  assert.doesNotMatch(readme, /goban-studio\.exe\.WebView2/, "the WebView2 cache is not where the data is");
+  // First launch on macOS 15: the button in System Settings, as the generated notes say.
+  assert.match(readme, /macOS 15 or later[^|]*Open Anyway/);
+});
+
 await test("screenshot checks catch blank and repeated screens", () => {
   const make = (w, h, fn) => {
     const png = new PNG({ width: w, height: h });
@@ -242,10 +281,10 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8").replace(/\r\n/g, "\n");
   const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
   const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["play", "game19", "review", "learn", "settings"]);
+  assert.deepEqual(names, ["play", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
-  // v13: one look at the configuration; the tour module loads only when it asks for it.
+  // One look at the configuration; the tour module loads only when it asks for it.
   assert.match(app, /if \(c\?\.tour\)[^\n]*import\("\.\.\/tour\.js"\)/);
   const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_TOUR_OUT/);
@@ -436,8 +475,6 @@ await test("the native install commands are fixed to this repository's release d
   // The helpers are embedded in the app, not downloaded.
   assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
   assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
   for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
 });
 

@@ -1,5 +1,5 @@
 /**
- * v9 storage (docs/v9.md, "Storage"): every key in memory, written through.
+ * Storage (docs/v9.md, "Storage"): every key in memory, written through.
  *
  *   await store.open()        read every key into memory (once)
  *   store.get(key)            the value, synchronously (undefined when absent)
@@ -7,6 +7,7 @@
  *   store.put(key, value)     set now; written ~300 ms later (debounced per key)
  *   store.remove(key)         delete now; removed ~300 ms later
  *   await store.flush()       write everything pending now (quit, tests)
+ *   store.onFlush(fn)         fn() first, at every flush
  *
  * Keys are relative paths of `[a-z0-9_-]+` segments separated by `/`,
  * ending in `.json`: settings.json, profile.json, current.json,
@@ -22,7 +23,7 @@
  * (the caller shows it); a failed write stays pending and is tried again
  * on the next put of that key or the next flush. Nothing fails silently.
  *
- * v13 (docs/storage.md):
+ * Safety (docs/storage.md):
  *
  *   await store.open({ lazy })  keys under a `lazy` prefix are listed, not
  *                               read (games/: read when a view needs one);
@@ -46,7 +47,7 @@ export const CHUNK_BYTES = 384 * 1024;
 /** Largest value the store keeps (as store.zig max_file_bytes). */
 export const MAX_BYTES = 8 * 1024 * 1024;
 /** Debounce of writes, per key. */
-export const WRITE_DELAY = 300;
+const WRITE_DELAY = 300;
 /** localStorage prefix of the browser preview. */
 export const LOCAL_PREFIX = "goban9:";
 
@@ -282,6 +283,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
   /** key → the number of the latest operation queued on it (newest wins). */
   const gen = new Map();
   let seq = 0;
+  /** Functions run at the start of every flush (onFlush). */
+  const flushHooks = new Set();
   let handler = onError;
   let opened = null;
   let openReport = { listFailed: false, failed: [] };
@@ -415,7 +418,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
     } catch (f) {
       if (f.kind === "parse" && f.preserved && !keepDamaged.has(key)) {
         // Moved aside: its copy is safe, so the damaged file goes and the
-        // key starts over (a game, the learn session …).
+        // key starts over (a game, the practice session …).
         try {
           await backendNow().remove(key);
         } catch (_) {
@@ -428,6 +431,8 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       }
       throw f;
     }
+    // Read after all (an earlier read of it had failed): it can be written again.
+    blocked.delete(key);
     // A put or remove made meanwhile (it took the key off `disk`) is newer than the disk.
     if (disk.has(key)) {
       mem.set(key, r.value);
@@ -602,7 +607,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       return [...pending.keys()].sort();
     },
 
-    /* --------------------------------------------- the safe state (v13) */
+    /* --------------------------------------------- the safe state */
 
     /** Hold every write in memory (true), or let them go again (false: what was held is written now). */
     setReadOnly(on) {
@@ -648,8 +653,26 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       held.clear();
     },
 
+    /**
+     * Run `fn()` at the start of every flush: what a module holds back in
+     * memory on purpose (data/games.js: a delete that can still be undone)
+     * is made final before everything is written out. Returns the function
+     * that stops it.
+     */
+    onFlush(fn) {
+      flushHooks.add(fn);
+      return () => flushHooks.delete(fn);
+    },
+
     /** Write everything pending now; true when all of it reached the disk (held writes are not pending). */
     async flush() {
+      for (const fn of [...flushHooks]) {
+        try {
+          fn();
+        } catch (e) {
+          report("write", "", e);
+        }
+      }
       const keys = new Set([...pending.keys(), ...chain.keys()]);
       const results = await Promise.all([...keys].map((k) => run(k)));
       return results.every(Boolean) && pending.size === 0;
@@ -661,7 +684,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
 /** The app's store (opened by the shell at boot). */
 export const store = createStore();
 
-// v13: the host asks for a flush before the app quits or its window closes
+// The host asks for a flush before the app quits or its window closes
 // and waits (at most 1.5 s) for the answer, so the last debounced writes —
 // a game's result, a solved problem — reach the disk (host.js).
 if (hasNative()) installFlushHook(() => store.flush());

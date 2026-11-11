@@ -1,5 +1,5 @@
 /**
- * Optional downloads for the interface (v5). See ../models.js for the
+ * Optional downloads for the interface. See ../models.js for the
  * rules: nothing is fetched unless the player starts a download here; the
  * host fetches only pinned URLs, verifies them and keeps them in the app's
  * data directory.
@@ -18,7 +18,7 @@
  *   stalled   downloading with no progress for 30 s
  *   needed    bytes the disk needs (DiskFull)
  *
- * The engine is told what is installed (`Engine.setModels`); v9: that only
+ * The engine is told what is installed (`Engine.setModels`); That only
  * changes which implementations the opponent ladder can reach
  * (opponents.js), never a mode the player picks.
  */
@@ -57,8 +57,8 @@ function apply(models, { announce = true } = {}) {
   syncEngine();
   if (announce) {
     for (const { kind, event } of M.transitions(before, models)) {
-      if (event === "ready") toast(t("models.readyToast", [label(kind)]), "info", 4000);
-      else toast(modelErrorText(models[kind]) || t("models.error.generic", [""]), "warn", 6000);
+      if (event === "ready") toast(t("models.readyToast", [label(kind)]), "success", 4000);
+      else toast(modelErrorText(models[kind]) || t("models.error.generic", [""]), "error", 6000);
     }
   }
   schedulePoll();
@@ -96,7 +96,7 @@ export async function downloadModel(kind) {
   }
   const r = await M.download(kind);
   apply(r.models);
-  if (!r.ok) toast(t(M.errorKey(r.error), [r.error]), "warn", 5000);
+  if (!r.ok) toast(t(M.errorKey(r.error), [r.error]), "error", 5000);
   return r;
 }
 
@@ -112,7 +112,7 @@ export function removeModel(kind, { confirm = true } = {}) {
   const run = async () => {
     const r = await M.remove(kind);
     apply(r.models, { announce: false });
-    if (!r.ok) toast(t("models.error.generic", [r.error || ""]), "warn");
+    if (!r.ok) toast(t("models.error.generic", [r.error || ""]), "error");
     return r;
   };
   if (!confirm) return run();

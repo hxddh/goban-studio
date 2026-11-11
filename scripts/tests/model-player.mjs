@@ -1,7 +1,7 @@
 /**
  * Model: the one player model (src/web/js/model/player.js) and the
  * measured ladder (model/ladder.js): the rating, spaced review of problems
- * and drills, game records, the week's focus, Learn's path, the next
+ * and drills, game records, the week's focus, Practice's path, the next
  * lesson and the beginner bridges.
  */
 import fs from "node:fs";
@@ -52,7 +52,7 @@ export default async function ({ test, assert, root }) {
       for (const mode of ["standard", "human"]) for (let i = 1; i < P.LEVELS.length; i++) assert.ok(P.levelTheta(P.LEVELS[i], { mode, size }) > P.levelTheta(P.LEVELS[i - 1], { mode, size }), `${mode} ${P.LEVELS[i]} ${size}`);
       assert.ok(P.levelTheta("2d", { mode: "strong", size }) > P.levelTheta("2d", { size }));
     }
-    // Measured ranks are the labels v9 shows: the standard ladder reads as its v4 labels.
+    // Measured ranks are the labels shown: the standard ladder reads as its calibrated labels.
     const labels = { "30k": 30, "25k": 29, "20k": 23, "15k": 18, "10k": 12, "5k": 7, "1k": 2, "2d": -3 };
     for (const [id, rank] of Object.entries(labels)) assert.equal(P.measuredRank(id), rank, id);
     const l9 = P.ladder({ size: 9, modes: ["standard", "human", "strong"] });
@@ -91,7 +91,8 @@ export default async function ({ test, assert, root }) {
     assert.equal(rec.rating.before, Math.round(P.thetaToGoR(mu0)));
     assert.equal(rec.rating.delta, rec.rating.after - rec.rating.before);
     assert.ok(rec.rating.delta > 0);
-    assert.deepEqual(won.history, [{ at: 1, size: 19, rank: P.estimate(won).rank, pm: P.estimate(won).pm }]);
+    const est = P.estimate(won);
+    assert.deepEqual(won.history, [{ at: 1, size: 19, rank: est.rank, pm: est.pm, r: est.r, sd: Math.round((est.hi - est.lo) / 2) }]);
     // Other boards keep their prior.
     assert.equal(won.rating[9].games, 0);
     assert.equal(won.rating[9].mu, mu0);
@@ -351,7 +352,7 @@ export default async function ({ test, assert, root }) {
   await test("model review: v9–v12 problem records migrate to the memory model (migrateProblemRecord)", () => {
     const old = { tries: 3, solved: true, clean: true, last: NOW - 2 * DAY, due: NOW + 5 * DAY, streak: 3, solvedAt: NOW - 2 * DAY };
     const m = P.migrateProblemRecord(old);
-    assert.deepEqual(m, { tries: 3, streak: 3, due: NOW + 5 * DAY, s: 7, d: 3.5, reps: 3, lapses: 0, rating: P.RATING.GOOD, solved: true, clean: true, last: NOW - 2 * DAY, solvedAt: NOW - 2 * DAY });
+    assert.deepEqual(m, { tries: 3, streak: 3, due: NOW + 5 * DAY, s: 7, d: 3.5, reps: 3, lapses: 0, rating: P.RATING.GOOD, solved: true, clean: true, last: NOW - 2 * DAY, solvedAt: NOW - 2 * DAY, first: "clean" });
     const missed = P.migrateProblemRecord({ tries: 1, solved: false, clean: false, last: NOW, due: NOW + DAY, streak: 0 });
     assert.deepEqual([missed.s, missed.d, missed.lapses, missed.rating, missed.due], [P.MEMORY.S0[0], 6.5, 1, P.RATING.AGAIN, NOW + DAY]);
     // Idempotent, pure, and the v13 shape passes through.
@@ -419,7 +420,7 @@ export default async function ({ test, assert, root }) {
 
   await test("model profile: v9–v13 are read; anything else is not read; bad parts are dropped", () => {
     const empty = P.newProfile();
-    assert.deepEqual(Object.keys(empty).sort(), ["classics", "games", "history", "lessons", "mistakes", "placement", "problems", "rating", "v", "week"]);
+    assert.deepEqual(Object.keys(empty).sort(), ["classics", "days", "games", "history", "lessons", "marks", "mistakes", "placement", "problems", "rating", "v", "week"]);
     assert.equal(empty.v, 13);
     assert.deepEqual(Object.keys(empty.rating), ["9", "13", "19"]);
     // A v8 progress object, or junk, is not migrated.
@@ -451,7 +452,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(n.lessons.l, undefined);
     assert.equal(n.week, null);
     assert.equal(n.games.length, 1);
-    // No v3 weakness counts and no separate rating history store.
+    // No weakness counts and no separate rating history store.
     assert.equal("weakness" in n, false);
     assert.equal("strength" in n, false);
   });
@@ -504,7 +505,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(m.focus.map((a) => a.key), ["cut"], "a theme from a single game is not claimed");
     assert.equal(m.focus[0].games.points, 18);
     assert.equal(m.focus[0].games.games, 6);
-    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "learn.why.points", params: ["18", 6] }]);
+    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "practice.why.points", params: ["18", 6] }]);
     assert.equal(m.areas.find((a) => a.key === "ladder").claim, false);
   });
 
@@ -513,7 +514,7 @@ export default async function ({ test, assert, root }) {
     const race = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "race");
     assert.ok(race);
     assert.equal(race.games.points, null);
-    assert.deepEqual(P.evidenceOf(race), [{ key: "learn.why.times", params: [4, 3] }]);
+    assert.deepEqual(P.evidenceOf(race), [{ key: "practice.why.times", params: [4, 3] }]);
   });
 
   await test("model focus: recent games weigh more, old games drop out", () => {
@@ -534,7 +535,7 @@ export default async function ({ test, assert, root }) {
     const eg = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "endgame");
     assert.ok(eg);
     assert.equal(eg.endgame.perGame, 9);
-    assert.deepEqual(P.evidenceOf(eg)[0], { key: "learn.why.lateGame", params: ["9", 3] });
+    assert.deepEqual(P.evidenceOf(eg)[0], { key: "practice.why.lateGame", params: ["9", 3] });
     const low = P.evidence(profile({ games: games.map((g) => ({ ...g, confidence: "low" })) }), { ...content, now: NOW });
     assert.ok(!low.focus.some((a) => a.key === "endgame"));
   });
@@ -547,7 +548,7 @@ export default async function ({ test, assert, root }) {
     cutProblems.slice(0, 5).forEach((x, i) => (problems[x.id] = entry(i === 0, i === 0 ? 1 : 0)));
     const cut = P.evidence(profile({ problems }), { ...content, now: NOW }).focus.find((a) => a.key === "cut");
     assert.ok(cut);
-    assert.deepEqual(P.evidenceOf(cut), [{ key: "learn.why.problems", params: [4, 5] }]);
+    assert.deepEqual(P.evidenceOf(cut), [{ key: "practice.why.problems", params: [4, 5] }]);
     const few = {};
     cutProblems.slice(0, 3).forEach((x) => (few[x.id] = entry(false, 0)));
     assert.deepEqual(P.evidence(profile({ problems: few }), { ...content, now: NOW }).focus, []);
@@ -579,9 +580,16 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.solvingLevel([...at(1, 4, 1), ...at(2, 4, 1), ...at(3, 1, 4)]), 2);
     // A lucky run at grade 4 over misses at grade 2 is not level 4.
     assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 1, 4), ...at(4, 5, 0)]), 1);
-    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)]), 4, "consistent below: level 4");
-    // A grade without results does not block the grades above it.
-    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)]), 3);
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(3, 2, 0), ...at(4, 5, 0)]), 4, "consistent below: level 4");
+    // A grade without results blocks the grades above it…
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)]), 2, "nothing known at grade 3");
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)]), 1);
+    assert.equal(P.solvingLevel(at(5, 6, 0)), 1, "grade 5 alone says nothing about the grades below");
+    assert.equal(P.solvingLevel(at(5, 6, 0), { fallback: false }), null);
+    // …unless the grade the player was started at covers it (the placement, or `cover`).
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(3, 5, 0)], { cover: 2 }), 3);
+    assert.equal(P.solvingLevel([...at(1, 5, 0), ...at(2, 4, 1), ...at(4, 5, 0)], { prior: 3 }), 4);
+    assert.equal(P.solvingLevel(at(5, 6, 0), { prior: 3, fallback: false }), null, "placed at 3: grade 4 is not covered");
     // Three of five clean at grade 3: not enough alone (smoothed to 4/7), enough with a prior of 3 (4.5/7), not with a prior of 1.
     assert.equal(P.solvingLevel(at(3, 3, 2)), 1);
     assert.equal(P.solvingLevel(at(3, 3, 2), { prior: 3 }), 3);
@@ -647,15 +655,15 @@ export default async function ({ test, assert, root }) {
       const { topic, theme } = P.focusTopic(key, PROBLEMS);
       assert.ok(PROBLEMS.some((x) => x.topic === topic && (!theme || x.theme === theme)), `${key} → ${topic}/${theme}`);
     }
-    // v13: the ko unit comes between the ko rule and the advanced ko life and death.
+    // The ko unit comes between the ko rule and the advanced ko life and death.
     assert.equal(P.focusLesson("ko", (id) => id === "stones-ko"), "ko-threat");
     assert.equal(P.focusLesson("ko", (id) => ["stones-ko", "ko-threat", "ko-count", "ko-resolve"].includes(id)), "adv-life-ko");
     assert.equal(P.focusLesson("nothing"), null);
   });
 
-  /* ------------------------------------------------------ Learn's path */
+  /* ------------------------------------------------------ Practice's path */
 
-  // v13: the second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
+  // The second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
   const cutGames = () => [0, 1, 2, 3].map((i) => game(i, { themes: { cut: 1, snapback: i < 2 ? 1 : 0 }, themeLoss: { cut: 4, snapback: i < 2 ? 5 : 0 } }));
 
   await test("model path: reviews first, focus problems at the level, one stretch, stable for the day", () => {
@@ -679,7 +687,7 @@ export default async function ({ test, assert, root }) {
     for (const it of focusItems) assert.ok(GRADES[it.id].grade >= 2 && GRADES[it.id].grade <= 3);
     const stretch = items.filter((i) => i.role === "stretch");
     assert.equal(stretch.length, 1);
-    assert.equal(GRADES[stretch[0].id].grade, 4);
+    assert.equal(GRADES[stretch[0].id].grade, 3, "one grade above the level, no more");
     assert.deepEqual(P.planProblems({ profile: p, model, pool: PROBLEMS, grades: GRADES, now: NOW + 3600000 }), items);
     // Without a focus: the reviews, no focus problems; the level is measured, so one stretch.
     const plain = P.planProblems({ profile: p, model: { ...model, focus: [] }, pool: PROBLEMS, grades: GRADES, now: NOW });
@@ -687,25 +695,25 @@ export default async function ({ test, assert, root }) {
     assert.ok(!plain.some((i) => i.role === "focus" || i.why));
     assert.equal(plain.filter((i) => i.role === "stretch").length, 1);
     assert.equal(P.planProblems({ profile: p, model, pool: [], grades: GRADES, now: NOW }), null, "nothing to choose from");
-    // The same, as Learn's list for a player: the next lesson, then these.
-    const path_ = P.learnPath(p, { ...content, course: COURSE, settings: { experience: "player", playerRank: 10 } }, NOW);
+    // The same, as Practice's list for a player: the next lesson, then these.
+    const path_ = P.practicePath(p, { ...content, course: COURSE, settings: { experience: "player", playerRank: 10 } }, NOW);
     assert.deepEqual(path_[0], { kind: "lesson", id: COURSE.find((u) => u.level === "intermediate").lessons[0].id, unit: COURSE.find((u) => u.level === "intermediate").id, role: "next" });
     assert.deepEqual(path_.slice(1), items);
   });
 
   await test("model path: without a focus, due drills and then problems at your level; a beginner's taught topics", () => {
     const beginner = { course: COURSE, ...content, settings: { experience: "new", playerRank: 30 } };
-    const first = P.learnPath(P.newProfile(), beginner, NOW);
+    const first = P.practicePath(P.newProfile(), beginner, NOW);
     assert.deepEqual(first[0], { kind: "lesson", id: COURSE[0].lessons[0].id, unit: COURSE[0].id, role: "next" });
     const probs = first.filter((i) => i.kind === "problem");
     assert.equal(probs.length, 5);
     for (const it of probs) assert.equal(PROBLEMS.find((x) => x.id === it.id).topic, "capture", "a beginner starts with capturing");
     assert.ok(probs.every((i) => i.role === "new"));
-    assert.deepEqual(P.learnPath(P.newProfile(), beginner, NOW + 3600000), first, "stable for the day");
+    assert.deepEqual(P.practicePath(P.newProfile(), beginner, NOW + 3600000), first, "stable for the day");
     // A due drill and a due problem come first.
     let p = P.addMistake(P.newProfile(), { gameId: "g", index: 3, theme: "cut" }, NOW - DAY);
     p = P.recordProblem(p, probs[2].id, { solved: false }, NOW - 2 * DAY);
-    const again = P.learnPath(p, beginner, NOW);
+    const again = P.practicePath(p, beginner, NOW);
     assert.deepEqual(again[1], { kind: "mistake", id: "g-3", role: "review" });
     assert.deepEqual(again[2], { kind: "problem", id: probs[2].id, role: "review" });
     assert.equal(again.length, 1 + 5);
@@ -737,17 +745,17 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.bridgeAfter("life-eye", empty), null);
     const played = P.recordGame(empty, { id: "1", at: 1, size: 9, won: false, moves: 30, level: "30k" });
     assert.equal(P.bridgeAfter("life-two-eyes", played), null, "not after a first game");
-    // In Learn's list while they apply: capture Go right after the next lesson, the first game last (it leaves Learn).
+    // In Practice's list while they apply: capture Go right after the next lesson, the first game last (it leaves Practice).
     const beginner = { course: COURSE, ...content, settings: { experience: "new", playerRank: 30 } };
     let p = P.recordLesson(empty, "stones-capture", { done: true }, NOW);
-    let list = P.learnPath(p, beginner, NOW);
+    let list = P.practicePath(p, beginner, NOW);
     assert.deepEqual(list[1], { kind: "capture", role: "bridge" });
-    assert.ok(!P.learnPath(p, { ...beginner, captureWins: 2 }, NOW).some((i) => i.kind === "capture"));
+    assert.ok(!P.practicePath(p, { ...beginner, captureWins: 2 }, NOW).some((i) => i.kind === "capture"));
     p = P.recordLesson(p, "life-two-eyes", { done: true }, NOW);
-    list = P.learnPath(p, { ...beginner, captureWins: 2 }, NOW);
+    list = P.practicePath(p, { ...beginner, captureWins: 2 }, NOW);
     assert.deepEqual(list.at(-1), { kind: "game", role: "bridge", game: { size: 9, level: "30k", handicap: 0 } });
     assert.equal(list.filter((i) => i.kind === "game").length, 1);
-    assert.ok(!P.learnPath(P.recordGame(p, { id: "1", at: 1, size: 9, won: true, moves: 30, level: "30k" }), beginner, NOW).some((i) => i.kind === "game"));
+    assert.ok(!P.practicePath(P.recordGame(p, { id: "1", at: 1, size: 9, won: true, moves: 30, level: "30k" }), beginner, NOW).some((i) => i.kind === "game"));
   });
 
   await test("model path: the next lesson sends players of about 5 kyu and stronger to the advanced course", () => {
@@ -766,27 +774,29 @@ export default async function ({ test, assert, root }) {
     assert.equal(next(new Set(mids), { experience: "player", playerRank: 4 }), firstOf("advanced"));
     assert.equal(next(new Set(mids), { experience: "player", playerRank: 10 }), firstOf("beginner"));
     assert.equal(P.nextLesson(all, () => true, { playerRank: 1 }), null);
-    // In Learn's list the estimate from rated games counts, the prior does not.
+    // In Practice's list the estimate from rated games counts, the prior does not.
     let p = P.newProfile({ rank: 10 });
     const who = { course: COURSE, ...content, settings: { experience: "player", playerRank: 10 } };
-    assert.equal(P.learnPath(p, who, NOW)[0].id, firstOf("intermediate"));
+    assert.equal(P.practicePath(p, who, NOW)[0].id, firstOf("intermediate"));
     p = P.normalizeProfile({ ...p, rating: { ...p.rating, 19: { mu: P.gorToTheta(1700), sigma: 0.6, games: 20, at: NOW } } });
-    assert.equal(P.learnPath(p, who, NOW)[0].id, firstOf("advanced"));
+    assert.equal(P.practicePath(p, who, NOW)[0].id, firstOf("advanced"));
     // Everything done: no lesson item.
     const done = P.normalizeProfile({ ...P.newProfile(), lessons: Object.fromEntries(all.map(({ lesson }) => [lesson.id, { done: true, step: 0, at: 0 }])) });
-    assert.ok(!P.learnPath(done, who, NOW).some((i) => i.kind === "lesson"));
+    assert.ok(!P.practicePath(done, who, NOW).some((i) => i.kind === "lesson"));
   });
 
   await test("model: pure — no DOM, storage, engine or app imports; the old modules are gone", () => {
-    for (const f of ["model/player.js", "model/ladder.js"]) {
+    const parts = fs.readdirSync(path.join(root, "src/web/js/model")).filter((n) => n.endsWith(".js")).map((n) => "model/" + n);
+    assert.ok(parts.length >= 12, "the model's parts");
+    for (const f of parts) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       const imports = [...src.matchAll(/^import[^;]*from "([^"]+)"/gm)].map((m) => m[1]);
       // opponents.js is the calibration's one source: tables and pure functions, no imports of its own.
-      for (const i of imports) assert.ok(i === "./ladder.js" || i === "../opponents.js" || i === "./move-rank.js", `${f} imports ${i}`);
+      for (const i of imports) assert.ok(/^\.\/[a-z-]+\.js$/.test(i) || i === "../opponents.js", `${f} imports ${i}`);
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
     assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");
-    // v13: the reading from your moves is pure too, with no imports.
+    // The reading from your moves is pure too, with no imports.
     const mr = fs.readFileSync(path.join(root, "src/web/js/model/move-rank.js"), "utf8");
     assert.equal([...mr.matchAll(/^import /gm)].length, 0, "move-rank.js imports nothing");
     assert.doesNotMatch(mr, /localStorage|document\.|window\.|Date\.now\(\)/);
@@ -811,17 +821,18 @@ export default async function ({ test, assert, root }) {
         assert.ok(grade <= P.PLACEMENT.MAX_GRADE + 1 && Math.abs(grade - P.placementTarget(results)) <= 1, `${id} grade ${grade}, target ${P.placementTarget(results)}`);
         results.push({ id, grade, solved: answer(grade) });
       }
-      assert.ok(results.length >= P.PLACEMENT.MIN && results.length <= P.PLACEMENT.MAX, `${results.length} problems`);
       assert.equal(results[0].grade, P.PLACEMENT.START);
+      if (P.placementFloored(results)) return { grade: P.placementGrade(results), ids: results.map((r) => r.id), n: results.length };
+      assert.ok(results.length >= P.PLACEMENT.MIN && results.length <= P.PLACEMENT.MAX, `${results.length} problems`);
       const life = results.filter((r) => P.PLACEMENT.LIFE_GOALS.includes(def(r.id).goal)).length;
       assert.ok(life >= P.PLACEMENT.LIFE, `${life} life-and-death problems`);
       assert.ok(new Set(results.map((r) => def(r.id).theme)).size >= 5, "themes mixed");
       return { grade: P.placementGrade(results), ids: results.map((r) => r.id), n: results.length };
     };
     assert.equal(run(() => true).grade, P.PLACEMENT.MAX_GRADE, "every answer right: capped");
-    const wrong = run(() => false);
-    assert.equal(wrong.grade, 1, "every answer wrong");
-    assert.equal(wrong.n, P.PLACEMENT.MIN, "a stable grade ends the quiz early");
+    const stable = run((g) => g <= 1);
+    assert.equal(stable.grade, 1);
+    assert.equal(stable.n, P.PLACEMENT.MIN, "a stable grade ends the quiz early");
     assert.equal(run((g) => g <= 3).grade, 3, "solves up to grade 3");
     assert.equal(run((g) => g <= 2).grade, 2);
     // Drawn per player: another seed, another quiz; the same seed, the same quiz.
@@ -834,8 +845,20 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.placementGrade([]), null);
     assert.equal(P.placementGrade([g3(true)]), 1, "one solve is not enough");
     assert.equal(P.placementGrade([g3(true), g3(true)]), 3);
-    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false)]), 3);
-    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false), g3(false)]), 1);
+    // From grade 3 up it must be solved more often than missed; at grade 2 as often is enough.
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false)]), 3);
+    assert.equal(P.placementGrade([g3(true), g3(true), g3(false), g3(false)]), 1, "half right at grade 3 is not passed");
+    const g2 = (solved) => ({ id: "y", grade: 2, solved });
+    assert.equal(P.placementGrade([g2(true), g2(true), g2(false), g2(false)]), 2);
+    assert.equal(P.placementGrade([g2(true), g2(true), g2(false), g2(false), g2(false)]), 1);
+    // The floor: the first four answers all missed end the quiz at grade 1.
+    const none = run(() => false);
+    assert.deepEqual([none.grade, none.n], [1, P.PLACEMENT.FLOOR], "every answer wrong: four problems, grade 1");
+    const miss = (grade) => ({ id: "m" + grade + Math.random(), grade, solved: false });
+    assert.ok(!P.placementDone([miss(2), miss(1), miss(1)]), "three misses are not the floor yet");
+    assert.ok(P.placementDone([miss(2), miss(1), miss(1), miss(1)]));
+    assert.ok(!P.placementDone([miss(2), miss(1), { id: "s", grade: 1, solved: true }, miss(2)]), "one solve among the first four: the quiz goes on");
+    assert.ok(!P.placementFloored([{ id: "s", grade: 2, solved: true }, miss(3), miss(2), miss(1), miss(1)]), "only the first four count");
     assert.equal(P.placementGrade([{ grade: 5, solved: true }, { grade: 5, solved: true }]), 1, "grade 5 is beyond the placement");
     assert.ok(!P.placementDone([]));
 
@@ -855,14 +878,14 @@ export default async function ({ test, assert, root }) {
 
     // The grade moves the course start: grade 4 skips the beginner units, grade 1 does not, and nothing reaches the advanced course.
     const content = { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: "rules", playerRank: 25 } };
-    const first = (prof) => P.learnPath(prof, content, 1000).find((it) => it.kind === "lesson");
+    const first = (prof) => P.practicePath(prof, content, 1000).find((it) => it.kind === "lesson");
     const beginnerUnit = COURSE.find((u) => !u.level).id;
     assert.equal(first(P.setPlacement(fresh, { grade: 1 }, 1)).unit, beginnerUnit);
     const mid = first(P.setPlacement(fresh, { grade: 4 }, 1));
     assert.equal(COURSE.find((u) => u.id === mid.unit).level, "intermediate");
     assert.equal(COURSE.find((u) => u.id === first(P.setPlacement(fresh, { grade: 5 }, 1)).unit).level, "intermediate", "a placement never sends to the advanced course");
     // And the first problems sit near the grade.
-    const probs = P.learnPath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
+    const probs = P.practicePath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
     assert.ok(probs.length > 0);
     for (const it of probs) assert.ok(GRADES[it.id].grade >= 3, `${it.id} grade ${GRADES[it.id].grade}`);
 
@@ -880,7 +903,7 @@ export default async function ({ test, assert, root }) {
     }
     assert.equal(P.placementGrade(quiz), 4);
     quizzed = P.setPlacement(quizzed, { grade: P.placementGrade(quiz) }, 600);
-    const after = P.learnPath(quizzed, content, 1000).filter((it) => it.kind === "problem" && it.role !== "review");
+    const after = P.practicePath(quizzed, content, 1000).filter((it) => it.kind === "problem" && it.role !== "review");
     assert.ok(after.length > 0);
     for (const it of after) assert.ok(GRADES[it.id].grade >= 3, `after the quiz: ${it.id} grade ${GRADES[it.id].grade}`);
     const topics = new Set(after.map((it) => PROBLEMS.find((d) => d.id === it.id).topic));

@@ -1,7 +1,7 @@
 /**
  * Core: the opening book — its trees, lookups, symmetries and transpositions.
  */
-import { test, BLACK, BOOK, BOOK_RAW, Book, EMPTY, LANG_IDS, MESSAGES, WHITE, assert, empty, emptyMap, fs, gtp, mv, path, replay, root, setup, symMap, t } from "./helpers.mjs";
+import { test, BLACK, BOOK, BOOK_RAW, Book, EMPTY, LANG_IDS, MESSAGES, WHITE, assert, emptyMap, fs, gtp, path, replay, root, symMap } from "./helpers.mjs";
 
 await test("explorer: the shipped book has both trees, its network and a compact size", () => {
   assert.equal(BOOK_RAW.format, Book.BOOK_FORMAT);
@@ -9,7 +9,7 @@ await test("explorer: the shipped book has both trees, its network and a compact
   assert.ok(BOOK_RAW.visits > 0);
   assert.equal(BOOK_RAW.komi, 6.5);
   const bytes = fs.statSync(path.join(root, "src/web/js/content/book.json")).size;
-  // v7: the book grew with the stronger network; scripts/tests/core-book-build.mjs checks its gzipped size.
+  // The book grew with the stronger network; scripts/tests/core-book-build.mjs checks its gzipped size.
   assert.ok(bytes < 1024 * 1024, `book is ${bytes} bytes`);
   for (const id of ["whole", "corner"]) {
     const tree = BOOK_RAW.trees[id];
@@ -37,8 +37,43 @@ await test("explorer: the shipped book has both trees, its network and a compact
   assert.equal(Book.stonesOf(setup).length, 4);
 });
 
+/** GTP point → [x, y] from the top left. */
+const at = (p) => [gtp(p).x, gtp(p).y];
+
+await test("explorer: the Chinese opening is Q16, Q3 and R9 (high: Q9), and nothing else carries its name", () => {
+  const src = fs.readFileSync(path.join(root, "scripts/make-book.mjs"), "utf8");
+  assert.match(src, /\{ name: "chinese", moves: "Q16 D4 Q3 D16 R9" \}/);
+  assert.match(src, /\{ name: "high-chinese", moves: "Q16 D4 Q3 D16 Q9" \}/);
+  // SGF: Q16 is pd, Q3 is pq, R9 is qk, Q9 is pk.
+  const sgf = (p) => "abcdefghijklmnopqrs"[gtp(p).x] + "abcdefghijklmnopqrs"[gtp(p).y];
+  assert.deepEqual(["Q16", "Q3", "R9", "Q9"].map(sgf), ["pd", "pq", "qk", "pk"]);
+  // In the book, a position named "chinese" or "high-chinese" has Black on those three points
+  // (under one of the board's symmetries) — or the name is not there at all.
+  const tree = BOOK.trees.whole;
+  const shape = { chinese: ["Q16", "Q3", "R9"], "high-chinese": ["Q16", "Q3", "Q9"] };
+  for (const node of tree.nodes) {
+    if (!shape[node.name]) continue;
+    const pts = shape[node.name].map(at);
+    const ok = [0, 1, 2, 3, 4, 5, 6, 7].some((s) => pts.every(([x, y]) => { const p = Book.applySym(s, x, y); return node.signMap[p.y][p.x] === BLACK; }));
+    assert.ok(ok, `record ${node.index} is named ${node.name} but is not that opening`);
+  }
+  // The old line (R4 with R10 or Q10) is still a book position, but it is not called the Chinese opening.
+  for (const side of ["R10", "Q10"]) {
+    const { signMap, toMove } = replay(tree, ["Q16", "D4", "R4", "D16", side]);
+    const hit = Book.lookup(tree, signMap, toMove);
+    if (hit) assert.ok(!/chinese/.test(hit.node.name || hit.node.lineName || ""), `${side}: ${hit.node.name || hit.node.lineName}`);
+  }
+  for (const lang of LANG_IDS) for (const name of Object.keys(shape)) assert.ok(MESSAGES[`explorer.name.whole.${name}`]?.[lang], `${name} ${lang}`);
+  assert.equal(MESSAGES["explorer.name.whole.high-chinese"].ja, "高中国流");
+  assert.equal(MESSAGES["explorer.name.whole.high-chinese"].ko, "고중국류");
+});
+
 await test("explorer: every named line is in the book and named", () => {
   const src = fs.readFileSync(path.join(root, "scripts/make-book.mjs"), "utf8");
+  // Lines corrected in make-book.mjs after book.json was last built (the build needs KataGo): the
+  // book has the position before their last move, and no position of that name. Once a rebuilt book
+  // has them, they are checked like every other line.
+  const awaiting = new Set(["chinese", "high-chinese"]);
   for (const id of ["whole", "corner"]) {
     const tree = BOOK.trees[id];
     const block = src.slice(src.indexOf(`  ${id}: [`), src.indexOf("],", src.indexOf(`  ${id}: [`)));
@@ -46,6 +81,16 @@ await test("explorer: every named line is in the book and named", () => {
     assert.ok(lines.length >= 5, `${id}: ${lines.length} lines`);
     for (const [, , name, moves] of lines) {
       const ms = moves.split(" ");
+      if (awaiting.has(name)) {
+        const end = replay(tree, ms);
+        if (!Book.lookup(tree, end.signMap, end.toMove)) {
+          const before = replay(tree, ms.slice(0, -1));
+          assert.ok(Book.lookup(tree, before.signMap, before.toMove), `${id} ${moves}: the position before the last move is in the book`);
+          assert.ok(!tree.nodes.some((n) => n.name === name), `${id}: no position is named ${name} until the book has this line`);
+          for (const lang of LANG_IDS) assert.ok(MESSAGES[`explorer.name.${id}.${name}`]?.[lang], `explorer.name.${id}.${name} ${lang}`);
+          continue;
+        }
+      }
       for (let i = 0; i <= ms.length; i++) {
         const { signMap, toMove } = replay(tree, ms.slice(0, i));
         const hit = Book.lookup(tree, signMap, toMove);

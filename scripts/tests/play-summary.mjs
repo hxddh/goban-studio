@@ -1,7 +1,7 @@
 /**
  * Play: the whole-game summary by phase and the trends across your games.
  */
-import { test, BLACK, MARK_KINDS, MESSAGES, PHASES, WHITE, assert, empty, fs, gameRecord, mv, path, phaseBoundaries, phaseThresholds, recordAnalysis, root, setLang, settled, settledShare, storyText, summarizeGame, t, themeCounts, trends, v5Review } from "./helpers.mjs";
+import { test, BLACK, MARK_KINDS, MESSAGES, PHASES, WHITE, assert, gameRecord, phaseBoundaries, phaseThresholds, recordAnalysis, setLang, settledShare, storyText, summarizeGame, themeCounts, trends, v5Review } from "./helpers.mjs";
 
 await test("play summary: phase boundaries scale with the board and follow KataGo's ownership when there is one", () => {
   assert.deepEqual(phaseThresholds(19), { openingEnd: 43, endgameStart: 162 });
@@ -119,7 +119,7 @@ await test("play summary: takeaways and summary strings read in all four languag
   setLang("ja");
   assert.equal(storyText(first[0]), "損の多くは中盤でした。約8目（全体の59%）です。");
   setLang("en");
-  // The v5 trends were removed with the strength chart (docs/v9.md, "Removed in v9").
+  // There are no trends and no strength chart (docs/v9.md, "Removed in v9").
   const keys = Object.keys(MESSAGES).filter((k) => /^(gameSummary|edit|phase|phaseIn)\./.test(k));
   assert.ok(keys.length >= 35);
   assert.ok(!Object.keys(MESSAGES).some((k) => k.startsWith("trend.")));

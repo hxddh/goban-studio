@@ -4,7 +4,8 @@
 //! The page asks for it (the user picks "Check for updates…", or turned on
 //! the weekly check, which is off by default). A short-lived thread makes
 //! one HTTPS GET to GitHub's "latest release" API for this repository and
-//! nothing else: no identifiers, no version, no cookies. The result is
+//! nothing else: no identifiers, no version, no cookies. It goes through
+//! the proxy the environment or the system names (net.zig), else directly. The result is
 //! handed to the UI thread the same way KataGo results are (a locked slot
 //! plus the platform's thread-safe `wake`), and the UI thread answers the
 //! waiting `studio.checkUpdate` call. Nothing here touches the webview.
@@ -19,6 +20,8 @@
 //! for an older release (a downgrade to a version with a known bug) or for
 //! a tag nobody checked.
 const std = @import("std");
+const json = @import("json.zig");
+const net = @import("net.zig");
 
 pub const releases_api_url = "https://api.github.com/repos/hxddh/goban-studio/releases/latest";
 /// The one page `studio.openReleasePage` opens.
@@ -43,6 +46,9 @@ pub const WakeFn = *const fn (context: ?*anyopaque) anyerror!void;
 pub const Checker = struct {
     io: std.Io = undefined,
     lock: std.Io.Mutex = .init,
+    /// Where the proxy settings are read from (net.zig); set once by
+    /// `main`. Null: always connect directly.
+    env: ?*const std.process.Environ.Map = null,
 
     // --- guarded by `lock`
     /// The generation the UI thread is waiting for; anything else is stale.
@@ -149,44 +155,44 @@ pub const Checker = struct {
             return;
         };
         defer allocator.free(response_buf);
-        const reply = check(allocator, self.io, response_buf, reply_buf);
+        const reply = check(allocator, self.io, self.env, response_buf, reply_buf);
         self.finish(gen, reply);
     }
 };
 
 /// One GET of the latest-release document; returns the reply for the page.
-pub fn check(allocator: std.mem.Allocator, io: std.Io, response_buf: []u8, reply_buf: []u8) []const u8 {
-    // No proxy configuration: the app talks to GitHub directly or not at all.
-    var client: std.http.Client = .{ .allocator = allocator, .io = io };
-    defer client.deinit();
-    return checkWith(&client, allocator, response_buf, reply_buf);
+pub fn check(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    env: ?*const std.process.Environ.Map,
+    response_buf: []u8,
+    reply_buf: []u8,
+) []const u8 {
+    // Through the proxy the environment or the system names, if any.
+    var session: net.Session = undefined;
+    session.init(allocator, io, env, "api.github.com");
+    defer session.deinit();
+    return checkWith(&session, allocator, response_buf, reply_buf);
 }
 
-/// `check` with a caller-made client (tests behind a proxy).
-pub fn checkWith(client: *std.http.Client, allocator: std.mem.Allocator, response_buf: []u8, reply_buf: []u8) []const u8 {
-    var writer = std.Io.Writer.fixed(response_buf);
-    const result = client.fetch(.{
-        .location = .{ .url = releases_api_url },
-        .method = .GET,
-        .keep_alive = false,
-        .headers = .{
-            .user_agent = .{ .override = user_agent },
-            .accept_encoding = .omit,
-        },
-        .extra_headers = &.{
-            .{ .name = "accept", .value = "application/vnd.github+json" },
-            .{ .name = "x-github-api-version", .value = "2022-11-28" },
-        },
-        .response_writer = &writer,
-    }) catch |err| return errorReply(reply_buf, switch (err) {
-        error.WriteFailed => "ResponseTooLarge",
+/// `check` with a caller-made session.
+pub fn checkWith(session: *net.Session, allocator: std.mem.Allocator, response_buf: []u8, reply_buf: []u8) []const u8 {
+    const result = net.get(session, releases_api_url, user_agent, &.{
+        .{ .name = "accept", .value = "application/vnd.github+json" },
+        .{ .name = "x-github-api-version", .value = "2022-11-28" },
+    }, response_buf) catch |err| return errorReply(reply_buf, switch (err) {
+        error.TooLarge => "ResponseTooLarge",
         else => "Network",
     });
-    const status = @intFromEnum(result.status);
+    return statusReply(allocator, result.status, result.body, reply_buf);
+}
+
+/// The reply for an answer of the releases API.
+pub fn statusReply(allocator: std.mem.Allocator, status: u16, body: []const u8, reply_buf: []u8) []const u8 {
     if (status == 404) return errorReply(reply_buf, "NoRelease");
     if (status == 403 or status == 429) return errorReply(reply_buf, "RateLimited");
     if (status != 200) return errorReply(reply_buf, "HttpStatus");
-    return releaseReply(allocator, writer.buffered(), reply_buf);
+    return releaseReply(allocator, body, reply_buf);
 }
 
 const Release = struct {
@@ -207,22 +213,22 @@ pub fn releaseReply(allocator: std.mem.Allocator, json_text: []const u8, out: []
     if (!validTag(r.tag_name)) return errorReply(out, "BadResponse");
     const url = if (validReleaseUrl(r.html_url)) r.html_url else releases_page_url;
     var n: usize = 0;
-    const ok = append(out, &n, "{\"ok\":true,\"latest\":") and
-        appendString(out, &n, r.tag_name) and
-        append(out, &n, ",\"url\":") and
-        appendString(out, &n, url) and
-        append(out, &n, ",\"notes\":") and
-        appendString(out, &n, trimUtf8(r.body orelse "", max_notes_bytes)) and
-        append(out, &n, ",\"publishedAt\":") and
-        appendString(out, &n, if (r.published_at) |p| (if (p.len <= 40) p else "") else "") and
-        append(out, &n, if (r.prerelease) ",\"prerelease\":true}" else ",\"prerelease\":false}");
+    const ok = json.append(out, &n, "{\"ok\":true,\"latest\":") and
+        json.appendString(out, &n, r.tag_name) and
+        json.append(out, &n, ",\"url\":") and
+        json.appendString(out, &n, url) and
+        json.append(out, &n, ",\"notes\":") and
+        json.appendString(out, &n, trimUtf8(r.body orelse "", max_notes_bytes)) and
+        json.append(out, &n, ",\"publishedAt\":") and
+        json.appendString(out, &n, if (r.published_at) |p| (if (p.len <= 40) p else "") else "") and
+        json.append(out, &n, if (r.prerelease) ",\"prerelease\":true}" else ",\"prerelease\":false}");
     if (!ok) return errorReply(out, "ResponseTooLarge");
     return out[0..n];
 }
 
 fn errorReply(out: []u8, name: []const u8) []const u8 {
     var n: usize = 0;
-    if (append(out, &n, "{\"ok\":false,\"error\":") and appendString(out, &n, name) and append(out, &n, "}")) return out[0..n];
+    if (json.append(out, &n, "{\"ok\":false,\"error\":") and json.appendString(out, &n, name) and json.append(out, &n, "}")) return out[0..n];
     return "{\"ok\":false}";
 }
 
@@ -351,41 +357,13 @@ pub fn trimUtf8(text: []const u8, max: usize) []const u8 {
     return text[0..end];
 }
 
-fn append(buf: []u8, n: *usize, text: []const u8) bool {
-    if (n.* + text.len > buf.len) return false;
-    @memcpy(buf[n.*..][0..text.len], text);
-    n.* += text.len;
-    return true;
-}
-
-/// A JSON string; control characters become \u00XX.
-fn appendString(buf: []u8, n: *usize, text: []const u8) bool {
-    if (!append(buf, n, "\"")) return false;
-    for (text) |c| {
-        const ok = switch (c) {
-            '"' => append(buf, n, "\\\""),
-            '\\' => append(buf, n, "\\\\"),
-            '\n' => append(buf, n, "\\n"),
-            '\r' => append(buf, n, "\\r"),
-            '\t' => append(buf, n, "\\t"),
-            else => if (c < 0x20) blk: {
-                var esc: [6]u8 = undefined;
-                const s = std.fmt.bufPrint(&esc, "\\u{x:0>4}", .{c}) catch break :blk false;
-                break :blk append(buf, n, s);
-            } else append(buf, n, &[_]u8{c}),
-        };
-        if (!ok) return false;
-    }
-    return append(buf, n, "\"");
-}
-
 test "release reply keeps tag, url and notes" {
     var out: [4096]u8 = undefined;
-    const json =
+    const release_json =
         \\{"tag_name":"v4.0.0","html_url":"https://github.com/hxddh/goban-studio/releases/tag/v4.0.0",
         \\ "body":"Line one\nLine \"two\"\u0001","published_at":"2026-11-01T00:00:00Z","author":{"login":"x"},"draft":false,"prerelease":false}
     ;
-    const reply = releaseReply(std.testing.allocator, json, &out);
+    const reply = releaseReply(std.testing.allocator, release_json, &out);
     try std.testing.expectEqualStrings(
         "{\"ok\":true,\"latest\":\"v4.0.0\",\"url\":\"https://github.com/hxddh/goban-studio/releases/tag/v4.0.0\",\"notes\":\"Line one\\nLine \\\"two\\\"\\u0001\",\"publishedAt\":\"2026-11-01T00:00:00Z\",\"prerelease\":false}",
         reply,

@@ -1,5 +1,5 @@
 /**
- * v7: background work, shown quietly. v8: there is no list of it any more
+ * Background work, shown quietly. There is no list of it any more
  * (the work is automatic and yields to the game); these helpers let a view
  * follow a job, e.g. a Library row's "Analysing… 40%".
  */

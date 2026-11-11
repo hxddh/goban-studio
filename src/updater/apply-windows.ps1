@@ -17,8 +17,12 @@
 #   3. renames the install folder to a hidden backup and the copy into its
 #      place, retrying while files are still locked (WebView2 and antivirus
 #      release them a moment after the app exits);
-#   4. moves the player's WebView2 profile (bin\goban-studio.exe.WebView2,
-#      where the games, progress and settings live) into the new folder;
+#   4. moves the WebView2 profile (bin\goban-studio.exe.WebView2: the web
+#      view's own cache and state) into the new folder. The player's games,
+#      progress and settings are not in it and not in the install folder
+#      at all: they are files under
+#      %LOCALAPPDATA%\dev.hxddh.gobanstudio\Data (docs/storage.md), which
+#      this script never touches;
 #   5. starts the new app with --goban-update-ack=<file> and waits for it to
 #      write that file (it does once its page is up);
 #   6. on success removes the backup; on any failure moves everything back
@@ -128,7 +132,8 @@ function Relaunch-Old {
   } catch { Log "could not start the previous version: $($_.Exception.Message)" }
 }
 
-# The player's WebView2 profile folders under bin\ (games, progress, settings).
+# The WebView2 profile folders under bin\ (the web view's cache and state;
+# the player's data lives under %LOCALAPPDATA%, not here).
 function Move-Profiles([string]$From, [string]$To) {
   $bin = Join-Path $From "bin"
   if (-not (Test-Path -LiteralPath $bin)) { return $true }
@@ -236,7 +241,7 @@ function Rollback([string]$Why) {
   Stop-InstallProcesses $InstallDir
   # Its WebView2 processes too: they hold the folder after the app is gone.
   Wait-InstallProcesses $InstallDir 10
-  # The player's profile goes back with the old version.
+  # The profile goes back with the old version.
   $profileBack = Move-Profiles $InstallDir $old
   if ((Retry { [System.IO.Directory]::Move($InstallDir, $failed) } "move the new version aside") -and
       (Retry { [System.IO.Directory]::Move($old, $InstallDir) } "restore the previous version")) {
@@ -247,8 +252,8 @@ function Rollback([string]$Why) {
     if ($profileBack) {
       try { Remove-Item -LiteralPath $failed -Recurse -Force -ErrorAction SilentlyContinue } catch { }
     } else {
-      # Never delete the only copy of the player's data.
-      Log "PROFILE NOT RESTORED: the player's WebView2 profile is kept in $failed\bin"
+      # Never delete the only copy of the profile.
+      Log "PROFILE NOT RESTORED: the WebView2 profile is kept in $failed\bin"
     }
     try { Remove-Item -LiteralPath $AckFile -Force -ErrorAction SilentlyContinue } catch { }
     Log "previous version restored"
@@ -259,7 +264,7 @@ function Rollback([string]$Why) {
   exit 3
 }
 
-# 4. Carry the player's data across.
+# 4. Carry the web view's profile across.
 if (-not (Move-Profiles $old $InstallDir)) { Rollback "could not move the WebView2 profile" }
 
 # 5. Start the new app and wait for its acknowledgement.

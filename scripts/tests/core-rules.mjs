@@ -1,7 +1,7 @@
 /**
  * Core: the rules — moves, captures, ko, suicide, scoring under the three rulesets, seki, marks and the game tree.
  */
-import { test, BLACK, DEFAULT_RULES, EMPTY, Game, MESSAGES, RULESETS, SEKI_BOARD_CLOSED, WALLS, WHITE, assert, branchedGame, coordLabel, defaultKomi, findSeki, formatPoints, fromRows, handicapCompensation, loadSGF, newGame, normalizeRules, root, setup, t, territoryMap, treeLayout } from "./helpers.mjs";
+import { test, BLACK, DEFAULT_RULES, EMPTY, Game, MESSAGES, RULESETS, SEKI_BOARD_CLOSED, WALLS, WHITE, assert, branchedGame, coordLabel, defaultKomi, findSeki, formatPoints, fromRows, handicapCompensation, loadSGF, newGame, normalizeRules, setup, territoryMap, treeLayout } from "./helpers.mjs";
 
 await test("coordinates skip I and count rows from the bottom", () => {
   assert.equal(coordLabel(0, 0, 19), "A19");
@@ -114,7 +114,9 @@ await test("dead stones are removed before scoring", () => {
     BLACK,
   );
   const score = g.score([{ x: 0, y: 0 }]);
-  assert.equal(score.blackTerritory, 1);
+  // White's only stone is dead, so White has nothing alive: the corner eye
+  // and the open board are Black's (81 points less Black's two stones).
+  assert.equal(score.blackTerritory, 79);
   assert.equal(score.board.get([0, 0]), EMPTY);
 });
 
@@ -138,7 +140,7 @@ await test("a wall that does not separate the board earns no territory", () => {
   assert.equal(t.flat().every((v) => v === 0), true);
 });
 
-// v13: a region that reaches all four sides is territory once the other
+// A region that reaches all four sides is territory once the other
 // colour has stones in the game (they lie in a region of their own).
 const CORNER_LIFE = [
   "..OX.....",
@@ -152,7 +154,7 @@ const CORNER_LIFE = [
   ".........",
 ];
 
-await test("v13 scoring: a corner group alive and the rest owned by one side, under all three rulesets", () => {
+await test("scoring: a corner group alive and the rest owned by one side, under all three rulesets", () => {
   const counts = territoryMap(fromRows(CORNER_LIFE).board).flat();
   assert.equal(counts.filter((v) => v === BLACK).length, 65);
   assert.equal(counts.filter((v) => v === WHITE).length, 4);
@@ -176,7 +178,7 @@ await test("v13 scoring: a corner group alive and the rest owned by one side, un
   assert.equal(cn.black + cn.white - cn.komi, 81);
 });
 
-await test("v13 scoring: a side group alive and the rest owned; colours swapped", () => {
+await test("scoring: a side group alive and the rest owned; colours swapped", () => {
   const side = [
     ".XO...OX.",
     ".XO...OX.",
@@ -200,7 +202,7 @@ await test("v13 scoring: a side group alive and the rest owned; colours swapped"
   assert.equal(w.result, "W+" + (65 + 7 + 7.5 - 9));
 });
 
-await test("v13 scoring: open regions stay dame until living stones of both colours divide the board", () => {
+await test("scoring: open regions stay dame until living stones of both colours divide the board", () => {
   // Both colours touch the open region: dame.
   const early = fromRows([".........", ".........", "..X......", ".........", ".........", ".........", "......O..", ".........", "........."]);
   assert.equal(territoryMap(early.board).flat().every((v) => v === 0), true);
@@ -217,12 +219,92 @@ await test("v13 scoring: open regions stay dame until living stones of both colo
   const d = fromRows(invaded).score([{ x: 6, y: 6 }]);
   assert.equal(d.blackTerritory, 65);
   assert.equal(d.blackPrisoners, 1);
-  // Every white stone dead: no living white stone divides the board, so the
-  // open board stays dame (the guard for a board passed out almost empty).
-  const allDead = fromRows(["X........", "X..O.....", "XXXX.....", ".........", ".........", ".........", ".........", ".........", "........."]);
-  const dd = allDead.score([{ x: 3, y: 1 }]);
-  assert.equal(dd.blackTerritory, 0);
-  assert.equal(dd.blackPrisoners, 1);
+  // The same stone left unmarked is alive as far as the count knows: it
+  // shares the open board with Black's wall, so that stays dame.
+  assert.equal(fromRows(invaded).score().blackTerritory, 0);
+});
+
+const ALL_DEAD = [".........", ".........", "..X...X..", ".........", "....O....", "...OO....", "..X...X..", ".........", "........."];
+const ALL_DEAD_STONES = [{ x: 4, y: 4 }, { x: 3, y: 5 }, { x: 4, y: 5 }];
+
+await test("scoring: when every stone of one side is dead, the open board belongs to the other", () => {
+  for (const rules of ["japanese", "chinese", "korean"]) {
+    // Black has four stones, White three, all marked dead (the engine does
+    // this by itself at the count).
+    const s = fromRows(ALL_DEAD, { rules }).score(ALL_DEAD_STONES);
+    assert.equal(s.blackTerritory, 77, rules);
+    assert.equal(s.whiteTerritory, 0, rules);
+    assert.equal(s.neutral, 0, rules);
+    assert.equal(s.result[0], "B", `${rules}: ${s.result}`);
+    // Territory: 77 + 3 prisoners against komi 6.5. Area: 77 + 4 stones against komi 7.5.
+    assert.equal(s.result, "B+73.5", rules);
+    // White's living corner marked dead as well: Black has the whole board.
+    const corner = fromRows(CORNER_LIFE, { rules });
+    const whites = [];
+    corner.board.signMap.forEach((row, y) => row.forEach((v, x) => v === WHITE && whites.push({ x, y })));
+    const c = corner.score(whites);
+    const blacks = 81 - 65 - 4 - whites.length; // 65 + 4 points of territory with White alive
+    assert.equal(c.blackTerritory, 81 - blacks, rules);
+    assert.equal(c.neutral, 0, rules);
+    assert.equal(c.result, rules === "chinese" ? "B+73.5" : "B+" + (81 - blacks + whites.length - 6.5), rules);
+    // Colours swapped: White owns the board.
+    const swap = (rows) => rows.map((r) => r.replace(/X/g, "o").replace(/O/g, "X").replace(/o/g, "O"));
+    const w = fromRows(swap(ALL_DEAD), { rules }).score(ALL_DEAD_STONES);
+    assert.equal(w.whiteTerritory, 77, rules);
+    assert.equal(w.blackTerritory, 0, rules);
+  }
+});
+
+await test("scoring: the open board is nobody's until one side has lost every stone", () => {
+  // Nothing marked dead: both colours touch the open board.
+  const unmarked = fromRows(ALL_DEAD).score();
+  assert.equal(unmarked.blackTerritory, 0);
+  assert.equal(unmarked.neutral, 74);
+  // Only some of White's stones marked: a living white stone is left.
+  const some = fromRows(ALL_DEAD).score(ALL_DEAD_STONES.slice(0, 1));
+  assert.equal(some.blackTerritory, 0);
+  // Two stones, nothing marked: neutral, as on any board passed out early.
+  const two = fromRows([".........", ".........", "..X......", ".........", ".........", ".........", "......O..", ".........", "........."]).score();
+  assert.equal(two.blackTerritory + two.whiteTerritory, 0);
+  assert.equal(two.neutral, 79);
+  // One side never played at all: a lone stone establishes nothing.
+  const lone = fromRows([".........", ".........", ".........", ".........", "....X....", ".........", ".........", ".........", "........."]).score();
+  assert.equal(lone.blackTerritory, 0);
+  assert.equal(lone.result, "W+6.5");
+  // territoryMap on its own (no count) knows nothing of dead stones.
+  const bare = fromRows(ALL_DEAD.map((r) => r.replace(/O/g, ".")));
+  assert.equal(territoryMap(bare.board).flat().every((v) => v === 0), true);
+  assert.equal(territoryMap(bare.board, { conceded: new Set([WHITE]) }).flat().filter((v) => v === BLACK).length, 77);
+});
+
+await test("scoring: a side whose stones were all captured in play has conceded the open board", () => {
+  const g = new Game({ size: 9 });
+  // White's lone corner stone is captured; Black has two stones, White none.
+  g.play(1, 0); // B
+  g.play(0, 0); // W
+  g.play(0, 1); // B captures
+  assert.equal(g.board.get([0, 0]), EMPTY);
+  g.pass();
+  g.pass();
+  const s = g.score();
+  assert.equal(s.blackTerritory, 79);
+  assert.equal(s.blackPrisoners, 1);
+  assert.equal(s.result[0], "B");
+});
+
+await test("SGF export: RE and DT", () => {
+  // RE is written from the end of the main line wherever the cursor is.
+  const g = loadSGF("(;SZ[9]RE[B+3.5];B[aa](;W[bb];B[cc])(;W[dd]))").game;
+  g.goto(g.root.children[0].children[1]);
+  assert.match(g.toSGF(), /RE\[B\+3\.5\]/);
+  const back = loadSGF(g.toSGF()).game;
+  assert.equal(back.mainLine().at(-1).result, "B+3.5");
+  // A game played here is dated today; one made without a date has no DT.
+  const pad = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  assert.ok(new Game({ size: 9 }).toSGF().includes(`DT[${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}]`));
+  assert.equal(/DT\[/.test(new Game({ size: 9, date: null }).toSGF()), false);
+  assert.ok(new Game({ size: 9, date: null, dateText: "1846" }).toSGF().includes("DT[1846]"));
 });
 
 await test("rules: rulesets, defaults and handicap compensation", () => {
@@ -245,7 +327,7 @@ await test("rules: rulesets, defaults and handicap compensation", () => {
   assert.equal(normalizeRules("Chinese"), "chinese");
   assert.equal(normalizeRules("aga"), "japanese");
   assert.equal(normalizeRules(undefined), "japanese");
-  // A Game without rules is Japanese with komi 6.5, as before v5.
+  // A Game without rules is Japanese with komi 6.5.
   const g = new Game({ size: 9 });
   assert.equal(g.rules, "japanese");
   assert.equal(g.komi, 6.5);

@@ -2,11 +2,12 @@
  * Release gate for the content and packaging promises.
  *
  * Counts what is real: a course of at least 20 units / 90 lessons / 310
- * steps (v13: with the ko and judgement units and area scoring) including
- * at least 8 advanced units / 27 advanced lessons, at least 250 solver-verified problems with themes with measured grades,
- * 20 classics, four languages
- * everywhere, Japanese rules by default (Chinese and Korean per game, v5),
- * licences and one version string.
+ * steps, including at least 7 intermediate units and 8 advanced units with
+ * 27 lessons; at least 500 solver-proved problems, each with a theme and a
+ * grade; 20 classics; four languages everywhere; the pinned network and
+ * engine configuration; the licences; one version string with its release
+ * notes; and that the counts written in the README, docs/QA.md and this
+ * version's release notes are the real ones.
  */
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
@@ -105,7 +106,47 @@ const nvmrc = fs.readFileSync(path.join(root, ".nvmrc"), "utf8").trim();
 assert.equal(packageJson.engines?.node, `>=${nvmrc}`, ".nvmrc is the lowest Node package.json's engines allows");
 const indexHtml = fs.readFileSync(path.join(root, "src/web/index.html"), "utf8");
 assert.match(indexHtml, new RegExp(`data-version="${APP_VERSION}"`), "index.html version agrees");
-assert.ok(fs.existsSync(path.join(root, `.github/release-notes/v${APP_VERSION}.md`)), "release notes exist");
+const notesFile = `.github/release-notes/v${APP_VERSION}.md`;
+assert.ok(fs.existsSync(path.join(root, notesFile)), "release notes exist");
+
+// The counts people read are the counts there are. A number in front of one
+// of these words, in the README, docs/QA.md's table or this version's notes, must be
+// the real one (problems: numbers of three digits, so "4 problems" in an
+// example is left alone), and the README must state each of the first five.
+const stated = {
+  units: [/\b(\d+) units\b/g, COURSE.length],
+  lessons: [/\b(\d+) lessons\b/g, lessons.length],
+  steps: [/\b(\d+) (?:lesson )?steps\b/g, steps.length],
+  problems: [/\b(\d{3,}) (?:solver-proved |verified )?problems\b/g, PROBLEMS.length],
+  classics: [/\b(\d+) classics\b/g, CLASSICS.length],
+  themes: [/\b(\d+) themes\b/g, THEMES.length],
+};
+/** Every count `text` states that is not the real one, as "file: 22 units (really 23 units)". */
+function wrongCounts(text, file) {
+  const wrong = [];
+  for (const [word, [pattern, real]] of Object.entries(stated)) {
+    for (const hit of text.matchAll(pattern)) if (Number(hit[1]) !== real) wrong.push(`${file}: ${hit[0]} (really ${real} ${word})`);
+  }
+  return wrong;
+}
+const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+for (const word of ["units", "lessons", "steps", "problems", "classics"]) {
+  const [pattern, real] = stated[word];
+  assert.ok([...readme.matchAll(pattern)].some((hit) => Number(hit[1]) === real), `README.md states the ${real} ${word}`);
+}
+// docs/QA.md keeps its numbers in one table (the rest of that page states the gate's minimums).
+const qaCounts = fs.readFileSync(path.join(root, "docs/QA.md"), "utf8").match(/<!-- counts -->[\s\S]*?<!-- \/counts -->/);
+assert.ok(qaCounts, "docs/QA.md has its counts table");
+const wrong = [
+  ...wrongCounts(readme, "README.md"),
+  ...wrongCounts(qaCounts[0], "docs/QA.md"),
+  ...wrongCounts(fs.readFileSync(path.join(root, notesFile), "utf8"), notesFile),
+];
+assert.deepEqual(wrong, [], "the documents state the real counts");
+// The README describes the app as it is: a version it names is this one,
+// and no heading tells a version's story (the release notes do that).
+for (const hit of readme.matchAll(/\bv(\d+\.\d+\.\d+)\b/g)) assert.equal(hit[1], APP_VERSION, `README.md names ${hit[0]}`);
+assert.doesNotMatch(readme, /^#+ .*\bv\d+\b/m, "no README heading is about a version");
 
 console.log(
   `release-check: ${COURSE.length} units · ${lessons.length} lessons · ${steps.length} steps · ${PROBLEMS.length} verified problems in ${THEMES.length} themes (grades ${histogram.join("/")}) · 20 classics · 4 languages · Japanese, Chinese and Korean rules · KataGo analysis bridge · licences · v${APP_VERSION}`,

@@ -30,7 +30,7 @@ const readJSON = (key, fallback) => {
 const writeJSON = (key, value) => store.put(key, value);
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** The setting that turns the weekly check on (default false). */
-export const AUTO_SETTING = "autoUpdateCheck";
+const AUTO_SETTING = "autoUpdateCheck";
 
 /** "v4.1.0" / "4.1" / "4.1.0-beta.2" → { major, minor, patch, pre } or null. */
 export function parseVersion(text) {
@@ -172,7 +172,7 @@ export function openReleasePage() {
   return Host.openReleasePage();
 }
 
-/* ------------------------------------------------------ v5 update install */
+/* ------------------------------------------------------ Update install */
 //
 // After a check found a newer release, "Download and install" asks the host
 // to fetch this platform's package of that release and the release's
@@ -190,7 +190,7 @@ export const INSTALL_BLOCKED = ["Unsupported", "NotPackaged", "Translocated", "R
 export const INSTALL_ERRORS = [
   "Busy",
   "BadTag",
-  // v13: the host installs only the tag its own last check found, and only
+  // The host installs only the tag its own last check found, and only
   // a newer one than this version.
   "NotChecked",
   "NotNewer",
@@ -200,10 +200,15 @@ export const INSTALL_ERRORS = [
   "NoAsset",
   "TooLarge",
   "NoChecksum",
-  // v13, builds with an update key (docs/signing.md): SHA256SUMS.sig is
+  // Builds with an update key (docs/signing.md): SHA256SUMS.sig is
   // missing or does not verify.
   "NoSignature",
   "BadSignature",
+  // The signed checksums name no version (a signed build refuses that),
+  // or name another one than the release asked for; or the package itself
+  // says it is another version.
+  "NoVersion",
+  "VersionMismatch",
   "ChecksumMismatch",
   "Unpack",
   "BadPackage",
@@ -212,7 +217,7 @@ export const INSTALL_ERRORS = [
   "Cancelled",
   "NotReady",
   "Helper",
-  // v13: another helper is updating this installation; the helper never
+  // Another helper is updating this installation; the helper never
   // proved it started (the app stays open).
   "HelperBusy",
   "HelperNotStarted",
@@ -223,21 +228,25 @@ export const INSTALL_ERRORS = [
 ];
 
 /** How often the page asks for download progress (ms). */
-export const INSTALL_POLL_MS = 500;
+const INSTALL_POLL_MS = 500;
 
 const PHASES = ["idle", "downloading", "verifying", "unpacking", "ready", "installing", "failed", "cancelled"];
 
 /**
  * Normalize a `studio.updateStatus` reply:
  *
- *   { phase, tag, received, total, progress (0…1 or null), error,
+ *   { phase, tag, received, total, progress (0…1 or null), retries, error,
  *     canInstall, blocked, justUpdated, installFailed }
+ *
+ * `retries`: how often the host continued the download on a new connection
+ * after the old one went silent (0 on a host that does not report it). The
+ * download is still running; the interface may say it is reconnecting.
  *
  * phase "unavailable" without a host (canInstall false, blocked "Unsupported").
  */
 export function interpretInstallStatus(reply) {
   if (!reply || typeof reply !== "object" || reply.ok !== true) {
-    return { phase: "unavailable", tag: "", received: 0, total: 0, progress: null, error: "", canInstall: false, blocked: "Unsupported", justUpdated: false, installFailed: false };
+    return { phase: "unavailable", tag: "", received: 0, total: 0, progress: null, retries: 0, error: "", canInstall: false, blocked: "Unsupported", justUpdated: false, installFailed: false };
   }
   const received = Math.max(0, Number(reply.received) || 0);
   const total = Math.max(0, Number(reply.total) || 0);
@@ -248,6 +257,7 @@ export function interpretInstallStatus(reply) {
     received,
     total,
     progress: total > 0 ? Math.min(1, received / total) : null,
+    retries: Math.max(0, Math.floor(Number(reply.retries) || 0)),
     error: String(reply.error || ""),
     canInstall: reply.canInstall === true && !blocked,
     blocked,
@@ -280,7 +290,7 @@ export function installStepOf(phase) {
  * interface falls back to "Open download page".
  */
 export function installFallsBack(code) {
-  return INSTALL_BLOCKED.includes(code) || ["NoAsset", "NoChecksum", "NoSignature", "BadSignature", "ChecksumMismatch", "BadPackage", "BadTag", "BadRedirect", "Helper", "NotNewer"].includes(code);
+  return INSTALL_BLOCKED.includes(code) || ["NoAsset", "NoChecksum", "NoSignature", "BadSignature", "NoVersion", "VersionMismatch", "ChecksumMismatch", "BadPackage", "BadTag", "BadRedirect", "Helper", "NotNewer"].includes(code);
 }
 
 /** The message key that explains an install error or block to the player. */
@@ -298,6 +308,8 @@ export function installMessageKey(code) {
     case "NoChecksum":
     case "NoSignature":
     case "BadSignature":
+    case "NoVersion":
+    case "VersionMismatch":
     case "BadPackage":
     case "Unpack":
       return "update.verifyError";

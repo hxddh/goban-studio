@@ -11,7 +11,7 @@
  *
  * Coordinates are zero-based from the top-left: x = column, y = row.
  *
- * v5: three rulesets, chosen per game (`Game.rules`). See RULESETS below
+ * Three rulesets, chosen per game (`Game.rules`). See RULESETS below
  * for what each one means here and how it differs from the official text.
  */
 import GoBoard from "@sabaki/go-board";
@@ -19,7 +19,7 @@ import { APP_VERSION } from "./version.js";
 
 /* -------------------------------------------------------------- rulesets
  *
- * v5 rules. A game is played under one of three rulesets:
+ * Rules. A game is played under one of three rulesets:
  *
  *   japanese  Territory scoring (Nihon Ki-in 1989 rules): empty points
  *             surrounded by one colour's living stones, plus prisoners
@@ -114,12 +114,12 @@ export function handicapCompensation(rules, handicap = 0) {
 /**
  * The ruleset an SGF RU value names: "japanese" | "chinese" | "korean", or
  * null when the app cannot score the record faithfully. No RU at all means
- * Japanese (records saved before v5 have none or RU[Japanese]).
+ * Japanese (older records have none or RU[Japanese]).
  *
  *   Japanese  Japanese, JP, JA, JPN, Nihon, uchikomi, 日本, 日本ルール, 日本规则
  *   Chinese   Chinese, CN, ZH, CHN, China, 中国, 中国规则, 中國規則
  *   Korean    Korean, KR, KO, KOR, Korea, 한국, 한국 규칙, 韓国, 韩国规则
- * (case-insensitive; "uchikomi" was accepted before v5 and stays Japanese).
+ * (case-insensitive; "uchikomi" has always been read as Japanese).
  *
  * Rejected on purpose, because no preset scores them the same way and
  * mapping them would change the record's result:
@@ -211,7 +211,7 @@ function zobristTable(size) {
 }
 
 /** The board's Zobrist hash, as a string of two 32-bit halves. */
-export function boardHash(board) {
+function boardHash(board) {
   const size = board.width;
   const table = zobristTable(size);
   const map = board.signMap;
@@ -255,7 +255,7 @@ function nodeHash(node) {
  * applied to a copy of `board`: { black: [{x, y}], white: [...], empty: [...] }.
  * AE first, then AB, then AW.
  */
-export function applySetup(board, setup) {
+function applySetup(board, setup) {
   const out = board.clone();
   if (!setup) return out;
   for (const p of setup.empty || []) out.set([p.x, p.y], EMPTY);
@@ -302,10 +302,13 @@ function cloneBoard(board) {
  * touches any of them is left out. Territory scoring passes the stones in
  * seki, so a seki eye is not territory; area scoring passes nothing.
  *
+ * `conceded` (optional) is a Set of colours that have played but have no
+ * living stone left (see "open regions" below); score() works it out.
+ *
  * Call it on a finished board: score() removes the dead stones first, so
  * every stone left is alive (see "open regions" below).
  */
-export function territoryMap(board, { exclude = null } = {}) {
+export function territoryMap(board, { exclude = null, conceded = null } = {}) {
   const size = board.width;
   const out = emptySignMap(size);
   const seen = new Set();
@@ -359,14 +362,21 @@ export function territoryMap(board, { exclude = null } = {}) {
       // The two differ in whether the other colour has stones on the board
       // at all: if it has, they lie in a region of their own, so the wall
       // really divides the board and the region is territory; if it has
-      // none, nothing has been divided and the region is dame. Before v13
-      // every four-side region was dame, which gave the second case's owner
-      // nothing. The test runs after dead stones are removed, so only living
-      // stones divide the board: a game in which every stone of one side is
-      // dead (a resignation in all but name) still leaves the open board as
-      // dame, as before.
+      // none, nothing has been divided and the region is dame (a lone stone
+      // on an otherwise untouched board establishes nothing).
+      //
+      // One more case: the other colour did play, and none of its stones
+      // lives. They were all captured, or all removed as dead at the count
+      // (the engine marks dead stones by itself, so this happens without
+      // the player doing anything). The board was contested and one side
+      // lost every stone, so the open region belongs to the colour whose
+      // living stones border it. score() names such colours in `conceded`;
+      // a colour that never had a stone on the board is not in it, and a
+      // colour with even one stone left unmarked is still `present`, in
+      // which case the rule of the first paragraph decides.
       const color = border.size === 1 ? [...border][0] : 0;
-      const open = edges.size === 4 && !present.has(other(color));
+      const rival = other(color);
+      const open = edges.size === 4 && !present.has(rival) && !(conceded && conceded.has(rival));
       if (color && !open && !touchesExcluded) {
         for (const [rx, ry] of region) out[ry][rx] = color;
       }
@@ -481,13 +491,14 @@ export class Game {
     komi = undefined,
     handicap = 0,
     date = new Date(),
+    dateText = "",
     playerBlack = "Black",
     playerWhite = "White",
     event = "",
     placeHandicap = true,
   } = {}) {
     this.size = size;
-    // v5: "japanese" | "chinese" | "korean" (see RULESETS). Unknown values
+    // "japanese" | "chinese" | "korean" (see RULESETS). Unknown values
     // fall back to Japanese, the default.
     this.rules = normalizeRules(rules);
     this.handicap = Math.max(0, Math.min(9, Math.floor(Number(handicap) || 0)));
@@ -500,7 +511,12 @@ export class Game {
     if (placeHandicap && this.handicap >= 2 && stones.length < this.handicap) this.handicap = stones.length >= 2 ? stones.length : 0;
     // Without an explicit komi, the ruleset's default for this handicap.
     this.komi = komi === undefined || komi === null || komi === "" ? defaultKomi(this.rules, this.handicap) : Number(komi);
-    this.date = date instanceof Date ? date : new Date(date);
+    // A game played here is dated today. An imported record passes its own
+    // date, or null when it states none (never today's): `dateText` is the
+    // record's DT exactly as written ("1846", "1933-10-16,17"), and toSGF()
+    // writes it back unchanged.
+    this.date = date === null ? null : date instanceof Date ? date : new Date(date);
+    this.dateText = String(dateText || "");
     this.playerBlack = playerBlack;
     this.playerWhite = playerWhite;
     this.event = event;
@@ -538,10 +554,10 @@ export class Game {
       result: fields.result || null,
       comment: fields.comment || "",
       marks: fields.marks || [],
-      // v5: SGF properties this app does not interpret, kept for the round
+      // SGF properties this app does not interpret, kept for the round
       // trip ({ KEY: [raw values] }), or null.
       extra: fields.extra || null,
-      // v13: stones the record set up just before this node's move (SGF
+      // Stones the record set up just before this node's move (SGF
       // AB / AW / AE in the middle of a game; see applySetup), or null. The
       // board above already includes them.
       setup: fields.setup || null,
@@ -740,7 +756,7 @@ export class Game {
     this.root.comment = String(text || "");
   }
 
-  /* ------------------------------------------------ v5: node editing */
+  /* ------------------------------------------------ Node editing */
 
   /** Set (or clear, with "") the comment of a node (object or id). */
   setComment(node, text) {
@@ -866,7 +882,28 @@ export class Game {
     const seki = findSeki(board);
     // Territory scoring gives no points inside a seki; area scoring counts
     // a seki group's own eye as part of its area.
-    const territory = territoryMap(board, { exclude: method === "territory" ? seki.keys : null });
+    const captures = {
+      black: this.current.board.getCaptures(BLACK) || 0,
+      white: this.current.board.getCaptures(WHITE) || 0,
+    };
+    // A colour that lost stones (captured during play or removed as dead
+    // now) and has none left on the finished board has conceded the open
+    // board to the other side: see "open regions" in territoryMap().
+    const conceded = new Set();
+    for (const [color, lostInPlay] of [[BLACK, captures.white], [WHITE, captures.black]]) {
+      if (!lostInPlay && !dead.some((d) => d.color === color)) continue;
+      let alive = false;
+      for (let y = 0; y < this.size && !alive; y++) {
+        for (let x = 0; x < this.size; x++) {
+          if (board.get([x, y]) === color) {
+            alive = true;
+            break;
+          }
+        }
+      }
+      if (!alive) conceded.add(color);
+    }
+    const territory = territoryMap(board, { exclude: method === "territory" ? seki.keys : null, conceded });
     let blackTerritory = 0;
     let whiteTerritory = 0;
     let blackStones = 0;
@@ -882,10 +919,6 @@ export class Game {
         else neutral++;
       }
     }
-    const captures = {
-      black: this.current.board.getCaptures(BLACK) || 0,
-      white: this.current.board.getCaptures(WHITE) || 0,
-    };
     let blackPrisoners = captures.black;
     let whitePrisoners = captures.white;
     for (const d of dead) {
@@ -945,12 +978,17 @@ export class Game {
   toSGF() {
     const root = this.root;
     const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
-    const dt = this.date instanceof Date ? this.date : new Date(this.date);
     const pad = (n) => String(n).padStart(2, "0");
-    const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    // DT: the record's own text when it has one, else the day the game was
+    // played here; a record without a date stays without one.
+    let date = this.dateText;
+    if (!date && this.date !== null && this.date !== undefined) {
+      const dt = this.date instanceof Date ? this.date : new Date(this.date);
+      if (!Number.isNaN(dt.getTime())) date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    }
     const rules = this.ruleset.sgf;
     // SGF columns run a, b, c … with the i included (FF[4]); only board
-    // labels skip I. (Before v7 this skipped the i too; see sgf.js.)
+    // labels skip I. (Records written with the i skipped too are still read; see sgf.js.)
     const sgfColumn = (x) => String.fromCharCode(97 + x);
     const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
@@ -966,12 +1004,17 @@ export class Game {
       esc(this.playerBlack) +
       "]PW[" +
       esc(this.playerWhite) +
-      "]DT[" +
-      date +
       "]";
-    let terminal = this.current;
+    if (date) head += "DT[" + esc(date) + "]";
+    // RE is the result of the game, which is the end of the main line
+    // wherever the cursor is (a side variation must not lose it). A result
+    // reached only on the cursor's own line (a resignation in a variation
+    // being explored) is the fallback.
+    let terminal = root;
     while (terminal.children.length) terminal = terminal.children[0];
-    const result = this.current.result || terminal.result;
+    let ahead = this.current;
+    while (ahead.children.length) ahead = ahead.children[0];
+    const result = terminal.result || this.current.result || ahead.result;
     if (result) head += "RE[" + esc(result) + "]";
     if (this.event) head += "EV[" + esc(this.event) + "]";
     if (root.comment) head += "C[" + esc(root.comment) + "]";
@@ -994,7 +1037,7 @@ export class Game {
     const nodeText = (n) => {
       if (!n.move) return "";
       let s = "";
-      // v13: a mid-game setup is a move-less node of its own before the move.
+      // A mid-game setup is a move-less node of its own before the move.
       if (n.setup) {
         let props = "";
         for (const [key, list] of [["AE", n.setup.empty], ["AB", n.setup.black], ["AW", n.setup.white]]) {
@@ -1010,7 +1053,7 @@ export class Game {
       s += marksText(n.marks, sgfCoord, esc) + extraText(n.extra, esc);
       return s;
     };
-    // v13: iterative, so a record of any length or depth cannot overflow the
+    // Iterative, so a record of any length or depth cannot overflow the
     // stack. A string on the stack is a parenthesis to write.
     const parts = [];
     const stack = [root];
@@ -1032,12 +1075,12 @@ export class Game {
   }
 }
 
-/* ------------------------------------------------------ v5: markup */
+/* ------------------------------------------------------ Markup */
 
 /** Board marks a node can carry, as stored in node.marks[].type. */
 export const MARK_KINDS = ["triangle", "square", "circle", "cross", "label"];
 /** SGF property for each mark kind. */
-export const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
+const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
 
 function nextLabel(marks) {
   const used = new Set(marks.filter((m) => m.type === "label").map((m) => m.text));
@@ -1068,7 +1111,7 @@ function extraText(extra, esc) {
 }
 
 /**
- * v5: layout of the whole game tree for a variation mini-map.
+ * Layout of the whole game tree for a variation mini-map.
  *
  *   x  depth (0 = root, so a move's x is its move number in its line)
  *   y  row (0 = main line); each variation takes the first row below its
@@ -1107,7 +1150,7 @@ export function treeLayout(game) {
   };
 
   // Places the first-child chain from `start` and returns a frame for its
-  // variations (v13: an explicit stack of frames, so a record nested
+  // variations (an explicit stack of frames, so a record nested
   // thousands of variations deep cannot overflow the call stack).
   const placeChain = (start, x0, row, main) => {
     const chain = [];

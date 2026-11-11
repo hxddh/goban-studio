@@ -1,5 +1,5 @@
 /**
- * v8 beginner path views: the lesson-complete page (with its bridge into a
+ * Beginner path views: the lesson-complete page (with its bridge into a
  * game), capture Go, and the one-time note on the first count.
  */
 import { useEffect } from "preact/hooks";
@@ -8,7 +8,7 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
-import { bridgeAfter } from "../model/player.js";
+import { bridgeAfter } from "../model/plan.js";
 import { Board, Button, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 
@@ -22,7 +22,7 @@ import { Toolbar } from "./chrome.jsx";
  * the next item — named after the bridge when the bridge is next.
  */
 export function LessonDone({ L }) {
-  if (state.learn.daily) return <SessionLessonDone L={L} />;
+  if (state.practice.daily) return <SessionLessonDone L={L} />;
   const next = C.nextLesson();
   const bridge = bridgeAfter(L.lesson.id, state.profile, { captureWins: state.settings.captureWins });
   const nextLesson = next && (
@@ -32,7 +32,7 @@ export function LessonDone({ L }) {
   );
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} />
+      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} />
       <div class="page center-page">
         <section class="card celebrate" data-bridge={bridge || undefined}>
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
@@ -51,8 +51,8 @@ export function LessonDone({ L }) {
               </Button>
             )}
             {nextLesson}
-            <Button kind="ghost" onClick={C.learnHome}>
-              {t("learn.backHome")}
+            <Button kind="ghost" onClick={C.practiceHome}>
+              {t("practice.backHome")}
             </Button>
           </div>
         </section>
@@ -74,7 +74,7 @@ function SessionLessonDone({ L }) {
   const at = C.sessionPlace();
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} sub={at ? t("learn.session.of", [at.n, at.total]) : ""} />
+      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} sub={at ? t("practice.session.of", [at.n, at.total]) : ""} />
       <div class="page center-page">
         <section class="card celebrate" data-bridge={bridge || undefined}>
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
@@ -85,8 +85,8 @@ function SessionLessonDone({ L }) {
             <Button kind="primary" onClick={C.continuePath}>
               {continueLabel(next)}
             </Button>
-            <Button kind="ghost" onClick={C.learnHome}>
-              {t("learn.backHome")}
+            <Button kind="ghost" onClick={C.practiceHome}>
+              {t("practice.backHome")}
             </Button>
           </div>
         </section>
@@ -98,7 +98,7 @@ function SessionLessonDone({ L }) {
 /* ----------------------------------------------------------- capture Go */
 
 export function CaptureView() {
-  const K = state.learn.capture;
+  const K = state.practice.capture;
   if (!K) return null;
   const game = K.game;
   const node = game.current;
@@ -128,11 +128,11 @@ export function CaptureView() {
   const next = C.nextLesson();
   const won = over && over.winner === K.human;
   const title = t("capture.title");
-  const daily = state.learn.daily;
+  const daily = state.practice.daily;
   const at = C.sessionPlace();
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={title} sub={at ? t("learn.session.of", [at.n, at.total]) : `${game.size} × ${game.size}`} />
+      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={title} sub={at ? t("practice.session.of", [at.n, at.total]) : `${game.size} × ${game.size}`} />
       <div class={`workspace capture ${over ? "is-over" : ""}`}>
         <section class="stage" aria-label={title}>
           <Board model={model} onPlay={C.capturePlay} onHover={(v) => (v ? C.captureCanPlay(v.x, v.y) : true)} />

@@ -115,7 +115,7 @@ export default async function ({ test, assert, root }) {
   state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: false, showEval: false, onboarded: true, confirmMove: false, liveAnalysis: false };
   state.profile = PM.newProfile();
   state.engine = { kind: "katago", name: "KataGo test", available: true };
-  // Back/forward as the app does it (controller.js restore drops the review).
+  // Back/forward as the app does it (spaces.js restore drops the review).
   A.setRestorer((loc) => {
     if (state.review) C.dropReview();
     state.space = loc.space;
@@ -192,6 +192,31 @@ export default async function ({ test, assert, root }) {
       await idle();
     });
 
+    await test("play analysis: a game finished after an undo is kept in the player's games but does not move the rating", async () => {
+      state.profile = PM.newProfile();
+      const rating = JSON.stringify(state.profile.rating);
+      C.newGame({ size: 19, color: BLACK, opponentRank: 30 });
+      const g = state.game;
+      fill(g.game, 20);
+      C.undo();
+      assert.equal(g.undos, 1);
+      fill(g.game, 30);
+      C.requestResign();
+      state.sheet.onConfirm();
+      state.sheet = null;
+      const rec = state.profile.games.find((x) => x.id === g.recordId);
+      assert.ok(rec, "the game is in the player's list");
+      assert.equal(rec.assisted, true);
+      assert.equal(rec.undos, 1);
+      assert.equal(rec.rated, false);
+      assert.equal(rec.rating, null);
+      assert.equal(JSON.stringify(state.profile.rating), rating, "the estimate did not move");
+      assert.deepEqual(state.profile.history, []);
+      assert.ok(!g.ratingChange, "no rating change to show");
+      C.dropReview();
+      await idle();
+    });
+
     await test("play analysis: try again from the position — KataGo judges, a miss shows its better move, each try is a drill", async () => {
       state.profile = PM.newProfile();
       const g = finishRatedGame(40);
@@ -227,7 +252,7 @@ export default async function ({ test, assert, root }) {
       assert.deepEqual(tr.best, { x: 0, y: 18 }, "KataGo's better move (A1) is shown");
       d = drills().find((m) => m.index === 11);
       assert.deepEqual([d.tries, d.streak], [2, 0], "a miss starts the ladder again");
-      assert.ok(PM.due(state.profile, Date.now() + PM.DAY + 1000).mistakes.some((m) => m.id === d.id), "a missed moment comes back in Learn tomorrow");
+      assert.ok(PM.due(state.profile, Date.now() + PM.DAY + 1000).mistakes.some((m) => m.id === d.id), "a missed moment comes back in Practice tomorrow");
       assert.equal(r.game.mainLine().length, moves, "a try never becomes a move of the game");
       assert.equal(r.game.current.children.length, 1, "nor a variation");
       // Move on: the next moment.
@@ -477,7 +502,7 @@ export default async function ({ test, assert, root }) {
       const src = (f) => fs.readFileSync(path.join(root, f), "utf8");
       for (const f of ["report.jsx", "report-ctl.js", "report-batch.js", "report-model.js", "report-status.jsx", "report-draw.js"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js/app", f)), f);
       assert.equal("report" in state, false, "no state.report");
-      for (const f of ["src/web/js/app/review-ctl.js", "src/web/js/app/play-ctl.js", "src/web/js/play/analysis.js"]) assert.doesNotMatch(src(f), /\.cancelled\b|summaryToken|state\.report/, f);
+      for (const f of ["src/web/js/app/review-position.js", "src/web/js/app/review-analysis.js", "src/web/js/app/review-nav.js", "src/web/js/app/review-edit.js", "src/web/js/app/review-insight.js", "src/web/js/app/review-try.js", "src/web/js/app/review-session.js", "src/web/js/app/review-board.js", "src/web/js/app/game-session.js", "src/web/js/app/game-end.js", "src/web/js/app/game-turn.js", "src/web/js/app/game-start.js", "src/web/js/play/analysis.js"]) assert.doesNotMatch(src(f), /\.cancelled\b|summaryToken|state\.report/, f);
     });
   } finally {
     delete globalThis.zero;

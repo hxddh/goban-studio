@@ -1,7 +1,7 @@
 /**
  * Core: the content — the classic games, the course (beginner, intermediate, advanced) and the endgame problems.
  */
-import { test, CLASSICS, COURSE, LANG_IDS, PROBLEMS, S, assert, execFileSync, fs, loadSGF, parse, path, root, t } from "./helpers.mjs";
+import { test, CLASSICS, COURSE, LANG_IDS, PROBLEMS, S, assert, execFileSync, fs, loadSGF, path, root } from "./helpers.mjs";
 
 await test("all 20 classic games parse and carry four-language notes", () => {
   assert.equal(CLASSICS.length, 20);
@@ -23,6 +23,37 @@ await test("all 20 classic games parse and carry four-language notes", () => {
   }
 });
 
+await test("classics: every commented moment is a move of its record, in four languages, and the famous ones are where the record has them", () => {
+  const at = (id, index) => {
+    const { game } = loadSGF(CLASSICS.find((c) => c.id === id).sgf);
+    const m = game.mainLine()[index].move;
+    return `${m.color === 1 ? "B" : "W"} ${"ABCDEFGHJKLMNOPQRST"[m.x]}${19 - m.y}`;
+  };
+  let commented = 0;
+  for (const classic of CLASSICS) {
+    if (!classic.moments) continue;
+    const line = loadSGF(classic.sgf).game.mainLine();
+    const seen = new Set();
+    for (const mo of classic.moments) {
+      commented++;
+      assert.ok(Number.isInteger(mo.index) && mo.index >= 1 && mo.index < line.length, `${classic.id}: move ${mo.index} of ${line.length - 1}`);
+      assert.ok(line[mo.index].move && !line[mo.index].move.pass, `${classic.id} ${mo.index}: a move on the board`);
+      assert.ok(!seen.has(mo.index), `${classic.id}: move ${mo.index} twice`);
+      seen.add(mo.index);
+      for (const lang of LANG_IDS) for (const field of ["title", "note"]) assert.ok(mo[field]?.[lang]?.trim(), `${classic.id} ${mo.index} ${field} ${lang}`);
+    }
+    assert.deepEqual(classic.moments.map((m) => m.index), [...seen].sort((a, b) => a - b), `${classic.id}: in move order`);
+  }
+  assert.ok(commented >= 9, `${commented} commented moments`);
+  // Jowa's three moves (68, 70, 80) are White's, where the notes say: the second line on the left,
+  // then from the centre side, then one point up on the right.
+  assert.deepEqual([68, 70, 80].map((i) => at("blood-vomiting", i)), ["W B11", "W E12", "W Q10"]);
+  assert.equal(at("blood-vomiting", 67), "B A14", "Black's move on the edge before it");
+  // Lee Sedol's wedge and AlphaGo's answer diagonally below it.
+  assert.deepEqual([78, 79].map((i) => at("alphago-lee-4", i)), ["W L11", "B K10"]);
+  assert.equal(at("ear-reddening", 127).slice(0, 1), "B");
+});
+
 await test("every course lesson is complete, four-language and solver-verified", () => {
   execFileSync(process.execPath, [path.join(root, "scripts/check-course.mjs")], { stdio: "inherit" });
   assert.ok(COURSE.length >= 13);
@@ -33,7 +64,7 @@ await test("advanced: the advanced units follow the intermediate ones and keep e
   const order = ["beginner", "intermediate", "advanced"];
   for (let i = 1; i < levels.length; i++) assert.ok(order.indexOf(levels[i]) >= order.indexOf(levels[i - 1]), `unit ${COURSE[i].id} out of order`);
   const adv = COURSE.filter((u) => u.level === "advanced");
-  // v13: opening frameworks, joseki choice and handicap strategy joined the v6 units.
+  // Opening frameworks, joseki choice and handicap strategy sit with the other advanced units.
   assert.ok(adv.length >= 8 && adv.length <= 10, `${adv.length} advanced units`);
   const lessons = adv.flatMap((u) => u.lessons);
   assert.ok(lessons.length >= 27 && lessons.length <= 40, `${lessons.length} advanced lessons`);
@@ -65,11 +96,11 @@ await test("endgame: at least 30 endgame problems over grades 1–5, with their 
   for (const t of ["hane-connect", "monkey-jump", "double-sente", "sente-gote", "reverse-sente", "endgame-compare", "deiri"]) assert.ok(themes.has(t), t);
   for (const p of eg.filter((x) => x.ask === "value")) assert.ok(p.choices.includes(p.value), p.id);
   assert.ok(eg.some((p) => S.countAreas(S.createPuzzle(p)) >= 3), "some problems compare three areas");
-  const jsx = fs.readFileSync(path.join(root, "src/web/js/learn/catalog.jsx"), "utf8");
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/practice/catalog.jsx"), "utf8");
   assert.match(jsx, /export const TOPICS = \[[^\]]*"endgame"\]/);
 });
 
-await test("endgame: the fighting unit teaches the leaning attack and sabaki, after the v5 lessons", () => {
+await test("endgame: the fighting unit teaches the leaning attack and sabaki, after its first lessons", () => {
   const unit = COURSE.find((u) => u.id === "fighting");
   const ids = unit.lessons.map((l) => l.id);
   assert.deepEqual(ids, ["fight-cutting-stones", "fight-attack-distance", "fight-split", "fight-leaning", "fight-sabaki"]);

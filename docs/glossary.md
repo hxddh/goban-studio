@@ -291,7 +291,7 @@ in this table. Usage targets:
 | diagonal star points | 对角星 | diagonal star points | 대각선 화점 | 対角の星 | |
 | facing / staggered 3-4 points | 向小目 / 错小目 | two 3-4 points (facing / staggered) | 향소목 / 엇갈린 소목 | 向かい小目 / 互い違いの小目 | |
 | one-space high approach (short form) | 一间高挂 | one-space high approach | 한 칸 높은 걸침 | 一間高ガカリ | v6 short form of the approach row above |
-| high Chinese opening | 高中国流 | High Chinese opening | 높은 중국류 | 高い中国流 | v7 book line: the side stone on the fourth line |
+| high Chinese opening | 高中国流 | High Chinese opening | 고중국류 | 高中国流 | the side stone on the fourth line (Q9; the low one is R9) |
 | one-space low / high pincer | 一间低夹 / 一间高夹 | one-space low / high pincer | 한 칸 낮은 / 높은 협공 | 一間挟み / 一間高挟み | v7 book lines; ja 一間挟み is the low one |
 | two-space low pincer | 二间低夹 | two-space low pincer | 두 칸 낮은 협공 | 二間挟み | v7 |
 | block (against the 3-3 invasion) | 挡 | block | 막기 | オサエ | v7 |
@@ -327,7 +327,7 @@ The v13 joseki lines follow the opening book's corner tree move by move
 (`star-one-space-low-pincer`, `star-two-space-low-pincer`,
 `komoku-high-approach-attach`, `komoku-low-approach`), and the whole-board
 steps follow its named lines (`chinese`, `sanrensei`);
-`scripts/tests/core-course-v13.mjs` checks every accepted point the book
+`scripts/tests/core-course-advanced.mjs` checks every accepted point the book
 knows against it.
 
 ## Decisions on doubtful terms

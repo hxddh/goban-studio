@@ -1,5 +1,5 @@
 /**
- * Data, v13 (docs/storage.md): the store's safe state (unreadable files
+ * Data safety (docs/storage.md): the store's safe state (unreadable files
  * are write-blocked, damaged ones copied aside first, a failed list makes
  * everything read-only, a packaged app without its bridge never falls back
  * to localStorage), versions and migrations of the stored files and of
@@ -74,6 +74,38 @@ await test("data safety: a file that cannot be read is reported and write-blocke
   store.remove("profile.json");
   await store.flush();
   assert.ok(be.files.has("profile.json"));
+});
+
+await test("data safety: a lazy file whose read failed is read again on the next load, and can then be written; flush runs its hooks first", async () => {
+  const be = memBackend(new Map([["settings.json", '{"lang":"ko"}'], ["games/a-1.json", '{"id":"a-1","sgf":"(;)"}']]));
+  const { store, errors } = await open(be, { lazy: ["games/"] });
+  be.fail.add("games/a-1.json");
+  await assert.rejects(store.load("games/a-1.json"));
+  assert.ok(errors.some((e) => e.op === "read" && e.key === "games/a-1.json"));
+  assert.deepEqual(store.blocked(), ["games/a-1.json"], "nothing is written over a file that could not be read");
+  assert.equal(store.isLoaded("games/a-1.json"), false, "still on disk, still to be read");
+  // The disk answers again (a Retry): the file is read, and a change to it now reaches the disk.
+  be.fail.clear();
+  assert.equal((await store.load("games/a-1.json")).id, "a-1");
+  assert.deepEqual(store.blocked(), []);
+  store.put("games/a-1.json", { id: "a-1", sgf: "(;)", meta: { name: "renamed" } });
+  assert.equal(await store.flush(), true);
+  assert.match(be.files.get("games/a-1.json"), /renamed/);
+  // onFlush: what a module holds back on purpose is made final before the writes go out.
+  const order = [];
+  const off = store.onFlush(() => {
+    order.push("hook");
+    store.remove("games/a-1.json");
+  });
+  store.onFlush(() => {
+    throw new Error("a broken hook does not stop the flush");
+  });
+  assert.equal(await store.flush(), true);
+  assert.deepEqual(order, ["hook"]);
+  assert.equal(be.files.has("games/a-1.json"), false, "the hook's removal went out with this flush");
+  off();
+  await store.flush();
+  assert.deepEqual(order, ["hook"], "a hook that was taken off is not called again");
 });
 
 await test("data safety: a damaged file is copied byte for byte to bad/<key>-<time>.json before anything else, and never read back as data", async () => {
@@ -151,7 +183,7 @@ await test("data safety: a packaged app without its bridge never opens the brows
 });
 
 await test("data safety: storeProblemOf — only the core files put the app in its safe state; resettable only when every one was copied aside", async () => {
-  const { storeProblemOf, CORE_KEYS } = await bundle(['export { storeProblemOf, CORE_KEYS } from "./src/web/js/app/controller.js";']);
+  const { storeProblemOf, CORE_KEYS } = await bundle(['export { storeProblemOf, CORE_KEYS } from "./src/web/js/app/boot.js";']);
   assert.deepEqual(CORE_KEYS, ["settings.json", "profile.json", "current.json"]);
   assert.equal(storeProblemOf({ listFailed: false, failed: [] }), null);
   assert.equal(storeProblemOf({ listFailed: false, failed: [{ key: "batch.json", kind: "read" }] }), null, "a side file is a toast, not the safe state");
@@ -260,11 +292,51 @@ await test("data backups: a restore snapshots what was there first, a failed sna
   const again = (await open(be, { lazy: ["games/", "backups/"] })).store;
   assert.equal(B.latestSnapshot(again).at, 7);
   assert.ok(!be.reads.some((k) => k.startsWith("backups/")), "a snapshot is not read at boot");
-  const u = await B.undoRestore(again);
+  const u = await B.undoRestore(again, { now: 9 });
   assert.equal(u.ok, true);
   assert.match(be.files.get("settings.json"), /"zh"/);
   assert.ok(be.files.has("games/old-1.json"), "the game is back");
-  assert.ok(be.files.has("backups/pre-restore-7/settings.json"), "the snapshot stays until a newer one");
+  // The undo took a snapshot of its own first (what the restore had put there), in place of the one it used.
+  assert.ok(!be.files.has("backups/pre-restore-7/settings.json"), "the snapshot that was put back is gone");
+  assert.match(be.files.get("backups/pre-restore-9/settings.json"), /"en"/, "what the undo replaced is kept");
+  // So the undo can be undone: the restored backup is back.
+  const third = (await open(be, { lazy: ["games/", "backups/"] })).store;
+  assert.equal(B.latestSnapshot(third).at, 9);
+  const redo = await B.undoRestore(third, { now: 11 });
+  assert.equal(redo.ok, true);
+  assert.match(be.files.get("settings.json"), /"en"/);
+  assert.ok(!be.files.has("games/old-1.json"));
+  assert.ok(be.files.has("backups/pre-restore-11/games/old-1.json"));
+});
+
+await test("data backups: Undo restore is offered for 30 days and until a backup is exported; an undo that cannot snapshot first changes nothing", async () => {
+  const DAY = 86400000;
+  const at = 1_800_000_000_000;
+  const be = memBackend(new Map([["settings.json", '{"v":13,"lang":"zh"}']]));
+  const { store } = await open(be, { lazy: ["games/", "backups/"] });
+  const doc = { app: "goban-studio", v: 13, at: 2, data: { "settings.json": { v: 13, lang: "en" } } };
+  assert.equal((await B.importBackup(store, doc, { now: at })).ok, true);
+  assert.equal(B.SNAPSHOT_DAYS, 30);
+  assert.equal(B.latestSnapshot(store, at + 29 * DAY).at, at, "still offered on day 29");
+  assert.equal(B.latestSnapshot(store, at + 31 * DAY), null, "not offered after 30 days");
+  assert.equal(B.latestSnapshot(store).at, at, "without a date the snapshot is still found");
+  // Launching within the 30 days keeps it; after them it is removed from disk.
+  assert.equal(await B.expireSnapshots(store, at + 29 * DAY), false);
+  assert.ok(be.files.has(`backups/pre-restore-${at}/settings.json`));
+  // A disk that refuses writes: the undo cannot copy what is there, so nothing is replaced.
+  be.fail.add("*write");
+  assert.deepEqual(await B.undoRestore(store, { now: at + DAY }), { ok: false, error: "snapshot" });
+  be.fail.delete("*write");
+  assert.match(be.files.get("settings.json"), /"en"/, "nothing was put back");
+  assert.equal(await B.expireSnapshots(store, at + 31 * DAY), true);
+  assert.ok(![...be.files.keys()].some((k) => k.startsWith("backups/")), "the expired snapshot is gone");
+  assert.equal(B.latestSnapshot(store), null);
+  // A backup exported after a restore: the snapshot has done its job.
+  assert.equal((await B.importBackup(store, doc, { now: at + 40 * DAY })).ok, true);
+  assert.ok(B.latestSnapshot(store));
+  assert.equal(await B.dropSnapshots(store), true);
+  assert.equal(B.latestSnapshot(store), null);
+  assert.ok(![...be.files.keys()].some((k) => k.startsWith("backups/")));
 });
 
 /* ------------------------------------------------ the games index (lazy) */

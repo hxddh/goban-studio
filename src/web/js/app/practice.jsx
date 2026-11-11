@@ -1,23 +1,26 @@
 /**
- * Learn (docs/v9.md, "Two spaces"): its home is the path chosen for you
- * (learn/path.jsx), one row away the catalog (learn/catalog.jsx). Here are
- * the pages they open: lessons, problems, topics, drills of your own
- * mistakes, and the quiet end of today's session.
+ * Practice's pages (its home is the path, practice/path.jsx, with the catalog
+ * below it): lessons, problems, a topic as a grid of positions, drills of
+ * your own mistakes, and the quiet end of today's session.
+ *
+ * A problem says only its goal until it is solved or its answer is shown;
+ * its name ("Straight three", "Snapback") would be most of the answer.
  */
-import { useState } from "preact/hooks";
-import { BLACK } from "../rules.js";
+import { useEffect, useState } from "preact/hooks";
 import * as S from "../solver.js";
 import { t, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
-import { LearnHome, whyText } from "../learn/path.jsx";
-import { CatalogView } from "../learn/catalog.jsx";
+import { PracticeHome, whyText } from "../practice/path.jsx";
+import { CatalogView } from "../practice/catalog.jsx";
+import { PositionTile } from "../practice/tile.jsx";
+import { cleanFirst, comesBackIn, problemStatus } from "../practice/progress.js";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
 export function PracticeView() {
-  const v = state.learn.view;
+  const v = state.practice.view;
   if (v === "lesson") return <LessonView />;
   if (v === "problem") return <ProblemView />;
   if (v === "topic") return <TopicPage />;
@@ -25,13 +28,13 @@ export function PracticeView() {
   if (v === "dailyDone") return <SessionDone />;
   if (v === "capture") return <CaptureView />;
   if (v === "catalog") return <CatalogView />;
-  return <LearnHome />;
+  return <PracticeHome />;
 }
 
 /** The toolbar's subtitle inside today's session: "Today 2 of 6". */
-export function sessionSub() {
+function sessionSub() {
   const at = C.sessionPlace();
-  return at ? t("learn.session.of", [at.n, at.total]) : "";
+  return at ? t("practice.session.of", [at.n, at.total]) : "";
 }
 
 /** The panel's eyebrow inside today's session: why this item is in the path. */
@@ -40,23 +43,113 @@ function SessionWhy() {
   return it ? <span class="eyebrow">{whyText(it)}</span> : null;
 }
 
+/**
+ * Enter goes on, as the primary button does, once there is something to go
+ * on from (`ready`). Not while a button or a field has the key, nor a
+ * sheet or a menu; `boardOnly` leaves everything but the board to the
+ * shell's own Enter (lessons, app.jsx).
+ */
+function useEnterToContinue(ready, go, { boardOnly = false } = {}) {
+  useEffect(() => {
+    if (!ready) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Enter" || e.repeat || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || state.sheet || state.menu) return;
+      const el = e.target;
+      if (el?.closest?.("button, a, input, textarea, select, [role=menu]")) return;
+      if (boardOnly && !el?.closest?.("canvas")) return;
+      e.preventDefault();
+      go();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [ready, go, boardOnly]);
+}
+
+/* ------------------------------------------------------------ a topic */
+
+/** The quiet mark of a problem's state on its tile (nothing for one not tried). */
+function StatusMark({ status }) {
+  if (status === "tried") return <i class="tile-mark tried" />;
+  if (status === "solved") return <span class="tile-mark solved"><Icon name="check" size={14} /></span>;
+  if (status === "due") return <span class="tile-mark due"><Icon name="replay" size={14} /></span>;
+  if (status === "mastered") return <span class="tile-mark mastered"><Icon name="check" size={12} /></span>;
+  return null;
+}
+
+/** A problem's state in words, for the tile's label. */
+function statusText(status, rec) {
+  if (status === "solved" && cleanFirst(rec)) return t("practice.status.clean");
+  return t("practice.status." + status);
+}
+
+/**
+ * One grade's problems as a grid of positions. Arrow keys move through the
+ * grid (one tile takes Tab), Home and End go to its ends, Enter opens.
+ */
+function ProblemGrid({ items, numberOf }) {
+  const p = state.profile;
+  const now = Date.now();
+  const firstOpen = Math.max(0, items.findIndex((x) => !p.problems[x.id]?.solved));
+  const [at, setAt] = useState(firstOpen);
+  const onKeyDown = (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const tiles = [...e.currentTarget.querySelectorAll(".problem-card")];
+    const i = tiles.indexOf(document.activeElement);
+    if (i < 0) return;
+    // How many tiles the first row holds, as laid out now.
+    let cols = tiles.findIndex((el) => el.offsetTop !== tiles[0].offsetTop);
+    if (cols < 0) cols = tiles.length;
+    const to = { ArrowLeft: i - 1, ArrowRight: i + 1, ArrowUp: i - cols, ArrowDown: i + cols, Home: 0, End: tiles.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    if (to < 0 || to >= tiles.length) return;
+    setAt(to);
+    tiles[to].focus();
+  };
+  return (
+    <div class="problem-grid" role="group" onKeyDown={onKeyDown}>
+      {items.map((x, i) => {
+        const rec = p.problems[x.id];
+        const status = problemStatus(rec, now);
+        const n = numberOf(x);
+        const name = C.nameKnown(x.id) ? C.tx(x.title) : "";
+        const toMove = C.defToMove(x);
+        const label = [name ? t("common.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
+        return (
+          <button type="button" class={`problem-card ${status}`} data-status={status} tabIndex={i === at ? 0 : -1} aria-label={label} title={name || undefined} onFocus={() => setAt(i)} onClick={() => C.openProblem(x.id)}>
+            <PositionTile def={x} />
+            <span class="tile-foot">
+              {toMove != null && <Stone color={toMove} size={10} />}
+              <span class="problem-no">{n}</span>
+              {name && <span class="problem-title">{name}</span>}
+              <StatusMark status={status} />
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TopicPage() {
-  const topic = state.learn.topic;
-  const theme = state.learn.theme;
-  const shape = state.learn.shape;
+  const topic = state.practice.topic;
+  const theme = state.practice.theme;
+  const shape = state.practice.shape;
   const all = shape ? C.problemsOfShape(shape) : C.problemsOfTopic(topic);
   const themes = [...new Set(all.map((x) => x.theme).filter(Boolean))];
   const list = theme ? all.filter((x) => x.theme === theme) : all;
   const p = state.profile;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
-  const setTheme = (th) => update((s) => (s.learn = { ...s.learn, theme: th }));
+  const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
   // Grades fold away: the first grade with unsolved problems starts open.
   const firstOpen = byGrade.find(({ items }) => items.some((x) => !p.problems[x.id]?.solved))?.g ?? byGrade[0]?.g;
   const [openGrades, setOpenGrades] = useState([firstOpen]);
+  const numbers = new Map(all.map((x, i) => [x.id, i + 1]));
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
-    <div class="page">
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
+    <div class="page topic-page">
       <header class="page-head">
         <h1>{shape ? C.shapeName(shape) : t("topic." + topic)}</h1>
         <p class="muted">{shape ? t("practice.shapes") : t("topic." + topic + ".desc")}</p>
@@ -77,27 +170,14 @@ function TopicPage() {
         const solved = items.filter((x) => p.problems[x.id]?.solved).length;
         const isOpen = openGrades.includes(g);
         return (
-          <section class="section grade-section">
+          <section class="section grade-section" key={g}>
             <button type="button" class="section-title grade-head" aria-expanded={isOpen} onClick={() => setOpenGrades(isOpen ? openGrades.filter((x) => x !== g) : [...openGrades, g])}>
               <Icon name={isOpen ? "down" : "next"} size={14} />
               <GradeDots grade={g} /> {t("grade." + g)}
+              <span class="grade-band">{C.gradeBandText(g)}</span>
               <span class="fine">{t("practice.ofN", [solved, items.length])}</span>
             </button>
-            {isOpen && (
-              <div class="problem-grid">
-                {items.map((x) => {
-                  const pr = p.problems[x.id];
-                  const n = all.indexOf(x) + 1;
-                  return (
-                    <button type="button" class={`problem-card ${pr?.solved ? "done" : ""}`} onClick={() => C.openProblem(x.id)}>
-                      <span class="problem-no">{n}</span>
-                      <span class="problem-title">{C.tx(x.title)}</span>
-                      {pr?.solved ? <Icon name="check" size={14} /> : pr ? <i class="dot tried" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {isOpen && <ProblemGrid key={`${g}:${theme || ""}`} items={items} numberOf={(x) => numbers.get(x.id)} />}
           </section>
         );
       })}
@@ -107,11 +187,11 @@ function TopicPage() {
 }
 
 function MistakeView() {
-  const D = state.learn.mistake;
+  const D = state.practice.mistake;
   const m = D.m;
   const game = D.game;
   const node = game.current;
-  const daily = state.learn.daily;
+  const daily = state.practice.daily;
   const marks = [];
   if (D.status === "wrong" || D.status === "same") marks.push({ ...D.last, type: "cross", tone: "bad" });
   if (D.status === "revealed" || D.status === "right") for (const a of m.accept || [m.best]) marks.push({ ...a, type: "circle", tone: "good" });
@@ -128,11 +208,12 @@ function MistakeView() {
     hoverColor: m.color,
     interactive: D.status !== "right" && D.status !== "revealed",
   };
+  useEnterToContinue(D.status === "right" || D.status === "revealed", C.nextAfterMistake);
   const msg =
     D.status === "right" ? t("mistakes.right") : D.status === "same" ? t("mistakes.same") : D.status === "wrong" ? t("mistakes.wrong") : D.status === "revealed" ? t("mistakes.revealed") : t("mistakes.prompt", [formatLoss(m.loss)]);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("mistakes.title")} sub={sessionSub()} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("mistakes.title")} sub={sessionSub()} />
     <div class="workspace">
       <section class="stage" aria-label={t("mistakes.title")}>
         <Board model={model} onPlay={C.practicePlay} />
@@ -290,17 +371,20 @@ function ProblemControls({ P, onNext, nextLabel }) {
   );
 }
 
-/** What this problem is: difficulty, theme, and your record with it. */
-function ProblemFacts({ def, grade }) {
+/**
+ * What this problem is: how hard, your record with it and, once its name
+ * may be said (`named`), its theme.
+ */
+function ProblemFacts({ def, grade, named }) {
   const rec = state.profile.problems[def.id];
-  const record = !rec ? t("practice.recordNew") : rec.solved ? tn("practice.recordSolved", rec.tries) : tn("practice.recordTried", rec.tries);
+  const record = !rec ? t("practice.recordNew") : cleanFirst(rec) && rec.tries === 1 ? t("practice.recordClean") : rec.solved ? tn("practice.recordSolved", rec.tries) : tn("practice.recordTried", rec.tries);
   return (
     <dl class="facts">
       <dt>{t("practice.difficulty")}</dt>
       <dd>
-        <GradeDots grade={grade} /> {t("grade." + grade)}
+        <GradeDots grade={grade} /> {C.gradeBandText(grade)}
       </dd>
-      {def.theme && (
+      {named && def.theme && (
         <>
           <dt>{t("practice.themes")}</dt>
           <dd>
@@ -316,20 +400,40 @@ function ProblemFacts({ def, grade }) {
   );
 }
 
+/**
+ * Under the verdict: the problem's name, once it is solved or its answer
+ * shown; after a miss, when it comes back ("back in about 3 days"; not in
+ * the placement quiz, which is not a review).
+ */
+function ProblemResult({ P, placing }) {
+  const named = C.problemNamed(P);
+  const back = !placing && P.missed ? comesBackIn(state.profile.problems[P.def.id], Date.now()) : null;
+  if (!named && back == null) return null;
+  return (
+    <div class="result-lines">
+      {named && <p class="result-name">{t("common.labelValue", [t("practice.thisProblem"), C.tx(P.def.title)])}</p>}
+      {back != null && <p class="fine come-back">{back === 1 ? t("practice.backTomorrow") : t("practice.backInDays", [back])}</p>}
+    </div>
+  );
+}
+
 function ProblemView() {
-  const pr = state.learn;
+  const pr = state.practice;
   const P = pr.problem;
   const def = P.def;
   const placing = C.placementPlace();
   const daily = pr.daily || placing;
-  const list = state.learn.theme ? C.problemsOfTheme(state.learn.theme) : C.problemsOfTopic(def.topic);
+  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
-  const crumbs = [{ label: t("nav.learn"), onClick: C.learnHome }];
+  const named = C.problemNamed(P);
+  const done = P.status === "won" || !!P.answer;
+  useEnterToContinue(done, C.nextProblem);
+  const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
   if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
-    <Toolbar crumbs={crumbs} title={C.tx(def.title)} sub={placing ? t("placement.of", [placing.n, placing.total]) : daily ? sessionSub() : t("practice.ofN", [n, list.length])} />
+    <Toolbar crumbs={crumbs} title={named ? C.tx(def.title) : t("practice.problem")} sub={placing ? t("placement.of", [placing.n, placing.total]) : daily ? sessionSub() : t("practice.ofN", [n, list.length])} />
     <div class="workspace">
       <section class="stage" aria-label={t("practice.problem")}>
         <Board model={puzzleModel(P)} onPlay={C.practicePlay} />
@@ -337,18 +441,18 @@ function ProblemView() {
       <aside class="panel">
         <div class="panel-title">
           {pr.daily && <SessionWhy />}
-          <h1>{C.tx(def.title)}</h1>
+          <h1 class="goal">
+            <Stone color={P.pz.userColor} size={14} /> {C.goalText(P.pz)}
+          </h1>
         </div>
-        <p class="goal">
-          <Stone color={P.pz.userColor} size={14} /> {C.goalText(P.pz)}
-        </p>
         {P.hintAt || P.used ? <p class="note">{C.tx(def.hint)}</p> : null}
         {def.shown && <p class="fine">{t("practice.turned")}</p>}
         {P.pz.counting && P.pz.ask === "value" && <ValueChoices P={P} />}
         <ProblemFeedback P={P} />
+        <ProblemResult P={P} placing={!!placing} />
         {P.ghost && <p class="fine">{t("play.confirmHint")}</p>}
         <ProblemControls P={P} onNext={C.nextProblem} nextLabel={daily ? t("common.continue") : t("practice.nextProblem")} />
-        <ProblemFacts def={def} grade={grade} />
+        <ProblemFacts def={def} grade={grade} named={named} />
         {!daily && (
           <footer class="panel-foot">
             <button type="button" class="link" onClick={C.prevProblem} disabled={n <= 1}>
@@ -367,10 +471,13 @@ function ProblemView() {
 }
 
 function LessonView() {
-  const L = state.learn.lesson;
+  const L = state.practice.lesson;
+  // Lesson complete, with its bridge into a game (beginner.jsx).
+  return L.finished ? <LessonDone L={L} /> : <LessonStep L={L} />;
+}
+
+function LessonStep({ L }) {
   const steps = L.lesson.steps;
-  // v8: lesson complete, with its bridge into a game (beginner.jsx).
-  if (L.finished) return <LessonDone L={L} />;
   const cur = L.cur;
   const step = cur.step;
   let model = null;
@@ -406,9 +513,12 @@ function LessonView() {
   }
   const stepDone = cur.kind === "read" || (cur.kind === "place" && cur.result === "right") || (cur.kind === "problem" && (cur.status === "won" || cur.answer));
   const last = L.index === steps.length - 1;
+  // Enter on the board goes on too (the shell handles Enter anywhere else).
+  useEnterToContinue(stepDone, C.lessonContinue, { boardOnly: true });
+  const goal = C.stepGoalText(cur);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} sub={sessionSub() || C.tx(L.unit.title)} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} sub={sessionSub() || C.tx(L.unit.title)} />
     <div class="workspace">
       <section class="stage" aria-label={C.tx(L.lesson.title)}>
         {model ? <Board model={model} onPlay={onPlay} /> : <div class="board-placeholder" />}
@@ -424,14 +534,9 @@ function LessonView() {
           ))}
         </div>
         <p class="lesson-text">{C.tx(step.text)}</p>
-        {cur.kind === "problem" && (
+        {goal && (
           <p class="goal">
-            <Stone color={cur.pz.userColor} size={14} /> {C.goalText(cur.pz)}
-          </p>
-        )}
-        {cur.kind === "place" && (
-          <p class="goal">
-            <Stone color={cur.toMove === BLACK ? 1 : -1} size={14} /> {t("goal.place", [t(cur.toMove === BLACK ? "common.black" : "common.white")])}
+            <Stone color={cur.kind === "problem" ? cur.pz.userColor : cur.toMove} size={14} /> {goal}
           </p>
         )}
         {cur.kind === "problem" && <ProblemFeedback P={cur} success={step.success ? C.tx(step.success) : null} />}
@@ -475,17 +580,17 @@ function LessonView() {
 function SessionDone() {
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("learn.path.doneToday")} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.path.doneToday")} />
     <div class="page center-page">
       <section class="card celebrate session-done">
-        <h1>{t("learn.path.doneToday")}</h1>
-        <p class="muted">{t("learn.path.doneLine")}</p>
+        <h1>{t("practice.path.doneToday")}</h1>
+        <p class="muted">{t("practice.path.doneLine")}</p>
         <div class="actions center wrap">
-          <Button kind="primary" onClick={C.learnHome}>
-            {t("learn.backHome")}
+          <Button kind="primary" onClick={C.practiceHome}>
+            {t("practice.backHome")}
           </Button>
           <Button kind="ghost" onClick={C.openCatalog}>
-            {t("learn.catalog")}
+            {t("practice.catalog")}
           </Button>
         </div>
       </section>

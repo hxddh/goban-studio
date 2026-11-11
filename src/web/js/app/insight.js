@@ -105,7 +105,7 @@ export function lossSource(signMapBefore, ownBefore, ownAfter, mover) {
 }
 
 /**
- * v4: where a mistake lost its points, from KataGo's ownership before the
+ * Where a mistake lost its points, from KataGo's ownership before the
  * move (what best play would keep: the root ownership of the position the
  * mover faced) and after it (the position as played, best play onwards).
  * Both arrays are Black's point of view, row-major.
@@ -255,7 +255,7 @@ export function areaName(x, y, size) {
 }
 
 /** Is (x, y) in a small empty area enclosed by `color` stones and the edge (an eye space)? */
-export function inEyeSpace(signMap, x, y, color, limit = 7) {
+function inEyeSpace(signMap, x, y, color, limit = 7) {
   const size = signMap.length;
   if (signMap[y]?.[x] !== 0) return false;
   const seen = new Set([y * size + x]);
@@ -285,12 +285,12 @@ export function inEyeSpace(signMap, x, y, color, limit = 7) {
  * when the mistake was strategic (no tactical pattern). Heuristics, named
  * honestly in the UI as "looks like".
  *
- * v4: given `attribution` (attributeLoss) and `facts` (story.simulate of the
+ * Given `attribution` (attributeLoss) and `facts` (story.simulate of the
  * punishing line from `signMapAfter`, the board after the mistake, with the
  * opponent's reply first), the theme is read off that line: a real ladder,
  * snapback or double atari, a lost race (shared or outside liberties), a
  * ko, a placement inside the eye space, a cut. Without them it falls back to
- * the v3 heuristics.
+ * plain heuristics (distance to the last stones, liberties).
  */
 export function classifyMistake({ signMapBefore, signMapAfter = null, move, pv = [], source, mover, attribution = null, facts = null }) {
   if (attribution && facts) {

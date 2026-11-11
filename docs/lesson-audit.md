@@ -13,6 +13,22 @@ build, the stronger network pinned in `src/models.zig`, both SHA-256
 checked) and commits the result back: `docs/lesson-audit.json` (every value)
 and the generated section at the end of this file.
 
+## Since the latest run
+
+The generated section at the end of this file is the latest KataGo run.
+The course has changed since, and **the audit has not been run again**:
+
+- Seven units were added (ko fighting, judging the position, area
+  scoring, the rebuilt endgame, openings, joseki, handicap Go): "v13
+  units waiting for a run" below.
+- Eighteen over-long steps were split or shortened, so the course has 377
+  steps and the step numbers after a split differ from the ones in the
+  generated section (`scripts/tests/course-steps.mjs` keeps a step under
+  170 Chinese characters).
+- The Chinese opening lesson was corrected to Q16–Q3–R9 (high: Q9). It
+  waits for a rebuild of the opening book with KataGo and for a strong
+  player's look; the entry below names the four steps.
+
 ## Method
 
 - **Place steps.** Every accepted point, KataGo's best move on the whole
@@ -160,12 +176,22 @@ generated section below does not list them yet. Before KataGo sees them:
 - Every opening and joseki step whose position is in the opening book
   (`content/book.json`, KataGo 1.18.1, 2000 visits) accepts only moves the
   book rates within `JOSEKI_LOSS` (1.5 points) of its best;
-  `scripts/tests/core-course-v13.mjs` enforces this. The worst accepted
-  book move is 0.8 points (the low Chinese opening's side stone).
+  `scripts/tests/core-course-advanced.mjs` enforces this.
+- **The Chinese opening has no evaluation yet.** The lesson
+  (`adv-open-chinese`) and the book's table (`scripts/make-book.mjs`) used
+  Q16–R4–R10 (high: Q10) until it was corrected to the real opening,
+  Q16–Q3–R9 (high: Q9). The shipped book was built with the old line, so it
+  has the position before the side stone but no evaluation of R9 or Q9
+  (KataGo's own choices there are the enclosures Q5, R6 and Q6), and the
+  two wrong labels were removed from it. Waiting for a book rebuild and a
+  run: `adv-open-chinese#1` and `#2` (the side stone), the approach
+  against it from the bottom (`adv-open-direction#2`: O3 or O4) and the
+  3-3 block toward it (`adv-joseki-choose#2`). A strong player should
+  look at these four steps.
 - Not covered by the book, so the next run is their first check: the
   urgent-point lesson (`adv-open-urgent`, whose life-and-death part the
   solver proves), the small knight's enclosure (`adv-joseki-knight#1`),
-  the block toward the Chinese opening (`adv-joseki-choose#2`), the 3-4
+  the 3-4
   approach F16 in `adv-open-direction#1`, the three-space pincers in
   `adv-joseki-choose#1` and `adv-handicap-stones#1`, and the nine-stone
   steps of `adv-handicap-simple` and `adv-handicap-white#1`.

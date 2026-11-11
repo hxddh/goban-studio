@@ -1,9 +1,9 @@
 /**
- * v6 accessibility: the words a screen reader says about the board.
+ * Accessibility: the words a screen reader says about the board.
  *
  * Pure text builders over a sign map (board[y][x]: 1 black, -1 white, 0
  * empty) in the interface language. No DOM, no app state, so the Node tests
- * can check every sentence (scripts/test.mjs, "v6 a11y: …"). Coordinates
+ * can check every sentence (scripts/tests/core-a11y.mjs). Coordinates
  * follow the app's convention: letters without I, rows counted from the
  * bottom (A19 is the top-left corner of a 19×19 board).
  *
@@ -201,7 +201,7 @@ export function boardKeyRows() {
   ];
 }
 
-/** App-wide keys added in v6 (menus and radio groups, text size). */
+/** App-wide keys (menus and radio groups, text size). */
 export function a11yKeyRows(mod = "Ctrl+") {
   return [
     ["↑ ↓ ← →", t("a11y.key.menus")],

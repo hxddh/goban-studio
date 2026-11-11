@@ -16,6 +16,7 @@
 //! `max_file_bytes`.
 
 const std = @import("std");
+const json = @import("json.zig");
 const builtin = @import("builtin");
 
 /// Largest file the store keeps (a game with its full analysis is well under).
@@ -299,9 +300,7 @@ pub const Store = struct {
             const is_dir = entry.kind == .directory or (entry.kind == .unknown and !is_file);
             if (is_file and validKey(key)) {
                 if (w.n > 1) try w.put(",");
-                try w.put("\"");
-                try w.put(key);
-                try w.put("\"");
+                try w.putString(key);
             } else if (is_dir and depth + 1 < max_depth and validPath(key)) {
                 const child = dir.openDir(self.io, entry.name, .{ .iterate = true }) catch continue;
                 defer child.close(self.io);
@@ -316,9 +315,15 @@ const Out = struct {
     n: usize = 0,
 
     fn put(self: *Out, text: []const u8) Error!void {
-        if (self.n + text.len > self.buf.len) return error.TooMany;
-        @memcpy(self.buf[self.n..][0..text.len], text);
-        self.n += text.len;
+        if (!json.append(self.buf, &self.n, text)) return error.TooMany;
+    }
+
+    fn putString(self: *Out, text: []const u8) Error!void {
+        const mark = self.n;
+        if (!json.appendString(self.buf, &self.n, text)) {
+            self.n = mark;
+            return error.TooMany;
+        }
     }
 };
 

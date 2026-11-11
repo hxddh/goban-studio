@@ -1,8 +1,8 @@
 /**
- * Update checks and installs for the interface (v4, v5). See ../update.js
+ * Update checks and installs for the interface. See ../update.js
  * for the rules: one request to GitHub, only when the player asks or opted
- * in to the weekly check (setting `autoUpdateCheck`, default false); in v5
- * the player may then download and install the new version.
+ * in to the weekly check (setting `autoUpdateCheck`, default false); the
+ * player may then download and install the new version.
  *
  * State for the views: `state.updateCheck` is null until a check has run,
  * then one of
@@ -67,7 +67,7 @@ export async function checkForUpdates({ quiet = false } = {}) {
     if (result.status === "available") toast(t("update.available", [result.latest]), "info", 6000);
     else if (result.status === "current") toast(t("update.current", [result.current]), "info");
     else if (result.status === "unavailable") toast(t("update.unavailable"), "warn");
-    else toast(t("update.error"), "warn");
+    else toast(t("update.error"), "error");
   }
   return result;
 }
@@ -90,7 +90,7 @@ export function openReleasePage() {
 }
 
 /**
- * v8: which download the interface is waiting for. A download cancelled and
+ * Which download the interface is waiting for. A download cancelled and
  * started again answers twice; only the newest answer counts.
  */
 let downloadGen = 0;
@@ -119,11 +119,11 @@ export async function downloadUpdate() {
   if (gen !== downloadGen || state.updateCheck?.status !== "downloading") return state.updateCheck;
   if (result.ok) {
     update({ updateCheck: { ...base, status: "ready" } });
-    toast(t("update.ready", [u.latest]), "info", 6000);
+    toast(t("update.ready", [u.latest]), "success", 6000);
   } else {
     const install = U.INSTALL_BLOCKED.includes(result.error) ? { can: false, blocked: result.error } : base.install;
     update({ updateCheck: { ...base, install, status: "available", installError: result.error } });
-    if (result.error !== "Cancelled") toast(t(U.installMessageKey(result.error)), "warn", 6000);
+    if (result.error !== "Cancelled") toast(t(U.installMessageKey(result.error)), "error", 6000);
   }
   return state.updateCheck;
 }
@@ -148,18 +148,18 @@ export async function applyUpdate() {
   if (result.ok) return state.updateCheck; // the app is quitting
   const install = U.INSTALL_BLOCKED.includes(result.error) ? { can: false, blocked: result.error } : u.install;
   update({ updateCheck: { ...u, install, status: result.error === "NotReady" ? "available" : "ready", installError: result.error } });
-  toast(t(U.installMessageKey(result.error)), "warn", 6000);
+  toast(t(U.installMessageKey(result.error)), "error", 6000);
   return state.updateCheck;
 }
 
 /**
- * Start-up (v5): say how the last install went, and pick up a download
+ * Start-up: say how the last install went, and pick up a download
  * that finished before the page was reloaded. No network request.
  */
 export async function restoreUpdateState() {
   const { status: s } = await U.installInfo({}, { probe: false });
   if (s.phase === "unavailable") return null;
-  if (s.justUpdated) toast(t("update.installed", [APP_VERSION]), "info", 6000);
+  if (s.justUpdated) toast(t("update.installed", [APP_VERSION]), "success", 6000);
   else if (s.installFailed) toast(t("update.rolledBack"), "warn", 8000);
   if (!state.updateCheck && s.tag && (s.phase === "ready" || U.installStatusOf(s.phase) === "downloading")) {
     const base = { latest: s.tag, current: APP_VERSION, url: "", notes: "", publishedAt: "", install: { can: s.canInstall, blocked: s.blocked } };

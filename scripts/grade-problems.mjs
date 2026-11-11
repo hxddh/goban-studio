@@ -5,11 +5,11 @@
  *   node scripts/grade-problems.mjs          write the grades file
  *   node scripts/grade-problems.mjs --print  print the grade histogram only
  *
- * v13: the grade estimates how hard a problem is for a person, not how
+ * The grade estimates how hard a problem is for a person, not how
  * much work it is for the solver (docs/problems-audit.md, "v13 grading").
- * Until v12 the grade was the quintile of the solver's search effort, so a
- * plain seven-move ladder (huge search, one obvious move after another)
- * came out at grade 5 and a one-move capture at grade 3. The score is now
+ * By the solver's search effort a plain seven-move ladder (huge search, one
+ * obvious move after another) would come out at grade 5 and a one-move
+ * capture at grade 3. The score is
  *
  *   base(theme)                          the idea itself (capture < escape <
  *                                        snapback/net < eye shapes < races,

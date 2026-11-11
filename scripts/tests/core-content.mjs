@@ -174,7 +174,7 @@ export default async function ({ test, assert, root }) {
     assert.match(win, /for part in \("course", "problems", "classics"\):/, "the Windows ZIP is checked too");
   });
 
-  await test("core content: Learn's openers wait for the lesson or problem they open", async () => {
+  await test("core content: Practice's openers wait for the lesson or problem they open", async () => {
     const { index, bodies } = split();
     const { mod: A } = await bundleLazy(
       root,
@@ -202,19 +202,19 @@ export default async function ({ test, assert, root }) {
       assert.ok(Practice.nextLesson()?.lesson.id);
       const id = Practice.COURSE[0].lessons[0].id;
       const opening = Practice.openLesson(id);
-      assert.notEqual(state.learn?.view, "lesson", "not before its steps are here");
+      assert.notEqual(state.practice?.view, "lesson", "not before its steps are here");
       gate.course();
       await opening;
-      assert.equal(state.learn.view, "lesson");
-      assert.equal(state.learn.lesson.lesson.id, id);
+      assert.equal(state.practice.view, "lesson");
+      assert.equal(state.practice.lesson.lesson.id, id);
       const pid = Practice.PROBLEMS[0].id;
       const pending = Practice.openProblem(pid);
-      assert.equal(state.learn.view, "lesson");
+      assert.equal(state.practice.view, "lesson");
       gate.problems();
       await pending;
-      assert.equal(state.learn.view, "problem");
-      assert.equal(state.learn.problem.def.id, pid);
-      assert.ok(state.learn.problem.pz, "the solver has the diagram");
+      assert.equal(state.practice.view, "problem");
+      assert.equal(state.practice.problem.def.id, pid);
+      assert.ok(state.practice.problem.pz, "the solver has the diagram");
       assert.ok(Content.loaded("course") && Content.loaded("problems") && !Content.loaded("classics"));
     } finally {
       delete globalThis.fetch;

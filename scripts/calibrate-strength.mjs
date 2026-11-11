@@ -16,8 +16,8 @@
  *          node scripts/calibrate-strength.mjs play ... --size 19 --pairs "L:10k-L:5k,L:5k-H:rank_5k" \
  *            --human-model b18c384nbt-humanv0.bin.gz
  *   fit    node scripts/calibrate-strength.mjs fit results.jsonl [more.jsonl …] [--size 19] [--anchor rank_10k] [--boot 1000]
- *            [--fixed]   (v6: hold the L: ladder at its measured θ; needs --size 9, 19 or, since v8, 13)
- *            [--fixed impls]  (v11: hold every implementation of the current ladder, opponents.js IMPLS)
+ *            [--fixed]   (hold the L: ladder at its measured θ; needs --size 9, 19 or, 13)
+ *            [--fixed impls]  (hold every implementation of the current ladder, opponents.js IMPLS)
  *            [--alias "C:b100=L:30k,..."] [--with-hh] [--only A,B,...] [--markdown]
  *
  * Players:
@@ -25,17 +25,17 @@
  *   C:<name>      a candidate level from --candidates FILE (JSON: name → strength fields)
  *   H:<profile>   KataGo's human SL model (raw policy, 1 visit) imitating a
  *                 human rank profile such as rank_10k — the absolute anchor
- *   HL:<id>       v5: a level's human-style opponent, exactly as shipped
+ *   HL:<id>       a level's human-style opponent, exactly as shipped
  *                 (STRENGTHS[].human, engine/model/human.cfg, the style
  *                 parameters of src/engine.zig, engine.js
  *                 humanMoveFromAnalysis); needs --human-model
- *   LS:<id>       v5: a level on the optional stronger network
+ *   LS:<id>       a level on the optional stronger network
  *                 (STRENGTHS[].strong); needs --strong-model
- *   CH:<name>     v7: a candidate human-style level from --candidates FILE
+ *   CH:<name>     a candidate human-style level from --candidates FILE
  *                 (an entry with a `human` object: profile, style, visits,
  *                 blunder), played exactly like HL:; needs --human-model
  *
- * v7, for parallel runners (.github/workflows/calibrate.yml):
+ * For parallel runners (.github/workflows/calibrate.yml):
  *   --shard I/N   play only every N-th game of the schedule, starting at I
  *                 (0-based), so N machines split one schedule between them
  *   --deadline M  start no new game after M minutes (finished games are kept)
@@ -46,12 +46,12 @@
  * levels apart), "anchors" (each H: profile in --anchors against the two
  * ladder levels nearest its nominal rank), or explicit "A-B" lists.
  *
- * v11, handicap games: a spec ending in "@hN" (e.g. "L:10k-L:5k@h2", or
+ * Handicap games: a spec ending in "@hN" (e.g. "L:10k-L:5k@h2", or
  * "adjacent@h2") plays N handicap stones for A, the first player: A always
  * takes Black, the stones stand on the app's handicap points (rules.js
  * handicapPoints, reaching KataGo as `play B …` before White's first move,
  * as the native host sends them) and komi is the app's handicap komi
- * (0.5 under Japanese rules, also for one stone; play-ctl.js). v13: "@h1"
+ * (0.5 under Japanese rules, also for one stone; play-ctl.js). "@h1"
  * places no stone, as the app's Game does for a handicap of one: Black
  * simply moves first at that komi (games measured before v13 had Black's
  * first stone on a handicap point instead, the same advantage). `fit` then
@@ -240,7 +240,7 @@ function katagoArgv(opt, human, variant = "") {
   const logs = path.join(os.tmpdir(), "goban-calibrate-logs");
   fs.mkdirSync(logs, { recursive: true });
   const common = `logDir=${logs},homeDataDir=${logs},logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false,numSearchThreads=${opt.threads}`;
-  // v5: the app's own human process (engine.zig Slot.human) and stronger network.
+  // The app's own human process (engine.zig Slot.human) and stronger network.
   if (variant === "humanLadder") {
     return [opt.katago, "gtp", "-model", opt.model, "-human-model", opt.humanModel, "-config", path.join(ROOT, "engine/model/human.cfg"), "-override-config", common];
   }
@@ -282,12 +282,12 @@ async function setup(proc, size, komi, stones = []) {
   await proc.send("clear_board");
   await proc.send(`komi ${komi}`);
   await proc.send("kata-set-rules japanese");
-  // v11: handicap stones as the app sends root stones (katago.js setupStones).
+  // Handicap stones as the app sends root stones (katago.js setupStones).
   for (const s of stones) await proc.send(`play ${s}`);
 }
 
 /**
- * v11: the root stones of a game as GTP plays, in the order the app sends
+ * The root stones of a game as GTP plays, in the order the app sends
  * them (katago.js setupStones: row by row; a handicap root is black only).
  */
 export function rootStones(game) {
@@ -297,7 +297,7 @@ export function rootStones(game) {
   return out;
 }
 
-/** v11: komi of a game with `handicap` stones, as play-ctl.js newGame sets it (Japanese rules). */
+/** Komi of a game with `handicap` stones, as play-ctl.js newGame sets it (Japanese rules). */
 export const handicapKomi = (handicap, komi = 6.5) => (handicap > 0 ? defaultKomi("japanese", Math.max(2, handicap)) : komi);
 
 /** One ladder move: the app's search, the app's picker. */
@@ -317,7 +317,7 @@ async function ladderMove(proc, game, strength, rnd) {
   return { move: move || { pass: true }, analysis, fallback: !move };
 }
 
-/** v5: one human-style move, as the app plays it (engine.js decide, mode "human"). */
+/** One human-style move, as the app plays it (engine.js decide, mode "human"). */
 async function humanLadderMove(proc, game, strength, rnd) {
   const req = humanRequest(strength.human);
   const styles = (humanLadderMove.styles ||= humanStyleParams());
@@ -425,7 +425,7 @@ async function playGame(task, procs, opt) {
 
 /* ------------------------------------------------------------ schedule */
 
-/** v11: "spec@hN" → [spec, N]; N is 0 without a suffix. */
+/** "spec@hN" → [spec, N]; N is 0 without a suffix. */
 export function parseHandicap(part) {
   const m = /^(.*)@h(\d+)$/.exec(part);
   if (!m) return [part, 0];
@@ -487,7 +487,7 @@ export function parseShard(text) {
 
 /**
  * The games of a schedule, round-robin over pairs (so a partial run is
- * still balanced), colours alternating by game number. v7: with `shard`,
+ * still balanced), colours alternating by game number. With `shard`,
  * only every count-th game of the full schedule, so parallel machines
  * play disjoint slices whose union is the whole schedule; games whose key
  * is in `done` are left out after slicing (a rerun keeps the same slices).
@@ -500,7 +500,7 @@ export function planTasks(opt, candidates = {}, done = new Set()) {
     for (const [a, b, handicap] of pairs) {
       const i = n++;
       if (opt.shard && i % opt.shard.count !== opt.shard.index) continue;
-      // v11: a handicap game has the app's handicap komi and "|hN" in its key;
+      // A handicap game has the app's handicap komi and "|hN" in its key;
       // the keys of even games are unchanged.
       const komi = handicapKomi(handicap, opt.komi);
       const key = `${opt.size}|${komi}|${a}|${b}|${g}${handicap ? "|h" + handicap : ""}${opt.tag ? "|" + opt.tag : ""}`;
@@ -585,11 +585,11 @@ function solve(A, b) {
  * (σ = `sigma` nats around the mean) so a clean sweep stays finite.
  * Returns θ in natural-log units, centred so that θ[ref] = 0.
  *
- * v6: `fixed` (player → θ) holds some players at known strengths (the v4
+ * `fixed` (player → θ) holds some players at known strengths (the v4
  * ladder) and fits only the others, in that frame; the prior is then
  * centred on the fixed players' mean and no recentring is done.
  *
- * v11: a game with `handicap` N ≥ 1 (N stones for Black at the app's
+ * A game with `handicap` N ≥ 1 (N stones for Black at the app's
  * handicap komi) gets its own first-move term γ_N in place of η:
  *   logit P(Black wins) = θ_B − θ_W + γ_N.
  * γ_N is Black's whole advantage from the stones and komi, in nats of the
@@ -647,7 +647,7 @@ export function fitBT(games, players, { ref = players[0], sigma = 6, fixed = nul
       H.map((r) => r.map((v) => -v)),
       g,
     );
-    // v6: damped (a held ladder can start the others far from the optimum).
+    // Damped (a held ladder can start the others far from the optimum).
     x = x.map((v, i) => v + (held.length ? Math.max(-2, Math.min(2, step[i])) : step[i]));
     if (Math.max(...step.map(Math.abs)) < 1e-9) break;
   }
@@ -658,7 +658,7 @@ export function fitBT(games, players, { ref = players[0], sigma = 6, fixed = nul
 }
 
 /**
- * v11: the strength of `t` (θ on a board of `size`) after giving `ranks`
+ * The strength of `t` (θ on a board of `size`) after giving `ranks`
  * 19×19 ranks of handicap, exactly as the app discounts an opponent that
  * gives stones (model/ladder.js levelTheta, implOpponent): carried to
  * 19×19, lowered by 100 GoR a rank, carried back.
@@ -667,13 +667,13 @@ export function discounted(t, ranks, size) {
   return onBoard(gorToTheta(thetaToGoR(fromBoard(t, size)) - ranks * 100), size);
 }
 
-/** v11: the 19×19 ranks that a shift of `nats` (θ on `size`) below `t` is worth. */
+/** The 19×19 ranks that a shift of `nats` (θ on `size`) below `t` is worth. */
 export function natsToRanks(t, nats, size) {
   return (thetaToGoR(fromBoard(t, size)) - thetaToGoR(fromBoard(t - nats, size))) / 100;
 }
 
 /**
- * v11: the value of one handicap stone in 19×19 ranks, as the app uses it
+ * The value of one handicap stone in 19×19 ranks, as the app uses it
  * (ladder.js RANKS_PER_STONE, engine.js suggestHandicap, player.js
  * handicapFor), fitted by maximum likelihood to handicap games between
  * players of known θ (`theta`, on the board's own scale):
@@ -768,13 +768,13 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
   const fit = fitBT(games, players, { ref, fixed });
   // Report weakest to strongest (pairs read "weaker vs stronger").
   players.sort((a, b) => fit.theta[a] - fit.theta[b]);
-  // v6: with the ladder held fixed, its known θ → GoR map replaces the anchors.
+  // With the ladder held fixed, its known θ → GoR map replaces the anchors.
   const mapOf = (theta) => (gorMap ? { map: gorMap, points: [] } : anchorMap(theta, anchors));
   const am = mapOf(fit.theta);
   const rnd = mulberry32(seed);
   const samples = Object.fromEntries(players.map((p) => [p, []]));
   const gorSamples = Object.fromEntries(players.map((p) => [p, []]));
-  // v11: handicap terms and the value of a stone (needs the board size).
+  // Handicap terms and the value of a stone (needs the board size).
   const hs = Object.keys(fit.gamma).map(Number);
   const gammaSamples = Object.fromEntries(hs.map((h) => [h, []]));
   const sz = size ?? games[0]?.size;
@@ -818,7 +818,7 @@ export function analyse(games, { boot = 1000, seed = 1, anchors: use = null, fix
       gorHi: gs.length ? quantile(gs, 0.975) : null,
     };
   });
-  // Pairwise results (v11: a handicap pair is "receiver (Black) vs giver"
+  // Pairwise results (a handicap pair is "receiver (Black) vs giver"
   // and is kept apart from the even games of the same players).
   const pairs = new Map();
   for (const g of games) {
@@ -889,7 +889,7 @@ function report(result, { markdown }) {
   lines.push("");
   lines.push(`First-move term η = ${result.eta.toFixed(2)} nats (positive favours Black at this komi).`);
   if (result.handicap?.length) {
-    // v11: Black's advantage at each stone count, and in 19×19 ranks at the
+    // Black's advantage at each stone count, and in 19×19 ranks at the
     // receivers' strengths (the shift of the giver that is worth γ_N).
     lines.push("");
     const receivers = [...new Set(result.pairs.filter((p) => p.h).map((p) => p.a))];
@@ -923,7 +923,7 @@ function report(result, { markdown }) {
   return lines.join("\n");
 }
 
-/* ------------------------------------------------------ v7: CI plans */
+/* ------------------------------------------------------ CI plans */
 
 /**
  * Merge JSONL game files: every line of `inputs` whose key is not already
@@ -971,7 +971,7 @@ export function planMatrix(plan, { pending = null } = {}) {
     if (!/^[\w.-]+$/.test(r.id || "")) throw new Error(`plan: bad run id ${r.id}`);
     if (![9, 13, 19].includes(r.size)) throw new Error(`plan ${r.id}: size must be 9, 13 or 19`);
     if (!(r.games > 0) || !r.pairs) throw new Error(`plan ${r.id}: games and pairs are required`);
-    // v11: a run whose games are all in its results file gets no jobs.
+    // A run whose games are all in its results file gets no jobs.
     if (pending && !pending(r)) continue;
     const shards = r.shards || 1;
     for (let i = 0; i < shards; i++) include.push({ run: r.id, shard: `${i}/${shards}` });
@@ -983,7 +983,7 @@ export function planMatrix(plan, { pending = null } = {}) {
   return { include };
 }
 
-/** v11: player → measured θ on `size` for every implementation of the current ladder (opponents.js IMPLS). */
+/** Player → measured θ on `size` for every implementation of the current ladder (opponents.js IMPLS). */
 export function fixedImpls(size) {
   const out = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
   for (const i of IMPLS) if (Number.isFinite(i.theta?.[size])) out[i.id] = i.theta[size];
@@ -991,7 +991,7 @@ export function fixedImpls(size) {
 }
 
 /**
- * v11: games of a plan run not yet in `docs/calibration/results/<id>.jsonl`
+ * Games of a plan run not yet in `docs/calibration/results/<id>.jsonl`
  * (relative to `root`), as `play` would schedule them.
  */
 export function pendingGames(run, root = ROOT) {
@@ -1040,10 +1040,10 @@ async function main() {
     fs.appendFileSync(out, add.map((g) => JSON.stringify(g) + "\n").join(""));
     console.error(`${add.length} new games → ${out} (${readGames(out).length} in all)`);
   } else if (cmd === "matrix") {
-    // v11: runs already complete in docs/calibration/results/ get no jobs.
+    // Runs already complete in docs/calibration/results/ get no jobs.
     console.log(JSON.stringify(planMatrix(JSON.parse(fs.readFileSync(a._[1] || "docs/calibration/plan.json", "utf8")), { pending: (r) => pendingGames(r) > 0 })));
   } else if (cmd === "run-args") {
-    // v7 CI: the play arguments of one plan run, one per line.
+    // CI: the play arguments of one plan run, one per line.
     const plan = JSON.parse(fs.readFileSync(a._[1], "utf8"));
     const r = (plan.runs || []).find((x) => x.id === a._[2]);
     if (!r) throw new Error(`no run ${a._[2]} in ${a._[1]}`);
@@ -1052,7 +1052,7 @@ async function main() {
     if (r.tag) out.push("--tag", r.tag);
     console.log(out.join("\n"));
   } else if (cmd === "fit") {
-    // v7: several files are pooled (e.g. docs/calibration/results/*.jsonl).
+    // Several files are pooled (e.g. docs/calibration/results/*.jsonl).
     const files = a._.length > 1 ? a._.slice(1) : ["calibration.jsonl"];
     let games = files.flatMap((file) =>
       fs
@@ -1075,17 +1075,17 @@ async function main() {
       const keep = new Set(String(a.only).split(","));
       games = games.filter((g) => keep.has(g.black) && keep.has(g.white));
     }
-    // v6: --fixed holds the shipped ladder (L:) at its v4 measurement
+    // --fixed holds the shipped ladder (L:) at its v4 measurement
     // (opponents.js MEASURED.standard, for --size 9 or 19) and places only
     // the other players; on 19×19 their GoR comes from the v4 anchor map.
     const anchors = a.anchor ? String(a.anchor).split(",") : null;
     const opt = { boot: Number(a.boot || 1000), anchors, size: a.size ? Number(a.size) : null };
     if (a.fixed) {
       const size = Number(a.size);
-      // v8: 13×13 too, once the standard ladder is measured there.
+      // 13×13 too, once the standard ladder is measured there.
       if (![9, 13, 19].includes(size) || !STRENGTHS.every((s) => Number.isFinite(MEASURED.standard[s.id][size]))) throw new Error("--fixed needs --size 9, 13 or 19 (a board the standard ladder is measured on)");
       opt.fixed = Object.fromEntries(STRENGTHS.map((s) => [`L:${s.id}`, MEASURED.standard[s.id][size]]));
-      // v11: "--fixed impls" holds every implementation of the current
+      // "--fixed impls" holds every implementation of the current
       // ladder (opponents.js IMPLS: the levels, the human-style levels and
       // the v4/v7 bridges) at its measured θ on that board, where measured.
       if (a.fixed === "impls") opt.fixed = fixedImpls(size);

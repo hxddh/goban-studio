@@ -1,5 +1,5 @@
 /**
- * Play, v13: late answers never land on a position that is gone, and the
+ * Play: late answers never land on a position that is gone, and the
  * game is never stuck on the computer's turn.
  *
  * With a fake KataGo host whose answers the checks release by hand (and
@@ -203,7 +203,7 @@ export default async function ({ test, assert, root }) {
       assert.equal(g.thinking, false);
       assert.equal(g.engineFailed, true, "Retry is offered");
       assert.equal(Play.isComputerTurn(), true, "still the computer's turn, but not stuck");
-      await until(() => state.announce.includes(t("v13ui.engineFailed")), 1000, "the announcement");
+      await until(() => state.announce.includes(t("play.engineFailed")), 1000, "the announcement");
       // Retry with the engine back.
       Play.moveSources.decide = saved.decide;
       Play.moveSources.offline = async () => ({ x: 6, y: 2 });

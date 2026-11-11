@@ -1,7 +1,7 @@
 /**
  * Core: SGF (FF[4]) — round trips of moves, setup, comments, markup, rules and unknown properties.
  */
-import { test, BLACK, CLASSICS, Game, MESSAGES, WHITE, assert, empty, loadSGF, newGame, root, rulesFromSgf, setup } from "./helpers.mjs";
+import { test, BLACK, CLASSICS, Game, MESSAGES, WHITE, assert, loadSGF, newGame, rulesFromSgf, setup } from "./helpers.mjs";
 
 await test("SGF export/import keeps moves, comments, setup and variations", () => {
   const g = setup(
@@ -70,7 +70,7 @@ await test("SGF columns are a..s with the i (FF[4])", () => {
   assert.equal(line[1].move.y, 3);
   const sgf = game.toSGF();
   assert.match(sgf, /;B\[id\];W\[jd\];B\[sd\]/);
-  // v9: the application tag never changes how columns are read.
+  // The application tag never changes how columns are read.
   const tagged = loadSGF("(;GM[1]FF[4]AP[Goban Studio:6.0.0]SZ[19];B[id];W[sd])").game.mainLine();
   assert.deepEqual([tagged[1].move.x, tagged[2].move.x], [8, 18]);
   // Every bundled classic now loads without an illegal move.
@@ -99,7 +99,7 @@ await test("rules: SGF round trip keeps RU, komi and handicap for each ruleset",
   const pos = loadSGF("(;GM[1]FF[4]SZ[9]RU[Chinese]AB[aa][bb]AW[cc])").game;
   assert.equal(pos.handicap, 0);
   assert.equal(pos.handicapCompensation, 0);
-  // No RU (records before v5) is Japanese; a missing KM takes the ruleset's komi.
+  // No RU is Japanese; a missing KM takes the ruleset's komi.
   const old = loadSGF("(;GM[1]FF[4]SZ[9];B[ee])").game;
   assert.equal(old.rules, "japanese");
   assert.equal(old.komi, 6.5);

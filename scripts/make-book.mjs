@@ -2,7 +2,7 @@
  * Build the opening and joseki book (src/web/js/content/book.json) with
  * KataGo's analysis engine.
  *
- * v7: the book is built on GitHub's runners (.github/workflows/book.yml) in
+ * The book is built on GitHub's runners (.github/workflows/book.yml) in
  * three phases, so the work splits over parallel jobs:
  *
  *   seed    one tree's top levels, searched in full; the positions just
@@ -95,6 +95,13 @@ function xyToGtp(mv) {
  * standard move order; longer joseki come from KataGo's own choices.
  * Kobayashi and mini-Chinese are not named: their move orders vary too much
  * to state one line for them.
+ *
+ * The Chinese opening is the star point Q16, the 3-4 point Q3 (third line
+ * from the bottom) and the side stone one line below the middle of the
+ * right side: R9 (low), Q9 (high). Until the book is next built it has
+ * neither position, and nothing in it carries these two names (the shipped
+ * book.json was made when this table said R4 and R10/Q10, which is not the
+ * Chinese opening; those labels were taken out of it).
  */
 const LINES = {
   whole: [
@@ -104,8 +111,8 @@ const LINES = {
     { name: "two-star", moves: "Q16 D4 Q4" },
     { name: "sanrensei", moves: "Q16 D4 Q4 D16 Q10" },
     { name: "diagonal-star", moves: "Q16 D16 D4" },
-    { name: "chinese", moves: "Q16 D4 R4 D16 R10" },
-    { name: "high-chinese", moves: "Q16 D4 R4 D16 Q10" },
+    { name: "chinese", moves: "Q16 D4 Q3 D16 R9" },
+    { name: "high-chinese", moves: "Q16 D4 Q3 D16 Q9" },
     { name: "star-komoku", moves: "Q16 D4 R4" },
     { name: "two-komoku", moves: "R16 D4 Q3" },
     { name: "facing-komoku", moves: "R16 D16 R4" },

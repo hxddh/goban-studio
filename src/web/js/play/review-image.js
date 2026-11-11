@@ -68,7 +68,7 @@ const LIGHT = {
  * played as a stone ringed in the mistake colour, the better move as a ring
  * in the good colour.
  */
-export function drawMoment(g, x0, y0, px, mo, size, colors = {}) {
+function drawMoment(g, x0, y0, px, mo, size, colors = {}) {
   const c = { ...LIGHT, ...colors };
   const cell = px / size;
   g.save();
@@ -156,7 +156,7 @@ export function wrap(g, text, max) {
 const rankText = (rank) => (rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]));
 
 /**
- * v7: the words for a rated game's change of strength estimate
+ * The words for a rated game's change of strength estimate
  * ({ before: { rank, pm }, after: { rank, pm } }, the game file's `rating`):
  * "Strength ≈ 12 kyu → ≈ 11 kyu (±1)", or "".
  */

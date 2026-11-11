@@ -38,17 +38,6 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------- A1: pre-empting a search */
 
-  /** A search that takes `ms`, logs when it starts, and stops on abort. */
-  const slow = (log, name, ms = 10) => (signal) =>
-    new Promise((resolve) => {
-      log.push(name);
-      const id = setTimeout(() => resolve(name), ms);
-      signal.addEventListener("abort", () => {
-        clearTimeout(id);
-        resolve(null);
-      });
-    });
-
 
   // The app with a fake async KataGo host (as in core-scheduler.mjs).
   const A = await bundle(root, [
@@ -181,11 +170,12 @@ export default async function ({ test, assert, root }) {
       assert.deepEqual(g.game.current.children, []);
       assert.equal(g.game.current.comment, "what if?", "the comment is kept");
       assert.equal(loadSGF(A.Lib.loadCurrent().sgf).game.mainLine().length, 4, "the saved game has no extra moves");
-      // A variation tried earlier in the game stays, as before.
+      // A variation tried earlier in the game stays once it is kept.
       Play.reviewCurrentGame();
       Review.reviewGoto(1);
       Review.reviewPlay(7, 7);
-      // Back, as the app does it (controller.js restore drops the review).
+      Review.keepDraft();
+      // Back, as the app does it (spaces.js restore drops the review).
       A.setRestorer(() => state.review && Review.dropReview());
       Review.closeReview();
       A.setRestorer(() => {});
@@ -258,13 +248,13 @@ export default async function ({ test, assert, root }) {
         let was = left();
         await run();
         assert.ok(left() < was, "the board: the clock runs");
-        // v12: another space (Today) keeps the board off screen.
+        // Another space (Today) keeps the board off screen.
         state.space = "today";
         was = left();
         await run();
         assert.equal(left(), was, "Today: the clock waits");
         state.space = "play";
-        // v12: the explorer is in the Library; another space keeps the board off screen.
+        // The explorer is in the Library; another space keeps the board off screen.
         state.play = { ...state.play, view: "game", explorer: "whole" };
         state.space = "library";
         await run();

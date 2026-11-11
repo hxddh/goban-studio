@@ -10,8 +10,10 @@
  *                        passes it as -Dupdate-pubkey=… and the app then
  *                        refuses updates whose SHA256SUMS.sig it cannot verify.
  *   UPDATE_SIGNING_KEY   the private key as a PKCS#8 PEM. Store it as the
- *                        repository *secret* UPDATE_SIGNING_KEY; only
- *                        scripts/sign-sums.mjs in the release job reads it.
+ *                        secret UPDATE_SIGNING_KEY of the *environment*
+ *                        `release-signing`, not as a repository secret:
+ *                        only the release's sign job, which runs in that
+ *                        environment, reads it (scripts/sign-sums.mjs).
  *
  * Run it on a trusted machine and clear the terminal afterwards. Never commit
  * either value to the repository (the public key is not secret, but keeping it
@@ -37,6 +39,6 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   console.log("UPDATE_PUBKEY (repository variable; build option -Dupdate-pubkey):");
   console.log(publicKey);
   console.log("");
-  console.log("UPDATE_SIGNING_KEY (repository secret; never commit it):");
+  console.log("UPDATE_SIGNING_KEY (secret of the environment release-signing; never commit it):");
   console.log(privateKeyPem.trim());
 }
