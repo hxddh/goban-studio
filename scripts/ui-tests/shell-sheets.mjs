@@ -29,7 +29,7 @@ const sources = () => {
 /** Every kind of sheet this file opens (kept equal to sheets.jsx by the first check). */
 const SHEETS_TESTED = ["confirm", "importReport", "level", "newGame", "onboarding", "rename", "settings", "sgfGames", "shortcuts"];
 /**
- * Every pane of Settings, in order (kept equal to sheets.jsx SETTINGS_PANES
+ * Every pane of Settings, in order (kept equal to settings-sheet.jsx SETTINGS_PANES
  * by the first check), with what each must hold: selector → how many.
  * (The fake host is a packaged app: the data folder row is there.)
  */
@@ -223,10 +223,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     for (const k of opened) assert(kinds.includes(k), `a sheet of kind "${k}" is opened somewhere, but sheets.jsx has no such kind`);
     for (const k of kinds) assert(opened.has(k), `no code opens a "${k}" sheet`);
     // Every pane of Settings.
-    const paneTable = /const SETTINGS_PANES = \[([\s\S]*?)\];/.exec(sheets);
-    assert(paneTable, "sheets.jsx: SETTINGS_PANES was not found");
+    const paneTable = /const SETTINGS_PANES = \[([\s\S]*?)\];/.exec(all.find((s) => s.file === "app/settings-sheet.jsx").text);
+    assert(paneTable, "settings-sheet.jsx: SETTINGS_PANES was not found");
     const paneIds = [...paneTable[1].matchAll(/id:\s*"(\w+)"/g)].map((m) => m[1]);
-    assert(JSON.stringify(paneIds) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `Settings panes in sheets.jsx: ${paneIds} — tested here: ${Object.keys(SETTINGS_PANES_TESTED)}`);
+    assert(JSON.stringify(paneIds) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `Settings panes in settings-sheet.jsx: ${paneIds} — tested here: ${Object.keys(SETTINGS_PANES_TESTED)}`);
     // Every menu.
     const menus = [];
     for (const { file, text } of all) {

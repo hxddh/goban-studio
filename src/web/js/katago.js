@@ -68,7 +68,7 @@ export async function status() {
   return probe;
 }
 
-export function maxTimeFor(visits) {
+function maxTimeFor(visits) {
   return visits > 600 ? 12 : visits > 150 ? 6 : 3;
 }
 

@@ -30,7 +30,7 @@ const readJSON = (key, fallback) => {
 const writeJSON = (key, value) => store.put(key, value);
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** The setting that turns the weekly check on (default false). */
-export const AUTO_SETTING = "autoUpdateCheck";
+const AUTO_SETTING = "autoUpdateCheck";
 
 /** "v4.1.0" / "4.1" / "4.1.0-beta.2" → { major, minor, patch, pre } or null. */
 export function parseVersion(text) {
@@ -228,7 +228,7 @@ export const INSTALL_ERRORS = [
 ];
 
 /** How often the page asks for download progress (ms). */
-export const INSTALL_POLL_MS = 500;
+const INSTALL_POLL_MS = 500;
 
 const PHASES = ["idle", "downloading", "verifying", "unpacking", "ready", "installing", "failed", "cancelled"];
 

@@ -40,7 +40,7 @@ export function thinkTime(rank, a, moveNumber, size, rnd = Math.random) {
 /** Opponents weaker than this rank (kyu) play every game out; from this rank up they may resign. */
 export const RESIGN_FROM_RANK = 15;
 /** Consecutive hopeless searches before the computer resigns. */
-export const RESIGN_STREAK = 3;
+const RESIGN_STREAK = 3;
 
 /** Points whose owner is still open (|ownership| < 0.5); null without ownership. */
 export function openPoints(ownership) {

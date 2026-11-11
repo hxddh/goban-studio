@@ -255,7 +255,7 @@ export function areaName(x, y, size) {
 }
 
 /** Is (x, y) in a small empty area enclosed by `color` stones and the edge (an eye space)? */
-export function inEyeSpace(signMap, x, y, color, limit = 7) {
+function inEyeSpace(signMap, x, y, color, limit = 7) {
   const size = signMap.length;
   if (signMap[y]?.[x] !== 0) return false;
   const seen = new Set([y * size + x]);

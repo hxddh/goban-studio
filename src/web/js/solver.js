@@ -1945,7 +1945,7 @@ export function countValue(pz, st, bias = 0) {
  * Is Black's value from `st` independent of how unsettled ends are scored?
  * Returns { value, exact }.
  */
-export function countExact(pz, st) {
+function countExact(pz, st) {
   const r = countValue(pz, st);
   // No unsettled end was ever read: nothing to prove.
   if (!pz._sawUnsettled) return { ...r, exact: true };

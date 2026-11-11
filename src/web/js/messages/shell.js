@@ -126,7 +126,7 @@ export const SHELL = {
   "settings.pane.data": m("数据", "Data", "데이터", "データ"),
   "settings.pane.about": m("关于", "About", "정보", "情報"),
   "settings.boardGroup": m("棋盘与棋子", "Board and stones", "바둑판과 돌", "碁盤と石"),
-  // Settings by pane (app/sheets.jsx) and the level sheet.
+  // Settings by pane (app/settings-sheet.jsx) and the level sheet.
   "settings.pane.you": m("棋力与练习", "You", "기력과 연습", "棋力と練習"),
   "settings.pane.engines": m("引擎", "Engines", "엔진", "エンジン"),
   "settings.soundGroup": m("声音", "Sound", "소리", "サウンド"),

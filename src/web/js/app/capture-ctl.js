@@ -15,9 +15,10 @@ import { moveText } from "../a11y.js";
 import { chooseCaptureMove, fromSignMap, hasLegalMove, levelFor } from "../capture-ai.js";
 import { state, update, toast, announce } from "./store.js";
 import { remember, isRestoring, setSetting } from "./ctl-core.js";
-import { newGame } from "./play-ctl.js";
-import { FIRST_GAME, measuredRank } from "../model/player.js";
-import { itemDone } from "../practice/session.js";
+import { newGame } from "./game-start.js";
+import { FIRST_GAME } from "../model/plan.js";
+import { measuredRank } from "../model/ladder.js";
+import { flow } from "../practice/flow.js";
 
 const SIZE = 9;
 
@@ -124,7 +125,7 @@ function finish(C, over) {
   C.thinking = false;
   const won = over.winner === C.human;
   // A game played to its end is done in today's session, won or lost.
-  itemDone("capture");
+  flow.itemDone("capture");
   if (won) {
     setSetting("captureWins", (state.settings.captureWins || 0) + 1);
     Audio.win();

@@ -7,14 +7,15 @@
 import { BLACK } from "../rules.js";
 import { loadSGF } from "../sgf.js";
 import * as S from "../solver.js";
-import { MEMORY, gradeForRank, nextLesson as pickNextLesson, recordLesson, recordMistake, recordProblem } from "../model/player.js";
+import { MEMORY } from "../model/memory.js";
+import { gradeForRank, nextLesson as pickNextLesson } from "../model/plan.js";
+import { recordLesson, recordMistake, recordProblem } from "../model/record.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
 import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember, tx } from "./ctl-core.js";
-import { continuePath, itemDone, lessonFinished } from "../practice/session.js";
-import { continuePlacement, placementAnswer } from "../practice/placement.js";
+import { flow } from "../practice/flow.js";
 import { reviewTransform, transformProblem } from "../practice/transform.js";
 import { gradeBand } from "../practice/progress.js";
 import "../practice/milestones.js"; // follows the profile: new milestones are kept and said once
@@ -74,7 +75,7 @@ function buildStep(step) {
  * one line), grown to at least 6 lines and kept square, snapped to the board
  * edge when within two lines of it.
  */
-export function tightView(size, points) {
+function tightView(size, points) {
   if (!points.length) return null;
   let x0 = Math.min(...points.map((p) => p.x)) - 1;
   let y0 = Math.min(...points.map((p) => p.y)) - 1;
@@ -127,7 +128,7 @@ function boardPuzzle(b, accept = null) {
 }
 
 /** Problem view: tight around stones and region. */
-export function problemView(pz) {
+function problemView(pz) {
   const pts = [...pz.stones, ...(pz.region || [])];
   return tightView(pz.size, pts) || pz.view;
 }
@@ -179,7 +180,7 @@ export function lessonContinue() {
   const next = L.index + 1;
   if (next >= L.lesson.steps.length) {
     changeProfile((p) => recordLesson(p, L.lesson.id, { done: true, step: next }, Date.now()));
-    lessonFinished(L.lesson.id);
+    flow.lessonFinished(L.lesson.id);
     Audio.win();
     update((s) => {
       s.practice.lesson = { ...L, index: next, cur: null, finished: true };
@@ -305,7 +306,7 @@ export function openProblem(id, { daily = null, placement = false } = {}) {
  * the remembered picture. The placement quiz and the first showing use the
  * problem as written. The id stays, so the result is the same problem's.
  */
-export function shownDef(p, { placement = false } = {}) {
+function shownDef(p, { placement = false } = {}) {
   if (placement) return p;
   return transformProblem(p, reviewTransform(p, state.profile.problems?.[p.id]?.tries || 0));
 }
@@ -567,8 +568,8 @@ function recordAttempt(P, solved) {
     const quick = solved && !P.used && now - (P.openedAt || now) < MEMORY.QUICK_MS;
     if (first) changeProfile((p) => recordProblem(p, P.def.id, { solved, clean: solved && !P.used, used: P.used, quick }, now));
     else changeProfile((p) => recordProblem(p, P.def.id, { late: true, used: P.used }, now));
-    if (solved) itemDone("problem", P.def.id);
-    if (first) placementAnswer(P.def.id, solved && !P.used);
+    if (solved) flow.itemDone("problem", P.def.id);
+    if (first) flow.placementAnswer(P.def.id, solved && !P.used);
   }
 }
 
@@ -624,8 +625,8 @@ export function showAnswer() {
 }
 
 export function nextProblem() {
-  if (state.practice.placement) return continuePlacement();
-  if (state.practice.daily) return continuePath();
+  if (state.practice.placement) return flow.continuePlacement();
+  if (state.practice.daily) return flow.continuePath();
   const P = state.practice.problem;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
@@ -756,7 +757,7 @@ function mistakePlay(x, y) {
     Audio.stone(false);
     Audio.correct?.();
     changeProfile((p) => recordMistake(p, D.m.id, { solved: D.tries === 1 && !D.revealed }, Date.now()));
-    itemDone("mistake", D.m.id);
+    flow.itemDone("mistake", D.m.id);
   } else {
     D.status = x === D.m.played.x && y === D.m.played.y ? "same" : "wrong";
     Audio.wrong?.();
@@ -770,11 +771,11 @@ export function revealMistake() {
   D.revealed = true;
   D.status = "revealed";
   changeProfile((p) => recordMistake(p, D.m.id, { solved: false }, Date.now()));
-  itemDone("mistake", D.m.id);
+  flow.itemDone("mistake", D.m.id);
   update();
 }
 
 export function nextAfterMistake() {
-  if (state.practice.daily) return continuePath();
+  if (state.practice.daily) return flow.continuePath();
   practiceHome();
 }

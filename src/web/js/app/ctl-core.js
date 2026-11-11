@@ -5,7 +5,7 @@
  */
 import { store } from "../data/store.js";
 import { defaultRulesOf, saveSettings } from "../data/settings.js";
-import { estimate } from "../model/player.js";
+import { estimate } from "../model/level.js";
 import { setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { applyBoardTheme } from "../theme.js";
@@ -145,7 +145,7 @@ export function setRestorer(fn) {
   restorer = fn;
 }
 
-export function locationNow() {
+function locationNow() {
   const p = state.practice;
   const r = state.review;
   return {

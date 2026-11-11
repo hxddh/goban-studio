@@ -437,7 +437,7 @@ try {
     assert.equal(state.toasts.length, 0);
     Games.deleteGame(c.id);
     // Clear all data and restoring a backup still ask first.
-    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
+    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/data-ctl.js"), "utf8");
     for (const fn of ["clearData", "offerRestore", "undoRestore"]) {
       const at = ctl.indexOf(`export function ${fn}(`);
       assert.match(ctl.slice(at, ctl.indexOf("\n}\n", at)), /confirmAction\(\{[^]*danger: true/, `${fn} asks first`);
@@ -467,7 +467,7 @@ try {
     // On Windows the same rows read Ctrl+…
     assert.ok(K.shortcutRows({ mod: "Ctrl+", shift: "Shift+", t }).some(([k]) => k === "Shift+Ctrl+P"));
     // The sheet renders that table and nothing of its own.
-    const sheets = fs.readFileSync(path.join(root, "src/web/js/app/sheets.jsx"), "utf8");
+    const sheets = fs.readFileSync(path.join(root, "src/web/js/app/shortcuts-sheet.jsx"), "utf8");
     assert.match(sheets, /shortcutRows\(\{ mod: MOD, shift: SHIFT, t \}\)/);
     assert.doesNotMatch(sheets, /\$\{MOD\}[A-Z]`/, "no shortcut is written out in the sheet");
     // The menu bar takes its keys from the table too.

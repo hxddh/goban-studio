@@ -711,9 +711,6 @@ function TryCard() {
   );
 }
 
-/** Which review tab is open; remembered for the session, not saved. */
-let reviewTab = "analysis";
-
 function ReviewPanel() {
   const r = state.review;
   const meta = r.meta;
@@ -727,9 +724,9 @@ function ReviewPanel() {
     ...(hasSummary ? [{ value: "summary", label: t("review.tab.summary") }] : []),
     { value: "notes", label: t("review.tab.notes") },
   ];
-  const tab = tabs.some((x) => x.value === reviewTab) ? reviewTab : "analysis";
+  const tab = tabs.some((x) => x.value === state.ui.reviewTab) ? state.ui.reviewTab : "analysis";
   const setTab = (v) => {
-    reviewTab = v;
+    state.ui.reviewTab = v;
     update();
   };
   return (

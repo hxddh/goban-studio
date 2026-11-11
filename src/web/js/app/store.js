@@ -34,9 +34,12 @@ export const state = {
   // Practice: view "home" (the path) or one of its pages (catalog,
   // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
   practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
+  // What the views remember for the session, not saved: the review's tab,
+  // the Settings pane last shown, the lists opened in full.
+  ui: { reviewTab: "analysis", settingsPane: "general", allGames: false, allUnfinished: false, allClassics: false },
   models: initialModels(), // optional downloads (app/models-ctl.js)
   bootError: null, // { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
-  storeProblem: null, // The safe state, controller.js storeProblemOf (+ continued)
+  storeProblem: null, // The safe state, boot.js storeProblemOf (+ continued)
 };
 
 export function update(fn) {

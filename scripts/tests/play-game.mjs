@@ -175,7 +175,7 @@ export default async function ({ test, assert, root }) {
       Review.reviewGoto(1);
       Review.reviewPlay(7, 7);
       Review.keepDraft();
-      // Back, as the app does it (controller.js restore drops the review).
+      // Back, as the app does it (spaces.js restore drops the review).
       A.setRestorer(() => state.review && Review.dropReview());
       Review.closeReview();
       A.setRestorer(() => {});

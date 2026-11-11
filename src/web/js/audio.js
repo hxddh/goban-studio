@@ -34,7 +34,7 @@ const FILES = {
  * Levels relative to the stone (docs/design.md §9): captures −6 dB, the
  * result −3 dB, everything that is not the board −4.5 dB.
  */
-export const LEVEL = { stone: 1, capture: 0.5, result: 0.71, ui: 0.6 };
+const LEVEL = { stone: 1, capture: 0.5, result: 0.71, ui: 0.6 };
 
 const buffers = {};
 const last = {};
@@ -141,7 +141,7 @@ function play(key, { gain = 1, delay = 0, detune = 0.03 } = {}) {
   }
 }
 
-export function setSound(on) {
+function setSound(on) {
   enabled = !!on;
 }
 
@@ -170,7 +170,7 @@ export function soundState() {
 }
 
 /** Master volume, 0..1. */
-export function setVolume(v) {
+function setVolume(v) {
   volume = Math.max(0, Math.min(1, Number(v) || 0));
   if (master) master.gain.value = volume;
 }

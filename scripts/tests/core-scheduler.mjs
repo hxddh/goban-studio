@@ -173,7 +173,7 @@ export default async function ({ test, assert, root }) {
     const src = (f) => fs.readFileSync(path.join(root, f), "utf8");
     const engine = src("src/web/js/engine.js");
     assert.doesNotMatch(engine, /function queued\(/);
-    for (const f of ["src/web/js/app/review-ctl.js", "src/web/js/app/play-ctl.js", "src/web/js/play/analysis.js"]) {
+    for (const f of ["src/web/js/app/review-position.js", "src/web/js/app/review-analysis.js", "src/web/js/app/review-nav.js", "src/web/js/app/review-edit.js", "src/web/js/app/review-insight.js", "src/web/js/app/review-try.js", "src/web/js/app/review-session.js", "src/web/js/app/review-board.js", "src/web/js/app/game-session.js", "src/web/js/app/game-end.js", "src/web/js/app/game-turn.js", "src/web/js/app/game-start.js", "src/web/js/play/analysis.js"]) {
       assert.doesNotMatch(src(f), /\.cancelled\b|summaryToken/, f);
     }
   });

@@ -90,7 +90,7 @@ export function eyes(signMap, color, ch = chains(signMap)) {
 }
 
 /** Number of eyes of the group made of `start` chains and everything linked to them through shared eyes. */
-export function groupEyes(signMap, color, start, ch = chains(signMap), eyeList = eyes(signMap, color, ch)) {
+function groupEyes(signMap, color, start, ch = chains(signMap), eyeList = eyes(signMap, color, ch)) {
   const group = new Set(start);
   if (!group.size) return 0;
   const counted = new Set();

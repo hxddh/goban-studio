@@ -35,11 +35,11 @@ export const SKIP_MOVES = 10;
 /** Fewest scored moves before a reading is given. */
 export const MIN_MOVES = 30;
 /** Each move counts as 1/TEMPER of an independent observation. */
-export const TEMPER = 4;
+const TEMPER = 4;
 /** A probability is never taken below this (a move the model did not expect is not proof). */
 export const FLOOR = 1e-3;
 /** The range shown is never narrower than ± this many ranks. */
-export const MIN_HALF_WIDTH = 2;
+const MIN_HALF_WIDTH = 2;
 
 /**
  * The reading from per-move probabilities: `rows` = [{ index, p: { [profile]: prob } }]

@@ -12,7 +12,7 @@ import { useState } from "preact/hooks";
 import { t, tn } from "../i18n.js";
 import * as C from "./controller.js";
 import { Async, Button, Icon, useAsync } from "./parts.jsx";
-import { Modal } from "./sheets.jsx";
+import { Modal } from "./modal.jsx";
 import { COLLECTION_PAGE, listCollection } from "../play/import.js";
 
 /** A game of the file, named: its players, else "Game 12" (or "Problem 12" for a set-up position). */

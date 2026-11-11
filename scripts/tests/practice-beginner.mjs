@@ -204,7 +204,7 @@ export default async function ({ test, assert, root }) {
       assert.ok(!code.includes(word), `capture-ctl uses ${word}`);
     }
     // Not in New game, Play or the sidebar: in Practice only (its path and the lesson-complete page).
-    for (const f of ["app/sheets.jsx", "app/app.jsx", "app/chrome.jsx", "play/home.jsx", "app/play.jsx"]) {
+    for (const f of ["app/sheets.jsx", "app/new-game-sheet.jsx", "app/onboarding.jsx", "app/app.jsx", "app/chrome.jsx", "play/home.jsx", "play/library.jsx", "app/play.jsx"]) {
       const s = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.ok(!/capture\.play|startCapture/.test(s), `${f} offers capture Go`);
     }

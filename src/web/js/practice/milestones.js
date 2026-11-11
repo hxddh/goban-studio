@@ -14,7 +14,7 @@
 import { t, tn } from "../i18n.js";
 import { state, subscribe, toast } from "../app/store.js";
 import { changeProfile, tx } from "../app/ctl-core.js";
-import { keepMilestones, milestones } from "../model/player.js";
+import { keepMilestones, milestones } from "../model/level.js";
 import { COURSE, GRADES, PROBLEMS } from "../content.js";
 
 const content = () => ({ course: COURSE, problems: PROBLEMS, grades: GRADES, settings: state.settings || {} });

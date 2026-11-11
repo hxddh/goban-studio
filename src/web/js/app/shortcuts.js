@@ -1,7 +1,7 @@
 /**
  * The keyboard shortcuts, once: the key handler (app.jsx) matches a key
  * press against this table, the native menu bar takes its keys from it,
- * and the shortcuts sheet (sheets.jsx) lists it. A shortcut added here
+ * and the shortcuts sheet (shortcuts-sheet.jsx) lists it. A shortcut added here
  * works, shows in the menu and is documented; none can be in one place and
  * not the others.
  *

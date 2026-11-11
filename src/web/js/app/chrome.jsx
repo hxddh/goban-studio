@@ -12,7 +12,7 @@ import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
 import { StatusChip } from "./status-chip.jsx";
 
-/** How each space looks in the sidebar; which spaces there are, and their order, is controller.js SPACES (one list). */
+/** How each space looks in the sidebar; which spaces there are, and their order, is spaces.js SPACES (one list). */
 const SPACE_LOOK = {
   today: { icon: "today", key: "nav.today" },
   play: { icon: "play", key: "nav.play" },
@@ -38,10 +38,10 @@ export function Mark({ size = 18 }) {
 }
 
 /** Narrow windows (the board's panel is a bar under the board): styles.css uses the same width. */
-export const NARROW_QUERY = "(max-width: 860px)";
+const NARROW_QUERY = "(max-width: 860px)";
 
 /** Whether the window is narrow now; follows resizes. */
-export function useNarrow() {
+function useNarrow() {
   const mq = typeof matchMedia === "function" ? matchMedia(NARROW_QUERY) : null;
   const [narrow, setNarrow] = useState(!!mq?.matches);
   useEffect(() => {

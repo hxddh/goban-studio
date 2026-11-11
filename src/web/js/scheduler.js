@@ -55,7 +55,7 @@ const laneIndex = (lane) => {
  * Abort `target` (an AbortController) when any of `signals` aborts.
  * Returns the function that detaches the listeners again.
  */
-export function linkSignals(target, signals) {
+function linkSignals(target, signals) {
   const offs = [];
   for (const s of signals) {
     if (!s) continue;

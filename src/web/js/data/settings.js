@@ -49,8 +49,8 @@ export const DEFAULT_SETTINGS = {
  * opponent is a rank of the ladder (opponents.js RANKS, 30 … 6 dan), the
  * player's own rank 30 kyu … 9 dan.
  */
-export const OPPONENT_RANKS = [-6, 30];
-export const PLAYER_RANKS = [-8, 30];
+const OPPONENT_RANKS = [-6, 30];
+const PLAYER_RANKS = [-8, 30];
 /** Capture Go games won: a count, kept to a sane size. */
 const MAX_COUNT = 1e6;
 

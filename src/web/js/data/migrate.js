@@ -19,7 +19,7 @@
  */
 import { NewerVersionError } from "./store.js";
 import { packAnalysis } from "./pack.js";
-import { PROFILE_V } from "../model/player.js";
+import { PROFILE_V } from "../model/rating.js";
 
 /** The format this version writes. */
 export const STORE_V = 13;
@@ -33,7 +33,7 @@ export const INDEX_KEY = "games-index.json";
 export const GAMES_PREFIX = "games/";
 
 /** Keys whose files carry the store's version. */
-export function versioned(key) {
+function versioned(key) {
   return key === SETTINGS_KEY || key === CURRENT_KEY || key === INDEX_KEY || (key.startsWith(GAMES_PREFIX) && key.endsWith(".json"));
 }
 
@@ -58,7 +58,7 @@ export const MIGRATIONS = {
 };
 
 /** The version a stored value says it is (LEGACY_V when it says nothing usable). */
-export function versionOf(value) {
+function versionOf(value) {
   const v = value?.v;
   return Number.isInteger(v) && v >= LEGACY_V ? v : LEGACY_V;
 }

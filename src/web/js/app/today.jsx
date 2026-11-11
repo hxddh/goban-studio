@@ -10,7 +10,9 @@
  */
 import { useState } from "preact/hooks";
 import * as Games from "../data/games.js";
-import { PLACEMENT, masteryByTheme, practiceDays, ratingHistory } from "../model/player.js";
+import { PLACEMENT } from "../model/profile.js";
+import { masteryByTheme } from "../model/review.js";
+import { practiceDays, ratingHistory } from "../model/level.js";
 import { GRADES, PROBLEMS } from "../content.js";
 import { t, tn } from "../i18n.js";
 import { state } from "./store.js";
@@ -18,7 +20,8 @@ import * as C from "./controller.js";
 import { Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { estimateLabel } from "./estimate-label.js";
-import { ContinueHero, SuggestedHero, gameInProgress, outcome, recordTitle } from "../play/home.jsx";
+import { ContinueHero, SuggestedHero, gameInProgress } from "../play/home.jsx";
+import { outcome, recordTitle } from "../play/library.jsx";
 import { pathRows } from "../practice/path.jsx";
 import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../practice/progress.js";
 import { milestoneText, reachedMilestones } from "../practice/milestones.js";

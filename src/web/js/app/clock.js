@@ -6,7 +6,7 @@
  *   move30    — 30 seconds for every move (sudden death per move)
  *   byoyomi   — main time, then N periods of P seconds (Japanese byo-yomi)
  */
-export const TIME_CONTROLS = {
+const TIME_CONTROLS = {
   none: null,
   move30: { main: 0, periods: 1, period: 30, perMove: true },
   byoyomi: { main: 600, periods: 3, period: 30, perMove: false },

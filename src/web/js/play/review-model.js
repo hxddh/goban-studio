@@ -36,7 +36,7 @@ import { MISTAKE, summarizeGame } from "../app/summary.js";
 export { MISTAKE };
 export const REVIEW_VERSION = 2;
 /** At most this many key moments, and this many of them to try again. */
-export const MOMENTS = 3;
+const MOMENTS = 3;
 export const MAX_TRIES = 3;
 
 const KEY = { [BLACK]: "black", [WHITE]: "white" };

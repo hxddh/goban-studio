@@ -20,10 +20,12 @@
 import { t } from "../i18n.js";
 import { state, toast, update } from "../app/store.js";
 import { changeProfile } from "../app/ctl-core.js";
-import { PLACEMENT, placementGrade, placementNext, placementOffered as offered, setPlacement } from "../model/player.js";
+import { PLACEMENT } from "../model/profile.js";
+import { placementGrade, placementNext, placementOffered as offered, setPlacement } from "../model/placement.js";
 import { GRADES, PROBLEMS, withContent } from "../content.js";
 import { gradeBandText, practiceHome, openProblem } from "../app/practice-ctl.js";
 import { resetSession } from "./session.js";
+import { onFlow } from "./flow.js";
 
 /** Whether Practice's home offers the quiz now. */
 export function placementOffered() {
@@ -88,3 +90,6 @@ export function skipPlacement() {
   resetSession();
   update();
 }
+
+// A quiz problem answered, and the next one, are decided here (./flow.js).
+onFlow({ placementAnswer, continuePlacement });

@@ -39,7 +39,7 @@ export const MODELS = Object.freeze({
 });
 
 /** No progress for this long while downloading: show "stalled". */
-export const STALL_MS = 30_000;
+const STALL_MS = 30_000;
 /** How often the controller polls while a download runs. */
 export const POLL_MS = 500;
 

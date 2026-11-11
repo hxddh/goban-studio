@@ -786,11 +786,13 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("model: pure — no DOM, storage, engine or app imports; the old modules are gone", () => {
-    for (const f of ["model/player.js", "model/ladder.js"]) {
+    const parts = fs.readdirSync(path.join(root, "src/web/js/model")).filter((n) => n.endsWith(".js")).map((n) => "model/" + n);
+    assert.ok(parts.length >= 12, "the model's parts");
+    for (const f of parts) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       const imports = [...src.matchAll(/^import[^;]*from "([^"]+)"/gm)].map((m) => m[1]);
       // opponents.js is the calibration's one source: tables and pure functions, no imports of its own.
-      for (const i of imports) assert.ok(i === "./ladder.js" || i === "../opponents.js" || i === "./move-rank.js", `${f} imports ${i}`);
+      for (const i of imports) assert.ok(/^\.\/[a-z-]+\.js$/.test(i) || i === "../opponents.js", `${f} imports ${i}`);
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
     assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");

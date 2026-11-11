@@ -4,7 +4,8 @@
  * without importing the play controller).
  */
 import * as Games from "../data/games.js";
-import { addMistake, recordGame, themeLosses } from "../model/player.js";
+import { addMistake, recordGame } from "../model/record.js";
+import { themeLosses } from "../model/focus.js";
 import { changeProfile } from "./ctl-core.js";
 import { describeMistakes } from "./explain.js";
 import { recordAnalysis, summarizeGame, themeCounts } from "./summary.js";

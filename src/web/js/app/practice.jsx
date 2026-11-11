@@ -32,7 +32,7 @@ export function PracticeView() {
 }
 
 /** The toolbar's subtitle inside today's session: "Today 2 of 6". */
-export function sessionSub() {
+function sessionSub() {
   const at = C.sessionPlace();
   return at ? t("practice.session.of", [at.n, at.total]) : "";
 }

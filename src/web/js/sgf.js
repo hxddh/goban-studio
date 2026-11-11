@@ -62,7 +62,7 @@ import { BLACK, WHITE, EMPTY, Game, defaultKomi, rulesFromSgf, emptySignMap } fr
 import { t, currentLang } from "./i18n.js";
 
 /** Board sizes the app (its board, its engines and its content) can play. */
-export const SGF_SIZES = Object.freeze([9, 13, 19]);
+const SGF_SIZES = Object.freeze([9, 13, 19]);
 
 let nodeSeq = 1;
 

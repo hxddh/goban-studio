@@ -29,15 +29,17 @@
  */
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { lossesOf } from "./explain.js";
-import { PHASES, THEME_TOPIC, normalizeGame, normalizeGames } from "../model/player.js";
+import { PHASES, normalizeGame, normalizeGames } from "../model/profile.js";
+import { THEME_TOPIC } from "../model/focus.js";
+import { FIRM, settledShare } from "../ownership.js";
 
-export { PHASES };
+export { PHASES, FIRM, settledShare };
 /** A move losing more than this many points is a mistake… */
 export const MISTAKE = 2;
 /** …and more than this, a blunder (blunders are not counted as mistakes). */
 export const BLUNDER = 6;
 /** A move within this many points of the best counts as accurate. */
-export const ACCURATE = 1;
+const ACCURATE = 1;
 
 /**
  * Move-number thresholds, scaled by board area (so 19×19: opening up to move
@@ -52,25 +54,17 @@ export function phaseThresholds(size) {
 }
 
 /**
- * Share of points KataGo considers decided (|ownership| ≥ FIRM). The
- * endgame starts when at least SETTLED of the board is decided and stays so
- * two positions later: what is left are boundaries, not whole areas.
+ * The endgame starts when at least this share of the board is decided
+ * (ownership.js settledShare) and stays so two positions later: what is
+ * left are boundaries, not whole areas.
  */
-export const FIRM = 0.8;
 export const SETTLED = 0.72;
-
-export function settledShare(ownership) {
-  if (!ownership?.length) return null;
-  let firm = 0;
-  for (const v of ownership) if (Math.abs(v) >= FIRM) firm++;
-  return firm / ownership.length;
-}
 
 /**
  * A position's settled share: from its ownership, or from `firm`, which a
  * stored analysis keeps in place of the map (data/pack.js).
  */
-export function firmOf(point) {
+function firmOf(point) {
   if (!point) return null;
   if (point.ownership?.length) return settledShare(point.ownership);
   return Number.isFinite(point.firm) ? point.firm : null;

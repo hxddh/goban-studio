@@ -17,12 +17,13 @@ import { bookDepth, loadBook, lookup, setupSignMap, stonesOf, tagOf, decodeMove 
 import BOOK_JSON from "../content/book.json";
 import { state, update, announce } from "./store.js";
 import { remember } from "./ctl-core.js";
-import { freshGameState, parkCurrent, persistCurrent, maybeComputerMove, ponder } from "./play-ctl.js";
+import { freshGameState, parkCurrent, persistCurrent } from "./game-session.js";
+import { maybeComputerMove, ponder } from "./game-turn.js";
 
-export const EXPLORER_MODES = ["whole", "corner"];
+const EXPLORER_MODES = ["whole", "corner"];
 
 /** The corner tree's own area: the upper-right quarter of the board. */
-export const CORNER_AREA = { x0: 9, y0: 0, x1: 18, y1: 9 };
+const CORNER_AREA = { x0: 9, y0: 0, x1: 18, y1: 9 };
 
 let book = null;
 // The app bundle leaves the book out (scripts/bundle.mjs LAZY_DATA:
@@ -232,7 +233,7 @@ export function explorerZoomable(e = explorerState()) {
   return true;
 }
 
-export function explorerZoomed(e = explorerState()) {
+function explorerZoomed(e = explorerState()) {
   return explorerZoomable(e) && e.zoom !== false;
 }
 
@@ -318,7 +319,7 @@ export function explorerMoveCount(e = explorerState()) {
 let liveCtl = null;
 let liveTimer = 0;
 
-export function stopExplorerLive() {
+function stopExplorerLive() {
   clearTimeout(liveTimer);
   if (liveCtl) liveCtl.abort();
   liveCtl = null;

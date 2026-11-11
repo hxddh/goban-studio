@@ -111,26 +111,26 @@ await test("every key in the string table is used by the interface", () => {
    */
   const DYNAMIC_PREFIXES = [
     "area.", // review.jsx, insight.js: "area." + areaOf(...)
-    "backup.error.", // controller.js restoreError
+    "backup.error.", // data-ctl.js restoreError
     "edit.mark.", // review.jsx: the mark kinds (rules.js MARK_KINDS)
     "error.", // play-ctl.js: "error." + the rules' reason
     "explorer.name.", // explorer-ctl.js: named openings and joseki of the book
     "explorer.tag.", // explorer.jsx: "explorer.tag." + tag
     "goal.", // practice-ctl.js goalText: "goal." + pz.goal
     "grade.", // "grade." + 1…5
-    "explorer.row.", // play/home.jsx: the two explorer rows, whole | corner
-    "library.kind.", // play/home.jsx: the history's filter chips
-    "library.sort.", // play/home.jsx: the sort choices
+    "explorer.row.", // play/library.jsx: the two explorer rows, whole | corner
+    "library.kind.", // play/library.jsx: the history's filter chips
+    "library.sort.", // play/library.jsx: the sort choices
     "lossKind.", // insight.js loss kinds
     "models.error.", // models-ctl.js modelErrorText
-    "models.human.", // sheets.jsx ModelRow: `models.${kind}.name` / `.desc`
+    "models.human.", // settings-sheet.jsx ModelRow: `models.${kind}.name` / `.desc`
     "models.strong.",
-    "newGame.", // sheets.jsx PRESETS: "newGame." + quick | medium | full
+    "newGame.", // new-game-sheet.jsx PRESETS: "newGame." + quick | medium | full
     "phase.", // summary.js PHASES
     "phaseIn.",
     "practice.status.", // practice.jsx: a tile's status (new, tried, solved, due, mastered)
     "problem.endgame.", // content/problems.js: `problem.endgame.${k}.title` / `.hint`
-    "settings.volume.", // sheets.jsx: the volume levels
+    "settings.volume.", // settings-sheet.jsx: the volume levels
     "shape.", // content: the classic shapes
     "theme.", // content: problem themes
     "tip.opening.", // play.jsx: "tip.opening." + 1…3

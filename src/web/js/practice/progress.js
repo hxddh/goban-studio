@@ -11,7 +11,9 @@
  *   comesBackIn      "back in about 3 days"
  *   weekParts        this week's line without its zero parts
  */
-import { DAY, GRADE_RANK, isMastered } from "../model/player.js";
+import { DAY } from "../model/util.js";
+import { GRADE_RANK } from "../model/plan.js";
+import { isMastered } from "../model/review.js";
 
 /**
  * A problem's state for its tile, from its record:
@@ -52,7 +54,7 @@ export function groupPath(items = [], themeOf = () => null) {
 }
 
 /** A sparkline needs at least this many rated games; fewer say nothing. */
-export const TREND_MIN = 3;
+const TREND_MIN = 3;
 /** …and shows at most this many, the newest. */
 export const TREND_MAX = 40;
 

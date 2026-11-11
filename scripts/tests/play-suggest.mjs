@@ -10,7 +10,8 @@ const A = await bundle([
   'export { state } from "./src/web/js/app/store.js";',
   'export { DEFAULT_SETTINGS } from "./src/web/js/data/settings.js";',
   'export * as PM from "./src/web/js/model/player.js";',
-  'export { classicYear, CLASSICS_SHOWN } from "./src/web/js/play/home.jsx";',
+  'export { classicYear } from "./src/web/js/app/play.jsx";',
+  'export { CLASSICS_SHOWN } from "./src/web/js/play/library.jsx";',
   'export { CLASSICS } from "./src/web/js/content/classics.js";',
   'export { weekCounts } from "./src/web/js/app/today.jsx";',
 ]);

@@ -28,7 +28,7 @@ import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 import { humanMoveProbabilities } from "../katago.js";
 import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
-import { recordGame } from "../model/player.js";
+import { recordGame } from "../model/record.js";
 import { changeProfile } from "../app/ctl-core.js";
 
 /* ---------------------------------------------------------- one pass */
@@ -103,7 +103,7 @@ function recordOf(id) {
 }
 
 /** The player's colour in a record (null: two people, or an imported game). */
-export const humanColorOf = (rec) => (rec?.opponent === "ai" ? (rec.humanColor === -1 ? -1 : 1) : null);
+const humanColorOf = (rec) => (rec?.opponent === "ai" ? (rec.humanColor === -1 ? -1 : 1) : null);
 
 /** A game played here (not imported), long enough to analyse. */
 export function isOwnGame(rec) {
@@ -166,7 +166,7 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
  * and in the player model, where it is only a weak prior (player.js
  * applyMoveRank). Resolves the reading, or null when it cannot be made.
  */
-export async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
+async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
   if (!recordId || !Engine.installed().human) return null;
   const rows = await humanMoveProbabilities(game, humanColor, PROFILES.map((p) => p.id), { signal });
   const reading = rows && rankFromLikelihoods(rows);
@@ -397,7 +397,7 @@ export function resumeBatch() {
 }
 
 /** How long after launch the quiet pass over older games starts. */
-export const AUTO_DELAY_MS = 20000;
+const AUTO_DELAY_MS = 20000;
 let autoTimer = null;
 
 /**

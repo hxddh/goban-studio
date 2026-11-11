@@ -11,7 +11,7 @@
  *        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">…</svg>
  */
 
-export const ICON_ATTRS = {
+const ICON_ATTRS = {
   viewBox: "0 0 20 20",
   fill: "none",
   stroke: "currentColor",

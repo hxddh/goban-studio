@@ -39,7 +39,7 @@ export const gorToTheta = (g) => -20 * Math.log((4100 - Math.min(g, 3900)) / ANC
 /** EGF rating of a rank (rating.js rankToRating, for every rank). */
 export const rankToGoR = (rank) => 2100 - 100 * rank;
 /** The 19×19 rank of θ, unrounded (10.0 = 10 kyu, 0 = 1 dan, -3 = 4 dan). */
-export const rankOfTheta = (t) => (2100 - thetaToGoR(t)) / 100;
+const rankOfTheta = (t) => (2100 - thetaToGoR(t)) / 100;
 
 /** A rank as shown: rounded; the kyu scale stops at 30 (rating.js ratingToRank). */
 export function roundRank(r) {

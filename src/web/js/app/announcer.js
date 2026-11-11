@@ -150,7 +150,7 @@ export function boardKey(e, bv) {
 /* ------------------------------------------------------ announcements */
 
 /** The words for the node the review is on. */
-export function reviewNodeText(r) {
+function reviewNodeText(r) {
   const game = r.game;
   const node = game.current;
   let number = 0;

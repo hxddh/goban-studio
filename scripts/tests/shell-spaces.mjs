@@ -41,7 +41,7 @@ try {
     assert.equal(C.playShowsBoard(), false);
     assert.ok(!("progress" in state), "no old progress object");
     // The source: boot awaits store.open() before it reads anything, and start() awaits boot before the first render.
-    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
+    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/boot.js"), "utf8");
     const at = ctl.indexOf("export async function boot()");
     assert.ok(at > 0);
     const body = ctl.slice(at, ctl.indexOf("\n}\n", at));
@@ -196,8 +196,8 @@ try {
       delay: 1,
     });
     // The app's handler, on a store that cannot write.
-    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/controller.js"), "utf8");
-    assert.match(ctl, /store\.setErrorHandler\(storeError\)/);
+    assert.match(fs.readFileSync(path.join(root, "src/web/js/app/boot.js"), "utf8"), /store\.setErrorHandler\(storeError\)/);
+    const ctl = fs.readFileSync(path.join(root, "src/web/js/app/data-ctl.js"), "utf8");
     assert.match(ctl, /toast\(t\(read \? "store\.readFailed" : "store\.writeFailed"\), "error", 5000, \{ key: "store" \}\)/);
     const before = state.toasts.length;
     const errors = [];

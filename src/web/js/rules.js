@@ -211,7 +211,7 @@ function zobristTable(size) {
 }
 
 /** The board's Zobrist hash, as a string of two 32-bit halves. */
-export function boardHash(board) {
+function boardHash(board) {
   const size = board.width;
   const table = zobristTable(size);
   const map = board.signMap;
@@ -255,7 +255,7 @@ function nodeHash(node) {
  * applied to a copy of `board`: { black: [{x, y}], white: [...], empty: [...] }.
  * AE first, then AB, then AW.
  */
-export function applySetup(board, setup) {
+function applySetup(board, setup) {
   const out = board.clone();
   if (!setup) return out;
   for (const p of setup.empty || []) out.set([p.x, p.y], EMPTY);
@@ -1080,7 +1080,7 @@ export class Game {
 /** Board marks a node can carry, as stored in node.marks[].type. */
 export const MARK_KINDS = ["triangle", "square", "circle", "cross", "label"];
 /** SGF property for each mark kind. */
-export const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
+const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
 
 function nextLabel(marks) {
   const used = new Set(marks.filter((m) => m.type === "label").map((m) => m.text));

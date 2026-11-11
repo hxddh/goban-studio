@@ -303,7 +303,7 @@ export default async function ({ test, assert, root }) {
       // Handicap stones make the opponent effectively weaker, on each board's own scale.
       assert.ok(PM.implOpponent("L:10k", { handicap: 4 }) < PM.implOpponent("L:10k"));
       assert.ok(PM.implOpponent("L:10k", { size: 9, handicap: 2 }) < PM.implOpponent("L:10k", { size: 9 }));
-      const src = fs.readFileSync(path.join(root, "src/web/js/app/play-ctl.js"), "utf8");
+      const src = fs.readFileSync(path.join(root, "src/web/js/app/game-end.js"), "utf8");
       assert.match(src, /const impl = g\.played \|\| Engine\.resolveOpponent\(/);
       assert.match(src, /const opponent = implOpponent\(impl, \{ size, handicap \}\)/);
     });
@@ -316,7 +316,7 @@ export default async function ({ test, assert, root }) {
   await test("play opponent: no mode wording or human-style switch is left in the interface", async () => {
     const { MESSAGES } = await import("../../src/web/js/messages.js");
     for (const k of Object.keys(MESSAGES)) assert.ok(!/^models\.(mode\.|humanStyle)/.test(k), k);
-    const files = ["app/sheets.jsx", "app/play.jsx", "app/models-ctl.js", "app/play-ctl.js", "app/controller.js", "play/home.jsx", "data/settings.js"];
+    const files = ["app/sheets.jsx", "app/new-game-sheet.jsx", "app/settings-sheet.jsx", "app/play.jsx", "app/models-ctl.js", "app/game-session.js", "app/game-end.js", "app/game-turn.js", "app/game-start.js", "app/controller.js", "play/home.jsx", "play/library.jsx", "data/settings.js"];
     for (const f of files) {
       const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.doesNotMatch(src, /humanStyle|opponentMode\(|models\.mode\.|STRENGTHS|strengthById|labelRank/, f);

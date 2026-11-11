@@ -33,7 +33,7 @@ export async function nativeInvoke(command, payload) {
   return invoke(command, payload);
 }
 
-export async function windowChrome() {
+async function windowChrome() {
   if (!hasNative()) return { top: 0, left: 0, right: 0 };
   try {
     const r = await invoke("studio.windowChrome");
@@ -43,7 +43,7 @@ export async function windowChrome() {
   }
 }
 
-export function windowDrag() {
+function windowDrag() {
   if (hasNative()) invoke("studio.windowDrag").catch(() => {});
 }
 

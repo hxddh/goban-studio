@@ -47,7 +47,7 @@ export const CHUNK_BYTES = 384 * 1024;
 /** Largest value the store keeps (as store.zig max_file_bytes). */
 export const MAX_BYTES = 8 * 1024 * 1024;
 /** Debounce of writes, per key. */
-export const WRITE_DELAY = 300;
+const WRITE_DELAY = 300;
 /** localStorage prefix of the browser preview. */
 export const LOCAL_PREFIX = "goban9:";
 

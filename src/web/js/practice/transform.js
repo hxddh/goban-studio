@@ -98,7 +98,7 @@ export function swapColourText(text, lang) {
 }
 
 /** A four-language text ({ zh, en, ko, ja }) with its colour words swapped. */
-export function swapColourTexts(texts) {
+function swapColourTexts(texts) {
   if (!texts || typeof texts !== "object") return texts;
   const out = {};
   for (const [lang, text] of Object.entries(texts)) out[lang] = swapColourText(text, lang);
@@ -160,11 +160,6 @@ export function transformProblem(def, t = IDENTITY) {
     if (def.hint) next.hint = swapColourTexts(def.hint);
   }
   return next;
-}
-
-/** A board point of the problem as written → the same point of the transformed problem. */
-export function mapProblemPoint(def, t, x, y) {
-  return mapPoint(x, y, def.size || 19, (t?.sym ?? 0) & 7);
 }
 
 /** A small string hash (FNV-1a), for reproducible choices. */

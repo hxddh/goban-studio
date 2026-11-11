@@ -21,9 +21,13 @@
 import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { changeProfile, isRestoring, remember, setSetting } from "../app/ctl-core.js";
-import { bridgeAfter, dailySize, evidenceOf, focus, focusLesson, keepFocus, practicePath as pathOf } from "../model/player.js";
+import { bridgeAfter } from "../model/plan.js";
+import { dailySize, evidenceOf, focus, focusLesson } from "../model/focus.js";
+import { keepFocus } from "../model/record.js";
+import { practicePath as pathOf } from "../model/path.js";
 import { COURSE, GRADES, PROBLEMS, withContent } from "../content.js";
 import { store } from "../data/store.js";
+import { onFlow } from "./flow.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, themeName } from "../app/practice-ctl.js";
 import { startCapture, startFirstGame } from "../app/capture-ctl.js";
 
@@ -309,3 +313,6 @@ export function resetSession({ keepStored = false } = {}) {
   session = null;
   if (!keepStored) store.remove(SESSION_KEY);
 }
+
+// What a finished item leads to is decided here (./flow.js).
+onFlow({ itemDone, lessonFinished, continuePath });

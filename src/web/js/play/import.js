@@ -35,7 +35,7 @@ export function playersOf(black, white) {
 }
 
 /** One game of a file, as the chooser lists it. */
-export function describeEntry(game, index) {
+function describeEntry(game, index) {
   const line = game.mainLine();
   const who = playersOf(game.playerBlack, game.playerWhite);
   return {

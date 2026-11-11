@@ -8,7 +8,7 @@ import { t } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { ataris } from "./insight.js";
-import { bridgeAfter } from "../model/player.js";
+import { bridgeAfter } from "../model/plan.js";
 import { Board, Button, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 

@@ -68,7 +68,7 @@ const LIGHT = {
  * played as a stone ringed in the mistake colour, the better move as a ring
  * in the good colour.
  */
-export function drawMoment(g, x0, y0, px, mo, size, colors = {}) {
+function drawMoment(g, x0, y0, px, mo, size, colors = {}) {
   const c = { ...LIGHT, ...colors };
   const cell = px / size;
   g.save();

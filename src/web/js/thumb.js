@@ -165,7 +165,7 @@ function specKey(spec) {
  * the cache when the same position was drawn at this size in this palette.
  * The caller draws it onto its own canvas (or uses it as is).
  */
-export function thumbCanvas(spec, cssPx, dpr = 1, pal = currentPalette()) {
+function thumbCanvas(spec, cssPx, dpr = 1, pal = currentPalette()) {
   const pxDev = Math.max(1, Math.round(cssPx * dpr));
   const key = `${pal.key}|${pxDev}|${specKey(spec)}`;
   const hit = cache.get(key);
