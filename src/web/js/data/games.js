@@ -76,7 +76,7 @@ export function describeGame(game) {
     handicap: game.handicap,
     moves: Math.max(0, game.mainLine().length - 1),
     result: game.mainLine().at(-1)?.result || game.current.result || null,
-    date: game.date instanceof Date ? game.date.toISOString() : String(game.date),
+    date: game.dateText || (game.date instanceof Date && !Number.isNaN(game.date.getTime()) ? game.date.toISOString() : ""),
     playerBlack: game.playerBlack,
     playerWhite: game.playerWhite,
     thumb: thumbnail(game),

@@ -302,10 +302,13 @@ function cloneBoard(board) {
  * touches any of them is left out. Territory scoring passes the stones in
  * seki, so a seki eye is not territory; area scoring passes nothing.
  *
+ * `conceded` (optional) is a Set of colours that have played but have no
+ * living stone left (see "open regions" below); score() works it out.
+ *
  * Call it on a finished board: score() removes the dead stones first, so
  * every stone left is alive (see "open regions" below).
  */
-export function territoryMap(board, { exclude = null } = {}) {
+export function territoryMap(board, { exclude = null, conceded = null } = {}) {
   const size = board.width;
   const out = emptySignMap(size);
   const seen = new Set();
@@ -359,14 +362,21 @@ export function territoryMap(board, { exclude = null } = {}) {
       // The two differ in whether the other colour has stones on the board
       // at all: if it has, they lie in a region of their own, so the wall
       // really divides the board and the region is territory; if it has
-      // none, nothing has been divided and the region is dame. Before v13
-      // every four-side region was dame, which gave the second case's owner
-      // nothing. The test runs after dead stones are removed, so only living
-      // stones divide the board: a game in which every stone of one side is
-      // dead (a resignation in all but name) still leaves the open board as
-      // dame, as before.
+      // none, nothing has been divided and the region is dame (a lone stone
+      // on an otherwise untouched board establishes nothing).
+      //
+      // One more case: the other colour did play, and none of its stones
+      // lives. They were all captured, or all removed as dead at the count
+      // (the engine marks dead stones by itself, so this happens without
+      // the player doing anything). The board was contested and one side
+      // lost every stone, so the open region belongs to the colour whose
+      // living stones border it. score() names such colours in `conceded`;
+      // a colour that never had a stone on the board is not in it, and a
+      // colour with even one stone left unmarked is still `present`, in
+      // which case the rule of the first paragraph decides.
       const color = border.size === 1 ? [...border][0] : 0;
-      const open = edges.size === 4 && !present.has(other(color));
+      const rival = other(color);
+      const open = edges.size === 4 && !present.has(rival) && !(conceded && conceded.has(rival));
       if (color && !open && !touchesExcluded) {
         for (const [rx, ry] of region) out[ry][rx] = color;
       }
@@ -481,6 +491,7 @@ export class Game {
     komi = undefined,
     handicap = 0,
     date = new Date(),
+    dateText = "",
     playerBlack = "Black",
     playerWhite = "White",
     event = "",
@@ -500,7 +511,12 @@ export class Game {
     if (placeHandicap && this.handicap >= 2 && stones.length < this.handicap) this.handicap = stones.length >= 2 ? stones.length : 0;
     // Without an explicit komi, the ruleset's default for this handicap.
     this.komi = komi === undefined || komi === null || komi === "" ? defaultKomi(this.rules, this.handicap) : Number(komi);
-    this.date = date instanceof Date ? date : new Date(date);
+    // A game played here is dated today. An imported record passes its own
+    // date, or null when it states none (never today's): `dateText` is the
+    // record's DT exactly as written ("1846", "1933-10-16,17"), and toSGF()
+    // writes it back unchanged.
+    this.date = date === null ? null : date instanceof Date ? date : new Date(date);
+    this.dateText = String(dateText || "");
     this.playerBlack = playerBlack;
     this.playerWhite = playerWhite;
     this.event = event;
@@ -866,7 +882,28 @@ export class Game {
     const seki = findSeki(board);
     // Territory scoring gives no points inside a seki; area scoring counts
     // a seki group's own eye as part of its area.
-    const territory = territoryMap(board, { exclude: method === "territory" ? seki.keys : null });
+    const captures = {
+      black: this.current.board.getCaptures(BLACK) || 0,
+      white: this.current.board.getCaptures(WHITE) || 0,
+    };
+    // A colour that lost stones (captured during play or removed as dead
+    // now) and has none left on the finished board has conceded the open
+    // board to the other side: see "open regions" in territoryMap().
+    const conceded = new Set();
+    for (const [color, lostInPlay] of [[BLACK, captures.white], [WHITE, captures.black]]) {
+      if (!lostInPlay && !dead.some((d) => d.color === color)) continue;
+      let alive = false;
+      for (let y = 0; y < this.size && !alive; y++) {
+        for (let x = 0; x < this.size; x++) {
+          if (board.get([x, y]) === color) {
+            alive = true;
+            break;
+          }
+        }
+      }
+      if (!alive) conceded.add(color);
+    }
+    const territory = territoryMap(board, { exclude: method === "territory" ? seki.keys : null, conceded });
     let blackTerritory = 0;
     let whiteTerritory = 0;
     let blackStones = 0;
@@ -882,10 +919,6 @@ export class Game {
         else neutral++;
       }
     }
-    const captures = {
-      black: this.current.board.getCaptures(BLACK) || 0,
-      white: this.current.board.getCaptures(WHITE) || 0,
-    };
     let blackPrisoners = captures.black;
     let whitePrisoners = captures.white;
     for (const d of dead) {
@@ -945,9 +978,14 @@ export class Game {
   toSGF() {
     const root = this.root;
     const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
-    const dt = this.date instanceof Date ? this.date : new Date(this.date);
     const pad = (n) => String(n).padStart(2, "0");
-    const date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    // DT: the record's own text when it has one, else the day the game was
+    // played here; a record without a date stays without one.
+    let date = this.dateText;
+    if (!date && this.date !== null && this.date !== undefined) {
+      const dt = this.date instanceof Date ? this.date : new Date(this.date);
+      if (!Number.isNaN(dt.getTime())) date = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    }
     const rules = this.ruleset.sgf;
     // SGF columns run a, b, c … with the i included (FF[4]); only board
     // labels skip I. (Before v7 this skipped the i too; see sgf.js.)
@@ -966,12 +1004,17 @@ export class Game {
       esc(this.playerBlack) +
       "]PW[" +
       esc(this.playerWhite) +
-      "]DT[" +
-      date +
       "]";
-    let terminal = this.current;
+    if (date) head += "DT[" + esc(date) + "]";
+    // RE is the result of the game, which is the end of the main line
+    // wherever the cursor is (a side variation must not lose it). A result
+    // reached only on the cursor's own line (a resignation in a variation
+    // being explored) is the fallback.
+    let terminal = root;
     while (terminal.children.length) terminal = terminal.children[0];
-    const result = this.current.result || terminal.result;
+    let ahead = this.current;
+    while (ahead.children.length) ahead = ahead.children[0];
+    const result = terminal.result || this.current.result || ahead.result;
     if (result) head += "RE[" + esc(result) + "]";
     if (this.event) head += "EV[" + esc(this.event) + "]";
     if (root.comment) head += "C[" + esc(root.comment) + "]";
