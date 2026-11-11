@@ -1013,14 +1013,23 @@ export function solveFirstMoves(pz, budget = 600000, { deadline = Infinity } = {
 
 /**
  * The learner's result from `st` with best play: "win" (unconditional),
- * "ko" (the learner gets a ko, i.e. wins only with enough ko threats) or
- * "loss". Independent of the problem's `ko` option.
+ * "ko" (the learner gets a ko, i.e. wins only with enough ko threats),
+ * "loss", or "unknown" when the search ran out of depth or nodes before it
+ * could prove one of them (a guess is never reported as a result).
+ * Independent of the problem's `ko` option. `budget` is the node limit of
+ * each search (the default when omitted).
  */
-export function outcome(pz, st) {
+export function outcome(pz, st, { budget } = {}) {
   if (pz.counting) return countStatus(pz, st) === "lost" ? "loss" : "win";
-  if (userWins(pz, st, undefined, false).win) return "win";
-  if (userWins(pz, st, undefined, true).win) return "ko";
-  return "loss";
+  const plain = userWins(pz, st, budget, false);
+  if (plain.exact && plain.win) return "win";
+  // As ko master the learner can only do better: a proved loss there is a
+  // loss outright, and a proved win there is a ko once the plain search
+  // has proved that there is no unconditional win.
+  const master = userWins(pz, st, budget, true);
+  if (!master.exact) return "unknown";
+  if (!master.win) return "loss";
+  return plain.exact ? "ko" : "unknown";
 }
 
 /**
@@ -1229,13 +1238,29 @@ export function validate(pz, { maxCorrect = 3, first = null, line = null } = {})
 
 export { PASS };
 
-/** The learner's winning moves from `st` (learner to move). For hints. */
-export function winningMoves(pz, st) {
-  if (pz.counting) return countWinningMoves(pz, st);
+/**
+ * The learner's winning moves from `st` (learner to move). For hints.
+ *
+ * Only proved wins are listed: a move whose search ran out of depth or
+ * nodes is left out, since showing it as the answer would be a guess. The
+ * returned array has `exact` false when that happened to any candidate, so
+ * an empty list with `exact` false means "not known", not "no winning
+ * move". `budget` is the node limit of each search (the default when
+ * omitted).
+ */
+export function winningMoves(pz, st, { budget } = {}) {
+  if (pz.counting) {
+    const moves = countWinningMoves(pz, st);
+    moves.exact = true;
+    return moves;
+  }
   const keyIdx = keyIndices(pz);
   const out = [];
+  out.exact = true;
   for (const m of candidates(pz, st, keyIdx)) {
-    if (userWins(pz, m.next).win) out.push(pointOf(pz, m.i));
+    const r = userWins(pz, m.next, budget);
+    if (!r.exact) out.exact = false;
+    else if (r.win) out.push(pointOf(pz, m.i));
   }
   return out;
 }
