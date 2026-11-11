@@ -13,6 +13,22 @@ build, the stronger network pinned in `src/models.zig`, both SHA-256
 checked) and commits the result back: `docs/lesson-audit.json` (every value)
 and the generated section at the end of this file.
 
+## Since the latest run
+
+The generated section at the end of this file is the latest KataGo run.
+The course has changed since, and **the audit has not been run again**:
+
+- Seven units were added (ko fighting, judging the position, area
+  scoring, the rebuilt endgame, openings, joseki, handicap Go): "v13
+  units waiting for a run" below.
+- Eighteen over-long steps were split or shortened, so the course has 377
+  steps and the step numbers after a split differ from the ones in the
+  generated section (`scripts/tests/course-steps.mjs` keeps a step under
+  170 Chinese characters).
+- The Chinese opening lesson was corrected to Q16–Q3–R9 (high: Q9). It
+  waits for a rebuild of the opening book with KataGo and for a strong
+  player's look; the entry below names the four steps.
+
 ## Method
 
 - **Place steps.** Every accepted point, KataGo's best move on the whole

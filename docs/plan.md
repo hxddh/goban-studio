@@ -1,11 +1,13 @@
 # The training plan
 
 The plan picks one or two things to work on ("this week's focus"), says why,
-and orders Learn's path around them. Since v9 it is part of the one player
-model, `src/web/js/model/player.js` (`evidence`, `focus`, `keepFocus`,
-`learnPath`; pure, tested in `scripts/tests/model-player.mjs`,
-`model-progress.mjs` and `learn-path.mjs`). The app side is `src/web/js/learn/session.js`. The
-thresholds are `RULES` in player.js.
+and orders Practice's path for today around them. It is part of the one
+player model, `src/web/js/model/player.js` (`evidence`, `focus`,
+`keepFocus`, `learnPath`; pure, tested in `scripts/tests/model-player.mjs`,
+`model-progress.mjs` and `learn-path.mjs`). The app side is
+`src/web/js/learn/session.js`. The thresholds are `RULES` in player.js.
+The space is called Practice in the interface; the code and this page
+still say Learn in names such as `learnPath`.
 
 ## What counts as evidence
 
@@ -13,7 +15,7 @@ thresholds are `RULES` in player.js.
 `profile.games`. Each rated game against the computer gets one, and the
 post-game analysis completes it. A record keeps the themes of up to ten
 explained mistakes (`describeMistakes`: ladder, snapback, double atari, cut,
-vital point, eye space, ko, races). From v7 it also keeps the points each
+vital point, eye space, ko, races). It also keeps the points each
 theme cost (`themeLoss`). The report and the review explain the same
 mistakes, so they agree with the record. Only records with an analysis count.
 
@@ -55,9 +57,9 @@ erase the evidence the focus came from.
 
 ## Solving level
 
-Since v13 the grades estimate how hard a problem is for a person (theme,
-reading that branches, plausible wrong moves; docs/problems-audit.md, "v13
-grading"), no longer the solver's search effort.
+The grades (shown as Level 1–5) estimate how hard a problem is for a
+person (theme, reading that branches, plausible wrong moves;
+docs/problems-audit.md, "v13 grading"), not the solver's search effort.
 
 **First sight counts.** A problem adds one result to the level: whether
 its *first ever* attempt was a clean solve (`first: "clean" | "miss"` on
@@ -155,7 +157,7 @@ is retired or its stability has reached 21 days and its last result was
 not a miss (`isMastered`). `masteryByTheme(profile, problems, grades)`
 gives `{ total, mastered, learning, unseen, grades }` per theme.
 
-## Placement (v10, v13)
+## Placement
 
 Someone who said at onboarding that they know the rules (or play) is
 offered a placement quiz on Learn's home before the first path
@@ -205,11 +207,11 @@ offered a placement quiz on Learn's home before the first path
   bank from grade 2, not only from the topics of finished beginner lessons.
 - Skipping is remembered; the path then starts from what onboarding said.
 
-## Review (v13)
+## Review
 
 Spaced review follows a memory model after FSRS (the free spaced-repetition
 scheduler, v4.5 formulas with its default weights rounded; `MEMORY` in
-player.js) instead of the fixed 1-3-7-21 day ladder. Each problem and each
+player.js), not a fixed ladder of days. Each problem and each
 drill from your games keeps a **stability** (days until the chance of still
 solving it falls to 90 %) and a **difficulty** (1–10). Each first answer of
 a visit is graded:
@@ -237,7 +239,9 @@ new problems keep arriving.
 v9–v12 records (`tries`, `streak`, `due`, `last`) are read by
 `migrateProblemRecord` (and drills the same way): the stability is the
 ladder interval reached, the due date is kept, so nothing moves on
-upgrade. `normalizeProfile` reads both shapes: the profile file is now version 13 (`PROFILE_V`), and a v9–v12 file (`v: 9`) is migrated, not reset.
+upgrade. `normalizeProfile` reads both shapes: the profile file is
+version 13 (`PROFILE_V`), and a v9–v12 file (`v: 9`) is migrated, not
+reset.
 
 **Shown differently.** A problem tried before comes back turned or
 mirrored (one of the eight board symmetries) and, except endgame

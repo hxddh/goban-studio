@@ -1,5 +1,5 @@
 /**
- * Say truthfully how a release was signed (v4).
+ * Say truthfully how a release was signed.
  *
  * Each platform build writes a signing status file (dist/signing-macos.json,
  * dist/signing-windows.json) describing what actually happened:
@@ -13,10 +13,10 @@
  *
  *   node scripts/signing-notes.mjs status macos|windows <mode> [--notarized|--timestamped] > status.json
  *   node scripts/signing-notes.mjs notes <notes.md> <signing-macos.json> <signing-windows.json> [<signing-macos-x64.json>] > out.md
- *
- * v5: with the Intel Mac status (fourth file) the table gains a
- * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
  *   node scripts/signing-notes.mjs readme <README-*.txt> <signing-*.json> > out.txt
+ *
+ * With the Intel Mac status (the fourth file) the table has a
+ * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
  */
 import fs from "node:fs";
 import path from "node:path";

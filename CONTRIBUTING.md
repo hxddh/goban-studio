@@ -114,8 +114,10 @@ that search source text. `docs/QA.md` lists what each gate covers.
 - **Four languages, always.** Every user-visible string exists in Chinese,
   English, Korean and Japanese, written naturally and with the terms in
   `docs/glossary.md` (correct Korean particles included). New interface
-  strings go through `m(zh, en, ko, ja)`; `docs/l10n/strings.csv` is
-  generated (`node scripts/export-strings.mjs`), never edited by hand.
+  strings go through `m(zh, en, ko, ja)` in the area's file under
+  `src/web/js/messages/`; a string no view uses fails the tests.
+  `docs/l10n/strings.csv` is generated (`node scripts/export-strings.mjs`),
+  never edited by hand.
   A count goes through `tn(key, n)` (its English singular is `key.one`);
   a label and its value through `v13ui.labelValue` (CJK takes a
   full-width colon), never `` `${label}: ${value}` ``; a Korean particle
@@ -139,6 +141,9 @@ that search source text. `docs/QA.md` lists what each gate covers.
 - The version lives in `package.json`, `app.zon`, `build.zig.zon`,
   `src/web/js/version.js` and `src/web/index.html`; `release-check` fails
   if they disagree. Release notes go in `.github/release-notes/v<version>.md`.
+  The README describes the app as it is, with no version history;
+  `release-check` also fails when a count it states (units, lessons,
+  steps, problems, classics) is not the real one.
 - Releases are made by the maintainer from `main` with `release.yml` (see
   `docs/signing.md`); a pull request never changes the version on its own.
 - Pin new GitHub Actions by commit SHA with the version as a comment

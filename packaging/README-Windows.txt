@@ -1,9 +1,11 @@
 Goban Studio for Windows
 =======================
 
-Run bin\goban-studio.exe. The app needs the Microsoft Edge WebView2
-runtime, which is preinstalled on Windows 10 and 11. The bundled KataGo
-engine starts only when a 19x19 game begins.
+Unzip the download anywhere you can write to (for example your user
+folder) and run bin\goban-studio.exe. There is no installer. The app
+needs the Microsoft Edge WebView2 runtime, which is preinstalled on
+Windows 10 and 11. The bundled KataGo engine starts the first time it is
+needed.
 
 This build is not Authenticode-signed. Windows SmartScreen may show
 "Windows protected your PC"; choose "More info" and then "Run anyway".

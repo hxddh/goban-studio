@@ -1,10 +1,9 @@
-# Storage (v13)
+# Storage
 
 How Goban Studio keeps your data, what format it is in, how older data is
 brought forward, and what the app does when something cannot be read. The
 code is `src/web/js/data/` (store, games, settings, backup, migrate, pack)
-over the host's `studio.store*` commands (`src/store.zig`). This page
-replaces the "Storage" and "Backups" parts of `docs/v9.md`.
+over the host's `studio.store*` commands (`src/store.zig`).
 
 ## Where it is
 
@@ -26,12 +25,13 @@ on macOS, or `%LOCALAPPDATA%\dev.hxddh.gobanstudio` on Windows (that
 folder also holds the window's remembered size, under `State`).
 
 On Windows the folder `bin\goban-studio.exe.WebView2` inside the app
-folder is the WebView2 component's own profile (its cache). Since v9 it
-holds none of the player's data; the update helper still carries it over
-to the new version so the web view does not start cold.
+folder is the WebView2 component's own profile (its cache). It holds none
+of the player's data; the update helper still carries it over to the new
+version so the web view does not start cold.
 
-`studio.revealDataDir` opens `<app data>/data` in Finder or Explorer
-(`host.js revealDataDir()`); the page never names the path.
+Settings → Data → *Show data folder* opens `<app data>/data` in Finder or
+Explorer (`studio.revealDataDir`, `host.js revealDataDir()`); the page
+never names the path.
 
 `GOBAN_DATA_DIR` and `GOBAN_MODELS_DIR` (absolute paths) replace the two
 folders, for tests and development.
@@ -68,6 +68,7 @@ games/<id>.json          { v, id, createdAt, updatedAt, finishedAt,
 session.json, batch.json, update state …                         read at boot
 bad/<key>-<time>.json    byte-for-byte copies of damaged files   never read
 backups/pre-restore-<time>/<key>   the restore snapshot           read on undo
+instance.lock, inbox/    the running copy's lock and its inbox   not the store's ("One instance")
 ```
 
 Keys are relative paths of 1–4 `[a-z0-9_-]` segments separated by `/`,
@@ -86,8 +87,16 @@ keeps `meta.rateBase`: `{ size, entry, history, opponent, handicap,
 eligible }` — the strength estimate's state on that board size before the
 game, and the opponent's measured strength — so that counting the game
 again can replace its rating step instead of adding one
-(`model/rerate.js`). Older games have none: a rated one among them cannot
-be counted again.
+(`model/rerate.js`). Games finished before this was kept have none: a
+rated one among them cannot be counted again.
+
+**Deleting a game** from the Library can be undone for a few seconds. The
+game held for that undo is kept in memory only (`data/games.js`
+`trashGame`, `restoreGame`, `commitTrash`): it leaves the list and the
+index at once, its file stays on disk until the undo has passed, another
+game is deleted, or everything is written out (before quitting, a backup
+or a restore). There is no trash folder. If the app dies in between, the
+file is still there and the next start lists the game again.
 
 ## Boot reads only what the first screens need
 
@@ -191,13 +200,29 @@ nothing is replaced. The offer ends when the snapshot is 30 days old (it is
 removed at the next launch) or when a backup is exported (the player then
 holds a newer copy than the snapshot), whichever comes first.
 
-`settings.json` — two settings changed shape and are migrated when read
-(`data/settings.js`): the `sound` switch became `volume` (`off`, `quiet`,
-`normal`, `loud`; `sound: false` reads as `off`), and `defaultRules` may be
-`null`, meaning "never chosen": new games then use the rules of the
-interface language (Chinese rules in Chinese, Korean rules in Korean,
-Japanese rules otherwise). A file written by an earlier version always
-carries the rules it played with, so an existing player keeps them.
+## Settings and the profile: additions without a new version
+
+Neither file's version changed for these; a file without them reads as
+before, and `normalizeSettings` / `normalizeProfile` fill in the rest.
+
+`settings.json` (`data/settings.js`):
+
+- `volume` (`off`, `quiet`, `normal`, `loud`) replaces the `sound` switch;
+  `sound: false` reads as `off`.
+- `defaultRules` may be `null`, meaning "never chosen": new games then use
+  the rules of the interface language (Chinese rules in Chinese, Korean
+  rules in Korean, Japanese rules otherwise). A file written before this
+  always carries the rules it played with, so an existing player keeps
+  them.
+- `boardStyle` (`standard`, `contrast`), `lastMoveMark` (true) and
+  `dailySize` (3, 5 or 10; 5) are new keys with those defaults.
+
+`profile.json` (`model/player.js`, version 13): a problem record may carry
+`first` and `seen` (the first attempt's result and time), a game record
+`assisted` (it used undo or hints and was not rated), a rating-history
+point `r` and `sd`, and the profile `days` (a map of practice days) and
+`marks` (when each milestone was first reached). `docs/plan.md`
+("Progress") says what reads them.
 
 ## Safe state
 
@@ -224,8 +249,8 @@ read, and then write defaults over your data.
 - **A side file** that cannot be read is one toast ("Some saved data
   couldn't be read"), as before.
 
-Writes that fail are kept pending and tried again (v9); a burst of failures
-is one toast.
+Writes that fail are kept pending and tried again; a burst of failures is
+one toast.
 
 ## The packaged app without its bridge
 

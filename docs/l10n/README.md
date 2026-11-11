@@ -1,10 +1,10 @@
 # Native-speaker review
 
-Every interface string lives in `src/web/js/messages.js` in four languages.
-The English column is the reference. The Chinese, Korean and Japanese text
-was written and cross-checked by a model against `docs/glossary.md`;
-**no native speaker has reviewed it yet.** This folder is how that review
-happens.
+Every interface string lives in `src/web/js/messages.js` and the area
+files under `src/web/js/messages/`, in four languages. The English column
+is the reference. The Chinese, Korean and Japanese text was written and
+cross-checked by a model against `docs/glossary.md`; **no native speaker
+has reviewed it yet.** This folder is how that review happens.
 
 ## For reviewers
 
@@ -25,8 +25,9 @@ not, so both the terms and the plain text get a native read.
 
 * Regenerate the sheet after changing strings:
   `node scripts/export-strings.mjs`. The test suite fails if the sheet is
-  out of date with `messages.js`.
-* Apply notes in `messages.js`, then record the review below.
+  out of date with the string table.
+* Apply notes in the file that holds the string, then record the review
+  below.
 
 ## Review log
 

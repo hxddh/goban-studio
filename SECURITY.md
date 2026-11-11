@@ -29,7 +29,9 @@ Only the latest release is supported. There are no older branches.
   GitHub's own download hosts over HTTPS. If your system (or the
   `HTTPS_PROXY` environment variable) names an HTTP proxy, these requests
   go through it as a CONNECT tunnel: the proxy learns the host name, and
-  TLS is still verified end to end with GitHub (`src/net.zig`).
+  TLS is still verified end to end with GitHub (`src/net.zig`). Only
+  plain HTTP proxies are used; SOCKS proxies and auto-config (PAC) scripts
+  are not, and when no tunnel can be set up the request goes out directly.
 - **Files you choose.** SGF files and backups are read and written where
   you point the file dialog, or opened from the OS ("Open with", drag and
   drop).
@@ -88,7 +90,9 @@ The release pipeline can close that gap with a separate signing key:
   new key.
 
 Without both, updates rely on GitHub and HTTPS, exactly like a manual
-download from the releases page. `docs/signing.md` describes the setup.
+download from the releases page. **Neither is configured yet**: no key
+pair has been made, and the `release-signing` environment has to be
+created by the repository's owner. `docs/signing.md` describes the setup.
 
 ## Code signing status
 

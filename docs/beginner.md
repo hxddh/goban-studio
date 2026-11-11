@@ -15,9 +15,14 @@ keeps one primary action. The rules live in `src/web/js/model/player.js`
 (`bridgeAfter`), the page in `app/beginner.jsx` (`LessonDone`); in v9 the
 bridges are also items of Learn's path (`learn/session.js`).
 
-Onboarding's *I know the rules* starts a 9×9 game against a gentle level
-(25 kyu) instead of 19×19. Teaching mode is on for these players
-automatically (`teachingOn`, about 15 kyu and weaker).
+After onboarding everyone lands on Today. For *I know the rules* its one
+button starts a 9×9 game against a gentle level; for someone who has
+never played it starts lesson one. A beginner's suggested game is 9×9
+until three games are finished there, then 13×13; someone who came up
+through the small boards and is past the beginner ranks plays two games
+on 13×13 before the full board (`app/first-run.js` `suggestedSize`).
+Teaching mode is on for these players automatically (`teachingOn`, about
+15 kyu and weaker).
 
 ## Capture Go (吃子棋)
 
