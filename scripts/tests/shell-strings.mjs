@@ -18,9 +18,9 @@ await test("shell strings: the area files are merged into the table, in four lan
     for (const [key, v] of Object.entries(table)) assert.equal(MESSAGES[key], v, `${key} (${file}.js) is the table's`);
   }
   assert.equal(total, Object.keys(MESSAGES).length, "no key is defined in two files");
-  // v12: the four spaces have their names (Practice keeps Learn's key).
-  for (const key of ["nav.today", "nav.play", "nav.learn", "nav.library"]) assert.ok(MESSAGES[key], key);
-  assert.ok(!MESSAGES["nav.practice"], "one key for Practice");
+  // The four spaces have their names; the old key for Practice is gone.
+  for (const key of ["nav.today", "nav.play", "nav.practice", "nav.library"]) assert.ok(MESSAGES[key], key);
+  assert.ok(!MESSAGES["nav.learn"], "one key for Practice");
 });
 
 await test("shell strings: every key prefix lives in exactly one area file, and none is named after a version", () => {
@@ -52,19 +52,19 @@ await test("every UI key exists in all four launch languages", () => {
   setLang("ko");
   assert.equal(t("nav.play"), "대국");
   setLang("ja");
-  assert.equal(t("nav.learn"), "練習");
+  assert.equal(t("nav.practice"), "練習");
   setLang("en");
-  assert.equal(t("nav.learn"), "Practice");
+  assert.equal(t("nav.practice"), "Practice");
   setLang("zh");
   assert.equal(t("nav.play"), "下棋");
-  assert.equal(t("nav.learn"), "练习");
+  assert.equal(t("nav.practice"), "练习");
   assert.equal(t("nav.today"), "今天");
   assert.equal(t("nav.library"), "棋谱");
 });
 
 await test("every key the interface uses is in the string table", () => {
   const used = new Set();
-  for (const area of ["app", "play", "learn", "data", "model"]) {
+  for (const area of ["app", "play", "practice", "data", "model"]) {
     const dir = path.join(root, "src/web/js", area);
     for (const file of fs.readdirSync(dir)) {
       const src = fs.readFileSync(path.join(dir, file), "utf8");

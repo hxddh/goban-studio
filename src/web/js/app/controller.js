@@ -4,7 +4,7 @@
  * This file is the hub the views import: it boots the app (the store
  * first), owns the four spaces (Today, Play, Practice and Library; v12)
  * and history restore, the games' history, backups and onboarding, and
- * re-exports the play, review and learn controllers. None of it touches the DOM.
+ * re-exports the play, review and practice controllers. None of it touches the DOM.
  */
 import { BLACK, formatPoints } from "../rules.js";
 import { countGames, decodeSgf, loadSGF } from "../sgf.js";
@@ -23,7 +23,7 @@ import { state, update, toast, dismissToastKey, runTask } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, openSheet, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
 import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, persistCurrent, ponder, recommendedGame, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
-import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
+import { allLessons, practiceHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
 import { initModels } from "./models-ctl.js";
 import { resumeBackground } from "../play/analysis.js";
@@ -39,10 +39,10 @@ export * from "./models-ctl.js";
 export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
-export * from "../learn/session.js"; // Learn's path, today's session
-export * from "../learn/placement.js"; // v10: the placement quiz
-import { itemKey, todaysSession } from "../learn/session.js";
-export * from "./capture-ctl.js"; // the beginner bridges (Learn)
+export * from "../practice/session.js"; // Practice's path, today's session
+export * from "../practice/placement.js"; // v10: the placement quiz
+import { itemKey, todaysSession } from "../practice/session.js";
+export * from "./capture-ctl.js"; // the beginner bridges (Practice)
 import { resumeCapture } from "./capture-ctl.js";
 export { CLASSICS, formatPoints };
 
@@ -238,7 +238,7 @@ export async function resetDamaged() {
 /* --------------------------------------------------------------- spaces */
 
 /** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
-export const SPACES = ["today", "play", "learn", "library"];
+export const SPACES = ["today", "play", "practice", "library"];
 
 /**
  * Play's top: the board while a game is not over (v12, as before v9), else
@@ -283,13 +283,13 @@ export function goSpace(space) {
   if (!SPACES.includes(space)) return;
   // The space you are in again: back to its top level.
   if (space === state.space) {
-    if (space === "learn") {
-      if (state.review && (state.review.meta.space || "play") === "learn") {
+    if (space === "practice") {
+      if (state.review && (state.review.meta.space || "play") === "practice") {
         remember();
         dropReview();
         return update();
       }
-      if (state.learn.view !== "home") return learnHome();
+      if (state.practice.view !== "home") return practiceHome();
       return;
     }
     if (space === "library") {
@@ -334,8 +334,8 @@ export function restore(loc) {
   if (state.review) dropReview();
   state.space = loc.space;
   state.play = { ...state.play, ...loc.play };
-  const p = loc.learn;
-  if (loc.space === "learn") {
+  const p = loc.practice;
+  if (loc.space === "practice") {
     // An item of today's session comes back inside the session.
     const s = p.daily ? todaysSession() : null;
     const within = (kind, id) => {
@@ -352,7 +352,7 @@ export function restore(loc) {
     else if (p.view === "catalog") openCatalog();
     else if (p.view === "topic" && p.shape) openShape(p.shape);
     else if (p.view === "topic" && p.topic) openTopic(p.topic, p.theme || null);
-    else learnHome();
+    else practiceHome();
   }
   const rv = loc.review;
   if (rv) {

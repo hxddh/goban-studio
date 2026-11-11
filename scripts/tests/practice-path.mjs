@@ -1,8 +1,8 @@
 /**
- * Learn: the path chosen for you (model/player.js learnPath) — its order
+ * Practice: the path chosen for you (model/player.js practicePath) — its order
  * and content for a new, a middle and a strong player, with reviews due and
  * the week's focus; the beginner bridges in it; the strings of the new
- * Learn views. Loaded by scripts/test.mjs; receives the runner's helpers.
+ * Practice views. Loaded by scripts/test.mjs; receives the runner's helpers.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -53,8 +53,8 @@ export default async function ({ test, assert, root }) {
     for (const it of list) if (it.role === "focus") assert.ok(it.why, `${who}: a focus item names its focus`);
   }
 
-  await test("learn path: a new player — the first lesson, then capturing problems at the easiest grades; no stretch yet", () => {
-    const list = P.learnPath(P.newProfile(), content(NEW), NOW);
+  await test("practice path: a new player — the first lesson, then capturing problems at the easiest grades; no stretch yet", () => {
+    const list = P.practicePath(P.newProfile(), content(NEW), NOW);
     wellFormed(list, "new");
     assert.deepEqual(list[0], { kind: "lesson", id: firstOf("beginner"), unit: COURSE[0].id, role: "next" });
     const probs = list.slice(1);
@@ -65,27 +65,27 @@ export default async function ({ test, assert, root }) {
       assert.equal(def(it.id).topic, "capture", "only what the lessons taught");
       assert.ok(gradeOf(it.id) <= 2, `grade ${gradeOf(it.id)}`);
     }
-    assert.deepEqual(P.learnPath(P.newProfile(), content(NEW), NOW + 3 * 3600000), list, "the same all day");
+    assert.deepEqual(P.practicePath(P.newProfile(), content(NEW), NOW + 3 * 3600000), list, "the same all day");
   });
 
-  await test("learn path: a new player with a game mistake and a missed problem due — reviews right after the lesson", () => {
+  await test("practice path: a new player with a game mistake and a missed problem due — reviews right after the lesson", () => {
     let p = P.addMistake(P.newProfile(), { gameId: "g1", index: 12, theme: "atari", color: 1, size: 9 }, NOW - DAY);
-    const first = P.learnPath(p, content(NEW), NOW).find((i) => i.kind === "problem").id;
+    const first = P.practicePath(p, content(NEW), NOW).find((i) => i.kind === "problem").id;
     p = P.recordProblem(p, first, { solved: false }, NOW - 2 * DAY);
-    const list = P.learnPath(p, content(NEW), NOW);
+    const list = P.practicePath(p, content(NEW), NOW);
     wellFormed(list, "new with reviews");
     assert.deepEqual(list.slice(0, 3).map((i) => [i.kind, i.role]), [["lesson", "next"], ["mistake", "review"], ["problem", "review"]]);
     assert.equal(list[1].id, "g1-12");
     assert.equal(list[2].id, first);
     // A drill from "try again from the position" (Play, addMistake) is due at once.
     const tried = P.addMistake(p, { gameId: "g2", index: 30, theme: "cut", color: -1, size: 19 }, NOW - 1000);
-    assert.ok(P.learnPath(tried, content(NEW), NOW).some((i) => i.kind === "mistake" && i.id === "g2-30"), "a moment tried again comes back");
+    assert.ok(P.practicePath(tried, content(NEW), NOW).some((i) => i.kind === "mistake" && i.id === "g2-30"), "a moment tried again comes back");
     // Reviewed: it leaves the path until it is due again.
     const reviewed = P.recordMistake(p, "g1-12", { solved: true }, NOW);
-    assert.ok(!P.learnPath(reviewed, content(NEW), NOW).some((i) => i.id === "g1-12"));
+    assert.ok(!P.practicePath(reviewed, content(NEW), NOW).some((i) => i.id === "g1-12"));
   });
 
-  await test("learn path: a middle player with a focus — intermediate lesson, reviews, the focus around the level, one stretch", () => {
+  await test("practice path: a middle player with a focus — intermediate lesson, reviews, the focus around the level, one stretch", () => {
     let p = P.normalizeProfile({ ...P.newProfile({ rank: 12 }), games: P.normalizeGames(cutGames()) });
     p = record(p, [1, 2]);
     p = { ...p, mistakes: [drill("d1", "cut")] };
@@ -95,7 +95,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(model.focus.map((a) => a.key), ["cut"]);
     const level = model.problems.level;
     assert.ok(level >= 1 && level <= 3, `level ${level}`);
-    const list = P.learnPath(p, content(MIDDLE), NOW);
+    const list = P.practicePath(p, content(MIDDLE), NOW);
     wellFormed(list, "middle");
     assert.deepEqual(list[0], { kind: "lesson", id: firstOf("intermediate"), unit: COURSE.find((u) => u.level === "intermediate").id, role: "next" });
     assert.deepEqual(list[1], { kind: "mistake", id: "d1", role: "review", why: "cut" }, "the drill names the focus it trains");
@@ -112,7 +112,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(gradeOf(stretch[0].id) > level, "a step up");
   });
 
-  await test("learn path: a strong player — the advanced course, problems near the top grades, the stretch at the top", () => {
+  await test("practice path: a strong player — the advanced course, problems near the top grades, the stretch at the top", () => {
     // Before any problem: their rank sets the level (gradeForRank).
     // v13: conservative — a rank gets the grade it should solve comfortably.
     assert.equal(P.gradeForRank(30), 1);
@@ -124,7 +124,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.gradeForRank(-1), 5);
     assert.equal(P.gradeForRank(null), null);
     for (const [g, rank] of Object.entries(P.PLACEMENT_RANK)) assert.ok(P.gradeForRank(rank) >= Number(g) || Number(g) === 1, `placement grade ${g} → ${rank} kyu → grade ${P.gradeForRank(rank)}`);
-    const fresh = P.learnPath(P.newProfile({ rank: 2 }), content(STRONG), NOW);
+    const fresh = P.practicePath(P.newProfile({ rank: 2 }), content(STRONG), NOW);
     wellFormed(fresh, "strong, new to the app");
     assert.equal(fresh[0].id, firstOf("advanced"));
     for (const it of fresh.filter((i) => i.kind === "problem")) assert.ok(gradeOf(it.id) >= 3, `${it.id} grade ${gradeOf(it.id)} for a 2 kyu`);
@@ -135,45 +135,45 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.levelPrior(p, STRONG, NOW), 5);
     assert.equal(P.focus(p, NOW, { problems: PROBLEMS, grades: GRADES, cover: P.levelPrior(p, STRONG, NOW) }).problems.level, 4);
     assert.equal(P.focus(p, NOW, { problems: PROBLEMS, grades: GRADES }).problems.level, 1, "without it, grades 1 and 2 are unknown");
-    const list = P.learnPath(p, content(STRONG), NOW);
+    const list = P.practicePath(p, content(STRONG), NOW);
     wellFormed(list, "strong");
     for (const it of list.filter((i) => i.role === "new")) assert.ok(gradeOf(it.id) >= 3, `${it.id} grade ${gradeOf(it.id)}`);
     const stretch = list.find((i) => i.role === "stretch");
     assert.equal(gradeOf(stretch.id), 5);
     // Everything done in the course: no lesson item, the problems remain.
     const done = P.normalizeProfile({ ...p, lessons: Object.fromEntries(lessons.map(({ lesson }) => [lesson.id, { done: true, step: 0, at: 0 }])) });
-    const rest = P.learnPath(done, content(STRONG), NOW);
+    const rest = P.practicePath(done, content(STRONG), NOW);
     assert.ok(!rest.some((i) => i.kind === "lesson"));
     assert.equal(rest.length, 5);
   });
 
-  await test("learn path: the beginner bridges are items of the path — capture Go after the lesson, the first 9×9 game last", () => {
+  await test("practice path: the beginner bridges are items of the path — capture Go after the lesson, the first 9×9 game last", () => {
     let p = P.recordLesson(P.newProfile(), "stones-capture", { done: true }, NOW);
-    let list = P.learnPath(p, content(NEW), NOW);
+    let list = P.practicePath(p, content(NEW), NOW);
     wellFormed(list, "after capturing");
     assert.deepEqual(list.slice(0, 2).map((i) => i.kind), ["lesson", "capture"]);
-    assert.ok(!P.learnPath(p, content(NEW, { captureWins: 2 }), NOW).some((i) => i.kind === "capture"), "two wins: no more");
+    assert.ok(!P.practicePath(p, content(NEW, { captureWins: 2 }), NOW).some((i) => i.kind === "capture"), "two wins: no more");
     p = P.recordLesson(p, "life-two-eyes", { done: true }, NOW);
-    list = P.learnPath(p, content(NEW), NOW);
+    list = P.practicePath(p, content(NEW), NOW);
     wellFormed(list, "both bridges");
     assert.equal(list.length, 8, "lesson, capture Go, five problems, the first game");
     assert.equal(list.at(-1).kind, "game");
     assert.deepEqual(list.at(-1).game, P.FIRST_GAME);
     const played = P.recordGame(p, { id: "1", at: NOW - 1000, size: 9, won: false, moves: 40, level: "30k" });
-    assert.ok(!P.learnPath(played, content(NEW), NOW).some((i) => i.kind === "game"), "not once a game is played");
+    assert.ok(!P.practicePath(played, content(NEW), NOW).some((i) => i.kind === "game"), "not once a game is played");
   });
 
-  await test("learn strings: the Learn area in four languages; the removed Daily five, plan and trend strings are gone", () => {
+  await test("practice strings: the Practice area in four languages; the removed Daily five, plan and trend strings are gone", () => {
     for (const [key, v] of Object.entries(PRACTICE)) {
       assert.deepEqual(MESSAGES[key], v, key);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(v[lang]?.trim(), `${key} ${lang}`);
     }
-    assert.equal(PRACTICE["learn.path.focus"].zh, "本周重点：{0}");
-    assert.equal(PRACTICE["learn.path.review"].en, "Due for review");
-    assert.equal(PRACTICE["learn.path.next"].en, "Next lesson");
-    for (const key of Object.keys(MESSAGES)) assert.ok(!/^(plan\.|trend\.|practice\.daily|practice\.nextDaily|practice\.finishDaily)/.test(key), key);
+    assert.equal(PRACTICE["practice.path.focus"].zh, "本周重点：{0}");
+    assert.equal(PRACTICE["practice.path.review"].en, "Due for review");
+    assert.equal(PRACTICE["practice.path.next"].en, "Next lesson");
+    for (const key of Object.keys(MESSAGES)) assert.ok(!/^(plan\.|trend\.|practice\.daily(?!\.label$)|practice\.nextDaily|practice\.finishDaily)/.test(key), key);
     for (const f of ["app/plan-ctl.js", "messages/v7-plan.js"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js", f)), f);
-    // The streak stays removed: nothing in Learn counts days in a row.
-    for (const f of ["learn/path.jsx", "learn/session.js", "learn/catalog.jsx", "app/practice.jsx"]) assert.doesNotMatch(fs.readFileSync(path.join(root, "src/web/js", f), "utf8"), /streak/i, f);
+    // The streak stays removed: nothing in Practice counts days in a row.
+    for (const f of ["practice/path.jsx", "practice/session.js", "practice/catalog.jsx", "app/practice.jsx"]) assert.doesNotMatch(fs.readFileSync(path.join(root, "src/web/js", f), "utf8"), /streak/i, f);
   });
 }

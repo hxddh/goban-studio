@@ -1,6 +1,6 @@
 /**
- * Learn's path as today's session (docs/v9.md, "Two spaces"): the one list
- * chosen for you (model/player.js learnPath — the next lesson, capture Go
+ * Practice's path as today's session (docs/v9.md, "Two spaces"): the one list
+ * chosen for you (model/player.js practicePath — the next lesson, capture Go
  * while it applies, your mistakes and problems due for review, the week's
  * focus around your solving level, one stretch problem, new problems, the
  * first 9×9 game while it applies), played in order. The number of problem
@@ -21,14 +21,14 @@
 import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { changeProfile, isRestoring, remember, setSetting } from "../app/ctl-core.js";
-import { bridgeAfter, dailySize, evidenceOf, focus, focusLesson, keepFocus, learnPath as pathOf } from "../model/player.js";
+import { bridgeAfter, dailySize, evidenceOf, focus, focusLesson, keepFocus, practicePath as pathOf } from "../model/player.js";
 import { COURSE, GRADES, PROBLEMS, withContent } from "../content.js";
 import { store } from "../data/store.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, themeName } from "../app/practice-ctl.js";
 import { startCapture, startFirstGame } from "../app/capture-ctl.js";
 
 /** The model's list for this player now, each item with its key. */
-export function learnPath(now = Date.now()) {
+export function practicePath(now = Date.now()) {
   const s = state.settings;
   const list = pathOf(state.profile, { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: s.experience, playerRank: s.playerRank }, captureWins: s.captureWins || 0, limit: s.dailySize }, now);
   return list.map(keyed);
@@ -115,7 +115,7 @@ function insertAt(s) {
 /**
  * Today's session, or null before it starts (and on another day). Items
  * that no longer exist (a drill removed) leave it; drills that fell due
- * since it started join it, before the first game (which leaves Learn).
+ * since it started join it, before the first game (which leaves Practice).
  */
 export function todaysSession(now = Date.now()) {
   const s = loaded();
@@ -123,7 +123,7 @@ export function todaysSession(now = Date.now()) {
   s.items = s.items.filter(known);
   s.done = s.done.filter((k) => s.items.some((it) => it.key === k));
   const have = new Set(s.items.map((it) => it.key));
-  const fresh = learnPath(now).filter((it) => it.kind === "mistake" && !have.has(it.key));
+  const fresh = practicePath(now).filter((it) => it.kind === "mistake" && !have.has(it.key));
   if (fresh.length) {
     let at = insertAt(s);
     const game = s.items.findIndex((it) => it.kind === "game");
@@ -137,7 +137,7 @@ export function todaysSession(now = Date.now()) {
 /** A new session from the path now, keeping what is already done today. */
 function begin(now = Date.now()) {
   const before = todaysSession(now);
-  const items = learnPath(now);
+  const items = practicePath(now);
   session = { date: dayOf(now), items, done: (before?.done || []).filter((k) => items.some((it) => it.key === k)), current: null };
   save();
   return session;
@@ -172,7 +172,7 @@ export function setDailySize(n, now = Date.now()) {
   }
   if (picks < size) {
     const have = new Set(s.items.map((it) => it.key));
-    const more = learnPath(now).filter((it) => isPick(it) && !have.has(it.key)).slice(0, size - picks);
+    const more = practicePath(now).filter((it) => isPick(it) && !have.has(it.key)).slice(0, size - picks);
     // Before the first game, which leaves Practice for Play.
     const game = s.items.findIndex((it) => it.kind === "game");
     s.items.splice(game >= 0 ? game : s.items.length, 0, ...more);
@@ -182,7 +182,7 @@ export function setDailySize(n, now = Date.now()) {
 }
 
 /** The first item not done after the one open now, else the first not done. */
-export function upNext(s = state.learn.daily || todaysSession()) {
+export function upNext(s = state.practice.daily || todaysSession()) {
   if (!s) return null;
   const at = s.items.findIndex((it) => it.key === s.current);
   return s.items.slice(at + 1).find((it) => !isDone(s, it)) || s.items.find((it) => !isDone(s, it) && it.key !== s.current) || null;
@@ -194,14 +194,14 @@ export function upNext(s = state.learn.daily || todaysSession()) {
  */
 export function pathNow(now = Date.now()) {
   const s = todaysSession(now);
-  const items = s ? s.items : learnPath(now);
+  const items = s ? s.items : practicePath(now);
   const done = new Set(s?.done || []);
   return { items, done, started: done.size > 0, finished: !!s && items.length > 0 && items.every((it) => done.has(it.key)) };
 }
 
 /** Where the open item stands in the session, for the toolbar: { n, total } or null. */
 export function sessionPlace() {
-  const s = state.learn.daily;
+  const s = state.practice.daily;
   if (!s) return null;
   const n = s.items.findIndex((it) => it.key === s.current);
   return n >= 0 ? { n: n + 1, total: s.items.length } : null;
@@ -209,7 +209,7 @@ export function sessionPlace() {
 
 /** The open session item, or null. */
 export function sessionItem() {
-  const s = state.learn.daily;
+  const s = state.practice.daily;
   return s ? s.items.find((it) => it.key === s.current) || null : null;
 }
 
@@ -265,7 +265,7 @@ function markDone(s, key) {
 
 /** The open session item is done (a problem solved, a drill found, a lesson finished, a capture game over). */
 export function itemDone(kind, id = null) {
-  const s = state.learn.daily;
+  const s = state.practice.daily;
   if (!s) return;
   const key = itemKey({ kind, id });
   if (s.items.some((it) => it.key === key)) markDone(s, key);
@@ -276,7 +276,7 @@ export function itemDone(kind, id = null) {
  * to joins the session — capture Go next, the first 9×9 game at the end.
  */
 export function lessonFinished(lessonId) {
-  const s = state.learn.daily;
+  const s = state.practice.daily;
   if (!s) return;
   itemDone("lesson", lessonId);
   const bridge = bridgeAfter(lessonId, state.profile, { captureWins: state.settings.captureWins });
@@ -287,7 +287,7 @@ export function lessonFinished(lessonId) {
 
 /** "Continue": the open item is done; on to the next, or the quiet end of the day. */
 export function continuePath() {
-  const s = state.learn.daily || todaysSession();
+  const s = state.practice.daily || todaysSession();
   if (!s) return;
   markDone(s, s.current);
   const it = upNext(s);
@@ -299,8 +299,8 @@ function finish(s) {
   s.current = null;
   save(s);
   update((st) => {
-    st.space = "learn";
-    st.learn = { ...st.learn, view: "dailyDone", lesson: null, problem: null, mistake: null, daily: null };
+    st.space = "practice";
+    st.practice = { ...st.practice, view: "dailyDone", lesson: null, problem: null, mistake: null, daily: null };
   });
 }
 

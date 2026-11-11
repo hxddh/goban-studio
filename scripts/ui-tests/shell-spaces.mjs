@@ -35,10 +35,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
     // Practice: the path, one primary (start it), then the course and the problems on the same page.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Practice");
-    assert(await page.evaluate(() => document.querySelector(".learn-path").compareDocumentPosition(document.querySelector(".learn-home .catalog")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
-    assert((await page.locator(".learn-home .units").count()) === 1 && (await page.locator(".learn-home .topic-row").count()) === 8, "the course and the topics are on the page");
+    assert(await page.evaluate(() => document.querySelector(".practice-path").compareDocumentPosition(document.querySelector(".practice-home .catalog")) & Node.DOCUMENT_POSITION_FOLLOWING), "the path comes before the catalog");
+    assert((await page.locator(".practice-home .units").count()) === 1 && (await page.locator(".practice-home .topic-row").count()) === 8, "the course and the topics are on the page");
     // The Library: your games, the classics, the explorer, Import SGF.
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home .collection-row");
@@ -55,7 +55,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await clickPoint(page, 4, 4);
     await page.waitForFunction(() => window.__state.game.game.moveNumber >= 1);
     await page.keyboard.press("Control+3");
-    await page.click(".learn-path .btn.primary");
+    await page.click(".practice-path .btn.primary");
     await page.waitForSelector(".steps");
     await page.waitForFunction(() => !!localStorage.getItem("goban9:current.json"), null, { timeout: 3000 });
     const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("goban9:")).sort());

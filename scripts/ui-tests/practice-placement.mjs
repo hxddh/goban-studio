@@ -1,6 +1,6 @@
 /**
- * Learn: the placement quiz in the browser (v10, learn/placement.js) —
- * someone who knows the rules finds it on Learn's home before the path,
+ * Practice: the placement quiz in the browser (v10, practice/placement.js) —
+ * someone who knows the rules finds it on Practice's home before the path,
  * with one primary and a quiet Not now; the quiz shows where it is (v13:
  * 10–12 problems, ending early once the grade is stable); at the end the
  * path appears and the offer is gone. The offer and a quiz problem
@@ -31,7 +31,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     assert(!bad.overflow, `${where}: the page scrolls sideways`);
   }
 
-  /** Someone who knows the rules (onboarding's second answer), on Learn's home. */
+  /** Someone who knows the rules (onboarding's second answer), on Practice's home. */
   async function knowsRules(locale = "en-US", scheme = "light") {
     const page = await fresh(locale);
     await page.emulateMedia({ colorScheme: scheme });
@@ -41,21 +41,21 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     return page;
   }
 
-  await check("learn placement: offered before the path with one primary; four misses end it at grade 1; then the path, and no offer", async () => {
+  await check("practice placement: offered before the path with one primary; four misses end it at grade 1; then the path, and no offer", async () => {
     const page = await knowsRules();
-    assert((await page.locator(".learn-path").count()) === 0, "no path before the placement");
+    assert((await page.locator(".practice-path").count()) === 0, "no path before the placement");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
     assert((await page.textContent(".placement-offer")).includes("10–12 problems"), "says how long");
     await page.click(".placement-offer .btn.primary");
     let asked = 0;
     for (let i = 1; i <= 12; i++) {
-      await page.waitForFunction((n) => (window.__state.learn.view === "problem" && window.__state.learn.placement?.results.length === n - 1) || !window.__state.learn.placement, i, { timeout: 4000 });
-      if (!(await page.evaluate(() => !!window.__state.learn.placement))) break;
+      await page.waitForFunction((n) => (window.__state.practice.view === "problem" && window.__state.practice.placement?.results.length === n - 1) || !window.__state.practice.placement, i, { timeout: 4000 });
+      if (!(await page.evaluate(() => !!window.__state.practice.placement))) break;
       asked = i;
       const sub = await page.textContent(".toolbar .tb-sub, .tb-sub");
       assert(sub.includes(`${i} of ${i > 10 ? 12 : 10}`), `where it is: ${sub}`);
       // The quiz asks for the answer, so it does not show the problem's name: only its goal.
-      const shown = await page.evaluate(() => ({ name: window.__state.learn.problem.def.title.en, title: document.querySelector(".tb-title h1").innerText.trim(), h1: document.querySelector(".panel h1").innerText.trim() }));
+      const shown = await page.evaluate(() => ({ name: window.__state.practice.problem.def.title.en, title: document.querySelector(".tb-title h1").innerText.trim(), h1: document.querySelector(".panel h1").innerText.trim() }));
       assert(shown.title === "Problem" && shown.h1.includes("to play") && shown.h1 !== shown.name, `a quiz problem named: ${JSON.stringify(shown)}`);
       // Show the answer (a miss), then Continue.
       await page.click('.panel .actions .btn:has-text("Show answer")');
@@ -63,7 +63,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     }
     // Every answer missed: after the first four the quiz stops there, at grade 1.
     assert(asked === 4, `${asked} problems`);
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     assert((await page.locator(".placement-offer").count()) === 0, "the offer is gone");
     const placed = await page.evaluate(() => window.__state.profile.placement);
     assert(placed?.grade === 1, JSON.stringify(placed));
@@ -74,26 +74,26 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await page.close();
   });
 
-  await check("learn placement: Not now shows the path and is remembered after a reload", async () => {
+  await check("practice placement: Not now shows the path and is remembered after a reload", async () => {
     const page = await knowsRules();
     await page.click(".placement-offer .link");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     await page.waitForTimeout(500); // the store writes a moment later
     await page.reload();
     await page.waitForFunction(() => window.__state?.ready);
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     assert((await page.locator(".placement-offer").count()) === 0, "not offered again");
     await page.close();
   });
 
   for (const [locale, scheme, large] of [["zh-CN", "dark", true], ["en-US", "light", false], ["ko-KR", "light", true], ["ja-JP", "dark", false]]) {
-    await check(`learn placement: the offer and a quiz problem in ${locale}, ${scheme}${large ? ", larger text" : ""} — audit, no clipping`, async () => {
+    await check(`practice placement: the offer and a quiz problem in ${locale}, ${scheme}${large ? ", larger text" : ""} — audit, no clipping`, async () => {
       const page = await knowsRules(locale, scheme);
       if (large) await page.keyboard.press("Control+=");
       await inspect(page, `${locale} offer`);
       await page.click(".placement-offer .btn.primary");
-      await page.waitForFunction(() => window.__state.learn.view === "problem");
+      await page.waitForFunction(() => window.__state.practice.view === "problem");
       await inspect(page, `${locale} quiz problem`);
       await page.close();
     });

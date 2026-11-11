@@ -16,7 +16,7 @@ import { StatusChip } from "./status-chip.jsx";
 const SPACE_LOOK = {
   today: { icon: "today", key: "nav.today" },
   play: { icon: "play", key: "nav.play" },
-  learn: { icon: "practice", key: "nav.learn" },
+  practice: { icon: "practice", key: "nav.practice" },
   library: { icon: "library", key: "nav.library" },
 };
 export const SPACES = C.SPACES.map((id) => ({ id, ...SPACE_LOOK[id] }));

@@ -1,5 +1,5 @@
 /**
- * Learn: the beginner bridges — capture Go and its small opponent, the
+ * Practice: the beginner bridges — capture Go and its small opponent, the
  * lesson-to-game bridges, the first count. Loaded by scripts/test.mjs;
  * receives the runner's helpers.
  */
@@ -56,7 +56,7 @@ function selfPlay(levelBlack, levelWhite, seed) {
 }
 
 export default async function ({ test, assert, root }) {
-  await test("learn capture Go: the computer always captures when it can", () => {
+  await test("practice capture Go: the computer always captures when it can", () => {
     // Random positions with no capture yet; whenever one is available, it takes it.
     let checked = 0;
     for (let seed = 1; seed <= 300; seed++) {
@@ -80,7 +80,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(checked > 50, `only ${checked} positions had a capture`);
   });
 
-  await test("learn capture Go: the computer saves its stone in atari", () => {
+  await test("practice capture Go: the computer saves its stone in atari", () => {
     // White's centre stone is in atari; extending gives it room.
     const b = board(".........", ".........", ".........", "....X....", "...XOX...", ".........");
     for (const level of [1, 2]) {
@@ -92,7 +92,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("learn capture Go: ladders and nets are read; the gentle level reads less", () => {
+  await test("practice capture Go: ladders and nets are read; the gentle level reads less", () => {
     // A ladder: White's stone has two liberties and every escape is ataried to the edge.
     const ladder = board(".........", "..X......", ".XO......", "...X.....");
     assert.equal(A.canForceCapture(ladder, 1, { depth: 8, nets: false }), true);
@@ -118,7 +118,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("learn capture Go: the computer defuses a ladder threat before it starts", () => {
+  await test("practice capture Go: the computer defuses a ladder threat before it starts", () => {
     // White's stone has two liberties and Black threatens to ladder or net
     // it. The stronger level answers so that no forced capture remains.
     const b = board(".........", "..X......", ".XO......");
@@ -130,7 +130,7 @@ export default async function ({ test, assert, root }) {
     }
   });
 
-  await test("learn capture Go: two levels, stronger after two wins, every move well under 50 ms", () => {
+  await test("practice capture Go: two levels, stronger after two wins, every move well under 50 ms", () => {
     assert.equal(A.levelFor(0), 1);
     assert.equal(A.levelFor(1), 1);
     assert.equal(A.levelFor(2), 2);
@@ -159,7 +159,7 @@ export default async function ({ test, assert, root }) {
     assert.ok(slowest < 250, `slowest move ${slowest.toFixed(1)} ms`);
   });
 
-  await test("learn capture Go: suicide is illegal and a full board has no move", () => {
+  await test("practice capture Go: suicide is illegal and a full board has no move", () => {
     // The corner point is surrounded by White: Black may not play there.
     const b = board(".O.......", "O........");
     assert.equal(A.tryMove(b, 0, 1), null);
@@ -170,7 +170,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(A.hasLegalMove(board("........."), 1), true);
   });
 
-  await test("learn bridges: capture Go after the capturing lessons, the first 9×9 game after the life basics", () => {
+  await test("practice bridges: capture Go after the capturing lessons, the first 9×9 game after the life basics", () => {
     const ids = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
     for (const id of [...CAPTURE_AFTER, ...FIRST_GAME_AFTER]) assert.ok(ids.includes(id), id);
     const stones = COURSE.find((u) => u.id === "stones").lessons.map((l) => l.id);
@@ -196,22 +196,22 @@ export default async function ({ test, assert, root }) {
     assert.match(done, /bridgeAfter\(L\.lesson\.id, state\.profile, \{ captureWins: state\.settings\.captureWins \}\)/);
   });
 
-  await test("learn beginner: capture games stay out of the game, the history of games and the player model", () => {
+  await test("practice beginner: capture games stay out of the game, the history of games and the player model", () => {
     const src = fs.readFileSync(path.join(root, "src/web/js/app/capture-ctl.js"), "utf8");
-    // Its own state in Learn; none of the rated-game machinery.
+    // Its own state in Practice; none of the rated-game machinery.
     for (const word of ["state.game", "Games.", "saveGame", "recordGame", "changeProfile", "queueReport", "persistCurrent", "state.profile"]) {
       const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
       assert.ok(!code.includes(word), `capture-ctl uses ${word}`);
     }
-    // Not in New game, Play or the sidebar: in Learn only (its path and the lesson-complete page).
+    // Not in New game, Play or the sidebar: in Practice only (its path and the lesson-complete page).
     for (const f of ["app/sheets.jsx", "app/app.jsx", "app/chrome.jsx", "play/home.jsx", "app/play.jsx"]) {
       const s = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
       assert.ok(!/capture\.play|startCapture/.test(s), `${f} offers capture Go`);
     }
-    assert.match(fs.readFileSync(path.join(root, "src/web/js/learn/session.js"), "utf8"), /startCapture\(\{ daily: s \}\)/, "an item of the path");
+    assert.match(fs.readFileSync(path.join(root, "src/web/js/practice/session.js"), "utf8"), /startCapture\(\{ daily: s \}\)/, "an item of the path");
   });
 
-  await test("learn beginner: strings in four languages; the first-count note is at most three sentences", () => {
+  await test("practice beginner: strings in four languages; the first-count note is at most three sentences", () => {
     for (const [key, v] of Object.entries(PRACTICE)) {
       assert.deepEqual(MESSAGES[key], v, key);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(v[lang]?.trim(), `${key} ${lang}`);

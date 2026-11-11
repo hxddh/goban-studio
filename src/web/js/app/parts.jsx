@@ -397,7 +397,7 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
 /**
  * v10: a problem's position, small: its diagram (solver.js notation, one
  * string per row) drawn as a square tile of 32 css px, so the rows of
- * Learn's path that share a title look different. Nothing before the
+ * Practice's path that share a title look different. Nothing before the
  * problem's part has arrived (content.js), the caller shows its icon.
  */
 export function DiagramThumb({ diagram, label = "" }) {

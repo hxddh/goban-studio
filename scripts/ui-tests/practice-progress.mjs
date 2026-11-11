@@ -1,14 +1,14 @@
 /**
- * Learn: Practice's topic grid, a problem's name, the path's merged rows
+ * Practice: Practice's topic grid, a problem's name, the path's merged rows
  * and the day's size, and Today's progress — in the browser, for a new
  * player and for one with a history. The history is a profile built with
- * the player model (learn-seed.js) and written into the store before the
+ * the player model (practice-seed.js) and written into the store before the
  * app boots. Loaded by scripts/ui-test.mjs; receives its helpers.
  */
 import { MESSAGES } from "../../src/web/js/messages.js";
 import { DAY, recordLesson, newProfile } from "../../src/web/js/model/player.js";
 import { COURSE } from "../../src/web/js/content/course.js";
-import { seededProfile } from "./learn-seed.js";
+import { seededProfile } from "./practice-seed.js";
 
 const KEYS = Object.keys(MESSAGES);
 const LANG = { "en-US": "en", "zh-CN": "zh", "ko-KR": "ko", "ja-JP": "ja" };
@@ -63,7 +63,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".problem-card");
   };
 
-  await check("learn progress: a topic is a grid of positions, each with its state as a mark and in words; the grade says done of total", async () => {
+  await check("practice progress: a topic is a grid of positions, each with its state as a mark and in words; the grade says done of total", async () => {
     const { profile } = history();
     const page = await boot(profile);
     await openTopic(page, "capture");
@@ -109,7 +109,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.close();
   });
 
-  await check("learn progress: the grid from the keyboard — one tab stop, arrows move by tile and by row, Home and End, Enter opens", async () => {
+  await check("practice progress: the grid from the keyboard — one tab stop, arrows move by tile and by row, Home and End, Enter opens", async () => {
     const page = await boot(newProfile({ rank: 20 }), { settings: { experience: "rules", playerRank: 20 } });
     await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
@@ -143,14 +143,14 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     assert((await page.evaluate(() => [...document.querySelectorAll(".problem-card")].findIndex((c) => c.tabIndex === 0))) === 1, "the tab stop follows");
     const want = await page.evaluate(() => document.activeElement.getAttribute("aria-label"));
     await page.keyboard.press("Enter");
-    await page.waitForFunction(() => window.__state.learn.view === "problem");
+    await page.waitForFunction(() => window.__state.practice.view === "problem");
     assert(/^Problem 2\b/.test(want), want);
     assert((await page.textContent(".tb-sub")).trim().startsWith("2 /"), "Enter opened the second problem");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
 
-  await check("learn progress: a grade of many problems opens within the place-switch budget, drawing only the tiles near the screen", async () => {
+  await check("practice progress: a grade of many problems opens within the place-switch budget, drawing only the tiles near the screen", async () => {
     const page = await boot(newProfile({ rank: 20 }), { settings: { experience: "rules", playerRank: 20 } });
     await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
@@ -182,7 +182,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     return timing.text;
   });
 
-  await check("learn progress: a problem says only its goal until it is solved — heading, toolbar and list; then its name is the result", async () => {
+  await check("practice progress: a problem says only its goal until it is solved — heading, toolbar and list; then its name is the result", async () => {
     const page = await boot(newProfile({ rank: 20 }), { settings: { experience: "rules", playerRank: 20 } });
     await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
@@ -190,8 +190,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".problem-card");
     assert((await page.locator(".problem-card .problem-title").count()) === 0, "a new player's grid names nothing");
     await page.click(".problem-card >> nth=0");
-    await page.waitForFunction(() => window.__state.learn.view === "problem" && window.__board?.geom?.cell > 0);
-    const def = await page.evaluate(() => ({ name: window.__state.learn.problem.def.title.en, theme: window.__state.learn.problem.def.theme }));
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && window.__board?.geom?.cell > 0);
+    const def = await page.evaluate(() => ({ name: window.__state.practice.problem.def.title.en, theme: window.__state.practice.problem.def.theme }));
     const before = await page.evaluate(() => ({ toolbar: document.querySelector(".toolbar").innerText, panel: document.querySelector(".panel").innerText, h1: document.querySelector(".panel h1").innerText.trim(), said: document.querySelector("#main ~ .sr-only, .app > .sr-only")?.textContent || "" }));
     assert(!before.toolbar.includes(def.name) && !before.panel.includes(def.name), `named before it is solved: ${def.name}`);
     assert(before.h1 === "Black to play: kill" || /to play/.test(before.h1), `the heading is the goal: ${before.h1}`);
@@ -202,18 +202,18 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click('.panel .actions .btn:has-text("Hint")');
     assert(!(await page.innerText(".panel h1")).includes(def.name), "the heading after a hint");
     // Solve it (the hint was used, so it is solved, not clean).
-    const ok = await page.evaluate(() => window.__solver.solveFirstMoves(window.__state.learn.problem.pz).correct[0]);
+    const ok = await page.evaluate(() => window.__solver.solveFirstMoves(window.__state.practice.problem.pz).correct[0]);
     await clickPoint(page, ok.x, ok.y);
     for (let i = 0; i < 12; i++) {
-      const st = await page.evaluate(() => ({ status: window.__state.learn.problem.status, busy: window.__state.learn.problem.busy }));
+      const st = await page.evaluate(() => ({ status: window.__state.practice.problem.status, busy: window.__state.practice.problem.busy }));
       if (st.status === "won") break;
       if (!st.busy && st.status === "open") {
-        const next = await page.evaluate(() => window.__solver.winningMoves(window.__state.learn.problem.pz, window.__state.learn.problem.st)[0]);
+        const next = await page.evaluate(() => window.__solver.winningMoves(window.__state.practice.problem.pz, window.__state.practice.problem.st)[0]);
         if (next && i > 0) await clickPoint(page, next.x, next.y);
       }
       await page.waitForTimeout(450);
     }
-    await page.waitForFunction(() => window.__state.learn.problem.status === "won", null, { timeout: 8000 });
+    await page.waitForFunction(() => window.__state.practice.problem.status === "won", null, { timeout: 8000 });
     await page.waitForSelector(".result-name");
     assert((await page.innerText(".result-name")).includes(def.name), "the name is the result");
     assert((await page.innerText(".tb-title h1")).trim() === def.name, "and the toolbar's title");
@@ -222,7 +222,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     // Enter goes on, as the primary does — also with the board focused, where the click left the focus.
     await page.focus("canvas.board");
     await page.keyboard.press("Enter");
-    await page.waitForFunction((n) => window.__state.learn.problem.def.title.en !== n || document.querySelector(".tb-sub").innerText.startsWith("2 /"), def.name);
+    await page.waitForFunction((n) => window.__state.practice.problem.def.title.en !== n || document.querySelector(".tb-sub").innerText.startsWith("2 /"), def.name);
     assert((await page.textContent(".tb-sub")).trim().startsWith("2 /"), "Enter went on to the next problem");
     // Back in the grid the solved one has its name.
     await page.keyboard.press("Control+[");
@@ -234,14 +234,14 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.close();
   });
 
-  await check("learn progress: a review comes back turned and unnamed; a miss says when it comes back", async () => {
+  await check("practice progress: a review comes back turned and unnamed; a miss says when it comes back", async () => {
     const { profile } = history();
     const page = await boot(profile);
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row[data-role=review]");
-    await page.click(".learn-path .path-row[data-role=review] >> nth=0");
-    await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.daily && window.__board?.geom?.cell > 0);
-    const P = await page.evaluate(() => ({ name: window.__state.learn.problem.def.title.en, review: window.__state.learn.problem.review, shown: window.__state.learn.problem.def.shown || null }));
+    await page.waitForSelector(".practice-path .path-row[data-role=review]");
+    await page.click(".practice-path .path-row[data-role=review] >> nth=0");
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.daily && window.__board?.geom?.cell > 0);
+    const P = await page.evaluate(() => ({ name: window.__state.practice.problem.def.title.en, review: window.__state.practice.problem.review, shown: window.__state.practice.problem.def.shown || null }));
     assert(P.review === true, "a review");
     assert((await page.innerText(".panel .eyebrow")).includes("Due for review"), "why it is here");
     const text = await page.evaluate(() => document.querySelector(".toolbar").innerText + "\n" + document.querySelector(".panel h1").innerText + "\n" + (document.querySelector(".result-lines")?.innerText || ""));
@@ -256,19 +256,19 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await inspect(page, "a missed review");
     // Enter goes on in the session.
     await page.evaluate(() => document.activeElement?.blur());
-    const key = await page.evaluate(() => window.__state.learn.daily.current);
+    const key = await page.evaluate(() => window.__state.practice.daily.current);
     await page.keyboard.press("Enter");
-    await page.waitForFunction((k) => window.__state.learn.daily?.current !== k || window.__state.learn.view !== "problem", key);
+    await page.waitForFunction((k) => window.__state.practice.daily?.current !== k || window.__state.practice.view !== "problem", key);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
 
-  await check("learn progress: the path merges problems of one theme into a row with its count, tiles and reason; the load is one quiet line", async () => {
+  await check("practice progress: the path merges problems of one theme into a row with its count, tiles and reason; the load is one quiet line", async () => {
     const { profile } = history();
     const page = await boot(profile);
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
-    const rows = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), title: r.querySelector("strong").innerText, sub: r.querySelector(".gr-text > span").innerText, tiles: r.querySelectorAll(".path-tiles canvas").length })));
+    await page.waitForSelector(".practice-path .path-row");
+    const rows = await page.evaluate(() => [...document.querySelectorAll(".practice-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), title: r.querySelector("strong").innerText, sub: r.querySelector(".gr-text > span").innerText, tiles: r.querySelectorAll(".path-tiles canvas").length })));
     const items = await page.evaluate(() => window.__state.settings.dailySize);
     const probs = rows.filter((r) => r.kind === "problem");
     assert(probs.reduce((n, r) => n + r.count, 0) === items, `the day's ${items} problems: ${JSON.stringify(rows)}`);
@@ -283,25 +283,25 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const load = (await page.innerText(".path-load")).trim();
     assert(/^\d+ to review today · \d+ mastered$/.test(load), `the load: ${load}`);
     // A merged row opens its first problem not done; done tiles count on the row.
-    await page.click(`.learn-path .path-row[data-count="${merged.count}"] >> nth=0`);
-    await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.daily);
+    await page.click(`.practice-path .path-row[data-count="${merged.count}"] >> nth=0`);
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.daily);
     await page.click('.panel .actions .btn:has-text("Show answer")');
     await page.click(".panel .actions .btn.primary");
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
-    const part = await page.innerText(`.learn-path .path-row[data-count="${merged.count}"] >> nth=0`);
+    await page.waitForSelector(".practice-path .path-row");
+    const part = await page.innerText(`.practice-path .path-row[data-count="${merged.count}"] >> nth=0`);
     assert(part.includes(`1 / ${merged.count}`), `part of a row done: ${part}`);
     await inspect(page, "the path with merged rows");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
 
-  await check("learn progress: the day's size is chosen on the path (3, 5 or 10) and kept across a restart", async () => {
+  await check("practice progress: the day's size is chosen on the path (3, 5 or 10) and kept across a restart", async () => {
     const page = await boot(newProfile({ rank: 20 }), { settings: { experience: "rules", playerRank: 20 } });
     await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
-    await page.waitForSelector(".learn-path .path-row");
-    const problems = () => page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row[data-kind=problem]")].reduce((n, r) => n + Number(r.dataset.count), 0));
+    await page.waitForSelector(".practice-path .path-row");
+    const problems = () => page.evaluate(() => [...document.querySelectorAll(".practice-path .path-row[data-kind=problem]")].reduce((n, r) => n + Number(r.dataset.count), 0));
     const chosen = () => page.evaluate(() => document.querySelector('.daily-size [role=radio][aria-checked="true"]').innerText.trim());
     assert((await chosen()) === "5" && (await problems()) === 5, "five by default");
     assert((await page.getAttribute(".daily-size [role=radiogroup]", "aria-label")) === "Problems a day", "the control's name");
@@ -314,7 +314,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.reload();
     await page.waitForFunction(() => window.__state?.ready);
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     assert((await chosen()) === "3" && (await problems()) === 3, "kept after a restart");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "still one primary");
     assert(page.errors.length === 0, page.errors.join("; "));
@@ -391,10 +391,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.keyboard.press("Control+3");
     await page.waitForSelector(".catalog .unit.open .lesson-row");
     await page.click(`.catalog .unit.open .lesson-row >> nth=${unit.lessons.length - 1}`);
-    await page.waitForFunction((id) => window.__state.learn.view === "lesson" && window.__state.learn.lesson.lesson.id === id, last.id);
+    await page.waitForFunction((id) => window.__state.practice.view === "lesson" && window.__state.practice.lesson.lesson.id === id, last.id);
     for (let i = 0; i < 40; i++) {
       const v = await page.evaluate(() => {
-        const L = window.__state.learn.lesson;
+        const L = window.__state.practice.lesson;
         if (L.finished) return "done";
         if (L.cur.kind === "place") L.cur.result = "right";
         return L.cur.kind === "problem" && !L.cur.answer && L.cur.status !== "won" ? "ask" : L.cur.kind;
@@ -418,7 +418,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
   });
 
   for (const [locale, scheme, large] of [["zh-CN", "dark", true], ["en-US", "light", false], ["ko-KR", "light", true], ["ja-JP", "dark", false]]) {
-    await check(`learn progress: Today's progress, the path and a topic's grid in ${locale}, ${scheme}${large ? ", larger text" : ""} — audit, no clipping`, async () => {
+    await check(`practice progress: Today's progress, the path and a topic's grid in ${locale}, ${scheme}${large ? ", larger text" : ""} — audit, no clipping`, async () => {
       const { profile } = history();
       const page = await boot(profile, { locale, scheme });
       if (large) await page.keyboard.press("Control+Equal");
@@ -426,7 +426,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
       await page.click("[data-row=mastery] button");
       await inspect(page, `${locale} Today`);
       await page.keyboard.press("Control+3");
-      await page.waitForSelector(".learn-path .path-row");
+      await page.waitForSelector(".practice-path .path-row");
       await inspect(page, `${locale} path`);
       await page.click(".topic-row[data-topic=capture]");
       await page.waitForSelector(".problem-card .tile svg");

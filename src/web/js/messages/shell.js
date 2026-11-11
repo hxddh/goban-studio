@@ -13,7 +13,7 @@ export const SHELL = {
   "nav.back": m("后退", "Back", "뒤로", "戻る"),
   "nav.forward": m("前进", "Forward", "앞으로", "進む"),
   "nav.play": m("下棋", "Play", "대국", "対局"),
-  "nav.learn": m("练习", "Practice", "연습", "練習"),
+  "nav.practice": m("练习", "Practice", "연습", "練習"),
   "nav.today": m("今天", "Today", "오늘", "今日"),
   "nav.library": m("棋谱", "Library", "기보", "棋譜"),
 

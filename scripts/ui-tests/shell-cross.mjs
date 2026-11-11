@@ -4,7 +4,7 @@
  * text and dark mode — so one feature cannot quietly break another (the
  * problem window and the screen-reader keys were such a pair).
  *
- * For each combination it visits Play's home, Learn's home (the path and
+ * For each combination it visits Play's home, Practice's home (the path and
  * the catalog), a problem, the history of games, the explorer (both
  * modes), a classic in review (every tab), a finished game's post-game
  * review (every tab), and every Settings pane, and checks: the audit, no raw string keys on screen, no
@@ -58,12 +58,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await page.waitForSelector(".today .hero");
       await inspect(page, "Today");
       await page.keyboard.press("Control+3");
-      await page.waitForSelector(".learn-path");
+      await page.waitForSelector(".practice-path");
       await page.waitForSelector(".catalog .topic-row");
       await inspect(page, "Practice");
       await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
-      await page.waitForFunction(() => window.__state.learn.view === "problem");
+      await page.waitForFunction(() => window.__state.practice.view === "problem");
       await inspect(page, "problem");
 
       // The Library, the explorer in both modes, a classic in review.

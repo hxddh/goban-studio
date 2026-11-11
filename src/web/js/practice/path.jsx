@@ -1,6 +1,6 @@
 /**
  * Practice's home: one path chosen for you, as a short list of rows in the
- * order they are played (learn/session.js). Problems that follow one
+ * order they are played (practice/session.js). Problems that follow one
  * another with the same theme and reason are one row ("Ladders · 4
  * problems", with their positions as small tiles); each row says why it is
  * there in the model's own terms — a review that is due, what your games
@@ -25,13 +25,13 @@ const MAX_TILES = 4;
 
 /** Why an item is in the path, in a few words (the panel's eyebrow inside the session). */
 export function whyText(it) {
-  if (it.kind === "lesson") return t("learn.path.next");
-  if (it.kind === "capture") return t("learn.path.bridge");
-  if (it.kind === "game") return t("learn.path.firstGame");
-  if (it.role === "review") return t("learn.path.review");
-  if (it.role === "focus" && it.why) return t("learn.path.focus", [C.focusName(it.why)]);
-  if (it.role === "stretch") return t("learn.path.stretch");
-  return t("learn.path.new");
+  if (it.kind === "lesson") return t("practice.path.next");
+  if (it.kind === "capture") return t("practice.path.bridge");
+  if (it.kind === "game") return t("practice.path.firstGame");
+  if (it.role === "review") return t("practice.path.review");
+  if (it.role === "focus" && it.why) return t("practice.path.focus", [C.focusName(it.why)]);
+  if (it.role === "stretch") return t("practice.path.stretch");
+  return t("practice.path.new");
 }
 
 /**
@@ -43,10 +43,10 @@ export function whyText(it) {
 function reasonText(row, wf) {
   const it = row.items[0];
   if (it.kind !== "problem" && it.kind !== "mistake") return whyText(it);
-  if (row.role === "review") return t("learn.path.review");
-  if (row.role === "stretch") return t("learn.path.stretch");
-  if (row.why) return wf?.reasons?.[row.why] || t("learn.path.focusShort");
-  return t("learn.path.new");
+  if (row.role === "review") return t("practice.path.review");
+  if (row.role === "stretch") return t("practice.path.stretch");
+  if (row.why) return wf?.reasons?.[row.why] || t("practice.path.focusShort");
+  return t("practice.path.new");
 }
 
 /** "Level 2", or "Level 1–2" when a row's problems span several. */
@@ -76,13 +76,13 @@ export function pathRows(items, wf = null) {
     else if (it.kind === "game") out.push({ ...base, icon: "play", title: t("firstGame.play"), more: "" });
     else if (it.kind === "mistake") {
       const m = state.profile.mistakes.find((x) => x.id === it.id);
-      if (m) out.push({ ...base, stone: m.color, title: t("mistakes.item", [m.index, m.size]), more: m.theme ? C.focusName(m.theme) : t("learn.path.mistake") });
+      if (m) out.push({ ...base, stone: m.color, title: t("mistakes.item", [m.index, m.size]), more: m.theme ? C.focusName(m.theme) : t("practice.path.mistake") });
     } else {
       const defs = row.items.map((x) => PROBLEMS.find((d) => d.id === x.id)).filter(Boolean);
       if (!defs.length) continue;
       const name = C.themeName(row.theme || defs[0].theme);
       const diagrams = defs.filter((d) => d.diagram).map((d) => ({ key: "problem:" + d.id, diagram: d.diagram }));
-      out.push({ ...base, icon: "target", title: t("learn.path.group", [name, tn("learn.path.problems", defs.length)]), more: gradesText(defs.map((d) => d.id)), diagrams });
+      out.push({ ...base, icon: "target", title: t("practice.path.group", [name, tn("practice.path.problems", defs.length)]), more: gradesText(defs.map((d) => d.id)), diagrams });
     }
   }
   return out;
@@ -96,13 +96,13 @@ function FocusLine({ wf, rows }) {
   const why = wf.keys.filter((k) => !said.has(k)).map((k) => wf.reasons?.[k]).filter(Boolean);
   return (
     <p class="path-focus">
-      <span class="path-focus-name">{t("learn.path.focus", [wf.names.join(" · ")])}</span>
+      <span class="path-focus-name">{t("practice.path.focus", [wf.names.join(" · ")])}</span>
       {why.length > 0 && <span> — {why.join(" · ")}</span>}
       {lesson && (
         <>
           {" "}
           <button type="button" class="link" onClick={() => C.openLesson(lesson.lesson.id)}>
-            {t("learn.focus.lesson", [C.tx(lesson.lesson.title)])}
+            {t("practice.focus.lesson", [C.tx(lesson.lesson.title)])}
           </button>
         </>
       )}
@@ -112,7 +112,7 @@ function FocusLine({ wf, rows }) {
 
 /** The review load in a few quiet words: "4 to review today · 37 mastered". Empty while both are zero. */
 export function loadText(load) {
-  return [load.due > 0 ? tn("learn.load.due", load.due) : "", load.mastered > 0 ? tn("learn.load.mastered", load.mastered) : ""].filter(Boolean).join(" · ");
+  return [load.due > 0 ? tn("practice.load.due", load.due) : "", load.mastered > 0 ? tn("practice.load.mastered", load.mastered) : ""].filter(Boolean).join(" · ");
 }
 
 /** The load, and the day's size as a small choice. */
@@ -121,8 +121,8 @@ function PathMeta() {
     <div class="path-meta">
       <span class="path-load">{loadText(reviewLoad(state.profile, Date.now()))}</span>
       <span class="daily-size">
-        <span class="fine">{t("learn.daily.label")}</span>
-        <Segmented value={state.settings.dailySize} options={RULES.DAILY_SIZES.map((n) => ({ value: n, label: String(n) }))} onChange={C.setDailySize} label={t("learn.daily.label")} />
+        <span class="fine">{t("practice.daily.label")}</span>
+        <Segmented value={state.settings.dailySize} options={RULES.DAILY_SIZES.map((n) => ({ value: n, label: String(n) }))} onChange={C.setDailySize} label={t("practice.daily.label")} />
       </span>
     </div>
   );
@@ -130,7 +130,7 @@ function PathMeta() {
 
 /**
  * Before the first path, someone who knows the rules is asked to place
- * themselves with a short quiz (learn/placement.js). The page's one primary
+ * themselves with a short quiz (practice/placement.js). The page's one primary
  * starts the quiz; "Not now" keeps what onboarding said.
  */
 function PlacementOffer() {
@@ -153,7 +153,7 @@ function PlacementOffer() {
   );
 }
 
-export function LearnHome() {
+export function PracticeHome() {
   // The focus first: the first one shown in a week is kept, and the path reads it.
   const wf = C.weekFocus();
   const now = C.pathNow();
@@ -161,25 +161,25 @@ export function LearnHome() {
   return (
     <>
       <Toolbar />
-      <div class="page learn-home">
+      <div class="page practice-home">
         <header class="page-head">
-          <h1>{t("nav.learn")}</h1>
+          <h1>{t("nav.practice")}</h1>
         </header>
         {C.placementOffered() ? (
           <PlacementOffer />
         ) : rows.length > 0 && (
-          <section class="learn-path enter-up" aria-labelledby="path-title">
+          <section class="practice-path enter-up" aria-labelledby="path-title">
             <div class="path-head">
               <h2 class="section-title" id="path-title">
-                {now.finished ? t("learn.path.doneToday") : t("learn.path.title")}
+                {now.finished ? t("practice.path.doneToday") : t("practice.path.title")}
               </h2>
               {!now.finished && (
                 <Button kind="primary" onClick={C.startPath}>
-                  {now.started ? t("learn.path.resume") : t("learn.path.start")}
+                  {now.started ? t("practice.path.resume") : t("practice.path.start")}
                 </Button>
               )}
             </div>
-            {now.finished ? <p class="path-focus">{t("learn.path.doneLine")}</p> : <FocusLine wf={wf} rows={rows} />}
+            {now.finished ? <p class="path-focus">{t("practice.path.doneLine")}</p> : <FocusLine wf={wf} rows={rows} />}
             <PathMeta />
             <ol class="group path-list">
               {rows.map((row) => {
@@ -208,7 +208,7 @@ export function LearnHome() {
                       )}
                       {some && <span class="row-count">{t("practice.ofN", [row.items.length - left.length, row.items.length])}</span>}
                       {done && (
-                        <span class="path-done" role="img" aria-label={t("learn.path.done")}>
+                        <span class="path-done" role="img" aria-label={t("practice.path.done")}>
                           <Icon name="check" size={16} />
                         </span>
                       )}

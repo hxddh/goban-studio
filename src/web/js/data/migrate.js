@@ -14,7 +14,7 @@
  *
  * profile.json is the player model's (model/player.js): its `v` is
  * PROFILE_V and normalizeProfile moves it on; here it is only refused when
- * it is newer than that. Other keys (the learn session, the update state,
+ * it is newer than that. Other keys (the practice session, the update state,
  * the analysis queue) belong to their modules, which check them.
  */
 import { NewerVersionError } from "./store.js";

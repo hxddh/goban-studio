@@ -1,5 +1,5 @@
 /**
- * Learn: review transforms (learn/transform.js) — a problem shown again is
+ * Practice: review transforms (practice/transform.js) — a problem shown again is
  * turned, mirrored and recoloured, and is still a proved problem: a
  * deterministic sample of 60 through the solver here (the whole bank:
  * `node scripts/check-transforms.mjs`), the colour words of every title and
@@ -7,10 +7,10 @@
  * transformed while recording it under the problem's own id.
  */
 import { test, assert, bundle, sleep, PROBLEMS, S } from "./helpers.mjs";
-import * as T from "../../src/web/js/learn/transform.js";
+import * as T from "../../src/web/js/practice/transform.js";
 import { checkTransformed, sample, transformFor } from "../check-transforms.mjs";
 
-await test("learn transform: the eight symmetries are distinct, map the board onto itself and invert", () => {
+await test("practice transform: the eight symmetries are distinct, map the board onto itself and invert", () => {
   const size = 19;
   const seen = new Set();
   for (let sym = 0; sym < 8; sym++) {
@@ -38,7 +38,7 @@ await test("learn transform: the eight symmetries are distinct, map the board on
   assert.equal(seen.size, 8);
 });
 
-await test("learn transform: a transformed problem keeps its id, moves its diagram, region, keys and window, and swaps the colours", () => {
+await test("practice transform: a transformed problem keeps its id, moves its diagram, region, keys and window, and swaps the colours", () => {
   const def = PROBLEMS.find((p) => p.id === "capture-basic-02"); // bottom right corner
   const t = { sym: 3, swap: true };
   const next = T.transformProblem(def, t);
@@ -75,7 +75,7 @@ await test("learn transform: a transformed problem keeps its id, moves its diagr
   assert.equal(egT.answer.length, eg.answer.length);
 });
 
-await test("learn transform: colour words in every title and hint swap both ways, and appear only as colours", () => {
+await test("practice transform: colour words in every title and hint swap both ways, and appear only as colours", () => {
   assert.equal(T.swapColourText("Black captures White's black stone.", "en"), "White captures Black's white stone.");
   assert.equal(T.swapColourText("黑先，白棋两口气。", "zh"), "白先，黑棋两口气。");
   assert.equal(T.swapColourText("흑은 백의 돌을", "ko"), "백은 흑의 돌을");
@@ -95,7 +95,7 @@ await test("learn transform: colour words in every title and hint swap both ways
   }
 });
 
-await test("learn transform: 60 problems across the bank are still proved after a turn and a colour swap", () => {
+await test("practice transform: 60 problems across the bank are still proved after a turn and a colour swap", () => {
   const t0 = performance.now();
   const list = sample(60);
   assert.equal(list.length, 60);
@@ -109,7 +109,7 @@ await test("learn transform: 60 problems across the bank are still proved after 
   assert.ok(performance.now() - t0 < 60000, "within a minute");
 });
 
-await test("learn transform: a review's transform is reproducible, never the written problem, within the allowed symmetries", () => {
+await test("practice transform: a review's transform is reproducible, never the written problem, within the allowed symmetries", () => {
   const def = PROBLEMS.find((p) => p.goal === "kill");
   assert.deepEqual(T.reviewTransform(def, 0), T.IDENTITY, "first showing: as written");
   const seen = new Set();
@@ -135,20 +135,20 @@ const A = await bundle([
   'export { setLang } from "./src/web/js/i18n.js";',
 ]);
 
-await test("learn transform: in the app, a problem tried before comes back transformed and is recorded under its own id", async () => {
+await test("practice transform: in the app, a problem tried before comes back transformed and is recorded under its own id", async () => {
   const { C, state, PM } = A;
   A.setLang("en");
   state.settings = { ...A.DEFAULT_SETTINGS, lang: "en", onboarded: true, experience: "player", playerRank: 10 };
   state.profile = PM.newProfile({ rank: 10 });
-  state.space = "learn";
-  state.learn = { view: "home", topic: null, lesson: null, problem: null, daily: null, placement: null };
+  state.space = "practice";
+  state.practice = { view: "home", topic: null, lesson: null, problem: null, daily: null, placement: null };
   const id = "capture-basic-02";
   C.openProblem(id);
-  assert.equal(state.learn.problem.def.shown, undefined, "the first time: as written");
+  assert.equal(state.practice.problem.def.shown, undefined, "the first time: as written");
   C.showAnswer();
   assert.equal(state.profile.problems[id].tries, 1);
   C.openProblem(id);
-  const P = state.learn.problem;
+  const P = state.practice.problem;
   const t = T.reviewTransform(PROBLEMS.find((p) => p.id === id), 1);
   assert.deepEqual(P.def.shown, t);
   assert.equal(P.def.id, id);
@@ -167,13 +167,13 @@ await test("learn transform: in the app, a problem tried before comes back trans
   assert.equal(state.profile.problems[id].solved, true);
 });
 
-await test("learn transform: Confirm moves in problems — the first click shows the stone, the same point again plays it, Esc cancels", async () => {
+await test("practice transform: Confirm moves in problems — the first click shows the stone, the same point again plays it, Esc cancels", async () => {
   const { C, state, PM } = A;
   state.settings = { ...state.settings, confirmProblemMove: true };
   state.profile = PM.newProfile({ rank: 10 });
   const id = "capture-basic-02";
   C.openProblem(id);
-  const P = state.learn.problem;
+  const P = state.practice.problem;
   const [right] = A.S.winningMoves(P.pz, P.st);
   const wrong = A.S.solveFirstMoves(P.pz).correct.some((m) => m.x === right.x - 1 && m.y === right.y) ? { x: right.x, y: right.y - 1 } : { x: right.x - 1, y: right.y };
   C.practicePlay(wrong.x, wrong.y);

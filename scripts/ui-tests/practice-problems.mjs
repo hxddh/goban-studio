@@ -1,5 +1,5 @@
 /**
- * Learn: problems in the browser — a solve after a miss, and reading the
+ * Practice: problems in the browser — a solve after a miss, and reading the
  * widened problem window. Loaded by scripts/ui-test.mjs before the visual
  * baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser).
@@ -10,15 +10,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.keyboard.press("Control+3");
     await page.click(".topic-row >> nth=0");
     await page.click(".problem-card >> nth=0");
-    await page.waitForFunction(() => window.__state.learn.view === "problem");
+    await page.waitForFunction(() => window.__state.practice.view === "problem");
     // The view switches before the board mounts; wait for the problem's own board.
     await page.waitForFunction(() => {
-      const P = window.__state.learn.problem;
+      const P = window.__state.practice.problem;
       const b = window.__board;
       return P?.pz && b?.model?.size === P.pz.size && !!b.model.view && b.geom?.cell > 0;
     });
     return page.evaluate(() => {
-      const P = window.__state.learn.problem;
+      const P = window.__state.practice.problem;
       const S = window.__solver;
       const ok = S.solveFirstMoves(P.pz).correct[0];
       const v = P.pz.view;
@@ -32,15 +32,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     });
   }
 
-  await check("learn problems: a problem solved after a miss is marked solved (not clean)", async () => {
+  await check("practice problems: a problem solved after a miss is marked solved (not clean)", async () => {
     const page = await fresh();
     await onboard(page, 1);
     const p = await openFirstProblem(page);
     assert(p, "no wrong move found");
     await clickPoint(page, p.wrong.x, p.wrong.y);
-    await page.waitForFunction(() => window.__state.learn.problem.feedback === "retry", null, { timeout: 5000 });
+    await page.waitForFunction(() => window.__state.practice.problem.feedback === "retry", null, { timeout: 5000 });
     await clickPoint(page, p.ok.x, p.ok.y);
-    await page.waitForFunction(() => window.__state.learn.problem.status === "won", null, { timeout: 8000 });
+    await page.waitForFunction(() => window.__state.practice.problem.status === "won", null, { timeout: 8000 });
     const rec = await page.evaluate((id) => window.__state.profile.problems[id], p.id);
     assert(rec.solved === true && rec.clean === false, `solved, not clean: ${JSON.stringify(rec)}`);
     assert(rec.streak === 0 && rec.tries === 1, `the miss still sets the schedule: ${JSON.stringify(rec)}`);
@@ -49,7 +49,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.close();
   });
 
-  await check("learn problems: row, column and board reading cover the widened problem window", async () => {
+  await check("practice problems: row, column and board reading cover the widened problem window", async () => {
     const page = await fresh();
     await onboard(page, 1);
     await openFirstProblem(page);
@@ -66,7 +66,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     // The row starts at the window's first column, so it names that column's letter.
     const letter = "ABCDEFGHJKLMNOPQRST"[w.win.x0];
     const stones = await page.evaluate(({ w }) => {
-      const P = window.__state.learn.problem;
+      const P = window.__state.practice.problem;
       let n = 0;
       for (let x = w.win.x0; x <= w.win.x1; x++) if (P.st.board[w.view.y1 * P.pz.size + x]) n++;
       return n;

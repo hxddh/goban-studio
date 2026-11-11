@@ -81,15 +81,15 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
       await page.keyboard.press("Control+3");
       await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
-      await page.waitForFunction(() => window.__state.learn.view === "problem");
-      const id = await page.evaluate(() => window.__state.learn.problem.def.id);
+      await page.waitForFunction(() => window.__state.practice.view === "problem");
+      const id = await page.evaluate(() => window.__state.practice.problem.def.id);
       await page.evaluate((pid) => {
         window.__state.profile.problems[pid] = { ...(window.__state.profile.problems[pid] || {}), tries: 3, solved: true };
       }, id);
       await page.keyboard.press("Control+3");
       await page.click(".topic-row >> nth=0");
       await page.click(".problem-card >> nth=0");
-      await page.waitForFunction(() => window.__state.learn.view === "problem");
+      await page.waitForFunction(() => window.__state.practice.view === "problem");
       await inspect(page, `${locale} a problem seen again`);
       assert(page.errors.length === 0, page.errors.join("; "));
       await page.close();

@@ -1,9 +1,9 @@
 /**
- * Learn: playing problems — the endgame questions and the problem window.
+ * Practice: playing problems — the endgame questions and the problem window.
  */
 import { test, PROBLEMS, assert, bundle, sleepMs } from "./helpers.mjs";
 
-await test("learn problems: a tight problem window widens towards the open side", async () => {
+await test("practice problems: a tight problem window widens towards the open side", async () => {
   const { windowOf } = await import("../../src/web/js/board.js");
   // A bottom-right corner problem on 19×19: grows up and left only.
   assert.deepEqual(windowOf({ x0: 13, y0: 13, x1: 18, y1: 18 }, 19), { x0: 10, y0: 10, x1: 18, y1: 18 });
@@ -17,7 +17,7 @@ await test("learn problems: a tight problem window widens towards the open side"
   assert.deepEqual(windowOf(null, 13), { x0: 0, y0: 0, x1: 12, y1: 12 });
 });
 
-await test("learn problems: the endgame — practice plays a move question and answers a value question", async () => {
+await test("practice problems: the endgame — practice plays a move question and answers a value question", async () => {
   const { C, state, P, PM } = await bundle([
     'export * as C from "./src/web/js/app/practice-ctl.js";',
     'export { state } from "./src/web/js/app/store.js";',
@@ -29,7 +29,7 @@ await test("learn problems: the endgame — practice plays a move question and a
   // A value question: a wrong choice is marked, the right one solves it.
   const vq = PROBLEMS.find((p) => p.id === "endgame-count-01");
   C.openProblem(vq.id);
-  let pr = state.learn.problem;
+  let pr = state.practice.problem;
   assert.equal(C.goalText(pr.pz).includes("?") || C.goalText(pr.pz).includes("？"), true);
   C.practicePlay(5, 5);
   assert.equal(pr.history.length, 0, "a value question takes no moves");
@@ -46,7 +46,7 @@ await test("learn problems: the endgame — practice plays a move question and a
   // A move question: the right move, the computer's answer, until settled.
   const mq = PROBLEMS.find((p) => p.id === "endgame-hane-01");
   C.openProblem(mq.id);
-  pr = state.learn.problem;
+  pr = state.practice.problem;
   const at = (q) => [q.x + mq.at[0], q.y + mq.at[1]];
   // A point the model does not read is refused, not played.
   C.practicePlay(...at({ x: 6, y: 1 }));

@@ -255,7 +255,7 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
   await check("shell first run: every answer lands on Today with nothing started; its hero starts lesson one, the gentle 9×9 or the 19×19 in one click", async () => {
     const out = [];
     const WANT = [
-      { choice: 0, hero: /Start here[\s\S]*Start lesson one/, after: () => window.__state.space === "learn" && window.__state.learn.view === "lesson" && window.__state.learn.lesson?.index === 0 },
+      { choice: 0, hero: /Start here[\s\S]*Start lesson one/, after: () => window.__state.space === "practice" && window.__state.practice.view === "lesson" && window.__state.practice.lesson?.index === 0 },
       { choice: 1, hero: /Suggested game[\s\S]*9×9/, after: () => window.__state.space === "play" && window.__state.game?.game.size === 9 && window.__state.settings.opponentRank === 30 && window.__state.game.game.handicap === 0 },
       { choice: 2, hero: /Suggested game[\s\S]*19×19/, after: () => window.__state.space === "play" && window.__state.game?.game.size === 19 && window.__state.game.game.handicap === 0 },
     ];
@@ -270,7 +270,7 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
       const st = await page.evaluate(() => ({
         space: window.__state.space,
         game: window.__state.game === null,
-        learn: window.__state.learn.view,
+        practice: window.__state.practice.view,
         sheet: window.__state.sheet,
         onboarded: window.__state.settings.onboarded,
         primaries: [...document.querySelectorAll(".btn.primary")].filter((el) => el.offsetParent !== null).length,
@@ -279,7 +279,7 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
         current: document.querySelector(".sidebar [aria-current=page]")?.textContent.trim(),
       }));
       assert(st.space === "today" && st.current === "Today", `answer ${w.choice}: landed on ${st.space}`);
-      assert(st.game && st.learn === "home" && st.board === 0, `answer ${w.choice}: something was started (${JSON.stringify(st)})`);
+      assert(st.game && st.practice === "home" && st.board === 0, `answer ${w.choice}: something was started (${JSON.stringify(st)})`);
       assert(st.sheet === null && st.onboarded === true, "onboarding is over");
       assert(st.heroes === 1 && st.primaries === 1, `answer ${w.choice}: ${st.heroes} heroes, ${st.primaries} primary buttons`);
       const hero = await page.innerText(".today .hero");

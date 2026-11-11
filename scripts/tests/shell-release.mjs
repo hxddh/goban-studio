@@ -240,7 +240,7 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8").replace(/\r\n/g, "\n");
   const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
   const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["play", "game19", "review", "learn", "settings"]);
+  assert.deepEqual(names, ["play", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
   // v13: one look at the configuration; the tour module loads only when it asks for it.

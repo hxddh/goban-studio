@@ -23,11 +23,11 @@
 import { BLACK, WHITE, EMPTY, territoryMap } from "./rules.js";
 
 export const LEVELS = [
-  { id: 1, key: "learn.easy", budget: 220, candidates: 6, playouts: 0 },
-  { id: 2, key: "learn.easy", budget: 420, candidates: 8, playouts: 3 },
-  { id: 3, key: "learn.medium", budget: 900, candidates: 8, playouts: 8 },
-  { id: 4, key: "learn.hard", budget: 1800, candidates: 10, playouts: 14 },
-  { id: 5, key: "learn.hard", budget: 3200, candidates: 12, playouts: 22 },
+  { id: 1, budget: 220, candidates: 6, playouts: 0 },
+  { id: 2, budget: 420, candidates: 8, playouts: 3 },
+  { id: 3, budget: 900, candidates: 8, playouts: 8 },
+  { id: 4, budget: 1800, candidates: 10, playouts: 14 },
+  { id: 5, budget: 3200, candidates: 12, playouts: 22 },
 ];
 
 const yieldNow = () => new Promise((resolve) => setTimeout(resolve, 0));

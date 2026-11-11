@@ -1039,7 +1039,7 @@ export function smoothedRate(clean, tried, grade, prior = null) {
  *     run at grade 4 over misses at grade 2 is not a level 4;
  *   - every lower grade has results at all, or is covered: at or below
  *     `cover`, the grade the player was started at (the placement grade
- *     by default; learnPath passes the grade of the rank given when there
+ *     by default; practicePath passes the grade of the rank given when there
  *     is no placement). Results at grade 5 alone say nothing about grades
  *     3 and 4.
  * Grade 1 when none qualifies yet but enough were tried; null with too
@@ -1225,11 +1225,11 @@ export function evidence(profile, { problems = [], grades = {}, now = 0, cover =
 export function evidenceOf(a) {
   const out = [];
   if (a.games?.claim) {
-    if (a.games.points != null) out.push({ key: "learn.why.points", params: [String(a.games.points), a.games.games] });
-    else out.push({ key: "learn.why.times", params: [a.games.mistakes, a.games.games] });
+    if (a.games.points != null) out.push({ key: "practice.why.points", params: [String(a.games.points), a.games.games] });
+    else out.push({ key: "practice.why.times", params: [a.games.mistakes, a.games.games] });
   }
-  if (a.endgame?.claim) out.push({ key: "learn.why.lateGame", params: [String(a.endgame.perGame), a.endgame.games] });
-  if (a.problems?.claim) out.push({ key: "learn.why.problems", params: [a.problems.missed, a.problems.tried] });
+  if (a.endgame?.claim) out.push({ key: "practice.why.lateGame", params: [String(a.endgame.perGame), a.endgame.games] });
+  if (a.problems?.claim) out.push({ key: "practice.why.problems", params: [a.problems.missed, a.problems.tried] });
   return out;
 }
 
@@ -1336,7 +1336,7 @@ export function isMastered(e) {
 /**
  * The review load, for a line such as "4 to review today · 31 learning ·
  * 12 mastered". Pure; counts problems and the drills from your games.
- *   due       reviews Learn offers today: the backlog, as far as the day's
+ *   due       reviews Practice offers today: the backlog, as far as the day's
  *             cap (MEMORY.REVIEW_CAP less the reviews already done today) allows
  *   overdue   the whole backlog: everything whose review date has come
  *   drills    how many of `overdue` are drills from your games
@@ -1387,7 +1387,7 @@ export function masteryByTheme(profile, problems = [], grades = {}) {
   return out;
 }
 
-/* ============================================================ Learn's path */
+/* ============================================================ Practice's path */
 
 function dayKey(now) {
   const d = new Date(now);
@@ -1445,7 +1445,7 @@ export function dailySet(profile, problems, grades, limit = 5, now = 0) {
 }
 
 /**
- * The problems and drills of Learn's path (`limit` items, a day's size):
+ * The problems and drills of Practice's path (`limit` items, a day's size):
  *   1. due reviews first, the most forgotten first: up to MAX_DRILLS
  *      drills from your games, then problems. Reviews come before anything
  *      new, so they cannot pile up: with a small backlog (at most
@@ -1655,7 +1655,7 @@ export function gradeForRank(rank) {
 
 /**
  * The placement quiz (v10; v13 adaptive and randomised). Someone who
- * already knows the rules answers 10–12 problems before Learn's first path,
+ * already knows the rules answers 10–12 problems before Practice's first path,
  * and the result sets where the course starts and which problems come
  * first, until their own results measure a solving level.
  *
@@ -1800,7 +1800,7 @@ export function levelPrior(profile, settings = {}, now = 0) {
 }
 
 /**
- * Learn's one ordered list, played as today's session (learn/session.js):
+ * Practice's one ordered list, played as today's session (practice/session.js):
  *   1. the next lesson                         { kind: "lesson", id, unit, role: "next" }
  *   2. capture Go, while it applies (beginners) { kind: "capture", role: "bridge" }
  *   3. due drills from your games (and from trying a moment again), due
@@ -1808,13 +1808,13 @@ export function levelPrior(profile, settings = {}, now = 0) {
  *      stretch problem and new problems at your level (planProblems)
  *                                              { kind: "mistake" | "problem", id, role, why? }
  *   4. the first 9×9 game, while it applies    { kind: "game", role: "bridge", game }
- * The first game comes last: it leaves Learn for Play.
+ * The first game comes last: it leaves Practice for Play.
  *
  * `content` = { course | lessons, problems, grades, settings: { experience,
  * playerRank }, captureWins, limit } (limit: the day's size, the problem
  * items: 3, 5 or 10 — RULES.DAILY_SIZES; 5 by default and for any other value).
  */
-export function learnPath(profile, content = {}, now = 0) {
+export function practicePath(profile, content = {}, now = 0) {
   const p = normalizeProfile(profile);
   const problems = content.problems || [];
   const grades = content.grades || {};

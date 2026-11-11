@@ -299,14 +299,14 @@ try {
       card.props.actions[0].onClick();
       assert.deepEqual(next, { error: null });
       // Go to Today: nothing left open, and the children again.
-      state.space = "learn";
+      state.space = "practice";
       state.sheet = { kind: "settings" };
       state.menu = "x";
-      state.learn = { ...state.learn, view: "problem" };
+      state.practice = { ...state.practice, view: "problem" };
       next = null;
       card.props.actions[1].onClick();
       await settle();
-      assert.deepEqual([state.space, state.sheet, state.menu, state.learn.view, state.play.view], ["today", null, null, "home", "home"]);
+      assert.deepEqual([state.space, state.sheet, state.menu, state.practice.view, state.play.view], ["today", null, null, "home", "home"]);
       assert.deepEqual(next, { error: null });
       // Another page (resetKey changed): tried again without asking.
       next = null;
@@ -516,7 +516,7 @@ try {
     C.newGame({ size: 9, opponent: "human", handicap: 0 });
     state.game.game.play(2, 2);
     const before = Games.listGames().length;
-    for (const space of ["today", "learn", "library"]) {
+    for (const space of ["today", "practice", "library"]) {
       state.space = space;
       A.COMMANDS["game.save"]();
     }

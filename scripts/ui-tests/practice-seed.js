@@ -4,7 +4,7 @@
  * against opponents near their level, the first course unit finished,
  * problems solved and reviewed until some are mastered, a few missed, some
  * due again. The browser checks of Practice and Today write it into the
- * store before the app boots (learn-progress.mjs), and so does anything
+ * store before the app boots (practice-progress.mjs), and so does anything
  * that wants a picture of those pages with something on them.
  *
  * Not a check itself: scripts/ui-test.mjs loads the *.mjs files here.

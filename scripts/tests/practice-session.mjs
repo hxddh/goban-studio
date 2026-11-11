@@ -1,5 +1,5 @@
 /**
- * Learn: today's session (learn/session.js) — starting the path plays its
+ * Practice: today's session (practice/session.js) — starting the path plays its
  * items in order; finishing one moves to the next, through a lesson and the
  * capture Go it leads to, a drill of your own mistake, problems and the
  * first 9×9 game, to a quiet "done for today". Run in Node on the
@@ -10,6 +10,7 @@ import { test, assert, bundle, sleep } from "./helpers.mjs";
 const A = await bundle([
   'export * as C from "./src/web/js/app/controller.js";',
   'export { state } from "./src/web/js/app/store.js";',
+  'export { store } from "./src/web/js/data/store.js";',
   'export { DEFAULT_SETTINGS } from "./src/web/js/data/settings.js";',
   'export * as PM from "./src/web/js/model/player.js";',
   'export { COURSE } from "./src/web/js/content/course.js";',
@@ -26,47 +27,47 @@ function beginner(id, extra = {}) {
   // A moment of a 9×9 game: Black played 3 at A1; C3 (2,2)... the better move is E5.
   p = PM.addMistake(p, { gameId: "g", index: 3, theme: "atari", color: 1, size: 9, loss: 4, sgf: "(;GM[1]FF[4]SZ[9];B[cc];W[gg];B[aa])", played: { x: 0, y: 0 }, best: { x: 4, y: 4 } }, Date.now() - 1000);
   state.profile = p;
-  state.space = "learn";
-  state.learn = { view: "home", topic: null, lesson: null, problem: null, daily: null };
+  state.space = "practice";
+  state.practice = { view: "home", topic: null, lesson: null, problem: null, daily: null };
   C.resetSession();
 }
 
 /** Finish the open lesson: every step continued. */
 function finishLesson() {
-  const L = state.learn.lesson;
+  const L = state.practice.lesson;
   for (let i = L.index; i < L.lesson.steps.length; i++) C.lessonContinue();
-  assert.equal(state.learn.lesson.finished, true);
+  assert.equal(state.practice.lesson.finished, true);
 }
 
 /** Show the answer of the open problem. */
 function giveUp() {
-  assert.equal(state.learn.view, "problem");
+  assert.equal(state.practice.view, "problem");
   C.showAnswer();
 }
 
-const keyNow = () => state.learn.daily?.current;
+const keyNow = () => state.practice.daily?.current;
 
 try {
-  await test("learn session: Back to an item of today's session reopens it inside the session", async () => {
+  await test("practice session: Back to an item of today's session reopens it inside the session", async () => {
     beginner("stones-capture");
     C.setRestorer(C.restore); // what boot installs
     C.startPath();
     const key = keyNow();
-    assert.equal(state.learn.view, "lesson");
+    assert.equal(state.practice.view, "lesson");
     C.goSpace("play");
     assert.equal(state.space, "play");
     assert.equal(C.back(), true);
     await sleep(0);
-    assert.equal(state.space, "learn");
-    assert.equal(state.learn.view, "lesson");
-    assert.ok(state.learn.daily, "inside the session");
+    assert.equal(state.space, "practice");
+    assert.equal(state.practice.view, "lesson");
+    assert.ok(state.practice.daily, "inside the session");
     assert.equal(keyNow(), key);
   });
 
-  await test("learn session: a lesson step's goal line is its own where the lesson gives one, else the line of its kind", () => {
+  await test("practice session: a lesson step's goal line is its own where the lesson gives one, else the line of its kind", () => {
     beginner("stones-board");
     C.openLesson("stones-board", 0);
-    const cur = () => state.learn.lesson.cur;
+    const cur = () => state.practice.lesson.cur;
     assert.equal(cur().kind, "read");
     assert.equal(C.stepGoalText(cur()), null, "a read step has no goal line");
     C.lessonContinue();
@@ -87,16 +88,16 @@ try {
     C.openLesson(plain.id, plain.steps.findIndex((s) => s.kind === "place" && !s.goal));
     assert.equal(C.stepGoalText(cur()), "Black to play: find the best point");
     assert.equal(C.stepGoalText(null), null);
-    C.learnHome();
+    C.practiceHome();
   });
 
-  await test("learn session: a restart keeps what is done today; another day starts afresh", async () => {
+  await test("practice session: a restart keeps what is done today; another day starts afresh", async () => {
     beginner("stones-capture");
     C.startPath();
     const first = keyNow();
     assert.ok(first, "an item is open");
     C.continuePath();
-    const done = [...state.learn.daily.done];
+    const done = [...state.practice.daily.done];
     assert.ok(done.includes(first), "the first item is done");
     // A restart: memory is gone, the store keeps the session.
     C.resetSession({ keepStored: true });
@@ -108,9 +109,41 @@ try {
     assert.equal(C.todaysSession(Date.now() + 86400000), null);
   });
 
-  await test("learn session: the path plays as one session — lesson, capture Go, your drill, problems — then done for today", async () => {
+  await test("practice session: a session.json saved while the space was called learn is read as it is — nothing stored names the space", () => {
     beginner("stones-capture");
-    const path0 = C.learnPath();
+    const now = Date.now();
+    const d = new Date(now);
+    const date = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const drill = state.profile.mistakes[0].id;
+    // The file exactly as the previous release wrote it: items by kind and key, the day, what is done.
+    const stored = {
+      date,
+      items: [
+        { kind: "lesson", id: "stones-capture", unit: COURSE[0].id, role: "next", key: "lesson:stones-capture" },
+        { kind: "mistake", id: drill, role: "review", key: "mistake:" + drill },
+        { kind: "capture", role: "bridge", key: "capture" },
+      ],
+      done: ["lesson:stones-capture"],
+      current: "mistake:" + drill,
+    };
+    A.store.put("session.json", stored);
+    C.resetSession({ keepStored: true });
+    const s = C.todaysSession(now);
+    assert.ok(s, "today's session is read");
+    assert.deepEqual(s.items.map((it) => it.key), stored.items.map((it) => it.key));
+    assert.deepEqual(s.done, stored.done);
+    assert.equal(s.current, stored.current);
+    // Opening an item lands in the space under its new id, and what is written back names no space at all.
+    C.openPathItem("mistake:" + drill);
+    assert.equal(state.space, "practice");
+    const text = JSON.stringify(A.store.get("session.json"));
+    assert.doesNotMatch(text, /"learn"|"practice"|space/);
+    C.resetSession();
+  });
+
+  await test("practice session: the path plays as one session — lesson, capture Go, your drill, problems — then done for today", async () => {
+    beginner("stones-capture");
+    const path0 = C.practicePath();
     assert.deepEqual(path0.slice(0, 2).map((i) => i.kind), ["lesson", "mistake"], "the lesson, then the drill due");
     assert.equal(path0[0].id, "stones-capture");
     let home = C.pathNow();
@@ -119,7 +152,7 @@ try {
 
     // Start: the first item, the lesson, in the session.
     C.startPath();
-    assert.equal(state.learn.view, "lesson");
+    assert.equal(state.practice.view, "lesson");
     assert.equal(keyNow(), "lesson:stones-capture");
     assert.deepEqual(C.sessionPlace(), { n: 1, total: path0.length });
     finishLesson();
@@ -131,9 +164,9 @@ try {
 
     // Continue: capture Go. A win ends it and marks it done.
     C.continuePath();
-    assert.equal(state.learn.view, "capture");
-    assert.ok(state.learn.daily, "capture Go is part of the session");
-    const K = state.learn.capture;
+    assert.equal(state.practice.view, "capture");
+    assert.ok(state.practice.daily, "capture Go is part of the session");
+    const K = state.practice.capture;
     K.game.setup([{ x: 4, y: 4, c: -1 }, { x: 3, y: 4, c: 1 }, { x: 5, y: 4, c: 1 }, { x: 4, y: 3, c: 1 }], 1);
     C.capturePlay(4, 5);
     assert.equal(K.over?.winner, 1);
@@ -142,43 +175,43 @@ try {
 
     // Continue: the drill from your own game.
     C.continuePath();
-    assert.equal(state.learn.view, "mistake");
+    assert.equal(state.practice.view, "mistake");
     assert.equal(keyNow(), "mistake:g-3");
     C.practicePlay(4, 4);
-    assert.equal(state.learn.mistake.status, "right");
+    assert.equal(state.practice.mistake.status, "right");
     assert.ok(C.todaysSession().done.includes("mistake:g-3"));
     assert.ok(state.profile.mistakes.find((m) => m.id === "g-3").due > Date.now(), "rescheduled");
 
     // Continue: the problems, one after another (the answer shown counts as done when you go on).
     C.continuePath();
     let guard = 0;
-    while (state.learn.view === "problem" && guard++ < 10) {
+    while (state.practice.view === "problem" && guard++ < 10) {
       const at = C.sessionPlace();
       assert.ok(at.n > 3 && at.n <= at.total, JSON.stringify(at));
       giveUp();
       C.nextProblem();
     }
-    assert.equal(state.learn.view, "dailyDone", "a quiet end");
-    assert.equal(state.learn.daily, null);
+    assert.equal(state.practice.view, "dailyDone", "a quiet end");
+    assert.equal(state.practice.daily, null);
     home = C.pathNow();
     assert.equal(home.finished, true);
     assert.equal(home.done.size, home.items.length);
     // Starting again does not start over: it is done for today.
     C.startPath();
-    assert.equal(state.learn.view, "dailyDone");
+    assert.equal(state.practice.view, "dailyDone");
     // Another day: a new session from the path as it is then.
     assert.equal(C.todaysSession(Date.now() + 86400000), null);
     await sleep(0);
   });
 
-  await test("learn session: a row starts the session at that item; a drill that falls due meanwhile joins it; the home goes on with it", () => {
+  await test("practice session: a row starts the session at that item; a drill that falls due meanwhile joins it; the home goes on with it", () => {
     beginner("stones-groups", { captureWins: 2 });
     const items = C.pathNow().items;
     const third = items[3];
     assert.equal(third.kind, "problem");
     C.openPathItem(third.key);
-    assert.equal(state.learn.view, "problem");
-    assert.equal(state.learn.problem.def.id, third.id);
+    assert.equal(state.practice.view, "problem");
+    assert.equal(state.practice.problem.def.id, third.id);
     assert.equal(keyNow(), third.key);
     // A moment tried again in Play (addMistake) while the session is open.
     state.profile = PM.addMistake(state.profile, { gameId: "h", index: 20, theme: "cut", color: -1, size: 19, sgf: "(;GM[1]FF[4]SZ[19];B[pd];W[dp])", played: { x: 0, y: 0 }, best: { x: 3, y: 3 } }, Date.now() - 1000);
@@ -190,26 +223,26 @@ try {
     C.continuePath();
     assert.ok(C.todaysSession().done.includes(third.key));
     assert.equal(keyNow(), "mistake:h-20", "the new drill is next");
-    // Learn's home shows the session, with its progress, and the primary goes on with it.
-    C.learnHome();
+    // Practice's home shows the session, with its progress, and the primary goes on with it.
+    C.practiceHome();
     const home = C.pathNow();
     assert.equal(home.started, true);
     assert.equal(home.finished, false);
     assert.ok(home.items.some((it) => it.key === "mistake:h-20"));
     C.startPath();
-    assert.equal(state.learn.view, "lesson", "the first item not done: the lesson");
+    assert.equal(state.practice.view, "lesson", "the first item not done: the lesson");
   });
 
-  await test("learn session: the first 9×9 game comes last and leaves for Play; the week's focus names its reason and its lesson", async () => {
+  await test("practice session: the first 9×9 game comes last and leaves for Play; the week's focus names its reason and its lesson", async () => {
     beginner("life-space", { captureWins: 2 });
     C.startPath();
     assert.equal(keyNow(), "lesson:life-space");
     finishLesson();
     const s = C.todaysSession();
     assert.equal(s.items.at(-1).kind, "game", "the bridge joins at the end");
-    for (let i = 0; i < 10 && state.learn.view !== "dailyDone" && state.space === "learn"; i++) {
-      if (state.learn.view === "mistake") C.revealMistake();
-      if (state.learn.view === "problem") C.showAnswer();
+    for (let i = 0; i < 10 && state.practice.view !== "dailyDone" && state.space === "practice"; i++) {
+      if (state.practice.view === "mistake") C.revealMistake();
+      if (state.practice.view === "problem") C.showAnswer();
       C.continuePath();
     }
     await sleep(0);
@@ -231,7 +264,7 @@ try {
     assert.match(wf.why[0], /Lost ≈20 points here in your last 4 games/);
     assert.equal(wf.lesson, "connect-cut", "the first lesson on cutting not done yet");
     assert.equal(state.profile.week.focus[0], "cut", "kept for the week");
-    const focusItems = C.learnPath().filter((i) => i.role === "focus");
+    const focusItems = C.practicePath().filter((i) => i.role === "focus");
     assert.ok(focusItems.length > 0 && focusItems.every((i) => i.why === "cut"), "the path brings the focus");
   });
 } finally {

@@ -146,11 +146,11 @@ export function setRestorer(fn) {
 }
 
 export function locationNow() {
-  const p = state.learn;
+  const p = state.practice;
   const r = state.review;
   return {
     space: state.space,
-    learn: {
+    practice: {
       view: p.view,
       topic: p.topic,
       theme: p.theme || null,

@@ -72,7 +72,7 @@ function fresh(lang = "en") {
   state.review = null;
   state.space = "play";
   state.sheet = { kind: "onboarding", step: 1 };
-  state.learn = { view: "home", topic: null, theme: null, lesson: null, problem: null, daily: null, placement: null };
+  state.practice = { view: "home", topic: null, theme: null, lesson: null, problem: null, daily: null, placement: null };
 }
 
 await test("first run: all three answers end on Today with nothing started; the hero's game is the one onboarding promised", () => {
@@ -82,7 +82,7 @@ await test("first run: all three answers end on Today with nothing started; the 
     assert.equal(state.space, "today", choice);
     assert.equal(state.sheet, null);
     assert.equal(state.game, null, `${choice}: no board was started`);
-    assert.equal(state.learn.view, "home", `${choice}: no lesson was opened`);
+    assert.equal(state.practice.view, "home", `${choice}: no lesson was opened`);
     assert.equal(state.settings.onboarded, true);
     assert.equal(state.settings.experience, choice);
     assert.equal(C.firstRunOffer(), offer);

@@ -218,24 +218,24 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".try-card .btn >> nth=-1");
     await page.waitForSelector(".try-card", { state: "detached" });
     assert(await page.evaluate(() => !window.__state.review.trial && window.__state.review.focus === 5), "back to the moment");
-    // Missed once more: the moment comes back in Learn's path, as a review due the next day.
+    // Missed once more: the moment comes back in Practice's path, as a review due the next day.
     await page.click(".key-move .try-again");
     await page.waitForFunction(() => window.__state.review.trial?.before && window.__board.model.interactive);
     await clickPoint(page, 8, 0);
     await verdict(page, "bad");
     // Today the miss put it on tomorrow's list (the game had made it a drill due at once).
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
-    assert((await page.locator(".learn-path .path-row[data-kind=mistake]").count()) === 0, "due before tomorrow");
+    await page.waitForSelector(".practice-path .path-row");
+    assert((await page.locator(".practice-path .path-row[data-kind=mistake]").count()) === 0, "due before tomorrow");
     await page.evaluate(() => {
       const real = Date.now.bind(Date);
       Date.now = () => real() + 26 * 3600 * 1000;
     });
     await page.keyboard.press("Control+2");
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
-    const rows = await page.locator(".learn-path .path-row[data-kind=mistake]").allInnerTexts();
-    assert(rows.some((r) => r.includes("Due for review") && /\b5\b/.test(r)), `Learn's path: ${rows.join(" | ") || "no mistake row"}`);
+    await page.waitForSelector(".practice-path .path-row");
+    const rows = await page.locator(".practice-path .path-row[data-kind=mistake]").allInnerTexts();
+    assert(rows.some((r) => r.includes("Due for review") && /\b5\b/.test(r)), `Practice's path: ${rows.join(" | ") || "no mistake row"}`);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });

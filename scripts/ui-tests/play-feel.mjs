@@ -121,7 +121,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     // A topic lists its problems by title (the problems part): it opens once that part arrives.
     await page.click(".topic-row >> nth=0");
     await page.waitForTimeout(150);
-    assert(await page.evaluate(() => window.__state.learn.view === "home"), "the topic opened without its problems");
+    assert(await page.evaluate(() => window.__state.practice.view === "home"), "the topic opened without its problems");
     const t0 = Date.now();
     hold = false;
     for (const r of held.splice(0)) await r.continue();
@@ -129,7 +129,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     const ms = Date.now() - t0;
     assert(ms < BUDGET.contentFirstUse, `topic ${ms} ms after its part was let through > ${BUDGET.contentFirstUse}`);
     await page.click(".problem-card >> nth=0");
-    await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.problem?.pz);
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.problem?.pz);
     // The rest arrives on idle, each part once.
     await page.waitForFunction(() => performance.getEntriesByType("resource").filter((e) => /content\/(course|problems|classics)\.json$/.test(e.name)).length >= 3, null, { timeout: 10000 });
     assert(asked.length === 3 && new Set(asked).size === 3, `asked: ${asked.join(", ")}`);

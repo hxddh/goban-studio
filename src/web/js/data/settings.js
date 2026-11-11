@@ -39,8 +39,8 @@ export const DEFAULT_SETTINGS = {
   // japanese | chinese | korean; null = never chosen: the rules of the
   // interface language (rulesForLang), read through defaultRulesOf.
   defaultRules: null,
-  captureWins: 0, // capture Go games won (the beginner bridge, Learn)
-  dailySize: 5, // problem items in a day of Learn: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
+  captureWins: 0, // capture Go games won (the beginner bridge, Practice)
+  dailySize: 5, // problem items in a day of Practice: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
   firstCountSeen: false, // the one-time note on the first count was shown
 };
 

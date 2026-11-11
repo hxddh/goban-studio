@@ -1,5 +1,5 @@
 /**
- * Learn: the beginner bridges in the browser (capture Go, lesson-to-game
+ * Practice: the beginner bridges in the browser (capture Go, lesson-to-game
  * bridges, the first count). Loaded by scripts/ui-test.mjs before the
  * visual baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser, audit).
@@ -13,7 +13,7 @@ const IDS = COURSE.flatMap((u) => u.lessons.map((l) => l.id));
 export default async function ({ check, assert, fresh, onboard, clickPoint, audit }) {
   /**
    * A new player who has done every lesson before `id` and is on its last
-   * step: the lesson opens from Learn's path (today's session, `session`) or
+   * step: the lesson opens from Practice's path (today's session, `session`) or
    * from the catalog (on its own), its last problem's answer is shown and the
    * lesson finished, leaving its lesson-complete page.
    */
@@ -35,18 +35,18 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.reload();
     await page.waitForFunction(() => window.__state?.ready && document.querySelector(".page"));
     await page.keyboard.press("Control+3");
-    await page.waitForFunction(() => window.__state.space === "learn" && window.__state.learn.view === "home" && document.querySelector(".learn-path .btn.primary"));
-    if (session) await page.click(".learn-path .btn.primary");
+    await page.waitForFunction(() => window.__state.space === "practice" && window.__state.practice.view === "home" && document.querySelector(".practice-path .btn.primary"));
+    if (session) await page.click(".practice-path .btn.primary");
     else {
       await page.click(".catalog .lesson-row.next");
     }
-    await page.waitForFunction((id) => window.__state.learn.lesson?.lesson.id === id, id);
-    const kind = await page.evaluate(() => window.__state.learn.lesson.cur.kind);
+    await page.waitForFunction((id) => window.__state.practice.lesson?.lesson.id === id, id);
+    const kind = await page.evaluate(() => window.__state.practice.lesson.cur.kind);
     if (kind === "problem") await page.click(".panel .actions .btn.ghost >> nth=-1"); // Show answer
     if (kind === "place") {
       await page.waitForFunction(() => window.__board?.geom?.cell > 0 && window.__board.model.interactive);
       const at = await page.evaluate(() => {
-        const cur = window.__state.learn.lesson.cur;
+        const cur = window.__state.practice.lesson.cur;
         return { x: cur.step.accept[0].x + cur.pz.x0, y: cur.step.accept[0].y + cur.pz.y0 };
       });
       await clickPoint(page, at.x, at.y);
@@ -78,7 +78,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
   /** The player's move in capture Go, chosen to end the game fast: a self-atari if there is one, else touching a white stone. */
   async function captureTurn(page) {
     const p = await page.evaluate(() => {
-      const K = window.__state.learn.capture;
+      const K = window.__state.practice.capture;
       const b = K.game.current.board.signMap;
       const n = b.length;
       const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -108,11 +108,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (b[y][x] === 0 && K.game.canPlay(x, y).ok) legal.push({ x, y });
       return legal.find(({ x, y }) => libsAfter(x, y) === 1) || legal.find(({ x, y }) => DIRS.some(([dx, dy]) => b[y + dy]?.[x + dx] === -1)) || legal[40] || legal[0];
     });
-    const n = await page.evaluate(() => window.__state.learn.capture.game.moveNumber);
+    const n = await page.evaluate(() => window.__state.practice.capture.game.moveNumber);
     await clickPoint(page, p.x, p.y);
     await page.waitForFunction(
       (n) => {
-        const K = window.__state.learn.capture;
+        const K = window.__state.practice.capture;
         return K.over || (K.game.moveNumber >= n + 2 && !K.thinking);
       },
       n,
@@ -128,31 +128,31 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     return page;
   }
 
-  await check("learn beginner: Back and Forward return to the capture game the player left, as it was", async () => {
+  await check("practice beginner: Back and Forward return to the capture game the player left, as it was", async () => {
     const page = await start();
     await lessonDone(page, "stones-capture");
     await page.click(".celebrate .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "capture" && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
+    await page.waitForFunction(() => window.__state.practice.view === "capture" && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
     // One quiet move away from the white stones, and the computer's reply.
     await clickPoint(page, 0, 8);
-    await page.waitForFunction(() => window.__state.learn.capture.game.moveNumber >= 2 && !window.__state.learn.capture.thinking, null, { timeout: 5000 });
-    const moves = await page.evaluate(() => window.__state.learn.capture.game.moveNumber);
+    await page.waitForFunction(() => window.__state.practice.capture.game.moveNumber >= 2 && !window.__state.practice.capture.thinking, null, { timeout: 5000 });
+    const moves = await page.evaluate(() => window.__state.practice.capture.game.moveNumber);
     await page.keyboard.press("Control+2");
     await page.waitForFunction(() => window.__state.space === "play");
     await page.keyboard.press("Control+[");
-    await page.waitForFunction(() => window.__state.learn.view === "capture", null, { timeout: 3000 });
-    const back = await page.evaluate(() => window.__state.learn.capture.game.moveNumber);
+    await page.waitForFunction(() => window.__state.practice.view === "capture", null, { timeout: 3000 });
+    const back = await page.evaluate(() => window.__state.practice.capture.game.moveNumber);
     assert(back === moves, `Back reopened another game: ${back} moves, not ${moves}`);
     await page.keyboard.press("Control+]");
     await page.waitForFunction(() => window.__state.space === "play");
     await page.keyboard.press("Control+[");
-    await page.waitForFunction(() => window.__state.learn.view === "capture", null, { timeout: 3000 });
-    assert((await page.evaluate(() => window.__state.learn.capture.game.moveNumber)) === moves, "Forward then Back keeps the game");
+    await page.waitForFunction(() => window.__state.practice.view === "capture", null, { timeout: 3000 });
+    assert((await page.evaluate(() => window.__state.practice.capture.game.moveNumber)) === moves, "Forward then Back keeps the game");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
 
-  await check("learn beginner: capture Go after the capturing lesson — one primary, a game to the first capture, not saved or rated", async () => {
+  await check("practice beginner: capture Go after the capturing lesson — one primary, a game to the first capture, not saved or rated", async () => {
     const page = await start();
     await lessonDone(page, "stones-capture");
     const card = await page.evaluate(() => ({
@@ -166,15 +166,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const stored = () => ({ lib: Object.keys(localStorage).filter((k) => k.startsWith("goban9:games/")).join(), current: localStorage.getItem("goban9:current.json"), games: window.__state.profile.games.length, rating: JSON.stringify(window.__state.profile.rating), wins: window.__state.settings.captureWins || 0 });
     const before = await page.evaluate(stored);
     await page.click(".celebrate .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "capture" && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
+    await page.waitForFunction(() => window.__state.practice.view === "capture" && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
     assert((await page.textContent(".panel")).includes("Whoever captures a stone first wins."), "the goal");
     await inspect(page, "capture Go");
     // Play until the computer captures (it always does when it can).
     for (let i = 0; i < 40; i++) {
-      if (await page.evaluate(() => !!window.__state.learn.capture.over)) break;
+      if (await page.evaluate(() => !!window.__state.practice.capture.over)) break;
       await captureTurn(page);
     }
-    const over = await page.evaluate(() => window.__state.learn.capture.over);
+    const over = await page.evaluate(() => window.__state.practice.capture.over);
     assert(over && over.winner === -1 && over.by === "capture", `over ${JSON.stringify(over)}`);
     await page.waitForSelector(".result-card");
     assert((await page.textContent(".result-big")).trim() === "The computer captured first", "the result line");
@@ -189,7 +189,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     assert(after.wins === 0, "a loss counted as a win");
     // Play again: a fresh board, same place.
     await page.click(".result-card .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.capture.game.moveNumber === 0 && !window.__state.learn.capture.over);
+    await page.waitForFunction(() => window.__state.practice.capture.game.moveNumber === 0 && !window.__state.practice.capture.over);
     // Back returns to the lesson-complete page.
     await page.keyboard.press("Control+BracketLeft");
     await page.waitForSelector(".celebrate[data-bridge=capture]");
@@ -197,7 +197,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
-  await check("learn beginner: capture Go is offered after the next two lessons, and not once two are won", async () => {
+  await check("practice beginner: capture Go is offered after the next two lessons, and not once two are won", async () => {
     const page = await start();
     for (const id of ["stones-groups", "stones-suicide"]) {
       await lessonDone(page, id);
@@ -218,15 +218,15 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
-  await check("learn beginner: a capture win counts; the second win brings the stronger level", async () => {
+  await check("practice beginner: a capture win counts; the second win brings the stronger level", async () => {
     const page = await start();
     await lessonDone(page, "stones-capture", { captureWins: 1 });
     await page.click(".celebrate .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "capture");
-    assert((await page.evaluate(() => window.__state.learn.capture.level)) === 1, "level 1 before two wins");
+    await page.waitForFunction(() => window.__state.practice.view === "capture");
+    assert((await page.evaluate(() => window.__state.practice.capture.level)) === 1, "level 1 before two wins");
     // Put the computer's stone in atari by hand: the player captures next.
     await page.evaluate(() => {
-      const K = window.__state.learn.capture;
+      const K = window.__state.practice.capture;
       K.game.setup([{ x: 4, y: 4, c: -1 }, { x: 3, y: 4, c: 1 }, { x: 5, y: 4, c: 1 }, { x: 4, y: 3, c: 1 }], 1);
     });
     await page.waitForFunction(() => window.__board?.geom?.cell > 20);
@@ -237,12 +237,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     assert(primary.length === 1 && primary[0] === "Next lesson", `after a win: ${primary}`);
     assert((await page.evaluate(() => window.__state.settings.captureWins)) === 2, "the win counted");
     await page.click(".result-card .btn.secondary");
-    await page.waitForFunction(() => window.__state.learn.capture.game.moveNumber === 0);
-    assert((await page.evaluate(() => window.__state.learn.capture.level)) === 2, "level 2 after two wins");
+    await page.waitForFunction(() => window.__state.practice.capture.game.moveNumber === 0);
+    assert((await page.evaluate(() => window.__state.practice.capture.level)) === 2, "level 2 after two wins");
     await page.close();
   });
 
-  await check("learn beginner: after the life basics, the first 9×9 game against the gentlest level, teaching on", async () => {
+  await check("practice beginner: after the life basics, the first 9×9 game against the gentlest level, teaching on", async () => {
     const page = await start();
     await lessonDone(page, "life-two-eyes");
     assert((await page.getAttribute(".celebrate", "data-bridge")) === "firstGame", "bridge");
@@ -256,7 +256,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
-  await check("learn beginner: 'I know the rules' starts a gentle 9×9 game; the first count explains itself once", async () => {
+  await check("practice beginner: 'I know the rules' starts a gentle 9×9 game; the first count explains itself once", async () => {
     const page = await fresh();
     await page.goto(ORIGIN + "/");
     await page.waitForSelector(".ob-card");
@@ -323,23 +323,23 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.close();
   });
 
-  await check("learn beginner: in today's session the bridge is the next item — the lesson's one primary plays it, then Continue goes on", async () => {
+  await check("practice beginner: in today's session the bridge is the next item — the lesson's one primary plays it, then Continue goes on", async () => {
     const page = await start();
     await lessonDone(page, "stones-capture", {}, { session: true });
     const card = await page.evaluate(() => ({
       bridge: document.querySelector(".celebrate")?.dataset.bridge,
       primary: [...document.querySelectorAll(".celebrate .btn.primary")].map((b) => b.textContent.trim()),
-      next: window.__state.learn.daily.items[1]?.kind,
+      next: window.__state.practice.daily.items[1]?.kind,
     }));
     assert(card.bridge === "capture" && card.next === "capture", JSON.stringify(card));
     assert(card.primary.length === 1 && card.primary[0] === "Play a game of capture Go", `primary ${card.primary}`);
     await inspect(page, "lesson complete in the session");
     await page.click(".celebrate .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "capture" && !!window.__state.learn.daily && window.__board?.geom?.cell > 20);
+    await page.waitForFunction(() => window.__state.practice.view === "capture" && !!window.__state.practice.daily && window.__board?.geom?.cell > 20);
     assert((await page.textContent(".toolbar")).includes("Today 2 of"), "the session's place in the toolbar");
     // A win: Continue is the one primary, and goes to the next item of the path.
     await page.evaluate(() => {
-      const K = window.__state.learn.capture;
+      const K = window.__state.practice.capture;
       K.game.setup([{ x: 4, y: 4, c: -1 }, { x: 3, y: 4, c: 1 }, { x: 5, y: 4, c: 1 }, { x: 4, y: 3, c: 1 }], 1);
     });
     await clickPoint(page, 4, 5);
@@ -348,12 +348,12 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     assert(primary.length === 1 && primary[0] === "Continue", `after a win in the session: ${primary}`);
     await inspect(page, "capture Go won, in the session");
     await page.click(".result-card .btn.primary");
-    await page.waitForFunction(() => ["problem", "mistake"].includes(window.__state.learn.view) && window.__state.learn.daily?.done.includes("capture"));
-    // Learn's home: the first two rows are checked, the primary goes on.
+    await page.waitForFunction(() => ["problem", "mistake"].includes(window.__state.practice.view) && window.__state.practice.daily?.done.includes("capture"));
+    // Practice's home: the first two rows are checked, the primary goes on.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row.done");
-    assert((await page.locator(".learn-path .path-row.done").count()) === 2, "two done");
-    assert((await page.textContent(".learn-path .btn.primary")).trim() === "Continue", "the primary goes on with the session");
+    await page.waitForSelector(".practice-path .path-row.done");
+    assert((await page.locator(".practice-path .path-row.done").count()) === 2, "two done");
+    assert((await page.textContent(".practice-path .btn.primary")).trim() === "Continue", "the primary goes on with the session");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
@@ -371,10 +371,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
       await lessonDone(page, "stones-capture", c.large ? { largeText: true } : {});
       await inspect(page, "lesson complete, capture Go");
       await page.click(".celebrate .btn.primary");
-      await page.waitForFunction(() => window.__state.learn.view === "capture" && window.__board?.geom?.cell > 20);
+      await page.waitForFunction(() => window.__state.practice.view === "capture" && window.__board?.geom?.cell > 20);
       await inspect(page, "capture Go");
       for (let i = 0; i < 40; i++) {
-        if (await page.evaluate(() => !!window.__state.learn.capture.over)) break;
+        if (await page.evaluate(() => !!window.__state.practice.capture.over)) break;
         await captureTurn(page);
       }
       await page.waitForSelector(".result-card");

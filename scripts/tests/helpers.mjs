@@ -120,7 +120,7 @@ export async function teardown() {
     if (st) {
       st.game = null;
       st.review = null;
-      if (st.learn) st.learn = { ...st.learn, capture: null };
+      if (st.practice) st.practice = { ...st.practice, capture: null };
       if (st.play) st.play = { ...st.play, explorer: null };
       if (st.settings) st.settings = { ...st.settings, liveAnalysis: false };
     }

@@ -108,7 +108,7 @@ export function ReviewView() {
 function reviewHeading(r) {
   const meta = r.meta;
   const space = meta.space || "play";
-  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
+  const crumbs = [{ label: t(space === "practice" ? "nav.practice" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");
   // A game with a result says it at the top of the panel (ResultLine).
   let sub = "";

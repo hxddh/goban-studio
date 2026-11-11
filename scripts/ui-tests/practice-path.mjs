@@ -1,10 +1,10 @@
 /**
- * Learn: the path, today's session and the catalog in the browser — the
+ * Practice: the path, today's session and the catalog in the browser — the
  * home is one short list with one primary, each row says why it is there
  * (problems of one theme share a row),
  * a row or the primary starts the session, finishing an item moves to the
  * next, and the end is a quiet "done for today"; the catalog is one row
- * away. Every new Learn view is checked in four languages, light and dark,
+ * away. Every new Practice view is checked in four languages, light and dark,
  * with larger text: the accessibility audit, raw keys, clipping, sideways
  * scrolling and one primary. Loaded by scripts/ui-test.mjs before the
  * visual baselines; receives its helpers.
@@ -32,31 +32,31 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     assert(!bad.overflow, `${where}: the page scrolls sideways`);
   }
 
-  /** A new player on Learn's home (onboarding "new" opens lesson one; Learn again is the home). */
+  /** A new player on Practice's home (onboarding "new" opens lesson one; Practice again is the home). */
   async function newPlayer(locale = "en-US", scheme = "light") {
     const page = await fresh(locale);
     // The scheme from the start: a switch half-way through the colours' transition would be audited mid-way.
     await page.emulateMedia({ colorScheme: scheme });
     await onboard(page, 0);
-    await page.waitForFunction(() => window.__state.space === "learn" && window.__state.learn.view === "lesson");
+    await page.waitForFunction(() => window.__state.space === "practice" && window.__state.practice.view === "lesson");
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     return page;
   }
 
-  await check("learn path: the home is one short list with one primary; each row says why; the catalog is one row away", async () => {
+  await check("practice path: the home is one short list with one primary; each row says why; the catalog is one row away", async () => {
     const page = await newPlayer();
-    const rows = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), text: r.innerText })));
+    const rows = await page.evaluate(() => [...document.querySelectorAll(".practice-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), text: r.innerText })));
     assert(rows.length >= 2 && rows.length <= 8, `${rows.length} rows`);
     assert(rows[0].kind === "lesson" && rows[0].text.includes("Next lesson"), JSON.stringify(rows[0]));
     // The day's five problems, those of one theme in one row, each row with its reason and how hard it is.
     for (const r of rows.slice(1)) assert(r.kind === "problem" && /New at your level|A step up/.test(r.text) && /Level \d/.test(r.text) && /\d problems?/.test(r.text), JSON.stringify(r));
     assert(rows.slice(1).reduce((n, r) => n + r.count, 0) === 5, `five problems: ${JSON.stringify(rows)}`);
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
-    assert((await page.textContent(".learn-path .btn.primary")).trim() === "Start", "Start");
+    assert((await page.textContent(".practice-path .btn.primary")).trim() === "Start", "Start");
     // No Daily five, no focus card, no mistakes section, no course hero, no tiles on the page.
-    assert((await page.locator(".learn-home .hero, .learn-home .problem-grid").count()) === 0, "the old sections");
-    assert(!(await page.textContent(".learn-home")).includes("Daily five"), "Daily five");
+    assert((await page.locator(".practice-home .hero, .practice-home .problem-grid").count()) === 0, "the old sections");
+    assert(!(await page.textContent(".practice-home")).includes("Daily five"), "Daily five");
     // v12: below the path, the course, the problem topics and the basic shapes, on the same page.
     await page.waitForSelector(".catalog .units");
     assert((await page.locator(".catalog .unit").count()) >= 10, "the course units");
@@ -74,18 +74,18 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     await page.close();
   });
 
-  await check("learn path: the session plays the rows in order — a lesson, then problems with Continue — to a quiet done for today", async () => {
+  await check("practice path: the session plays the rows in order — a lesson, then problems with Continue — to a quiet done for today", async () => {
     const page = await newPlayer();
-    const rowCount = await page.locator(".learn-path .path-row").count();
+    const rowCount = await page.locator(".practice-path .path-row").count();
     // The session plays the items; a row may hold several problems.
-    const total = await page.evaluate(() => [...document.querySelectorAll(".learn-path .path-row")].reduce((n, r) => n + Number(r.dataset.count), 0));
-    await page.click(".learn-path .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "lesson" && !!window.__state.learn.daily);
+    const total = await page.evaluate(() => [...document.querySelectorAll(".practice-path .path-row")].reduce((n, r) => n + Number(r.dataset.count), 0));
+    await page.click(".practice-path .btn.primary");
+    await page.waitForFunction(() => window.__state.practice.view === "lesson" && !!window.__state.practice.daily);
     assert((await page.textContent(".toolbar")).includes(`Today 1 of ${total}`), "its place in the toolbar");
     // Finish the lesson: Continue through its steps (answers shown where asked).
     for (let i = 0; i < 40; i++) {
       const v = await page.evaluate(() => {
-        const L = window.__state.learn.lesson;
+        const L = window.__state.practice.lesson;
         if (L.finished) return "done";
         if (L.cur.kind === "place") L.cur.result = "right"; // the point itself is the beginner checks' business
         return L.cur.kind === "problem" && !L.cur.answer && L.cur.status !== "won" ? "ask" : L.cur.kind;
@@ -101,12 +101,12 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     assert((await page.textContent(".celebrate .btn.primary")).trim() === "Continue", "Continue to the next item");
     await inspect(page, "lesson complete in the session");
     await page.click(".celebrate .btn.primary");
-    await page.waitForFunction(() => window.__state.learn.view === "problem" && window.__state.learn.daily?.done.length === 1);
+    await page.waitForFunction(() => window.__state.practice.view === "problem" && window.__state.practice.daily?.done.length === 1);
     assert((await page.textContent(".toolbar")).includes(`Today 2 of ${total}`), "the second item");
     assert(/New at your level|A step up/.test(await page.textContent(".panel .eyebrow")), "why it is there");
     // Each problem: the answer, then Continue.
     for (let n = 2; n <= total; n++) {
-      await page.waitForFunction((n) => window.__state.learn.view === "problem" && document.querySelector(".toolbar").innerText.includes(`Today ${n} of`), n);
+      await page.waitForFunction((n) => window.__state.practice.view === "problem" && document.querySelector(".toolbar").innerText.includes(`Today ${n} of`), n);
       await page.click(".panel .actions .btn.ghost >> text=Show answer");
       await page.click(".panel .actions .btn.primary >> text=Continue");
     }
@@ -114,10 +114,10 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     assert((await page.textContent(".session-done h1")).trim() === "Done for today", "a quiet end");
     await inspect(page, "done for today");
     await page.click(".session-done .btn.primary");
-    await page.waitForSelector(".learn-path");
-    assert((await page.locator(".learn-path .path-row.done").count()) === rowCount, "every row checked");
+    await page.waitForSelector(".practice-path");
+    assert((await page.locator(".practice-path .path-row.done").count()) === rowCount, "every row checked");
     assert((await page.locator(".btn.primary:visible").count()) === 0, "nothing left to start");
-    assert((await page.textContent(".learn-path .section-title")).trim() === "Done for today", "the heading says so");
+    assert((await page.textContent(".practice-path .section-title")).trim() === "Done for today", "the heading says so");
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
@@ -129,17 +129,17 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     { locale: "ja-JP", scheme: "dark", large: false },
   ];
   for (const c of combos) {
-    await check(`learn path: the path, a session problem, done for today and the catalog in ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""} — audit, no clipping`, async () => {
+    await check(`practice path: the path, a session problem, done for today and the catalog in ${c.locale}, ${c.scheme}${c.large ? ", larger text" : ""} — audit, no clipping`, async () => {
       const page = await newPlayer(c.locale, c.scheme);
       if (c.large) await page.keyboard.press("Control+Equal");
-      await inspect(page, "Learn's path");
+      await inspect(page, "Practice's path");
       // The second row: a problem of the session.
-      await page.click(".learn-path .path-row >> nth=1");
-      await page.waitForFunction(() => window.__state.learn.view === "problem" && !!window.__state.learn.daily && window.__board?.geom?.cell > 0);
+      await page.click(".practice-path .path-row >> nth=1");
+      await page.waitForFunction(() => window.__state.practice.view === "problem" && !!window.__state.practice.daily && window.__board?.geom?.cell > 0);
       await inspect(page, "a problem of the session");
       // Everything else done: Continue ends the session.
       await page.evaluate(() => {
-        const s = window.__state.learn.daily;
+        const s = window.__state.practice.daily;
         for (const it of s.items) if (it.key !== s.current && !s.done.includes(it.key)) s.done.push(it.key);
       });
       await page.click(".panel .actions .btn.ghost >> nth=-1"); // Show answer
@@ -147,8 +147,8 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
       await page.waitForSelector(".session-done");
       await inspect(page, "done for today");
       await page.click(".session-done .btn.primary");
-      await page.waitForSelector(".learn-path .path-row.done");
-      await inspect(page, "Learn's path, done");
+      await page.waitForSelector(".practice-path .path-row.done");
+      await inspect(page, "Practice's path, done");
       await page.waitForSelector(".catalog .topic-row");
       await inspect(page, "the catalog");
       assert(page.errors.length === 0, page.errors.join("; "));

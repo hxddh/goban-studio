@@ -10,7 +10,7 @@
  * stones and the window the board frames), its placement on the board,
  * the endgame answer points, and the colour words of the title and hint
  * in all four languages. The solver then proves and answers the
- * transformed problem like any other (scripts/tests/learn-transform.mjs
+ * transformed problem like any other (scripts/tests/practice-transform.mjs
  * checks the whole bank). The id stays the same, so progress is kept per
  * problem whatever it looks like.
  *

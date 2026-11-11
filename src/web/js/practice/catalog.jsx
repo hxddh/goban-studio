@@ -1,5 +1,5 @@
 /**
- * The catalog (docs/v9.md, "Two spaces"): everything in Learn for browsing,
+ * The catalog (docs/v9.md, "Two spaces"): everything in Practice for browsing,
  * one row away from the path — the course units and their lessons, the
  * problem topics and the basic shapes. Rows, not tiles; counts as quiet
  * text. The classics stay in Play.
@@ -16,10 +16,10 @@ export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "
 export function CatalogView() {
   return (
     <>
-      <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("learn.catalog")} />
+      <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.catalog")} />
       <div class="page catalog">
         <header class="page-head">
-          <h1>{t("learn.catalog")}</h1>
+          <h1>{t("practice.catalog")}</h1>
         </header>
         <CatalogSections />
       </div>

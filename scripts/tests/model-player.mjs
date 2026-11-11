@@ -1,7 +1,7 @@
 /**
  * Model: the one player model (src/web/js/model/player.js) and the
  * measured ladder (model/ladder.js): the rating, spaced review of problems
- * and drills, game records, the week's focus, Learn's path, the next
+ * and drills, game records, the week's focus, Practice's path, the next
  * lesson and the beginner bridges.
  */
 import fs from "node:fs";
@@ -505,7 +505,7 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(m.focus.map((a) => a.key), ["cut"], "a theme from a single game is not claimed");
     assert.equal(m.focus[0].games.points, 18);
     assert.equal(m.focus[0].games.games, 6);
-    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "learn.why.points", params: ["18", 6] }]);
+    assert.deepEqual(P.evidenceOf(m.focus[0]), [{ key: "practice.why.points", params: ["18", 6] }]);
     assert.equal(m.areas.find((a) => a.key === "ladder").claim, false);
   });
 
@@ -514,7 +514,7 @@ export default async function ({ test, assert, root }) {
     const race = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "race");
     assert.ok(race);
     assert.equal(race.games.points, null);
-    assert.deepEqual(P.evidenceOf(race), [{ key: "learn.why.times", params: [4, 3] }]);
+    assert.deepEqual(P.evidenceOf(race), [{ key: "practice.why.times", params: [4, 3] }]);
   });
 
   await test("model focus: recent games weigh more, old games drop out", () => {
@@ -535,7 +535,7 @@ export default async function ({ test, assert, root }) {
     const eg = P.evidence(profile({ games }), { ...content, now: NOW }).focus.find((a) => a.key === "endgame");
     assert.ok(eg);
     assert.equal(eg.endgame.perGame, 9);
-    assert.deepEqual(P.evidenceOf(eg)[0], { key: "learn.why.lateGame", params: ["9", 3] });
+    assert.deepEqual(P.evidenceOf(eg)[0], { key: "practice.why.lateGame", params: ["9", 3] });
     const low = P.evidence(profile({ games: games.map((g) => ({ ...g, confidence: "low" })) }), { ...content, now: NOW });
     assert.ok(!low.focus.some((a) => a.key === "endgame"));
   });
@@ -548,7 +548,7 @@ export default async function ({ test, assert, root }) {
     cutProblems.slice(0, 5).forEach((x, i) => (problems[x.id] = entry(i === 0, i === 0 ? 1 : 0)));
     const cut = P.evidence(profile({ problems }), { ...content, now: NOW }).focus.find((a) => a.key === "cut");
     assert.ok(cut);
-    assert.deepEqual(P.evidenceOf(cut), [{ key: "learn.why.problems", params: [4, 5] }]);
+    assert.deepEqual(P.evidenceOf(cut), [{ key: "practice.why.problems", params: [4, 5] }]);
     const few = {};
     cutProblems.slice(0, 3).forEach((x) => (few[x.id] = entry(false, 0)));
     assert.deepEqual(P.evidence(profile({ problems: few }), { ...content, now: NOW }).focus, []);
@@ -661,7 +661,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.focusLesson("nothing"), null);
   });
 
-  /* ------------------------------------------------------ Learn's path */
+  /* ------------------------------------------------------ Practice's path */
 
   // v13: the second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
   const cutGames = () => [0, 1, 2, 3].map((i) => game(i, { themes: { cut: 1, snapback: i < 2 ? 1 : 0 }, themeLoss: { cut: 4, snapback: i < 2 ? 5 : 0 } }));
@@ -695,25 +695,25 @@ export default async function ({ test, assert, root }) {
     assert.ok(!plain.some((i) => i.role === "focus" || i.why));
     assert.equal(plain.filter((i) => i.role === "stretch").length, 1);
     assert.equal(P.planProblems({ profile: p, model, pool: [], grades: GRADES, now: NOW }), null, "nothing to choose from");
-    // The same, as Learn's list for a player: the next lesson, then these.
-    const path_ = P.learnPath(p, { ...content, course: COURSE, settings: { experience: "player", playerRank: 10 } }, NOW);
+    // The same, as Practice's list for a player: the next lesson, then these.
+    const path_ = P.practicePath(p, { ...content, course: COURSE, settings: { experience: "player", playerRank: 10 } }, NOW);
     assert.deepEqual(path_[0], { kind: "lesson", id: COURSE.find((u) => u.level === "intermediate").lessons[0].id, unit: COURSE.find((u) => u.level === "intermediate").id, role: "next" });
     assert.deepEqual(path_.slice(1), items);
   });
 
   await test("model path: without a focus, due drills and then problems at your level; a beginner's taught topics", () => {
     const beginner = { course: COURSE, ...content, settings: { experience: "new", playerRank: 30 } };
-    const first = P.learnPath(P.newProfile(), beginner, NOW);
+    const first = P.practicePath(P.newProfile(), beginner, NOW);
     assert.deepEqual(first[0], { kind: "lesson", id: COURSE[0].lessons[0].id, unit: COURSE[0].id, role: "next" });
     const probs = first.filter((i) => i.kind === "problem");
     assert.equal(probs.length, 5);
     for (const it of probs) assert.equal(PROBLEMS.find((x) => x.id === it.id).topic, "capture", "a beginner starts with capturing");
     assert.ok(probs.every((i) => i.role === "new"));
-    assert.deepEqual(P.learnPath(P.newProfile(), beginner, NOW + 3600000), first, "stable for the day");
+    assert.deepEqual(P.practicePath(P.newProfile(), beginner, NOW + 3600000), first, "stable for the day");
     // A due drill and a due problem come first.
     let p = P.addMistake(P.newProfile(), { gameId: "g", index: 3, theme: "cut" }, NOW - DAY);
     p = P.recordProblem(p, probs[2].id, { solved: false }, NOW - 2 * DAY);
-    const again = P.learnPath(p, beginner, NOW);
+    const again = P.practicePath(p, beginner, NOW);
     assert.deepEqual(again[1], { kind: "mistake", id: "g-3", role: "review" });
     assert.deepEqual(again[2], { kind: "problem", id: probs[2].id, role: "review" });
     assert.equal(again.length, 1 + 5);
@@ -745,17 +745,17 @@ export default async function ({ test, assert, root }) {
     assert.equal(P.bridgeAfter("life-eye", empty), null);
     const played = P.recordGame(empty, { id: "1", at: 1, size: 9, won: false, moves: 30, level: "30k" });
     assert.equal(P.bridgeAfter("life-two-eyes", played), null, "not after a first game");
-    // In Learn's list while they apply: capture Go right after the next lesson, the first game last (it leaves Learn).
+    // In Practice's list while they apply: capture Go right after the next lesson, the first game last (it leaves Practice).
     const beginner = { course: COURSE, ...content, settings: { experience: "new", playerRank: 30 } };
     let p = P.recordLesson(empty, "stones-capture", { done: true }, NOW);
-    let list = P.learnPath(p, beginner, NOW);
+    let list = P.practicePath(p, beginner, NOW);
     assert.deepEqual(list[1], { kind: "capture", role: "bridge" });
-    assert.ok(!P.learnPath(p, { ...beginner, captureWins: 2 }, NOW).some((i) => i.kind === "capture"));
+    assert.ok(!P.practicePath(p, { ...beginner, captureWins: 2 }, NOW).some((i) => i.kind === "capture"));
     p = P.recordLesson(p, "life-two-eyes", { done: true }, NOW);
-    list = P.learnPath(p, { ...beginner, captureWins: 2 }, NOW);
+    list = P.practicePath(p, { ...beginner, captureWins: 2 }, NOW);
     assert.deepEqual(list.at(-1), { kind: "game", role: "bridge", game: { size: 9, level: "30k", handicap: 0 } });
     assert.equal(list.filter((i) => i.kind === "game").length, 1);
-    assert.ok(!P.learnPath(P.recordGame(p, { id: "1", at: 1, size: 9, won: true, moves: 30, level: "30k" }), beginner, NOW).some((i) => i.kind === "game"));
+    assert.ok(!P.practicePath(P.recordGame(p, { id: "1", at: 1, size: 9, won: true, moves: 30, level: "30k" }), beginner, NOW).some((i) => i.kind === "game"));
   });
 
   await test("model path: the next lesson sends players of about 5 kyu and stronger to the advanced course", () => {
@@ -774,15 +774,15 @@ export default async function ({ test, assert, root }) {
     assert.equal(next(new Set(mids), { experience: "player", playerRank: 4 }), firstOf("advanced"));
     assert.equal(next(new Set(mids), { experience: "player", playerRank: 10 }), firstOf("beginner"));
     assert.equal(P.nextLesson(all, () => true, { playerRank: 1 }), null);
-    // In Learn's list the estimate from rated games counts, the prior does not.
+    // In Practice's list the estimate from rated games counts, the prior does not.
     let p = P.newProfile({ rank: 10 });
     const who = { course: COURSE, ...content, settings: { experience: "player", playerRank: 10 } };
-    assert.equal(P.learnPath(p, who, NOW)[0].id, firstOf("intermediate"));
+    assert.equal(P.practicePath(p, who, NOW)[0].id, firstOf("intermediate"));
     p = P.normalizeProfile({ ...p, rating: { ...p.rating, 19: { mu: P.gorToTheta(1700), sigma: 0.6, games: 20, at: NOW } } });
-    assert.equal(P.learnPath(p, who, NOW)[0].id, firstOf("advanced"));
+    assert.equal(P.practicePath(p, who, NOW)[0].id, firstOf("advanced"));
     // Everything done: no lesson item.
     const done = P.normalizeProfile({ ...P.newProfile(), lessons: Object.fromEntries(all.map(({ lesson }) => [lesson.id, { done: true, step: 0, at: 0 }])) });
-    assert.ok(!P.learnPath(done, who, NOW).some((i) => i.kind === "lesson"));
+    assert.ok(!P.practicePath(done, who, NOW).some((i) => i.kind === "lesson"));
   });
 
   await test("model: pure — no DOM, storage, engine or app imports; the old modules are gone", () => {
@@ -876,14 +876,14 @@ export default async function ({ test, assert, root }) {
 
     // The grade moves the course start: grade 4 skips the beginner units, grade 1 does not, and nothing reaches the advanced course.
     const content = { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: "rules", playerRank: 25 } };
-    const first = (prof) => P.learnPath(prof, content, 1000).find((it) => it.kind === "lesson");
+    const first = (prof) => P.practicePath(prof, content, 1000).find((it) => it.kind === "lesson");
     const beginnerUnit = COURSE.find((u) => !u.level).id;
     assert.equal(first(P.setPlacement(fresh, { grade: 1 }, 1)).unit, beginnerUnit);
     const mid = first(P.setPlacement(fresh, { grade: 4 }, 1));
     assert.equal(COURSE.find((u) => u.id === mid.unit).level, "intermediate");
     assert.equal(COURSE.find((u) => u.id === first(P.setPlacement(fresh, { grade: 5 }, 1)).unit).level, "intermediate", "a placement never sends to the advanced course");
     // And the first problems sit near the grade.
-    const probs = P.learnPath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
+    const probs = P.practicePath(P.setPlacement(fresh, { grade: 4 }, 1), content, 1000).filter((it) => it.kind === "problem");
     assert.ok(probs.length > 0);
     for (const it of probs) assert.ok(GRADES[it.id].grade >= 3, `${it.id} grade ${GRADES[it.id].grade}`);
 
@@ -901,7 +901,7 @@ export default async function ({ test, assert, root }) {
     }
     assert.equal(P.placementGrade(quiz), 4);
     quizzed = P.setPlacement(quizzed, { grade: P.placementGrade(quiz) }, 600);
-    const after = P.learnPath(quizzed, content, 1000).filter((it) => it.kind === "problem" && it.role !== "review");
+    const after = P.practicePath(quizzed, content, 1000).filter((it) => it.kind === "problem" && it.role !== "review");
     assert.ok(after.length > 0);
     for (const it of after) assert.ok(GRADES[it.id].grade >= 3, `after the quiz: ${it.id} grade ${GRADES[it.id].grade}`);
     const topics = new Set(after.map((it) => PROBLEMS.find((d) => d.id === it.id).topic));

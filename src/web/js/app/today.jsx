@@ -19,9 +19,9 @@ import { Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { estimateLabel } from "./estimate-label.js";
 import { ContinueHero, SuggestedHero, gameInProgress, outcome, recordTitle } from "../play/home.jsx";
-import { pathRows } from "../learn/path.jsx";
-import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../learn/progress.js";
-import { milestoneText, reachedMilestones } from "../learn/milestones.js";
+import { pathRows } from "../practice/path.jsx";
+import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../practice/progress.js";
+import { milestoneText, reachedMilestones } from "../practice/milestones.js";
 import { FirstLessonHero } from "./first-run.jsx";
 
 const DAY = 86400000;
@@ -92,16 +92,16 @@ function TodayList() {
     // The row the next item is in: a problem is named by its theme there, never by its own name.
     const nextRow = rows.find((r) => r.items.some((it) => !now.done.has(it.key)));
     row = (
-      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""}`} data-row="path" onClick={now.finished ? C.learnHome : C.startPath}>
+      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""}`} data-row="path" onClick={now.finished ? C.practiceHome : C.startPath}>
         <span class="gr-icon">
           <Icon name="practice" size={18} />
         </span>
         <span class="gr-text">
           <strong>{t("today.practice")}</strong>
-          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? t("common.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
+          <span>{now.finished ? t("practice.path.doneLine") : nextRow ? t("common.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
         </span>
         <span class="row-count">{t("practice.ofN", [done, now.items.length])}</span>
-        {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("learn.path.resume") : t("learn.path.start")}</span>}
+        {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("practice.path.resume") : t("practice.path.start")}</span>}
       </button>
     );
   }

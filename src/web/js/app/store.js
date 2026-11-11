@@ -15,7 +15,7 @@ let scheduled = false;
 
 export const state = {
   ready: false,
-  space: "today", // today | play | learn | library (v12)
+  space: "today", // today | play | practice | library
   settings: null, // data/settings.js
   profile: null, // the one player model (model/player.js), stored as profile.json
   engine: { kind: "offline", name: "", available: false },
@@ -31,9 +31,9 @@ export const state = {
   // finished game turns into its review); kind and query filter the
   // history; explorer is the opening explorer.
   play: { view: "home", kind: "all", query: "" },
-  // Learn: view "home" (the path) or one of its pages (catalog,
+  // Practice: view "home" (the path) or one of its pages (catalog,
   // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
-  learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },
+  practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   models: initialModels(), // optional downloads (app/models-ctl.js)
   bootError: null, // v13: { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
   storeProblem: null, // v13: the safe state, controller.js storeProblemOf (+ continued)

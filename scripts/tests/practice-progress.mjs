@@ -1,19 +1,19 @@
 /**
- * Learn: what Practice and Today show about progress (learn/progress.js,
- * learn/tile.jsx, learn/milestones.js) and the rules around a problem's
+ * Practice: what Practice and Today show about progress (practice/progress.js,
+ * practice/tile.jsx, practice/milestones.js) and the rules around a problem's
  * name — the tile marks, the path's merged rows, the rating trend, mastery,
  * the difficulty bands, when a review comes back, this week's line, the
  * milestones kept and said once, the day's size, and a name that is not
  * shown before the problem is solved.
  */
 import { test, assert, bundle, PROBLEMS, S, setLang, t } from "./helpers.mjs";
-import * as G from "../../src/web/js/learn/progress.js";
+import * as G from "../../src/web/js/practice/progress.js";
 import * as PM from "../../src/web/js/model/player.js";
 
 const DAY = PM.DAY;
 const NOW = new Date(2026, 10, 11, 12).getTime();
 
-await test("learn progress: a tile's state — new, tried, solved (clean at first sight), due, mastered; due comes first", () => {
+await test("practice progress: a tile's state — new, tried, solved (clean at first sight), due, mastered; due comes first", () => {
   assert.equal(G.problemStatus(undefined, NOW), "new");
   assert.equal(G.problemStatus({ tries: 0 }, NOW), "new");
   let p = PM.recordProblem(PM.newProfile(), "a", { solved: false }, NOW - DAY / 2);
@@ -36,7 +36,7 @@ await test("learn progress: a tile's state — new, tried, solved (clean at firs
   assert.equal(G.problemStatus({ tries: 9, solved: true, retired: true, due: 0 }, NOW), "mastered");
 });
 
-await test("learn progress: the path merges neighbours of one theme, role and reason; other items stay rows of their own", () => {
+await test("practice progress: the path merges neighbours of one theme, role and reason; other items stay rows of their own", () => {
   const theme = { a: "ladder", b: "ladder", c: "ladder", d: "net", e: "ladder", f: "ladder" };
   const items = [
     { kind: "lesson", id: "l1", role: "next" },
@@ -61,7 +61,7 @@ await test("learn progress: the path merges neighbours of one theme, role and re
   assert.deepEqual(G.groupPath([]), []);
 });
 
-await test("learn progress: the rating trend needs three rated games, shows the newest forty, and says the change in whole ranks", () => {
+await test("practice progress: the rating trend needs three rated games, shows the newest forty, and says the change in whole ranks", () => {
   const pt = (i, rating) => ({ t: NOW - (30 - i) * DAY, size: 19, rating, sd: 80, rank: 20, pm: 1 });
   assert.equal(G.ratingTrend([]), null);
   assert.equal(G.ratingTrend([pt(0, 100), pt(1, 150)]), null, "two points draw no line");
@@ -92,7 +92,7 @@ await test("learn progress: the rating trend needs three rated games, shows the 
   assert.ok(real.ranks > 0, "five wins move the estimate up");
 });
 
-await test("learn progress: mastery totals and the themes met; the difficulty bands are the model's own (gradeForRank)", () => {
+await test("practice progress: mastery totals and the themes met; the difficulty bands are the model's own (gradeForRank)", () => {
   const by = { ladder: { total: 10, mastered: 3, learning: 2, unseen: 5 }, net: { total: 4, mastered: 0, learning: 0, unseen: 4 }, cut: { total: 6, mastered: 3, learning: 3, unseen: 0 } };
   assert.deepEqual(G.masteryTotals(by), { total: 20, mastered: 6, learning: 5, unseen: 9 });
   assert.deepEqual(G.themesMet(by).map((r) => r.key), ["cut", "ladder"], "most mastered first (then most under way); a theme not met is not listed");
@@ -116,7 +116,7 @@ await test("learn progress: mastery totals and the themes met; the difficulty ba
   setLang("en");
 });
 
-await test("learn progress: when a review comes back, this week's parts, the days practised, the newest milestones", () => {
+await test("practice progress: when a review comes back, this week's parts, the days practised, the newest milestones", () => {
   assert.equal(G.comesBackIn(null, NOW), null);
   assert.equal(G.comesBackIn({ due: NOW - 1 }, NOW), null, "already due");
   assert.equal(G.comesBackIn({ due: 0, retired: true }, NOW), null);
@@ -151,9 +151,9 @@ const A = await bundle([
   'export { COURSE } from "./src/web/js/content/course.js";',
   'export { PROBLEMS } from "./src/web/js/content/problems.js";',
   'export { setLang } from "./src/web/js/i18n.js";',
-  'export * as M from "./src/web/js/learn/milestones.js";',
-  'export * as Tile from "./src/web/js/learn/tile.jsx";',
-  'export * as Path from "./src/web/js/learn/path.jsx";',
+  'export * as M from "./src/web/js/practice/milestones.js";',
+  'export * as Tile from "./src/web/js/practice/tile.jsx";',
+  'export * as Path from "./src/web/js/practice/path.jsx";',
   'export * as Today from "./src/web/js/app/today.jsx";',
 ]);
 const { C, state, M, Tile, Path, Today } = A;
@@ -162,14 +162,14 @@ function player(extra = {}) {
   A.setLang("en");
   state.settings = { ...A.DEFAULT_SETTINGS, lang: "en", onboarded: true, experience: "rules", playerRank: 20, confirmProblemMove: false, ...extra };
   state.profile = { ...A.PM.newProfile({ rank: 20 }), placement: { skipped: true, at: NOW } };
-  state.space = "learn";
-  state.learn = { view: "home", topic: null, lesson: null, problem: null, daily: null };
+  state.space = "practice";
+  state.practice = { view: "home", topic: null, lesson: null, problem: null, daily: null };
   state.toasts = [];
   C.resetSession();
   M.resetMilestoneWatch();
 }
 
-await test("learn progress: a tile shows the board's own edges where the position touches them, and marks the stones the goal is about", () => {
+await test("practice progress: a tile shows the board's own edges where the position touches them, and marks the stones the goal is about", () => {
   // A corner problem: anchored top left, the board goes on to the right and below.
   const corner = { diagram: ["x O .", "O O .", ". . ."], corner: "tl" };
   const w = Tile.tileWindow(corner);
@@ -194,7 +194,7 @@ await test("learn progress: a tile shows the board's own edges where the positio
   }
 });
 
-await test("learn progress: a problem's goal from its definition is the goal of its puzzle, for every problem", () => {
+await test("practice progress: a problem's goal from its definition is the goal of its puzzle, for every problem", () => {
   A.setLang("en");
   for (const d of PROBLEMS) {
     const pz = S.createPuzzle(d);
@@ -205,11 +205,11 @@ await test("learn progress: a problem's goal from its definition is the goal of 
   assert.equal(C.defToMove({ id: "x" }), null);
 });
 
-await test("learn progress: a problem is not named before it is solved or its answer shown — first sight, the placement quiz, a review", async () => {
+await test("practice progress: a problem is not named before it is solved or its answer shown — first sight, the placement quiz, a review", async () => {
   player();
   const d = PROBLEMS.find((x) => x.id === "capture-basic-01");
   C.openProblem(d.id);
-  let P = state.learn.problem;
+  let P = state.practice.problem;
   assert.equal(C.problemNamed(P), false, "first sight");
   assert.equal(C.nameKnown(d.id), false, "not in lists either");
   assert.equal(P.review, false);
@@ -220,50 +220,50 @@ await test("learn progress: a problem is not named before it is solved or its an
   C.showAnswer();
   assert.equal(C.problemNamed(P), true);
   C.retryProblem();
-  assert.equal(C.problemNamed(state.learn.problem), true);
+  assert.equal(C.problemNamed(state.practice.problem), true);
   assert.equal(P.missed, true, "the first answer was a miss");
   assert.equal(C.nameKnown(d.id), false, "shown the answer is not solved: lists keep the goal");
   // The same problem again is a review: unnamed until solved in this visit.
   C.openProblem(d.id);
-  P = state.learn.problem;
+  P = state.practice.problem;
   assert.equal(P.review, true);
   assert.equal(C.problemNamed(P), false, "a review asks for the idea, not the name");
   const ok = S.solveFirstMoves(P.pz).correct[0];
   C.practicePlay(ok.x, ok.y);
-  for (let i = 0; i < 60 && state.learn.problem.status !== "won"; i++) await new Promise((r) => setTimeout(r, 50));
-  assert.equal(state.learn.problem.status, "won");
-  assert.equal(C.problemNamed(state.learn.problem), true, "solved: its name is the result");
+  for (let i = 0; i < 60 && state.practice.problem.status !== "won"; i++) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(state.practice.problem.status, "won");
+  assert.equal(C.problemNamed(state.practice.problem), true, "solved: its name is the result");
   assert.equal(C.nameKnown(d.id), true, "and lists may say it");
   // The placement quiz: the problem as written, unnamed.
   player();
   C.startPlacement({ seed: 3 });
-  assert.equal(state.learn.view, "problem");
-  assert.ok(state.learn.placement);
-  assert.equal(C.problemNamed(state.learn.problem), false);
-  C.learnHome();
+  assert.equal(state.practice.view, "problem");
+  assert.ok(state.practice.placement);
+  assert.equal(C.problemNamed(state.practice.problem), false);
+  C.practiceHome();
 });
 
-await test("learn progress: a lesson step that is solved waits for the learner — nothing goes on by itself", async () => {
+await test("practice progress: a lesson step that is solved waits for the learner — nothing goes on by itself", async () => {
   player({ experience: "new", playerRank: 30 });
   const lesson = A.COURSE.flatMap((u) => u.lessons).find((l) => l.steps.some((s, i) => s.kind === "place" && i < l.steps.length - 1));
   const at = lesson.steps.findIndex((s) => s.kind === "place");
   C.openLesson(lesson.id, at);
-  const cur = state.learn.lesson.cur;
+  const cur = state.practice.lesson.cur;
   assert.equal(cur.kind, "place");
   const a = cur.step.accept[0];
   C.practicePlay(a.x + cur.pz.x0, a.y + cur.pz.y0);
   assert.equal(cur.result, "right");
   await new Promise((r) => setTimeout(r, 1800));
-  assert.equal(state.learn.lesson.index, at, "still on the step, its feedback on screen");
+  assert.equal(state.practice.lesson.index, at, "still on the step, its feedback on screen");
   C.lessonContinue();
-  assert.equal(state.learn.lesson.index, at + 1, "Continue goes on");
+  assert.equal(state.practice.lesson.index, at + 1, "Continue goes on");
   // A step with its own goal says it; one without says the line of its kind.
   const own = A.COURSE.flatMap((u) => u.lessons).flatMap((l) => l.steps).find((s) => s.goal);
   if (own) assert.equal(C.stepGoalText({ kind: own.kind, step: own, toMove: 1 }), own.goal.en);
-  C.learnHome();
+  C.practiceHome();
 });
 
-await test("learn progress: the path's rows — problems of one theme as one row with its count, each row with its reason; a problem's own name never in it", () => {
+await test("practice progress: the path's rows — problems of one theme as one row with its count, each row with its reason; a problem's own name never in it", () => {
   player();
   const now = C.pathNow();
   const rows = Path.pathRows(now.items);
@@ -302,7 +302,7 @@ await test("learn progress: the path's rows — problems of one theme as one row
   assert.equal(Path.loadText({ due: 0, mastered: 1 }), "1 mastered");
 });
 
-await test("learn progress: the day's size — kept in the settings; a session not started is made again, one under way keeps what is done", () => {
+await test("practice progress: the day's size — kept in the settings; a session not started is made again, one under way keeps what is done", () => {
   player();
   const count = () => C.pathNow().items.filter((it) => it.kind === "problem" || it.kind === "mistake").length;
   assert.equal(state.settings.dailySize, 5);
@@ -316,13 +316,13 @@ await test("learn progress: the day's size — kept in the settings; a session n
   assert.equal(state.settings.dailySize, 5, "anything else is the default");
   // Under way: the first problem done, then a smaller day and a larger one.
   C.startPath();
-  const s = state.learn.daily;
+  const s = state.practice.daily;
   const first = s.items.find((it) => it.kind === "problem");
   C.openPathItem(first.key);
   C.showAnswer();
   C.nextProblem();
   assert.ok(s.done.includes(first.key));
-  const open = state.learn.daily.current;
+  const open = state.practice.daily.current;
   C.setDailySize(3);
   const after = C.todaysSession();
   assert.equal(after.items.filter((it) => it.kind === "problem").length, 3);
@@ -333,10 +333,10 @@ await test("learn progress: the day's size — kept in the settings; a session n
   assert.equal(more.items.filter((it) => it.kind === "problem").length, 10);
   assert.ok(more.done.includes(first.key));
   assert.equal(new Set(more.items.map((it) => it.key)).size, more.items.length, "no item twice");
-  C.learnHome();
+  C.practiceHome();
 });
 
-await test("learn progress: milestones — kept once, said once; what a profile had already reached is not news", () => {
+await test("practice progress: milestones — kept once, said once; what a profile had already reached is not news", () => {
   player();
   // A first game, recorded as Play does.
   state.profile = A.PM.recordGame(state.profile, { id: "g1", at: Date.now(), size: 9, won: true, result: "B+R", moves: 40, color: 1, handicap: 0, opponent: A.PM.gorToTheta(A.PM.rankToRating(25)) });
@@ -368,7 +368,7 @@ await test("learn progress: milestones — kept once, said once; what a profile 
   assert.equal(M.milestoneText({ key: "unit", id: "no-such-unit" }), "");
 });
 
-await test("learn progress: Today's words — this week without zero parts, the trend honest about being about", () => {
+await test("practice progress: Today's words — this week without zero parts, the trend honest about being about", () => {
   A.setLang("en");
   assert.equal(Today.weekText({ played: 1, solved: 0 }), "1 game played.");
   assert.equal(Today.weekText({ played: 0, solved: 4 }), "4 problems solved.");

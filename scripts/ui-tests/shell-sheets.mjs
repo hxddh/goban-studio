@@ -866,7 +866,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await seeded();
     // A lesson's text.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-home");
+    await page.waitForSelector(".practice-home");
     const sel = (s) => page.evaluate((q) => getComputedStyle(document.querySelector(q)).userSelect, s);
     assert((await sel(".sidebar .sb-item")) === "none", "a button is not selectable");
     assert((await sel("body")) === "none", "the page as a whole is not");
@@ -892,7 +892,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForFunction((n) => Object.keys(window.__files).filter((k) => k.startsWith("games/")).length === n + 1, before, { timeout: 3000 });
     // A lesson's text is selectable; the board is not.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-home");
+    await page.waitForSelector(".practice-home");
     await page.close();
 
     // A browser that is not driven by a test: nothing on window.

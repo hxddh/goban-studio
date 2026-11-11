@@ -418,7 +418,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
     } catch (f) {
       if (f.kind === "parse" && f.preserved && !keepDamaged.has(key)) {
         // Moved aside: its copy is safe, so the damaged file goes and the
-        // key starts over (a game, the learn session …).
+        // key starts over (a game, the practice session …).
         try {
           await backendNow().remove(key);
         } catch (_) {

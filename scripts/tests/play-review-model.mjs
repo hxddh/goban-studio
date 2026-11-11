@@ -101,7 +101,7 @@ await test("play review model: up to three moments can be tried again, each a dr
   assert.equal(p.mistakes.length, 1);
   p = recordMistake(p, d.id, { solved: false }, 0);
   assert.equal(p.mistakes[0].due, DAY, "a missed moment comes back tomorrow");
-  assert.deepEqual(due(p, DAY).mistakes.map((x) => x.id), ["rec-1-25"], "in Learn's due list");
+  assert.deepEqual(due(p, DAY).mistakes.map((x) => x.id), ["rec-1-25"], "in Practice's due list");
   p = recordMistake(p, d.id, { solved: true }, DAY);
   p = recordMistake(p, d.id, { solved: true }, 2 * DAY);
   assert.deepEqual([p.mistakes[0].tries, p.mistakes[0].streak], [3, 2]);

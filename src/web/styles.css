@@ -930,7 +930,7 @@ button.group-row:hover { background: var(--fill); }
 .row-analysis { color: var(--text-3); font-variant-numeric: tabular-nums; }
 .row-analysis::before { content: " · "; }
 
-/* Learn: the path, its session and the catalog (learn/path.jsx, learn/catalog.jsx) */
+/* Practice: the path, its session and the catalog (practice/path.jsx, practice/catalog.jsx) */
 .path-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .path-head .section-title { margin-bottom: 0; }
 .path-focus { margin-top: var(--s-2); font: var(--t-small); color: var(--text-2); }
@@ -953,7 +953,7 @@ button.group-row:hover { background: var(--fill); }
 .catalog .units.map .unit-text h3 { font: 500 13px/18px var(--font); }
 .catalog .units-heading { margin: 0; padding: var(--s-3) var(--s-4) var(--s-1); border-top: 1px solid var(--line); }
 
-/* Practice and Today. A topic is a grid of positions (learn/tile.jsx), each
+/* Practice and Today. A topic is a grid of positions (practice/tile.jsx), each
  * with a quiet mark of its state; a problem's panel leads with its goal;
  * the path merges problems of one theme into a row with their positions as
  * tiles and carries the review load and the day's size on one line;

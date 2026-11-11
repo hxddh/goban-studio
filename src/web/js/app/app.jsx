@@ -4,8 +4,8 @@
  * itself. Each page starts with the shared toolbar (chrome.jsx).
  *
  * Play shows its home (play/home.jsx) or the board (play.jsx), which a
- * finished game turns into its review; Learn its home (the path,
- * learn/path.jsx, then the catalog) or one of its pages (practice.jsx).
+ * finished game turns into its review; Practice its home (the path,
+ * practice/path.jsx, then the catalog) or one of its pages (practice.jsx).
  */
 import { render } from "preact";
 import { useEffect } from "preact/hooks";
@@ -64,7 +64,7 @@ function Shell({ s }) {
   const focus = isFocus();
   // The game that ends turns into its review on the same page (no new place).
   const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
-  const page = s.space === "learn" ? s.learn.view : s.space === "library" ? (s.play.explorer ? "explorer" : "list") : s.space === "play" ? s.play.view : "today";
+  const page = s.space === "practice" ? s.practice.view : s.space === "library" ? (s.play.explorer ? "explorer" : "list") : s.space === "play" ? s.play.view : "today";
   const place = s.space + reviewKey + page;
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
@@ -78,7 +78,7 @@ function Shell({ s }) {
             <CrashProbe at="page" />
             {s.space === "today" && <TodayView />}
             {s.space === "play" && <PlaySpace />}
-            {s.space === "learn" && <PracticeView />}
+            {s.space === "practice" && <PracticeView />}
             {s.space === "library" && <LibrarySpace />}
           </div>
         </ErrorBoundary>
@@ -126,9 +126,9 @@ const COMMANDS = {
   "file.export": () => (C.playReviewing() || state.review ? C.exportSGF(state.review.game, state.review.meta.name) : C.exportSGF()),
   "game.pass": () => onBoard() && C.requestPass(),
   // In a review on screen ⌘Z takes back an edit of the record; in a game, a move.
-  "game.undo": () => (reviewOnScreen() ? C.reviewUndo() : state.space === "learn" ? C.undoProblemMove() : onBoard() ? C.undo() : null),
+  "game.undo": () => (reviewOnScreen() ? C.reviewUndo() : state.space === "practice" ? C.undoProblemMove() : onBoard() ? C.undo() : null),
   "game.redo": () => (reviewOnScreen() ? C.reviewRedo() : onBoard() ? C.redo() : null),
-  "game.hint": () => (onBoard() ? C.askHint() : state.space === "learn" ? C.problemHint() : null),
+  "game.hint": () => (onBoard() ? C.askHint() : state.space === "practice" ? C.problemHint() : null),
   "game.resign": () => onBoard() && C.requestResign(),
   "game.review": () => C.reviewCurrentGame(),
   // Only where the game is: in another space the board is not on screen,
@@ -142,7 +142,7 @@ const COMMANDS = {
   "view.largeText": () => C.setSetting("largeText", !state.settings.largeText),
   "go.today": () => C.goSpace("today"),
   "go.play": () => C.goSpace("play"),
-  "go.learn": () => C.goSpace("learn"),
+  "go.practice": () => C.goSpace("practice"),
   "go.library": () => C.goSpace("library"),
   "go.back": () => C.back(),
   "go.forward": () => C.forward(),
@@ -191,7 +191,7 @@ function menuSpec() {
       items: [
         { label: t("nav.today"), command: "go.today", ...menuKey("go.today") },
         { label: t("nav.play"), command: "go.play", ...menuKey("go.play") },
-        { label: t("nav.learn"), command: "go.learn", ...menuKey("go.learn") },
+        { label: t("nav.practice"), command: "go.practice", ...menuKey("go.practice") },
         { label: t("nav.library"), command: "go.library", ...menuKey("go.library") },
         { separator: true },
         { label: t("nav.back"), command: "go.back", ...menuKey("go.back") },
@@ -286,8 +286,8 @@ function onKeyDown(e) {
   }
   // (← and → do nothing during a game: looking back is "Review so far", chosen from the menu.)
   // (Not the Enter that confirms an input method's candidate.)
-  if (state.space === "learn" && state.learn.view === "lesson" && e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && !e.target.closest("button, canvas")) {
-    const cur = state.learn.lesson?.cur;
+  if (state.space === "practice" && state.practice.view === "lesson" && e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && !e.target.closest("button, canvas")) {
+    const cur = state.practice.lesson?.cur;
     if (cur && (cur.kind === "read" || cur.result === "right" || cur.status === "won" || cur.answer)) C.lessonContinue();
   }
   if (e.key === "?") C.openSheet("shortcuts");

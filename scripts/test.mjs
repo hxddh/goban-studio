@@ -4,7 +4,7 @@
  * The checks live in scripts/tests/, one file per area (docs/v9.md,
  * "Layout"): core-* (rules, SGF, solver, engine, content, book, a11y),
  * data-* (the store, games, settings, backups), model-* (the player model),
- * play-*, learn-* and shell-*. They need no browser and no native SDK.
+ * play-*, practice-* and shell-*. They need no browser and no native SDK.
  * A file either runs its checks when imported, through the harness in
  * scripts/tests/helpers.mjs, or exports a function that receives it.
  * Each file runs in a Node process of its own, so nothing one file leaves
@@ -33,7 +33,7 @@ if (one) {
   process.exit(failures ? 1 : 0);
 }
 
-// `node scripts/test.mjs play-,learn-` runs only the files whose names contain one of these.
+// `node scripts/test.mjs play-,practice-` runs only the files whose names contain one of these.
 const only = (process.argv[2] || "").split(",");
 const files = fs.readdirSync(path.join(root, "scripts/tests")).filter((n) => n.endsWith(".mjs") && n !== "helpers.mjs" && only.some((o) => n.includes(o))).sort();
 const self = fileURLToPath(import.meta.url);

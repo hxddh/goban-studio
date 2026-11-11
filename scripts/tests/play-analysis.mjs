@@ -252,7 +252,7 @@ export default async function ({ test, assert, root }) {
       assert.deepEqual(tr.best, { x: 0, y: 18 }, "KataGo's better move (A1) is shown");
       d = drills().find((m) => m.index === 11);
       assert.deepEqual([d.tries, d.streak], [2, 0], "a miss starts the ladder again");
-      assert.ok(PM.due(state.profile, Date.now() + PM.DAY + 1000).mistakes.some((m) => m.id === d.id), "a missed moment comes back in Learn tomorrow");
+      assert.ok(PM.due(state.profile, Date.now() + PM.DAY + 1000).mistakes.some((m) => m.id === d.id), "a missed moment comes back in Practice tomorrow");
       assert.equal(r.game.mainLine().length, moves, "a try never becomes a move of the game");
       assert.equal(r.game.current.children.length, 1, "nor a variation");
       // Move on: the next moment.

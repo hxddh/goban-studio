@@ -1,6 +1,6 @@
 /**
- * Learn's pages: lessons, problems, topics, the catalog and drills of your
- * own mistakes. Today's session (learn/session.js) opens them one after
+ * Practice's pages: lessons, problems, topics, the catalog and drills of your
+ * own mistakes. Today's session (practice/session.js) opens them one after
  * another; each says when it is done. Everything the learner does is
  * recorded in the one player model (model/player.js) through changeProfile.
  */
@@ -13,11 +13,11 @@ import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
 import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember, tx } from "./ctl-core.js";
-import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
-import { continuePlacement, placementAnswer } from "../learn/placement.js";
-import { reviewTransform, transformProblem } from "../learn/transform.js";
-import { gradeBand } from "../learn/progress.js";
-import "../learn/milestones.js"; // follows the profile: new milestones are kept and said once
+import { continuePath, itemDone, lessonFinished } from "../practice/session.js";
+import { continuePlacement, placementAnswer } from "../practice/placement.js";
+import { reviewTransform, transformProblem } from "../practice/transform.js";
+import { gradeBand } from "../practice/progress.js";
+import "../practice/milestones.js"; // follows the profile: new milestones are kept and said once
 
 export { COURSE, GRADES, PROBLEMS, SHAPES, THEMES };
 
@@ -155,16 +155,16 @@ function showLesson(lessonId, stepIndex, daily) {
   // v8: back to a finished lesson (from the game it led to) shows its lesson-complete page.
   if (index >= found.lesson.steps.length) {
     update((s) => {
-      s.space = "learn";
-      s.learn = { ...s.learn, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: null, finished: true }, problem: null, mistake: null, daily };
+      s.space = "practice";
+      s.practice = { ...s.practice, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: null, finished: true }, problem: null, mistake: null, daily };
     });
     return;
   }
   const step = found.lesson.steps[index];
   if (step?.kind === "place") step.board = { ...step.board, accept: step.accept };
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: buildStep(step) }, problem: null, mistake: null, daily };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "lesson", lesson: { unit: found.unit, lesson: found.lesson, index, cur: buildStep(step) }, problem: null, mistake: null, daily };
   });
 }
 
@@ -174,7 +174,7 @@ function showLesson(lessonId, stepIndex, daily) {
  * what it says.
  */
 export function lessonContinue() {
-  const L = state.learn.lesson;
+  const L = state.practice.lesson;
   if (!L) return;
   const next = L.index + 1;
   if (next >= L.lesson.steps.length) {
@@ -182,7 +182,7 @@ export function lessonContinue() {
     lessonFinished(L.lesson.id);
     Audio.win();
     update((s) => {
-      s.learn.lesson = { ...L, index: next, cur: null, finished: true };
+      s.practice.lesson = { ...L, index: next, cur: null, finished: true };
     });
     return;
   }
@@ -195,7 +195,7 @@ export function lessonContinue() {
 }
 
 export function lessonBack() {
-  const L = state.learn.lesson;
+  const L = state.practice.lesson;
   if (!L || L.index === 0) return;
   L.index -= 1;
   L.cur = buildStep(L.lesson.steps[L.index]);
@@ -203,21 +203,21 @@ export function lessonBack() {
   update();
 }
 
-/** Learn's home: the path (learn/path.jsx). */
-export function learnHome() {
+/** Practice's home: the path (practice/path.jsx). */
+export function practiceHome() {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "home", lesson: null, problem: null, daily: null, placement: null, topic: null, mistake: null, theme: null, shape: null };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "home", lesson: null, problem: null, daily: null, placement: null, topic: null, mistake: null, theme: null, shape: null };
   });
 }
 
-/** The catalog, for browsing: the course, the problem topics and the basic shapes (learn/catalog.jsx). */
+/** The catalog, for browsing: the course, the problem topics and the basic shapes (practice/catalog.jsx). */
 export function openCatalog() {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "catalog", lesson: null, problem: null, daily: null, topic: null, mistake: null, theme: null, shape: null };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "catalog", lesson: null, problem: null, daily: null, topic: null, mistake: null, theme: null, shape: null };
   });
 }
 
@@ -228,8 +228,8 @@ export function openTopic(topic, theme = null) {
 function showTopic(topic, theme) {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "topic", topic, theme, shape: null, problem: null, daily: null, mistake: null };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "topic", topic, theme, shape: null, problem: null, daily: null, mistake: null };
   });
 }
 
@@ -241,8 +241,8 @@ export function openShape(shape) {
 function showShape(shape) {
   if (!isRestoring()) remember();
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "topic", topic: "shapes", shape, theme: null, problem: null, daily: null, mistake: null };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "topic", topic: "shapes", shape, theme: null, problem: null, daily: null, mistake: null };
   });
 }
 
@@ -272,7 +272,7 @@ export function practiseTheme(theme, topic = null) {
     const open = list.filter((p) => !solved(p.id));
     const pool = open.length ? open : list;
     const pick = pool.slice().sort((a, b) => Math.abs(gradeOf(a.id) - target) - Math.abs(gradeOf(b.id) - target))[0];
-    update((s) => (s.learn = { ...s.learn, theme: useTheme ? theme : null }));
+    update((s) => (s.practice = { ...s.practice, theme: useTheme ? theme : null }));
     openProblem(pick.id);
     return pick.id;
   });
@@ -301,7 +301,7 @@ export function openProblem(id, { daily = null, placement = false } = {}) {
 
 /**
  * v13: a problem tried before comes back turned, mirrored and sometimes in
- * the other colour (learn/transform.js), so a review asks for the idea, not
+ * the other colour (practice/transform.js), so a review asks for the idea, not
  * the remembered picture. The placement quiz and the first showing use the
  * problem as written. The id stays, so the result is the same problem's.
  */
@@ -320,16 +320,16 @@ function showProblem(id, daily, placement = false) {
   // Tried before: this showing is a review (a miss says when it comes back).
   const review = (state.profile.problems?.[id]?.tries || 0) > 0;
   update((s) => {
-    s.space = "learn";
-    // The placement quiz goes on only on its own problems (learn/placement.js).
-    const keep = placement && s.learn.placement ? s.learn.placement : null;
-    s.learn = { ...s.learn, view: "problem", problem: { def: p, pz, ...problemState(pz), review }, mistake: null, daily: daily || null, placement: keep, topic: daily ? s.learn.topic : p.topic };
+    s.space = "practice";
+    // The placement quiz goes on only on its own problems (practice/placement.js).
+    const keep = placement && s.practice.placement ? s.practice.placement : null;
+    s.practice = { ...s.practice, view: "problem", problem: { def: p, pz, ...problemState(pz), review }, mistake: null, daily: daily || null, placement: keep, topic: daily ? s.practice.topic : p.topic };
   });
 }
 
 /** The list a problem is browsed in: its theme or topic. */
 function browseList(def) {
-  return state.learn.theme ? problemsOfTheme(state.learn.theme) : problemsOfTopic(def.topic);
+  return state.practice.theme ? problemsOfTheme(state.practice.theme) : problemsOfTopic(def.topic);
 }
 
 /* ---------------------------------------------------------- problems */
@@ -349,17 +349,17 @@ function later(P, ms, fn) {
 }
 
 function currentProblem() {
-  const v = state.learn.view;
-  if (v === "problem") return state.learn.problem;
-  if (v === "lesson" && state.learn.lesson?.cur?.kind === "problem") return state.learn.lesson.cur;
+  const v = state.practice.view;
+  if (v === "problem") return state.practice.problem;
+  if (v === "lesson" && state.practice.lesson?.cur?.kind === "problem") return state.practice.lesson.cur;
   return null;
 }
 
 /** The learner clicks a point in practice. */
 export function practicePlay(x, y) {
-  const v = state.learn.view;
+  const v = state.practice.view;
   if (v === "mistake") return mistakePlay(x, y);
-  if (v === "lesson" && state.learn.lesson?.cur?.kind === "place") return placePlay(x, y);
+  if (v === "lesson" && state.practice.lesson?.cur?.kind === "place") return placePlay(x, y);
   const P = currentProblem();
   if (!P || P.busy || P.status !== "open" || P.answer) return;
   const pz = P.pz;
@@ -561,7 +561,7 @@ function recordAttempt(P, solved) {
   const first = !P.recorded;
   if (first && !solved) P.missed = true;
   P.recorded = solved ? "solved" : "miss";
-  if (state.learn.view === "problem" && P.def) {
+  if (state.practice.view === "problem" && P.def) {
     const now = Date.now();
     // A clean solve this fast counts as easy for the review schedule.
     const quick = solved && !P.used && now - (P.openedAt || now) < MEMORY.QUICK_MS;
@@ -624,25 +624,25 @@ export function showAnswer() {
 }
 
 export function nextProblem() {
-  if (state.learn.placement) return continuePlacement();
-  if (state.learn.daily) return continuePath();
-  const P = state.learn.problem;
+  if (state.practice.placement) return continuePlacement();
+  if (state.practice.daily) return continuePath();
+  const P = state.practice.problem;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i >= 0 && i + 1 < list.length) openProblem(list[i + 1].id);
-  else openTopic(P.def.topic, state.learn.theme);
+  else openTopic(P.def.topic, state.practice.theme);
 }
 
 export function prevProblem() {
-  const P = state.learn.problem;
-  if (!P || state.learn.daily || state.learn.placement) return;
+  const P = state.practice.problem;
+  if (!P || state.practice.daily || state.practice.placement) return;
   const list = browseList(P.def);
   const i = list.findIndex((p) => p.id === P.def.id);
   if (i > 0) openProblem(list[i - 1].id);
 }
 
 function placePlay(x, y) {
-  const C = state.learn.lesson.cur;
+  const C = state.practice.lesson.cur;
   if (C.result === "right") return;
   const ox = C.pz.x0;
   const oy = C.pz.y0;
@@ -736,13 +736,13 @@ export function openMistakeDrill(id, { daily = null } = {}) {
   game.goto(line[Math.max(0, Math.min(line.length - 1, m.index - 1))].id);
   if (!isRestoring() && !daily) remember();
   update((s) => {
-    s.space = "learn";
-    s.learn = { ...s.learn, view: "mistake", mistake: { m, game, status: "open", tries: 0, last: null, revealed: false }, problem: null, daily: daily || null };
+    s.space = "practice";
+    s.practice = { ...s.practice, view: "mistake", mistake: { m, game, status: "open", tries: 0, last: null, revealed: false }, problem: null, daily: daily || null };
   });
 }
 
 function mistakePlay(x, y) {
-  const D = state.learn.mistake;
+  const D = state.practice.mistake;
   if (!D || D.status === "right") return;
   if (!D.game.canPlay(x, y).ok) {
     toast(t("error.illegal"), "warn");
@@ -765,7 +765,7 @@ function mistakePlay(x, y) {
 }
 
 export function revealMistake() {
-  const D = state.learn.mistake;
+  const D = state.practice.mistake;
   if (!D) return;
   D.revealed = true;
   D.status = "revealed";
@@ -775,6 +775,6 @@ export function revealMistake() {
 }
 
 export function nextAfterMistake() {
-  if (state.learn.daily) return continuePath();
-  learnHome();
+  if (state.practice.daily) return continuePath();
+  practiceHome();
 }

@@ -909,7 +909,7 @@ export function clockTick() {
   lastTick = now;
   const g = state.game;
   if (!g?.clock || dt <= 0 || dt > 2) return;
-  // Only while the game is on screen: not on Play's home, in the explorer or in Learn.
+  // Only while the game is on screen: not on Play's home, in the explorer or in Practice.
   if (!boardShown() || (typeof document !== "undefined" && document.hidden)) return;
   if (gameOver(g) || g.scoring || g.pending || g.game.phase !== "playing" || state.sheet) return;
   const color = g.game.turn;
