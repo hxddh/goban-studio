@@ -306,7 +306,7 @@ jobs:
           # it is the release's version (src/install.zig stagedVersionMatches).
           import json
           built = json.loads(z.read("GobanStudio/resources/frontend/dist/build-info.json"))["app"]
-          wanted = json.load(open("package.json"))["version"]
+          wanted = json.load(open("package.json", encoding="utf-8"))["version"]
           assert built == wanted, f"build-info.json says {built}, package.json {wanted}"
           info = z.getinfo(next(n for n in names if n.endswith("bin/goban-studio.exe")))
           assert info.external_attr >> 16 & 0o111, "exe has no execute bits"
