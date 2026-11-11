@@ -50,7 +50,7 @@ export const PLAY = {
 
   // Named lines (v7), whole board.
   "explorer.name.whole.san-san": m("三三", "3-3 point", "삼삼", "三々"),
-  "explorer.name.whole.high-chinese": m("高中国流", "High Chinese opening", "높은 중국류", "高い中国流"),
+  "explorer.name.whole.high-chinese": m("高中国流", "High Chinese opening", "고중국류", "高中国流"),
   "explorer.name.whole.komoku-star": m("小目·星位", "3-4 point and star point", "소목·화점", "小目・星"),
   "explorer.name.whole.star-early-33": m("早点三三", "Early 3-3 invasion", "이른 삼삼 침입", "早い三々入り"),
   // Named lines (v7), corner joseki.

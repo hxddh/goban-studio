@@ -12,7 +12,7 @@ import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
 import { state, update, toast, announce } from "./store.js";
-import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember } from "./ctl-core.js";
+import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember, tx } from "./ctl-core.js";
 import { continuePath, itemDone, lessonFinished } from "../learn/session.js";
 import { continuePlacement, placementAnswer } from "../learn/placement.js";
 import { reviewTransform, transformProblem } from "../learn/transform.js";
@@ -670,6 +670,20 @@ export function goalText(pz) {
   const color = t(pz.userColor === BLACK ? "common.black" : "common.white");
   if (pz.counting) return t(pz.ask === "value" ? "goal.endgameValue" : "goal.endgame", [color]);
   return t("goal." + pz.goal, [color]);
+}
+
+/**
+ * The goal line of a lesson step (`cur`, the step as built for the board):
+ * the step's own goal when the lesson gives one (`goal` in the course, four
+ * languages: "Black to play: the centre point"), else the line of its kind —
+ * the puzzle's goal for a problem step, "find the best point" for a place
+ * step. Null for a read step, which has no goal line.
+ */
+export function stepGoalText(cur) {
+  if (!cur || cur.kind === "read") return null;
+  if (cur.step?.goal) return tx(cur.step.goal);
+  if (cur.kind === "problem") return goalText(cur.pz);
+  return t("goal.place", [t((cur.toMove ?? BLACK) === BLACK ? "common.black" : "common.white")]);
 }
 
 /* ------------------------------------------------------ mistake drills */

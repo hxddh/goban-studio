@@ -69,7 +69,8 @@ const swap = (rows) => rows.map((r) => r.replace(/[XxOo]/g, (c) => ({ X: "O", x:
 const FOUR_BLACK = [[3, 3], [2, 5], [3, 15], [5, 16]];
 const FOUR_WHITE = [[15, 3], [13, 2], [15, 15], [16, 13]];
 const BOUNDARY = full(FOUR_BLACK, FOUR_WHITE);
-const BOUNDARY_MARKED = full(FOUR_BLACK, FOUR_WHITE, { marks: labels([9, 3, "A"], [3, 9, "B"]) });
+const BOUNDARY_A = full(FOUR_BLACK, FOUR_WHITE, { marks: labels([9, 3, "A"]) });
+const BOUNDARY_B = full(FOUR_BLACK, FOUR_WHITE, { marks: labels([9, 3, "A"], [3, 9, "B"]) });
 // Black has taken the top; White to play.
 const BOUNDARY_WHITE = full([...FOUR_BLACK, [9, 3]], FOUR_WHITE);
 const TOP_MIDDLE = box(7, 2, 11, 3);
@@ -131,16 +132,20 @@ const CORNER_OTHER_LONG = [". . . o X , ,", ". o o o X , ,", ". o X X X , ,", ".
 // Board coordinates below are [x, y] from the top left: Q16 = [15, 3],
 // D4 = [3, 15]. The whole-board openings follow the named lines of the
 // opening book (content/book.json, tree "whole"); its KataGo evaluations put
-// every accepted point within a point of the book's best move.
+// every accepted point within a point of the book's best move. The Chinese
+// opening is the exception: it is taught as the named opening it is, and its
+// side stone is not among the book's searched moves (the book has the position
+// before it; scripts/tests/core-course-v13.mjs names the steps).
 
-// The Chinese opening: star point, 3-4 point and the side stone (low at R10, high at Q10).
-const CH_B = [[15, 3], [16, 15]];
+// The Chinese opening: the star point Q16, the 3-4 point Q3 (third line from the bottom) and the side
+// stone one line below the middle of the right side (low at R9, high at Q9).
+const CH_B = [[15, 3], [15, 16]];
 const CH_W = [[3, 15], [3, 3]];
 const CH_BASE = full(CH_B, CH_W);
-const CH = full([...CH_B, [16, 9]], CH_W);
-const CH_READ = full([...CH_B, [16, 9]], CH_W, { marks: labels([15, 3, "1"], [3, 15, "2"], [16, 15, "3"], [3, 3, "4"], [16, 9, "5"], [15, 9, "A"]) });
-// The same opening along the bottom side (the book's transposition of the one above).
-const CH_BOTTOM = full([[3, 15], [15, 16]], [[15, 3], [3, 3]]);
+const CH = full([...CH_B, [16, 10]], CH_W);
+const CH_READ = full([...CH_B, [16, 10]], CH_W, { marks: labels([15, 3, "1"], [3, 15, "2"], [15, 16, "3"], [3, 3, "4"], [16, 10, "5"], [15, 10, "A"]) });
+// The same opening along the bottom side (the one above, mirrored on the diagonal): D4, R4, and L3 or L4.
+const CH_BOTTOM = full([[3, 15], [16, 15]], [[15, 3], [3, 3]]);
 
 // Sanrensei: three star points along the right side.
 const SAN_B = [[15, 3], [15, 15]];
@@ -245,7 +250,7 @@ const J_LOW = [
 // invaded at the 3-3 point of Black's star point. (2) White has approached
 // Black's upper right star point from the side facing Black's lower right
 // corner.
-const CHOOSE_33 = full([...CH_B, [16, 9]], [...CH_W, [16, 2]]);
+const CHOOSE_33 = full([...CH_B, [16, 10]], [...CH_W, [16, 2]]);
 const CHOOSE_PINCER = full(SAN_B, [...SAN_W, [16, 5]]);
 const CHOOSE_READ = full(SAN_B, [...SAN_W, [16, 5]], { marks: labels([16, 8, "A"], [13, 2, "B"]) });
 
@@ -289,10 +294,10 @@ export const ADVANCED = [
           {
             kind: "read",
             text: L(
-              "黑1星位、黑3小目，黑5下在右边第三线：这就是中国流。三颗子沿着右边展开，速度快，又以右边为中心形成模样。黑5下在A（第四线）叫高中国流，更重视中腹；下在三线则更坚实。小林流和迷你中国流也是“小目加边上低位一子”的构思，只是手顺变化多。",
-              "Black 1 on a star point, Black 3 on a 3-4 point and Black 5 on the third line of the right side: this is the Chinese opening. The three stones develop quickly along the right side and form a framework (moyo) around it. Black 5 at A, on the fourth line, is the high Chinese opening, which aims more at the centre; the third-line stone is more solid. The Kobayashi opening and the mini-Chinese are built on the same idea, a 3-4 point with a low stone on the side, but their move orders vary.",
-              "흑 1 화점, 흑 3 소목, 그리고 흑 5를 오른쪽 변 3선에 두면 중국류입니다. 세 돌이 오른쪽 변을 따라 빠르게 전개되고, 오른쪽을 중심으로 모양을 이룹니다. 흑 5를 4선의 A에 두면 높은 중국류로 중앙을 더 중시하고, 3선은 더 튼튼합니다. 고바야시류와 미니 중국류도 ‘소목과 변의 낮은 한 수’라는 같은 구상이지만 수순은 여러 가지입니다.",
-              "黒1の星、黒3の小目に、黒5を右辺の三線に打つのが中国流です。三つの石が右辺に沿って速く展開し、右辺を中心に模様を作ります。黒5を四線のAに打つと高い中国流で、中央をより重視します。三線の方が堅実です。小林流やミニ中国流も「小目と辺の低い一手」という同じ構想ですが、手順はいろいろです。",
+              "黑1右上星位，黑3右下小目（离下边三路），黑5下在右边第三线、比正中低一路：这就是中国流。三颗子沿着右边展开，速度快，又以右边为中心形成模样。黑5下在A（第四线）叫高中国流，更重视中腹；下在三线则更坚实。",
+              "Black 1 on the upper right star point, Black 3 on the lower right 3-4 point (third line from the bottom), and Black 5 on the third line of the right side, one line below the middle: this is the Chinese opening. The three stones develop quickly along the right side and form a framework (moyo) around it. Black 5 at A, on the fourth line, is the high Chinese opening: more toward the centre, less solid.",
+              "흑 1은 오른쪽 위 화점, 흑 3은 오른쪽 아래 소목(아래 변에서 3선), 흑 5는 오른쪽 변 3선에서 한가운데보다 한 줄 아래: 이것이 중국류입니다. 세 돌이 오른쪽 변을 따라 빠르게 전개되고, 오른쪽을 중심으로 모양을 이룹니다. 흑 5를 4선의 A에 두면 고중국류로 중앙을 더 중시하고, 3선은 더 튼튼합니다.",
+              "黒1は右上の星、黒3は右下の小目（下辺から三線）、黒5は右辺の三線で中央より一路下。これが中国流です。三つの石が右辺に沿って速く展開し、右辺を中心に模様を作ります。黒5を四線のAに打つと高中国流で、中央をより重視します。三線の方が堅実です。",
             ),
             board: CH_READ,
           },
@@ -306,18 +311,18 @@ export const ADVANCED = [
             ),
             board: CH_BASE,
             toMove: BLACK,
-            accept: pts([16, 9], [15, 9]),
+            accept: pts([16, 10], [15, 10]),
             success: L(
-              "右边的星位和小目之间，正中央那一点：中国流成形了。",
-              "Halfway between the star point and the 3-4 point on the right side: the Chinese opening is complete.",
-              "오른쪽 화점과 소목 사이의 한가운데입니다. 중국류가 완성되었습니다.",
-              "右辺の星と小目のちょうど中ほどです。中国流の完成です。",
+              "右边正中偏下一路，靠近小目的一侧：中国流成形了。",
+              "One line below the middle of the right side, on the 3-4 point's side: the Chinese opening is complete.",
+              "오른쪽 변 한가운데에서 한 줄 아래, 소목에 가까운 쪽입니다. 중국류가 완성되었습니다.",
+              "右辺の中央より一路下、小目寄りの点です。中国流の完成です。",
             ),
             wrong: L(
-              "边上那颗子下在右边的中间一带，第三线或第四线，和上下两个角呼应。",
-              "The side stone goes around the middle of the right side, on the third or fourth line, working with both corners.",
-              "변의 한 수는 오른쪽 변 가운데쯤, 3선이나 4선에 두어 위아래 두 귀와 호응하게 합니다.",
-              "辺の一手は右辺の中ほど、三線か四線に打ち、上下の隅と連携させます。",
+              "边上那颗子下在右边正中偏下一路，第三线或第四线，离小目近一些。",
+              "The side stone goes one line below the middle of the right side, on the third or fourth line: a little nearer the 3-4 point.",
+              "변의 한 수는 오른쪽 변 한가운데에서 한 줄 아래, 3선이나 4선에 둡니다. 소목 쪽에 조금 더 가깝습니다.",
+              "辺の一手は右辺の中央より一路下、三線か四線です。小目に少し近い側です。",
             ),
           },
           {
@@ -330,19 +335,29 @@ export const ADVANCED = [
             ),
             board: CH_BOTTOM,
             toMove: BLACK,
-            accept: pts([9, 15], [9, 16]),
+            accept: pts([10, 16], [10, 15]),
             success: L(
-              "方向不同，构思一样：星位、小目和中间的一子。",
-              "A different side, the same idea: the star point, the 3-4 point and the stone between them.",
-              "방향은 달라도 구상은 같습니다. 화점, 소목, 그리고 그 사이의 한 수입니다.",
-              "向きは違っても構想は同じです。星、小目、その間の一手です。",
+              "方向不同，构思一样：星位、小目，和两者之间偏向小目一路的一子。",
+              "A different side, the same idea: the star point, the 3-4 point and the stone between them, one line nearer the 3-4 point.",
+              "방향은 달라도 구상은 같습니다. 화점, 소목, 그리고 그 사이에서 소목 쪽으로 한 줄 치우친 한 수입니다.",
+              "向きは違っても構想は同じです。星、小目、そしてその間で一路小目寄りの一手です。",
             ),
             wrong: L(
-              "找下边黑棋两个角之间的中点，在第三线或第四线。",
-              "Find the middle of the bottom side between Black's two corners, on the third or fourth line.",
-              "아래쪽 변에서 흑의 두 귀 사이 가운데를 3선이나 4선에서 찾으세요.",
-              "下辺で、黒の二つの隅の中ほどを三線か四線で探しましょう。",
+              "在下边找比正中靠近小目一路的点，第三线或第四线。",
+              "Find the point on the bottom side one line nearer the 3-4 point than the middle, on the third or fourth line.",
+              "아래쪽 변에서 한가운데보다 소목 쪽으로 한 줄 가까운 점을 3선이나 4선에서 찾으세요.",
+              "下辺で、中央より一路小目寄りの点を三線か四線で探しましょう。",
             ),
+          },
+          {
+            kind: "read",
+            text: L(
+              "小林流和迷你中国流也是“小目加边上低位一子”的构思，只是手顺变化多。",
+              "The Kobayashi opening and the mini-Chinese are built on the same idea, a 3-4 point with a low stone on the side, but their move orders vary.",
+              "고바야시류와 미니 중국류도 ‘소목과 변의 낮은 한 수’라는 같은 구상이지만 수순은 여러 가지입니다.",
+              "小林流やミニ中国流も「小目と辺の低い一手」という同じ構想ですが、手順はいろいろです。",
+            ),
+            board: CH,
           },
         ],
       },
@@ -354,7 +369,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "黑1、3、5三颗子都在第四线的星位上：三连星。它不急于守角，而是在右边和中腹形成大模样。模样不是实地：它只是“将来可能成为实地”的地方。对付模样，白棋通常先在角上拿实地（点三三），以后再侵消或打入；黑棋则要把外面的厚势变成实地，或者用它攻击。",
-              "Black 1, 3 and 5 all stand on star points of the fourth line: sanrensei. It does not hurry to secure corners; it builds a large framework (moyo) on the right side and toward the centre. A framework is not territory, only an area that may become territory later. Against it White usually takes territory in a corner first, with a 3-3 invasion, and reduces or invades later. Black's task is to turn the outside strength into territory or to attack with it.",
+              "Black 1, 3 and 5 all stand on star points of the fourth line: sanrensei. It does not hurry to secure corners but builds a large framework (moyo) on the right side and toward the centre. A framework is not territory yet, only an area that may become it. White usually answers with a 3-3 invasion for corner territory, reducing or invading later. Black then turns the outside strength into territory, or attacks with it.",
               "흑 1, 3, 5가 모두 4선의 화점에 놓였습니다. 삼연성입니다. 귀를 서둘러 지키지 않고 오른쪽 변과 중앙에 큰 모양을 만듭니다. 모양은 집이 아니라 ‘나중에 집이 될 수도 있는 곳’일 뿐입니다. 모양에 맞서 백은 보통 먼저 삼삼에 들어가 귀의 실리를 차지하고, 삭감이나 침입은 나중에 합니다. 흑은 바깥의 세력을 집으로 바꾸거나 그것으로 공격해야 합니다.",
               "黒1、3、5がすべて四線の星に打たれています。三連星です。隅を急いで守らず、右辺から中央へ大きな模様を作ります。模様は地ではなく、「後で地になるかもしれない所」にすぎません。模様に対して白はふつう先に三々に入って隅の実利を取り、消しや打ち込みは後にします。黒は外の勢力を地に変えるか、それで攻めなければなりません。",
             ),
@@ -442,7 +457,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "黑棋要挂左上白棋的星位。从上边A挂，挂角子靠近右上的黑子：白棋若从上边夹击，夹击的子就离黑棋很近，不会有力；黑棋要拆，也能和右上配合。从左边B挂，白棋的夹击会和左下的白子配合，黑棋处境就难了。一般来说，挂角要从对自己有利的一侧，也就是靠自己棋子的一侧。",
-              "Black wants to approach White's upper left star point. An approach from the top (A) stands near Black's upper right stone: a white pincer on the top side would be close to Black's stones and weak, and if Black extends, the extension works with the upper right corner. An approach from the left (B) invites a pincer that works with White's lower left stone, and Black has a harder time. As a rule, approach from the side that works with your own stones.",
+              "Black wants to approach White's upper left star point. From the top (A) the approach stands near Black's upper right stone: a white pincer there would be close to Black's stones and weak, and a black extension works with the upper right corner. From the left (B) it invites a pincer that works with White's lower left stone, and Black has a harder time. As a rule, approach from the side that works with your own stones.",
               "흑이 왼쪽 위 백 화점에 걸치려 합니다. 위쪽(A)에서 걸치면 걸친 돌이 오른쪽 위 흑돌과 가깝습니다. 백이 위쪽에서 협공해도 협공한 돌이 흑돌 가까이 있어 힘이 없고, 흑이 벌리면 오른쪽 위 귀와도 호응합니다. 왼쪽(B)에서 걸치면 백의 협공이 왼쪽 아래 백돌과 호응해 흑이 고생합니다. 대체로 걸침은 내 돌과 호응하는 쪽에서 합니다.",
               "黒が左上の白の星にカカろうとしています。上辺（A）からカカれば、カカリの石は右上の黒石に近く、白が上辺からハサんでもその石は黒の近くで弱く、黒が開けば右上の隅とも連携します。左辺（B）からカカると、白のハサミが左下の白石と連携し、黒は苦労します。一般に、カカリは自分の石と連携する側から打ちます。",
             ),
@@ -482,7 +497,7 @@ export const ADVANCED = [
             ),
             board: CH,
             toMove: WHITE,
-            accept: pts([14, 16], [14, 15], [13, 15]),
+            accept: pts([13, 16], [13, 15]),
             success: L(
               "从下边挂，挂角子背后宽阔，不会被夹在黑棋的子之间。",
               "From the bottom: the approaching stone has open space behind it and is not caught between Black's stones.",
@@ -490,10 +505,10 @@ export const ADVANCED = [
               "下辺からのカカリで、カカリの石の背後は広く、黒石の間に挟まれません。",
             ),
             wrong: L(
-              "在小目左边的下边挂：小飞挂、一间高挂或二间高挂。",
-              "Approach on the bottom side, to the left of the 3-4 stone: a small knight's, one-space high or two-space high approach.",
-              "소목 왼쪽, 아래쪽 변에서 걸치세요. 날일자 걸침, 한 칸 높은 걸침, 두 칸 높은 걸침입니다.",
-              "小目の左、下辺でカカりましょう。小ゲイマガカリ、一間高ガカリ、二間高ガカリです。",
+              "在小目左边的下边挂：和小目隔一路，第三线或第四线。",
+              "Approach on the bottom side, to the left of the 3-4 stone: leave one empty point between them, on the third or fourth line.",
+              "소목 왼쪽, 아래쪽 변에서 걸치세요. 소목과 한 칸 띄워 3선이나 4선입니다.",
+              "小目の左、下辺でカカりましょう。小目から一路あけて、三線か四線です。",
             ),
           },
         ],
@@ -601,7 +616,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "白1小飞挂，黑2一间低夹。现代最常见的应法是白3点三三：角上的实地比被夹的挂角子更重要。黑4从挂角子一侧挡，把三三和白1分开，白1就被夹在黑棋两子之间。接着白棋沿上边做活，黑棋得到外势，白1以后成为黑棋的攻击目标。这一型可以在定式图谱的角部里继续研究。",
-              "White 1 approaches with a small knight's move and Black 2 plays the one-space low pincer. Today the most common answer is White 3, the 3-3 invasion: the corner territory matters more than the pincered stone. Black 4 blocks on the approach stone's side, cutting the 3-3 stone off from White 1, which is left between Black's stones. White then lives along the top, Black gets outside strength, and White 1 becomes a target. You can follow this line further in the corner tree of the opening explorer.",
+              "White 1 is a small knight's approach and Black 2 the one-space low pincer. Today White 3, the 3-3 invasion, is the most common answer: the corner matters more than the pincered stone. Black 4 blocks on the approach stone's side and cuts the 3-3 stone off from White 1. White lives along the top, Black gets outside strength, and White 1 becomes a target. The opening explorer's corner tree shows more of this line.",
               "백 1 날일자 걸침에 흑 2 한 칸 낮은 협공. 요즘 가장 흔한 응수는 백 3 삼삼 침입입니다. 협공당한 돌보다 귀의 실리가 더 중요하기 때문입니다. 흑 4는 걸친 돌 쪽에서 막아 삼삼과 백 1을 갈라놓고, 백 1은 흑돌 사이에 남습니다. 이어서 백은 위쪽 변에서 살고 흑은 바깥의 세력을 얻으며, 백 1은 공격 목표가 됩니다. 이 진행은 포석·정석 탐색의 귀 정석에서 더 살펴볼 수 있습니다.",
               "白1の小ゲイマガカリに黒2の一間挟み。現代で最も多いのは白3の三々入りです。挟まれた石より隅の実利が大事だからです。黒4はカカリの石の側からオサエて三々と白1を分断し、白1は黒石の間に取り残されます。続いて白は上辺で生き、黒は外の勢力を得て、白1は攻めの目標になります。この進行は布石・定石エクスプローラーの隅の定石でさらに調べられます。",
             ),
@@ -1048,10 +1063,10 @@ export const ADVANCED = [
           {
             kind: "read",
             text: L(
-              "同一个定式，在不同的局面下好坏不同。白棋从右边挂进黑棋两个星位之间：黑棋在A夹击，同时又是从右下拆过来，白子两边受压；在B守角就太缓了。选定式要看周围：厚势要朝着自己的阵势，夹击要从有自己棋子的一侧。征子也要先看清：有些定式里的切断只有在征子有利时才成立，征子不利就要选别的下法。",
-              "The same joseki can be good in one position and poor in another. White has approached from the right side, between Black's two star points. A pincer at A is also an extension from the lower right corner, and the white stone is pressed from both sides; securing the corner at B would be too slow. Choose a joseki by the stones around it: point your thickness toward your own area, and pincer from the side where your stones are. Read the ladders first, too: in some joseki a cut works only when the ladder works, and when it does not, choose another line.",
-              "같은 정석도 국면에 따라 좋고 나쁨이 다릅니다. 백이 오른쪽 변에서 흑의 두 화점 사이로 걸쳤습니다. A의 협공은 오른쪽 아래 귀에서 벌린 수도 되어, 백돌이 양쪽에서 압박받습니다. B로 귀를 지키는 것은 너무 느립니다. 정석은 주위의 돌을 보고 고릅니다. 두터움은 내 진영 쪽을 향하게 하고, 협공은 내 돌이 있는 쪽에서 합니다. 축도 먼저 확인하세요. 어떤 정석의 끊음은 축이 유리할 때만 성립하므로, 축이 불리하면 다른 수를 골라야 합니다.",
-              "同じ定石でも、局面によって良し悪しが変わります。白が右辺から黒の二つの星の間にカカりました。Aのハサミは右下の隅からの開きにもなり、白石は両側から迫られます。Bで隅を守るのでは遅すぎます。定石は周りの石を見て選びます。厚みは自分の陣地に向け、ハサミは自分の石がある側から打ちます。シチョウも先に確かめましょう。定石の中には、シチョウが有利なときだけ成立する切りがあり、不利なら別の手を選ぶ必要があります。",
+              "同一个定式，在不同的局面下好坏不同。白棋从右边挂进黑棋两个星位之间：黑棋在A夹击，同时又是从右下拆过来，白子两边受压；在B守角就太缓了。选定式要看周围：厚势要朝着自己的阵势，夹击要从有自己棋子的一侧。",
+              "A joseki can be good in one position and poor in another. White has approached from the right side, between Black's two star points. A pincer at A is also an extension from the lower right corner, pressing the white stone from both sides; guarding the corner at B would be too slow. Choose a joseki by the stones around it: point your thickness toward your own area, and pincer from the side where your stones are.",
+              "같은 정석도 국면에 따라 좋고 나쁨이 다릅니다. 백이 오른쪽 변에서 흑의 두 화점 사이로 걸쳤습니다. A의 협공은 오른쪽 아래 귀에서 벌린 수도 되어, 백돌이 양쪽에서 압박받습니다. B로 귀를 지키는 것은 너무 느립니다. 정석은 주위의 돌을 보고 고릅니다. 두터움은 내 진영 쪽을 향하게 하고, 협공은 내 돌이 있는 쪽에서 합니다.",
+              "同じ定石でも、局面によって良し悪しが変わります。白が右辺から黒の二つの星の間にカカりました。Aのハサミは右下の隅からの開きにもなり、白石は両側から迫られます。Bで隅を守るのでは遅すぎます。定石は周りの石を見て選びます。厚みは自分の陣地に向け、ハサミは自分の石がある側から打ちます。",
             ),
             board: CHOOSE_READ,
           },
@@ -1103,6 +1118,15 @@ export const ADVANCED = [
               "白石のすぐ下、つまり右辺の側にくっつけてオサエましょう。",
             ),
           },
+          {
+            kind: "read",
+            text: L(
+              "征子也要先看清：有些定式里的切断只有在征子有利时才成立，征子不利就要选别的下法。",
+              "Read the ladders before you choose, too: in some joseki a cut works only when the ladder works, and when it does not, choose another line.",
+              "축도 먼저 확인하세요. 어떤 정석의 끊음은 축이 유리할 때만 성립하므로, 축이 불리하면 다른 수를 골라야 합니다.",
+              "シチョウも先に確かめましょう。定石の中には、シチョウが有利なときだけ成立する切りがあり、不利なら別の手を選ぶ必要があります。",
+            ),
+          },
         ],
       },
     ],
@@ -1127,12 +1151,12 @@ export const ADVANCED = [
           {
             kind: "read",
             text: L(
-              "四个角都守住了。左边夹在黑棋两个角之间，右边夹在白棋两个角之间，上边和下边则在黑角和白角之间。A这样的点，既从自己的角拆开，又阻止对方从角上拆过来，一手棋起两个作用。B只是扩大黑棋已经占优的一边：白棋夹在黑棋两个坚固的角之间很难安顿，所以B通常可以先放一放。一般来说，双方都想拆的那条边最大。",
-              "All four corners are enclosed. The left side lies between Black's two corners, the right side between White's, and the top and bottom between a black and a white corner. A point like A extends from your corner and also stops the opponent extending from theirs: one move does two jobs. B only adds to a side where Black is already stronger; a white stone there would sit between two solid black corners and have a hard time, so Black can usually leave B for later. As a rule, the side that both players want to extend along is the biggest.",
-              "네 귀가 모두 굳혀졌습니다. 왼쪽 변은 흑의 두 귀 사이, 오른쪽 변은 백의 두 귀 사이, 위와 아래 변은 흑 귀와 백 귀 사이에 있습니다. A 같은 자리는 내 귀에서 벌리면서 상대가 자기 귀에서 벌리는 것도 막습니다. 한 수가 두 가지 일을 하는 셈입니다. B는 흑이 이미 강한 변을 넓힐 뿐입니다. 백이 그곳에 들어와도 튼튼한 흑의 두 귀 사이에서 고생하므로, 흑은 보통 B를 나중으로 미룰 수 있습니다. 대체로 양쪽이 모두 벌리고 싶은 변이 가장 큽니다.",
-              "四隅ともシマリが打たれています。左辺は黒の二つの隅の間、右辺は白の二つの隅の間、上辺と下辺は黒の隅と白の隅の間です。Aのような点は、自分の隅から開くと同時に、相手が隅から開くのも止めます。一手で二つの仕事をします。Bは黒がすでに優勢な辺を広げるだけです。白がそこに来ても堅い黒の二つの隅に挟まれて苦労するので、黒はふつうBを後回しにできます。一般に、両方が開きたい辺がいちばん大きいのです。",
+              "四个角都守住了。左边夹在黑棋两个角之间，右边夹在白棋两个角之间，上边和下边则在黑角和白角之间。A这样的点，既从自己的角拆开，又阻止对方从角上拆过来，一手棋起两个作用。一般来说，双方都想拆的那条边最大。",
+              "All four corners are enclosed. The left side lies between Black's two corners, the right side between White's, and the top and bottom between a black and a white corner. A point like A extends from your corner and also stops the opponent extending from theirs: one move does two jobs. As a rule, the side that both players want to extend along is the biggest.",
+              "네 귀가 모두 굳혀졌습니다. 왼쪽 변은 흑의 두 귀 사이, 오른쪽 변은 백의 두 귀 사이, 위와 아래 변은 흑 귀와 백 귀 사이에 있습니다. A 같은 자리는 내 귀에서 벌리면서 상대가 자기 귀에서 벌리는 것도 막습니다. 한 수가 두 가지 일을 하는 셈입니다. 대체로 양쪽이 모두 벌리고 싶은 변이 가장 큽니다.",
+              "四隅ともシマリが打たれています。左辺は黒の二つの隅の間、右辺は白の二つの隅の間、上辺と下辺は黒の隅と白の隅の間です。Aのような点は、自分の隅から開くと同時に、相手が隅から開くのも止めます。一手で二つの仕事をします。一般に、両方が開きたい辺がいちばん大きいのです。",
             ),
-            board: BOUNDARY_MARKED,
+            board: BOUNDARY_A,
           },
           {
             kind: "place",
@@ -1157,6 +1181,16 @@ export const ADVANCED = [
               "흑 귀와 백 귀 사이에 있는 변의 가운데쯤을 찾으세요. 위쪽 변이나 아래쪽 변입니다.",
               "黒の隅と白の隅の間にある辺の中ほど、上辺か下辺を探しましょう。",
             ),
+          },
+          {
+            kind: "read",
+            text: L(
+              "B这样的点只是扩大黑棋已经占优的一边：白棋到那里，会夹在黑棋两个坚固的角之间，很难安顿。所以B通常可以先放一放。",
+              "A point like B only adds to a side where Black is already stronger: a white stone there would sit between two solid black corners and have a hard time. So Black can usually leave B for later.",
+              "B 같은 자리는 흑이 이미 강한 변을 넓힐 뿐입니다. 백이 그곳에 들어와도 튼튼한 흑의 두 귀 사이에서 고생합니다. 그래서 흑은 보통 B를 나중으로 미룰 수 있습니다.",
+              "Bのような点は黒がすでに優勢な辺を広げるだけです。白がそこに来ても堅い黒の二つの隅に挟まれて苦労します。だから黒はふつうBを後回しにできます。",
+            ),
+            board: BOUNDARY_B,
           },
           {
             kind: "place",
@@ -1192,7 +1226,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "左边黑棋有一道厚实的墙，白棋在里面低位活了。上边有一颗白子。黑棋若从墙的一侧（B）逼它，白棋就往右边宽阔的地方开拆；从另一侧（A）夹，白棋就被夹在黑墙和夹击的子之间，没有地方做根据地。厚势最好用来攻击，而攻击通常要把对方往厚势上赶。",
-              "Black has a thick wall on the left side, and White has lived low inside it. There is a white stone on the top side. If Black presses it from the wall's side (B), White extends into the open space to the right. If Black pincers from the other side (A), the white stone is caught between the wall and the pincer, with no room for a base. Thickness is best used for attacking, and an attack usually drives the opponent toward your thickness.",
+              "Black has a thick wall on the left side, and White has lived low inside it. There is a white stone on the top side. If Black presses it from the wall's side (B), White extends into the open space on the right. If Black pincers from the other side (A), the stone is caught between the wall and the pincer, with no room for a base. Thickness is best used for attacking, and an attack usually drives the opponent toward it.",
               "왼쪽 변에 흑의 두터운 벽이 있고, 백은 그 안쪽 낮은 곳에서 살았습니다. 위쪽 변에는 백돌 하나가 있습니다. 흑이 벽 쪽(B)에서 다가가면 백은 오른쪽 넓은 곳으로 벌립니다. 반대쪽(A)에서 협공하면 백돌은 흑 벽과 협공한 돌 사이에 끼어 근거를 만들 자리가 없습니다. 두터움은 공격에 쓰는 것이 가장 좋고, 공격은 보통 상대를 두터움 쪽으로 몰아갑니다.",
               "左辺に黒の厚い壁があり、白はその内側で低く生きています。上辺には白石が一つあります。黒が壁の側（B）から迫ると、白は右の広い方へ開きます。反対側（A）からはさむと、白石は黒の壁とはさんだ石の間に挟まれ、根拠を作る場所がありません。厚みは攻めに使うのがいちばんで、攻めはふつう相手を厚みの方へ追い込みます。",
             ),
@@ -2004,7 +2038,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "让子棋里，黑棋的让子已经占好了四个角。白棋挂角时，最有力的往往是从另一颗让子那一侧夹击（A）：夹击的子同时是从右下拆过来的，白子两边都有黑子。只是守角（B）也不坏，但让子就没有发挥作用。不要在自己已经很强的地方再补棋（重复），也不要让自己的子被分开。",
-              "In a handicap game Black's stones already hold the four corners. When White approaches, the strongest answer is often a pincer from the side of another handicap stone (A): the pincer is also an extension from the lower right corner, and the white stone has black stones on both sides. Simply guarding the corner (B) is not bad, but it leaves the handicap stones idle. Do not add stones where you are already strong (overconcentration), and do not let your stones be split apart.",
+              "In a handicap game Black already holds the four corners. When White approaches, a pincer from the side of another handicap stone (A) is often strongest: it also extends from the lower right corner, and the white stone has black stones on both sides. Guarding the corner (B) is not bad, but leaves the handicap stones idle. Do not add stones where you are already strong (overconcentration) or let your stones be split.",
               "접바둑에서는 흑의 치석이 이미 네 귀를 차지하고 있습니다. 백이 걸쳐 오면 다른 치석 쪽에서 협공하는 수(A)가 가장 강력할 때가 많습니다. 협공한 돌은 오른쪽 아래 귀에서 벌린 수도 되어, 백돌 양쪽에 흑돌이 있게 됩니다. 귀만 지키는 수(B)도 나쁘지 않지만 치석이 제 역할을 못 합니다. 이미 강한 곳에 또 두지 말고(중복), 내 돌이 갈라지지 않게 하세요.",
               "置き碁では、黒の置き石がすでに四隅を占めています。白がカカってきたら、別の置き石の側からハサむ手（A）が最も強力なことが多いでしょう。ハサんだ石は右下の隅からの開きにもなり、白石の両側に黒石があることになります。隅を守るだけの手（B）も悪くありませんが、置き石が働きません。すでに強い所にさらに打たず（凝り形）、自分の石が分断されないようにしましょう。",
             ),

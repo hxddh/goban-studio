@@ -146,6 +146,7 @@ const BEGINNER = [
           },
           {
             kind: "place",
+            goal: L("黑先，下在棋盘正中央", "Black to play: the centre point", "흑선: 한가운데 점에 두세요", "黒先：盤の真ん中に打ってください"),
             text: L(
               "试试看：把你的第一颗黑子放在棋盘正中央的点上。",
               "Try it: put your first black stone on the point in the very middle of the board.",
@@ -165,6 +166,7 @@ const BEGINNER = [
           },
           {
             kind: "place",
+            goal: L("黑先，紧挨着黑子下一手", "Black to play: next to your stone", "흑선: 흑돌 바로 옆에 두세요", "黒先：黒石のすぐ隣に打ってください"),
             text: L(
               "沿着线紧挨在一起的同色棋子连成一块。在你的黑子旁边紧挨着下一颗。",
               "Stones of one colour that touch along a line are joined into one group. Place a stone right next to your black stone.",
@@ -189,6 +191,7 @@ const BEGINNER = [
           },
           {
             kind: "place",
+            goal: L("黑先，把两颗黑子连起来", "Black to play: join the two stones", "흑선: 두 흑돌을 이으세요", "黒先：二つの黒石をつないでください"),
             text: L(
               "这两颗黑子只是斜着相对，还没有连上。下一颗子把它们连起来。",
               "These two black stones only touch diagonally, so they are not joined yet. Join them with one stone.",
@@ -237,6 +240,7 @@ const BEGINNER = [
           },
           {
             kind: "place",
+            goal: L("黑先，紧白子一口气", "Black to play: take a liberty from the white stone", "흑선: 백돌의 활로를 하나 메우세요", "黒先：白石の呼吸点を一つふさいでください"),
             text: L(
               "下在对方棋子的气上，就能减少它的气。紧贴白子下一颗，拿走它一口气。",
               "Playing on a liberty of an enemy stone takes it away. Play right next to the white stone to take one of its liberties.",
@@ -261,6 +265,7 @@ const BEGINNER = [
           },
           {
             kind: "place",
+            goal: L("黑先，再紧白子一口气", "Black to play: take another liberty", "흑선: 활로를 하나 더 메우세요", "黒先：呼吸点をもう一つふさいでください"),
             text: L(
               "边上的白子本来有三口气，黑棋已经占了一口。再拿走一口。",
               "This white stone on the edge started with three liberties and Black has taken one. Take another.",
@@ -2170,7 +2175,7 @@ const BEGINNER = [
             kind: "read",
             text: L(
               "日本规则数目：地加上提掉的子就是你的得分。黑棋先下占便宜，所以白棋另得6目半贴目。这盘棋黑31目，白28目加6目半是34目半，白胜3目半。本应用的新对局默认用日本规则，可以在“设置 › 对局 › 新对局的规则”里改成中国规则（数子，下一课讲）或韩国规则。",
-              "Under Japanese rules (territory scoring) your score is your territory plus the stones you captured. Black has the advantage of moving first, so White receives 6.5 points of komi. Here Black has 31 points and White 28 + 6.5 = 34.5: White wins by 3.5. New games in this app use Japanese rules unless you change it in Settings › Playing › Rules for new games, where you can choose Chinese rules (area scoring, the next lesson) or Korean rules.",
+              "Under Japanese rules (territory scoring) your score is your territory plus the stones you captured. Black moves first, so White receives 6.5 points of komi. Here Black has 31 points and White 28 + 6.5 = 34.5: White wins by 3.5. New games in this app use Japanese rules; in Settings › Playing › Rules for new games you can choose Chinese rules (area scoring, the next lesson) or Korean rules.",
               "일본 규칙(계지)에서는 집에 따낸 돌을 더한 것이 점수입니다. 흑이 먼저 두는 이점이 있어 백은 덤 6집 반을 받습니다. 이 판은 흑 31집, 백 28집에 덤을 더해 34집 반, 백이 3집 반 이깁니다. 이 앱의 새 대국은 기본이 일본 규칙이며, '설정 › 대국 › 새 대국의 규칙'에서 중국 규칙(계자, 다음 강의)이나 한국 규칙으로 바꿀 수 있습니다.",
               "日本ルール（計地）では、地とアゲハマの合計が得点です。黒は先に打てる分有利なので、白はコミ6目半をもらいます。この碁は黒31目、白28目＋6目半で34目半、白の3目半勝ちです。このアプリの新しい対局は日本ルールが基本で、「設定 › 対局 › 新しい対局のルール」で中国ルール（計子、次の課）や韓国ルールに変えられます。",
             ),
@@ -2223,10 +2228,10 @@ const BEGINNER = [
           {
             kind: "read",
             text: L(
-              "中国规则用数子法：终局拿掉死子以后，数一方盘上的活子加上它围住的空点，提子不算。这盘棋黑棋11个子加31目是42子，白棋11个子加28目是39子。黑先占便宜，贴3又3/4子，也就是7目半：白棋39加7.5是46.5，白胜4目半。数子和数目的结果通常只差1目左右。数子时单官也算：填一个单官就多一个子，所以单官一定要填完；在自己地里补一手也不亏，因为棋子本身也算数。",
-              "Chinese rules use area scoring: once dead stones are removed, each side counts its stones on the board plus the empty points they surround; prisoners do not count. In this game Black has 11 stones and 31 points of territory, 42 in all; White has 11 stones and 28 points, 39. Black moved first, so White gets 7.5 points of komi: 39 + 7.5 = 46.5, and White wins by 4.5. Area and territory scoring usually differ by about a point. Under area scoring neutral points count too: each one you fill is a stone on the board, so fill them all; and a defensive move inside your own territory costs nothing, because the stone itself counts.",
-              "중국 규칙은 계자로 셉니다. 사석을 들어낸 뒤, 판 위에 살아 있는 자기 돌과 그 돌이 둘러싼 빈 점을 더합니다. 따낸 돌은 세지 않습니다. 이 판에서 흑은 돌 11개와 집 31집으로 42, 백은 돌 11개와 28집으로 39입니다. 흑이 먼저 두었으므로 백은 덤 7집 반을 받아 46.5가 되고, 백이 4집 반 이깁니다. 계자와 계지의 결과는 보통 1집 정도만 다릅니다. 계자에서는 공배도 셈에 들어갑니다. 공배를 메우면 돌 하나가 늘어나니 모두 메우세요. 자기 집 안에 손질해도 손해가 없습니다. 돌 자체가 한 점이기 때문입니다.",
-              "中国ルールは計子で数えます。死に石を取り除いた後、盤上の生きている自分の石と、それが囲んだ空点を合わせて数えます。アゲハマは数えません。この碁では黒は石11と地31で42、白は石11と地28で39です。黒が先に打ったので白はコミ7目半をもらって46.5、白の4目半勝ちです。計子と計地の結果はふつう1目くらいしか違いません。計子ではダメも数に入ります。ダメを詰めれば石が一つ増えるので、すべて詰めましょう。自分の地の中に手入れしても損はありません。石そのものが一つと数えられるからです。",
+              "中国规则用数子法：终局拿掉死子以后，数一方盘上的活子加上它围住的空点，提子不算。这盘棋黑棋11个子加31目是42子，白棋11个子加28目是39子。黑先占便宜，贴3又3/4子，也就是7目半：白棋39加7.5是46.5，白胜4目半。数子和数目的结果通常只差1目左右。",
+              "Chinese rules use area scoring: once dead stones are removed, each side counts its stones on the board plus the empty points they surround; prisoners do not count. In this game Black has 11 stones and 31 points of territory, 42 in all; White has 11 stones and 28 points, 39. White gets 7.5 points of komi: 39 + 7.5 = 46.5, and White wins by 4.5. Area and territory scoring usually differ by about a point.",
+              "중국 규칙은 계자로 셉니다. 사석을 들어낸 뒤, 판 위에 살아 있는 자기 돌과 그 돌이 둘러싼 빈 점을 더합니다. 따낸 돌은 세지 않습니다. 이 판에서 흑은 돌 11개와 집 31집으로 42, 백은 돌 11개와 28집으로 39입니다. 흑이 먼저 두었으므로 백은 덤 7집 반을 받아 46.5가 되고, 백이 4집 반 이깁니다. 계자와 계지의 결과는 보통 1집 정도만 다릅니다.",
+              "中国ルールは計子で数えます。死に石を取り除いた後、盤上の生きている自分の石と、それが囲んだ空点を合わせて数えます。アゲハマは数えません。この碁では黒は石11と地31で42、白は石11と地28で39です。黒が先に打ったので白はコミ7目半をもらって46.5、白の4目半勝ちです。計子と計地の結果はふつう1目くらいしか違いません。",
             ),
             board: END,
           },
@@ -2248,6 +2253,16 @@ const BEGINNER = [
               "흑돌과 백돌에 함께 닿은 빈 점을 찾으세요.",
               "黒石と白石の両方に接する空点を探しましょう。",
             ),
+          },
+          {
+            kind: "read",
+            text: L(
+              "数子时单官也算：填一个单官就多一个子，所以单官一定要填完。在自己地里补一手也不亏，因为棋子本身也算数。",
+              "Under area scoring neutral points count too: each one you fill is a stone on the board, so fill them all. A defensive move inside your own territory costs nothing either, because the stone itself counts.",
+              "계자에서는 공배도 셈에 들어갑니다. 공배를 메우면 돌 하나가 늘어나니 모두 메우세요. 자기 집 안에 손질해도 손해가 없습니다. 돌 자체가 한 점이기 때문입니다.",
+              "計子ではダメも数に入ります。ダメを詰めれば石が一つ増えるので、すべて詰めましょう。自分の地の中に手入れしても損はありません。石そのものが一つと数えられるからです。",
+            ),
+            board: { ...b9({ ...END_ROWS, 3: ". . . X . O . . .", 6: ". . . X . O . . ." }), marks: [{ x: 4, y: 3, type: "circle" }, { x: 4, y: 6, type: "circle" }] },
           },
           {
             kind: "place",
