@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@sabaki/go-board": "1.4.3",
-    "preact": "^10.29.8"
+    "preact": "^11.2.0"
   },
   "devDependencies": {
     "@native-sdk/cli": "0.11.0",
