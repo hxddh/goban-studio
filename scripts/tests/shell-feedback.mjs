@@ -481,7 +481,7 @@ try {
     }
     // And every shortcut the menu bar can show is shown there.
     const inMenus = new Set(A.menuSpec().flatMap((m) => m.items.filter((i) => i.key).map((i) => i.command)));
-    for (const sc of K.SHORTCUTS) assert.ok(inMenus.has(sc.command) || sc.command === "game.undo", `${sc.command} is in a menu`);
+    for (const sc of K.SHORTCUTS) assert.ok(inMenus.has(sc.command) || sc.command === "game.undo" || sc.command === "game.redo", `${sc.command} is in a menu`);
   });
 
   await test("shortcuts: what a key press means depends on the sheet and the text field, as before", () => {
@@ -551,7 +551,7 @@ try {
   });
 
   await test("sheets: the kinds a test must open are the kinds the app has", () => {
-    assert.deepEqual([...A.SHEET_KINDS].sort(), ["confirm", "newGame", "onboarding", "rename", "settings", "shortcuts"]);
+    assert.deepEqual([...A.SHEET_KINDS].sort(), ["confirm", "importReport", "newGame", "onboarding", "rename", "settings", "sgfGames", "shortcuts"]);
   });
 } finally {
   mock.timers.reset();

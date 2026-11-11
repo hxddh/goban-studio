@@ -150,7 +150,8 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("play teaching: every reason string exists in four languages with matching placeholders", () => {
-    const holes = (v) => [...new Set([...v.matchAll(/\{(\d)\}/g)].map((m) => m[1]))].sort().join();
+    // {0}, or {0:이/가} (Korean: the value with the particle that suits it).
+    const holes = (v) => [...new Set([...v.matchAll(/\{(\d)(?::[^}]*)?\}/g)].map((m) => m[1]))].sort().join();
     for (const k of Object.keys(PLAY)) {
       assert.ok(MESSAGES[k], k);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(MESSAGES[k][lang].trim(), `${k} ${lang}`);

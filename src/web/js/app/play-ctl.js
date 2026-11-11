@@ -8,15 +8,17 @@ import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { estimate, focus, implOpponent, recordGame, suggestedGame } from "../model/player.js";
+import { rateBase } from "../model/rerate.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasFileDialogs, hasNative, normalizePaths, revealPath, saveFileDialog, writeTextFile } from "../host.js";
 import { state, update, toast, announce, clockChanged } from "./store.js";
 import { moveText } from "../a11y.js";
 import { changeProfile, confirmAction, openSheet, playerRankNow, remember, resultText, setGameHooks, setSetting, syncMenus, teachingOn } from "./ctl-core.js";
+import { colorName } from "./game-view.js";
 import { countReady, resignStep, thinkTime } from "./feel.js";
 import { newClock, tick, moveMade } from "./clock.js";
-import { dropReview, gameAt, openReview, saveEdits } from "./review-ctl.js";
+import { dropReview, gameAt, openReview, recordIdOf, saveEdits } from "./review-ctl.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 import { learnFromGame } from "./learn-game.js";
 
@@ -68,6 +70,9 @@ export function freshGameState(game, meta = {}) {
     proposalSeen: -1, // v8: the move number of the last "keep playing"
     aiLow: 0,
     ghost: null, // two-click placement
+    redo: [], // moves taken back that Redo can play again: one list of moves per undo
+    passAsk: null, // the pass waiting for its inline confirmation: "first" | "ends"
+    assistSaid: false, // "this game will not be rated" was said
     captureFx: null,
     analysis: null, // whole-game analysis, shared with review
     rated: !!meta.rated,
@@ -171,11 +176,16 @@ export function unfinishedGame(g = state.game) {
  * game in progress is saved to the Library as unfinished, with what it
  * takes to continue it (docs/design.md, "Unfinished games"). Opening it
  * there continues it (resumeRecord). It is not rated until it is finished.
- * Returns its record, or null when there was nothing to keep.
+ * A game with fewer than KEEP_MOVES moves of the player's is not kept (a
+ * stray click does not make a row in the Library), unless it is already
+ * there. Returns its record, or null when there was nothing to keep.
  */
+export const KEEP_MOVES = 2;
+
 export function parkCurrent({ quiet = false } = {}) {
   const g = state.game;
   if (!unfinishedGame(g)) return null;
+  if (humanMoves(g) < KEEP_MOVES && !(g.recordId && Games.getGame(g.recordId))) return null;
   // A review of this game open on top (Review so far) keeps its edits.
   if (state.review?.source === "current" && state.review.game === g.game) saveEdits(state.review);
   const rec = Games.saveGame(g.game, { ...recordMeta(g), clock: g.clock || null, rated: !!g.rated });
@@ -361,6 +371,7 @@ export function humanPlay(x, y) {
   if (g.scoring) return toggleDead(x, y);
   if (g.thinking || g.pending || g.game.phase !== "playing" || gameOver(g)) return;
   if (g.opponent === "ai" && g.game.turn !== g.humanColor) return;
+  g.passAsk = null;
   if (!g.game.canPlay(x, y).ok) {
     const res = g.game.canPlay(x, y);
     toast(t("error." + (res.reason || "illegal")), "warn");
@@ -373,6 +384,8 @@ export function humanPlay(x, y) {
     return;
   }
   g.ghost = null;
+  // A new move of the player's: what was taken back cannot be played again.
+  g.redo = [];
   playOnGame(x, y, { human: true });
 }
 
@@ -645,9 +658,18 @@ export function teachShowBest() {
   update();
 }
 
-export function undo() {
-  const g = state.game;
-  if (!g || playReviewing() || !g.game.current.parent) return;
+/**
+ * A rated game stops being rated with its first undo or hint
+ * (model/player.js: assisted). Said once per game, when it happens.
+ */
+function noteAssisted(g) {
+  if (g.opponent !== "ai" || !g.rated || g.assistSaid || g.undos + g.hints > 0) return;
+  g.assistSaid = true;
+  toast(t("play.unratedNow"), "info", { key: "unrated" });
+}
+
+/** Everything a position change resets (an undo, a redo). */
+function settle(g) {
   Engine.cancel();
   g.gen++;
   g.thinking = false;
@@ -656,11 +678,32 @@ export function undo() {
   g.scoring = null;
   g.hint = null;
   g.ghost = null;
+  g.passAsk = null;
   g.proposal = false;
   g.aiLow = 0;
-  if (g.game.current.result) g.game.current.result = null;
-  g.game.undo();
-  if (g.opponent === "ai" && g.game.turn !== g.humanColor && g.game.current.parent) g.game.undo();
+  g.eval = null;
+}
+
+/**
+ * Take back a move: the player's last move, with the computer's reply to
+ * it when it has one (so it is the player's turn again). The moves taken
+ * back can be played again with redo until a new move is played.
+ */
+export function undo() {
+  const g = state.game;
+  if (!g || playReviewing() || !g.game.current.parent) return;
+  settle(g);
+  const taken = [];
+  const back = () => {
+    const node = g.game.current;
+    if (node.result) node.result = null;
+    taken.unshift({ ...node.move });
+    g.game.undo();
+  };
+  back();
+  if (g.opponent === "ai" && g.game.turn !== g.humanColor && g.game.current.parent) back();
+  g.redo.push(taken);
+  noteAssisted(g);
   g.undos++;
   persistCurrent();
   update();
@@ -668,23 +711,94 @@ export function undo() {
   ponder();
 }
 
+/** There is a move taken back that can be played again. */
+export function canRedo(g = state.game) {
+  return !!g && g.redo.length > 0 && !g.pending && !gameOver(g);
+}
+
+/**
+ * Play the moves of the last undo again: the player's move and the reply
+ * the computer made to it (the computer is not asked again; it is when the
+ * undo took back the player's move alone). The clocks stay as they are:
+ * the time of those moves was already spent. An undo redone leaves no
+ * trace: the game counts one undo fewer.
+ */
+export function redo() {
+  const g = state.game;
+  if (!g || playReviewing() || !canRedo(g)) return;
+  settle(g);
+  const moves = g.redo.pop();
+  for (const mv of moves) {
+    const res = mv.pass ? g.game.pass({ color: mv.color, force: true }) : g.game.play(mv.x, mv.y, { color: mv.color, force: true });
+    if (!res.ok) {
+      g.redo = [];
+      break;
+    }
+  }
+  g.undos = Math.max(0, g.undos - 1);
+  Audio.stone(false);
+  const last = g.game.current.move;
+  if (last) announce(moveText({ color: last.color, x: last.x, y: last.y, pass: last.pass, size: g.game.size }));
+  if (g.game.phase === "scoring" && !g.scoring) startScoring();
+  persistCurrent();
+  update();
+  maybeComputerMove();
+  ponder();
+}
+
+/** The player has passed before in this game (both sides in a game between two people). */
+function passedBefore(g) {
+  return g.game.path.some((n) => n.move?.pass && (g.opponent === "human" || n.move.color === g.humanColor));
+}
+
+/**
+ * Pass. The first pass of a game is confirmed in the panel (g.passAsk
+ * "first"), and so is a pass that answers a pass, which ends the game and
+ * starts the count ("ends"); asking again while it waits confirms it. Any
+ * other pass is played at once: the status line says so, and Undo takes
+ * it back.
+ */
 export function requestPass() {
   const g = state.game;
   if (!g || g.thinking || g.pending || g.game.phase !== "playing" || gameOver(g)) return;
   if (g.opponent === "ai" && g.game.turn !== g.humanColor) return;
-  confirmAction({
-    title: t("play.passConfirm"),
-    body: t("play.passBody"),
-    confirm: t("common.pass"),
-    onConfirm: () => {
-      const color = g.game.turn;
-      g.game.pass();
-      g.clock = moveMade(g.clock, color);
-      Audio.pass();
-      announce(moveText({ color, pass: true }));
-      afterMove({ human: true });
-    },
-  });
+  if (g.passAsk) return passNow();
+  const ends = !!g.game.current.move?.pass;
+  if (!ends && passedBefore(g)) return passNow();
+  g.passAsk = ends ? "ends" : "first";
+  g.ghost = null;
+  announce(passAskText(g));
+  update();
+}
+
+/** What the inline confirmation asks. */
+export function passAskText(g = state.game) {
+  if (g?.passAsk !== "ends") return t("play.passAsk");
+  return g.opponent === "ai" ? t("play.passAskEndsAi") : t("play.passAskEnds", [colorName(-g.game.turn)]);
+}
+
+/** The pass, confirmed or needing no confirmation. */
+export function passNow() {
+  const g = state.game;
+  if (!g || g.thinking || g.pending || g.game.phase !== "playing" || gameOver(g)) return;
+  if (g.opponent === "ai" && g.game.turn !== g.humanColor) return;
+  g.passAsk = null;
+  g.redo = [];
+  const color = g.game.turn;
+  g.game.pass();
+  g.clock = moveMade(g.clock, color);
+  Audio.pass();
+  announce(moveText({ color, pass: true }));
+  afterMove({ human: true });
+}
+
+/** Not passing after all (Cancel, Esc, a move on the board). */
+export function cancelPass() {
+  const g = state.game;
+  if (!g?.passAsk) return false;
+  g.passAsk = null;
+  update();
+  return true;
 }
 
 /** "The game looks finished — count?" accepted: both sides pass. */
@@ -692,6 +806,8 @@ export function acceptCount() {
   const g = state.game;
   if (!g || g.game.phase !== "playing" || gameOver(g)) return;
   g.proposal = false;
+  g.passAsk = null;
+  g.redo = [];
   Engine.cancel();
   g.gen++;
   g.thinking = false;
@@ -748,6 +864,7 @@ export async function askHint() {
   if (state.game !== g || gen !== g.gen) return;
   g.thinking = false;
   if (g.game.current !== node) return update();
+  noteAssisted(g);
   g.hints++;
   if (h && !h.pass) {
     g.hint = { x: h.x, y: h.y, reason: hintReason(node.board.signMap, g.game.turn, h) };
@@ -859,25 +976,18 @@ function finishGame() {
   saveToLibrary({ quiet: true });
   // Rating: games against the computer with enough moves to mean something
   // (model/player.js recordGame rates a game once, by its measured opponent).
-  if (g.opponent === "ai" && g.rated && won !== null && g.game.moveNumber >= 12) {
+  g.redo = [];
+  g.passAsk = null;
+  if (g.opponent === "ai" && g.rated && g.game.moveNumber >= 12) {
     const handicap = g.humanColor === BLACK ? g.game.handicap : -g.game.handicap;
     // Against the implementation that played, by its measured strength
     // (the offline engine counts as the standard level of the rank).
     const impl = g.played || Engine.resolveOpponent({ rank: g.rank, impl: g.impl }, {}).id;
     const size = g.game.size;
-    const now = Date.now();
-    const before = estimate(state.profile, { size, now });
-    const id = g.recordId || String(now);
-    changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent: implOpponent(impl, { size, handicap }), undos: g.undos, hints: g.hints }));
-    const rec = state.profile.games.find((x) => x.id === id);
-    g.rated = false;
-    g.trendId = id;
-    if (rec?.rating) {
-      const after = estimate(state.profile, { size, now });
-      g.ratingDelta = rec.rating.delta;
-      // The estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
-      g.ratingChange = ratingChange(before, after);
-    }
+    const opponent = implOpponent(impl, { size, handicap });
+    // What "Count again" needs to replace this game's rating step (model/rerate.js).
+    if (g.recordId) Games.patchGame(g.recordId, { rateBase: { ...rateBase(state.profile, size), opponent, handicap, eligible: true } });
+    if (won !== null) rate(g, { won, result, size, handicap, opponent });
   }
   if (g.ratingChange && g.recordId) Games.patchGame(g.recordId, { rating: g.ratingChange });
   announce(resultText(result));
@@ -885,6 +995,36 @@ function finishGame() {
   // is the game's one analysis (stored with it, play/analysis.js). Away
   // from the board (the computer resigned meanwhile), when it is back.
   showFinished();
+}
+
+/** Rate the finished game (once; a game with undos or hints is recorded unrated). */
+function rate(g, { won, result, size, handicap, opponent }) {
+  const now = Date.now();
+  const before = estimate(state.profile, { size, now });
+  const id = g.recordId || String(now);
+  changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent, undos: g.undos, hints: g.hints }));
+  const rec = state.profile.games.find((x) => x.id === id);
+  g.rated = false;
+  g.trendId = id;
+  if (rec?.rating) {
+    const after = estimate(state.profile, { size, now });
+    g.ratingDelta = rec.rating.delta;
+    // The estimate before and after, for the report ("≈ 12 kyu → ≈ 11 kyu (±1)").
+    g.ratingChange = ratingChange(before, after);
+  }
+}
+
+/**
+ * Why a game against the computer was not rated, in a phrase ("Not rated:
+ * you took back moves"), or "" when it has no undo and no hint. Takes the
+ * game on the board or a Library record ({ opponent, undos, hints }).
+ */
+export function unratedReason(g) {
+  if (!g || g.opponent !== "ai") return "";
+  const undos = g.undos > 0;
+  const hints = g.hints > 0;
+  if (!undos && !hints) return "";
+  return t(undos && hints ? "play.unrated.both" : undos ? "play.unrated.undos" : "play.unrated.hints");
 }
 
 /** The finished game on the board as its review: the result, the balance, the key moments. */
@@ -915,6 +1055,14 @@ export function showFinished() {
 export function ratingChange(before, after) {
   if (!before || !after) return null;
   return { before: { r: before.r, rank: before.rank, pm: before.pm }, after: { r: after.r, rank: after.rank, pm: after.pm } };
+}
+
+/** unratedReason for the game a review is of (the game on the board, or its Library record). */
+export function reviewUnrated(r = state.review) {
+  if (!r || r.meta.classic) return "";
+  if (r.source === "current" && state.game?.game === r.game) return unratedReason(state.game);
+  const id = recordIdOf(r);
+  return unratedReason(id ? Games.getGame(id) : null);
 }
 
 export function resultHeadline(g) {

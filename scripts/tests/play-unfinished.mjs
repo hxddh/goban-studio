@@ -70,8 +70,9 @@ await test("play unfinished: opening it continues it on the same record; the gam
   const parked = Play.parkCurrent();
   assert.ok(parked && parked.rated === true && parked.clock?.kind === "move30", "what it takes to continue is saved with it");
   Play.newGame({ size: 9, opponent: "human" });
-  // Another game in progress, then the unfinished one is opened.
+  // Another game in progress (two moves: worth keeping), then the unfinished one is opened.
   state.game.game.play(1, 1);
+  state.game.game.play(7, 7);
   await Play.resumeRecord(parked.id);
   const g = state.game;
   assert.equal(g.recordId, parked.id);

@@ -12,7 +12,8 @@ import { t, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { storyText } from "./story.js";
-import { Board, Button, Icon, IconButton, Segmented, Stone, Thumb } from "./parts.jsx";
+import { Board, Button, Icon, IconButton, MoreMenu, Segmented, Stone, Thumb, MOD, SHIFT } from "./parts.jsx";
+import { ScoreCard } from "./score-card.jsx";
 import { BLUNDER, MISTAKE } from "./summary.js";
 import { accuracyText, lossText, momentWords, ratingChangeText, reviewFacts, reviewHeadline } from "../play/review-image.js";
 import { Toolbar } from "./chrome.jsx";
@@ -61,6 +62,9 @@ export function ReviewView() {
       varMoves = varMoves.filter((m, i) => lastAt.get(m.x + "," + m.y) === i && !steps.slice(m.n).some((st) => (st.captured || []).some((p) => p.x === m.x && p.y === m.y)));
     }
   }
+  const rc = r.recount;
+  // Counting again: the final position with the count on it, and nothing else.
+  if (rc) marks.length = 0;
   const tr = r.trial;
   if (tr) {
     // Trying a moment again: the position before it, the move tried, and
@@ -72,16 +76,16 @@ export function ReviewView() {
   const model = {
     size: game.size,
     board,
-    lastMove: tr ? null : node.move,
+    lastMove: tr || rc ? null : node.move,
     marks,
-    ownership: tr ? null : C.reviewOwnershipMap(),
-    territory: null,
-    deadStones: [],
-    variation: varMoves,
-    moveNumbers: r.variation || tr ? null : moveNumbers(game),
+    ownership: tr || rc ? null : C.reviewOwnershipMap(),
+    territory: rc ? rc.score.territory : null,
+    deadStones: rc ? rc.dead : [],
+    variation: rc ? null : varMoves,
+    moveNumbers: r.variation || tr || rc ? null : moveNumbers(game),
     showCoords: s.settings.coords,
     view: null,
-    hoverColor: tr ? tr.color : game.turn,
+    hoverColor: rc ? null : tr ? tr.color : game.turn,
     interactive: !tr || tr.status === "open",
   };
   const h = reviewHeading(r);
@@ -95,7 +99,7 @@ export function ReviewView() {
           <Board model={model} onPlay={C.reviewPlay} />
           <ReviewNav />
         </section>
-        <ReviewPanel />
+        {r.meta.free ? <FreeBoardPanel /> : <ReviewPanel />}
       </div>
     </>
   );
@@ -112,7 +116,26 @@ function reviewHeading(r) {
     title = C.tx(meta.classic.title);
     sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${classicYear(meta.classic.date)}`;
   } else if (meta.name) title = meta.name;
+  else if (meta.free) title = t("board.free");
   return { crumbs, title, sub };
+}
+
+/**
+ * An icon-only tool of the toolbar. It has a name for assistive technology,
+ * and the same name appears under it on hover and on keyboard focus (a
+ * `title` alone shows late, and never for the keyboard).
+ */
+function Tool({ icon, label, onClick, active, disabled }) {
+  return (
+    <span class="tool">
+      <button type="button" class={`icon-btn ${active ? "on" : ""}`} aria-label={label} aria-pressed={active === undefined ? undefined : !!active} disabled={disabled} onClick={onClick}>
+        <Icon name={icon} size={18} />
+      </button>
+      <span class="tool-tip" aria-hidden="true">
+        {label}
+      </span>
+    </span>
+  );
 }
 
 /** Review tools live in the toolbar; Esc or × goes back. */
@@ -121,12 +144,12 @@ function ReviewTools() {
   const meta = r.meta;
   return (
     <div class="tool-group">
-      {state.engine.available && <IconButton icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis} onClick={C.toggleLive} />}
-      <IconButton icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
-      {!meta.classic && <IconButton icon="upload" label={t("report.exportImage")} onClick={C.exportReviewImage} disabled={r.analyzing || !r.model || r.model.confidence === "none"} />}
-      <IconButton icon="download" label={t("common.exportSgf")} onClick={() => C.exportSGF(r.game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
+      {state.engine.available && <Tool icon="sparkle" label={t("review.liveToggle")} active={state.settings.liveAnalysis} onClick={C.toggleLive} />}
+      <Tool icon="eye" label={t("review.ownership")} active={r.ownership} onClick={C.toggleOwnership} />
+      {!meta.classic && !meta.free && <Tool icon="image" label={t("report.exportImage")} onClick={C.exportReviewImage} disabled={r.analyzing || !r.model || r.model.confidence === "none"} />}
+      <Tool icon="share" label={t("common.exportSgf")} onClick={() => C.exportSGF(r.game, meta.name || (meta.classic ? meta.classic.id : "goban-studio"))} />
       <span class="tool-sep" />
-      <IconButton icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
+      <Tool icon="close" label={`${t("review.close")} (Esc)`} onClick={C.closeReview} />
     </div>
   );
 }
@@ -364,8 +387,9 @@ function LiveLine() {
 
 function Variations() {
   const r = state.review;
-  const inVar = !C.onMainLine();
-  const branches = C.branchPoints();
+  // A line being tried has its own bar (DraftBar); it is not a variation of the record yet.
+  const inVar = !C.onMainLine() && !r.draft;
+  const branches = C.branchPoints().filter((b) => !(r.draft && b.node === r.draft.from && b.count === 1));
   if (!inVar && !branches.length) return null;
   return (
     <section class="variations">
@@ -423,12 +447,134 @@ function ResultLine() {
   const m = r.model;
   const headline = m ? reviewHeadline(m) : C.resultText(result);
   const rating = ratingChangeText(C.reviewRating());
+  const unrated = rating ? "" : C.reviewUnrated(r);
   return (
     <header class="review-result" aria-live="polite">
-      <h2 class="result-big">{headline}</h2>
+      <div class="result-head">
+        <h2 class="result-big">{headline}</h2>
+        {C.canRecount(r) && !r.recount && <MoreMenu id="review-result" label={t("review.resultMore")} items={[{ icon: "replay", label: t("recount.again"), onClick: C.startRecount }]} />}
+      </div>
       {m && <span class="fine">{reviewFacts(m)}</span>}
       {rating && <span class="fine review-rating">{rating}</span>}
+      {unrated && <span class="fine unrated-note">{unrated}</span>}
     </header>
+  );
+}
+
+/** A line being tried on the board: say so, and offer to keep it or drop it. */
+function DraftBar() {
+  // From the last move of a game still in play a line can be tried, not kept: the game goes on from there.
+  const keepable = C.draftKeepable();
+  return (
+    <div class="var-bar draft-bar enter-up" role="group" aria-label={t("review.draft")}>
+      <Icon name="branch" size={15} />
+      <span>{t(keepable ? "review.draft" : "review.draftLive")}</span>
+      {keepable && (
+        <button type="button" class="link" onClick={C.keepDraft}>
+          {t("review.draftKeep")}
+        </button>
+      )}
+      <button type="button" class="link" onClick={C.discardDraft}>
+        {t("review.draftDiscard")}
+      </button>
+    </div>
+  );
+}
+
+/** The finished game counted again: the same card as the count, over the final position. */
+function RecountCard() {
+  const r = state.review;
+  return <ScoreCard sc={r.recount} komi={r.game.komi} title={t("recount.title")} confirm={t("recount.confirm")} cancel={t("common.cancel")} onConfirm={C.confirmRecount} onCancel={C.cancelRecount} />;
+}
+
+/** What the foot of the panel offers: one primary, by what the review is of. */
+function ReviewFoot() {
+  const r = state.review;
+  const line = r.game.mainLine();
+  const mine = r.source === "current" && state.game?.game === r.game;
+  // The game that just ended: the next game is the one primary action.
+  if (mine && line[line.length - 1].result) {
+    return (
+      <div class="actions">
+        <Button kind="primary" icon="plus" class="block" onClick={() => C.openNewGame()}>
+          {t("common.newGame")}
+        </Button>
+        <Button kind="ghost" icon="resume" onClick={C.playFromHere}>
+          {t("review.playFromHere")}
+        </Button>
+      </div>
+    );
+  }
+  // "Review so far" of the game in play: the way back to it.
+  if (mine) {
+    return (
+      <div class="actions">
+        <Button kind="primary" icon="back" class="block back-to-game" onClick={C.closeReview}>
+          {t("review.backToGame")}
+        </Button>
+        <Button kind="ghost" onClick={C.playFromHere}>
+          {t("review.playFromHere")}
+        </Button>
+      </div>
+    );
+  }
+  // A game left unfinished, looked at: continuing it is the primary.
+  if (C.reviewUnfinished(r)) {
+    return (
+      <div class="actions">
+        <Button kind="primary" icon="resume" class="block continue-game" onClick={() => C.resumeRecord(r.meta.recordId)}>
+          {t("library.continue")}
+        </Button>
+        <Button kind="ghost" onClick={C.playFromHere}>
+          {t("review.playFromHere")}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
+      {t("review.playFromHere")}
+    </Button>
+  );
+}
+
+/**
+ * The free board's panel: what it is, its size while it is empty, the
+ * position's estimate, notes and the tree, and Save to Library (then Play
+ * from here) as the one primary.
+ */
+function FreeBoardPanel() {
+  const r = state.review;
+  const saved = !!r.meta.recordId;
+  const empty = C.freeBoardEmpty(r);
+  return (
+    <aside class="panel review-panel free-panel" aria-label={t("board.free")}>
+      <header class="review-result">
+        <h2 class="result-big">{t("board.free")}</h2>
+        <span class="fine">{t("board.freeHelp")}</span>
+      </header>
+      {empty && <Segmented class="free-size" label={t("board.size")} value={r.game.size} options={[9, 13, 19].map((n) => ({ value: n, label: `${n} × ${n}` }))} onChange={C.setFreeBoardSize} />}
+      <LiveLine />
+      <Variations />
+      <EditSection />
+      <TreeView />
+      <div class="panel-foot">
+        {saved ? (
+          <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
+            {t("review.playFromHere")}
+          </Button>
+        ) : (
+          <div class="actions">
+            <Button kind="primary" icon="save" class="block save-board" onClick={C.saveFreeBoard} disabled={empty}>
+              {t("board.save")}
+            </Button>
+            <Button kind="ghost" icon="resume" onClick={C.playFromHere} disabled={empty}>
+              {t("review.playFromHere")}
+            </Button>
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }
 
@@ -586,8 +732,6 @@ function ReviewPanel() {
     reviewTab = v;
     update();
   };
-  // The game that just ended: the next game is the one primary action.
-  const ended = r.source === "current" && !!line[line.length - 1].result;
   return (
     <aside class="panel review-panel" aria-label={t("review.title")}>
       <ResultLine />
@@ -600,7 +744,10 @@ function ReviewPanel() {
         )}
         <BookExitNote game={r.game} onGoto={C.reviewGoto} inline />
       </p>
-      {r.trial ? (
+      {r.draft && <DraftBar />}
+      {r.recount ? (
+        <RecountCard />
+      ) : r.trial ? (
         <TryCard />
       ) : (
         <>
@@ -630,22 +777,11 @@ function ReviewPanel() {
         </>
       )}
 
-      <div class="panel-foot">
-        {ended ? (
-          <div class="actions">
-            <Button kind="primary" icon="plus" class="block" onClick={() => C.openNewGame()}>
-              {t("common.newGame")}
-            </Button>
-            <Button kind="ghost" icon="resume" onClick={C.playFromHere}>
-              {t("review.playFromHere")}
-            </Button>
-          </div>
-        ) : (
-          <Button kind="primary" icon="resume" class="block" onClick={C.playFromHere}>
-            {t("review.playFromHere")}
-          </Button>
-        )}
-      </div>
+      {!r.recount && (
+        <div class="panel-foot">
+          <ReviewFoot />
+        </div>
+      )}
     </aside>
   );
 }
@@ -780,7 +916,13 @@ function EditSection() {
   const glyph = { triangle: "△", square: "□", circle: "○", cross: "×", label: "A" };
   return (
     <section class="edit-section">
-      <h2 class="slot-title">{t("edit.comment")}</h2>
+      <div class="edit-head">
+        <h2 class="slot-title">{t("edit.comment")}</h2>
+        <span class="edit-history">
+          <IconButton icon="undo" size={16} label={`${t("edit.undo")} (${MOD}Z)`} onClick={C.reviewUndo} disabled={!C.canUndoEdit(r)} />
+          <IconButton icon="redo" size={16} label={`${t("edit.redo")} (${SHIFT}${MOD}Z)`} onClick={C.reviewRedo} disabled={!C.canRedoEdit(r)} />
+        </span>
+      </div>
       <textarea
         class="comment-box"
         aria-label={t("edit.comment")}
@@ -789,6 +931,7 @@ function EditSection() {
         placeholder={t("edit.commentPlaceholder")}
         value={node.comment || ""}
         onInput={(e) => C.setComment(e.currentTarget.value)}
+        onBlur={C.commitComment}
       />
       <div class="mark-tools" role="toolbar" aria-label={t("edit.marks")}>
         {kinds.map((k) => (
@@ -802,7 +945,7 @@ function EditSection() {
           </button>
         )}
       </div>
-      {r.edits?.target === null && <p class="fine">{t("edit.notSaved")}</p>}
+      {r.edits?.target === null && !r.meta.free && <p class="fine">{t("edit.notSaved")}</p>}
     </section>
   );
 }

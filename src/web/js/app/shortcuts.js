@@ -19,6 +19,7 @@ export const SHORTCUTS = [
   { command: "game.save", key: "s", label: "play.save", when: "idle" },
   { command: "file.export", key: "e", shift: true, label: "common.exportSgf", when: "idle" },
   { command: "game.undo", key: "z", label: "common.undo", when: "idle" },
+  { command: "game.redo", key: "z", shift: true, label: "common.redo", when: "idle" },
   { command: "game.pass", key: "p", shift: true, label: "common.pass", when: "idle" },
   { command: "game.hint", key: "h", shift: true, label: "common.hint", when: "idle" },
   { command: "game.review", key: "r", shift: true, label: "play.reviewSoFar", when: "idle" },
