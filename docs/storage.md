@@ -6,6 +6,53 @@ code is `src/web/js/data/` (store, games, settings, backup, migrate, pack)
 over the host's `studio.store*` commands (`src/store.zig`). This page
 replaces the "Storage" and "Backups" parts of `docs/v9.md`.
 
+## Where it is
+
+`<app data>` is the app's own folder under the user's application data
+(`src/paths.zig`; the Native SDK's data directory for the bundle id
+`dev.hxddh.gobanstudio`):
+
+| | `<app data>` |
+| --- | --- |
+| macOS | `~/Library/Application Support/dev.hxddh.gobanstudio` |
+| Windows | `%LOCALAPPDATA%\dev.hxddh.gobanstudio\Data` (usually `C:\Users\<you>\AppData\Local\dev.hxddh.gobanstudio\Data`) |
+
+Inside it, `data/` holds everything on this page and `models/` the
+optional KataGo networks (`src/models.zig`). Nothing is kept inside the
+installed app: replacing the app (an in-app update, or a newer download
+unpacked over it) keeps the data, and deleting the app leaves it behind.
+To remove it, delete `~/Library/Application Support/dev.hxddh.gobanstudio`
+on macOS, or `%LOCALAPPDATA%\dev.hxddh.gobanstudio` on Windows (that
+folder also holds the window's remembered size, under `State`).
+
+On Windows the folder `bin\goban-studio.exe.WebView2` inside the app
+folder is the WebView2 component's own profile (its cache). Since v9 it
+holds none of the player's data; the update helper still carries it over
+to the new version so the web view does not start cold.
+
+`studio.revealDataDir` opens `<app data>/data` in Finder or Explorer
+(`host.js revealDataDir()`); the page never names the path.
+
+`GOBAN_DATA_DIR` and `GOBAN_MODELS_DIR` (absolute paths) replace the two
+folders, for tests and development.
+
+## One instance
+
+The first process takes an exclusive lock on `<app data>/data/instance.lock`
+and keeps it until it exits (`src/instance.zig`); the operating system
+releases it however the process ends. A second launch does not open the
+store. It writes a request — the `.sgf` files it was started with, one
+absolute path per line, or nothing — into `<app data>/data/inbox/`, which
+the running app looks at every 400 ms: it deletes the request, brings its
+window forward and opens the file. The second process exits as soon as its
+request is gone. If instead the lock comes free (the first process was
+just quitting), the second one carries on as the only instance; if neither
+happens within four seconds it exits. Neither name is a valid store key,
+so the store never lists them.
+
+A launch while the update helper is replacing the app exits at once
+(`src/install.zig ownUpdateInProgress`).
+
 ## Files
 
 Desktop: files under `<app data>/data`. Browser preview: `localStorage`
@@ -168,7 +215,11 @@ a fresh install. The store refuses that fallback too.
 ## Exports
 
 In the app, SGF, image and backup exports go through the native save
-dialog and `studio.writeTextFile`. If the write fails, or the host has no
+dialog and `studio.writeTextFile`. When the player types a name without
+the extension, the host adds it; the dialog only asked about the name as
+typed, so if a file of the completed name exists the export goes to the
+next free name (`game (2).sgf`) instead of replacing it
+(`src/files.zig freeSavePath`). If the write fails, or the host has no
 save dialog, the app shows an error; it does not fall back to a download
 link, which a WebView silently ignores. The download link is the browser
 preview's only.

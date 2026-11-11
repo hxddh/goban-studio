@@ -209,32 +209,61 @@ read them: *signing mode* (which checks that all five exist), *import
 Developer ID certificate*, and the two notarization steps (the Apple ID
 trio). Signing with the imported identity needs no secret. In
 `build-windows.yml` the two Windows secrets reach only *signing mode* and
-the Authenticode step. The build jobs run with a read-only `GITHUB_TOKEN`;
-a manual run with `release_tag` uploads from a separate `upload` job that
-has write access and no secrets. `release.yml` grants `contents: write` to
-the publish job (and to the calls of the two build workflows, only so their
-`upload` job may exist; the build jobs stay read-only).
-`scripts/tests/shell-ci.mjs` fails if any of this changes.
+the Authenticode step. The build workflows run with a read-only
+`GITHUB_TOKEN` and have no job that writes to a release: a package reaches
+a release only through `release.yml`, which checksums and signs all of them
+together. (Earlier versions had an `upload` job that could replace one
+platform's file in a published release from any branch; `SHA256SUMS` was
+not recomputed, so every installed app then refused that file. It is
+gone.) In `release.yml` only the `publish` job has `contents: write`, and
+only the `sign` job holds the update key. `scripts/tests/shell-ci.mjs`
+fails if any of this changes.
 
 **Update signing.**
 
 | Name | Kind | What it is |
 | --- | --- | --- |
-| `UPDATE_SIGNING_KEY` | repository **secret** | The private key `scripts/sign-sums.mjs` signs `SHA256SUMS` with |
+| `UPDATE_SIGNING_KEY` | **environment secret** of the environment `release-signing` (Settings → Environments) | The private key `scripts/sign-sums.mjs` signs `SHA256SUMS` with |
 | `UPDATE_PUBKEY` | repository **variable** (Settings → Secrets and variables → Actions → Variables) | The matching public key; not secret |
+
+**The `release-signing` environment — one-time setup by the owner.** The
+key is what protects users from someone who can push a branch and start a
+workflow, so it must not be readable by every workflow run:
+
+1. Settings → Environments → New environment → `release-signing`.
+2. *Deployment branches and tags*: selected branches → `main` only.
+3. *Required reviewers*: at least one person (yourself is fine; tick
+   "Prevent self-review" only if someone else can approve).
+4. Add `UPDATE_SIGNING_KEY` as a secret **of this environment**.
+5. Delete the repository-level secret `UPDATE_SIGNING_KEY` (Settings →
+   Secrets and variables → Actions). Until you do, any workflow on any
+   branch can still read it, and the environment protects nothing.
+
+`release.yml` signs in a job of its own, `sign`, which declares
+`environment: release-signing`: the run waits for the reviewer's approval,
+and only then does the secret exist for that one job. The job never runs
+in a rehearsal (`rehearse=true`), checks out nothing but
+`scripts/sign-sums.mjs`, has a read-only token, and signs exactly the
+`SHA256SUMS` the `assemble` job produced. The environment is created
+without any rule the first time the workflow runs if it does not exist
+yet, so steps 2–5 are what make it a protection.
 
 - Both platform builds pass `-Dupdate-pubkey="$UPDATE_PUBKEY"` to
   `native test` and `native build` (an empty value when the variable is not
   set, which builds an app that does not require a signature).
-- The publish job writes `SHA256SUMS`, then, if `UPDATE_SIGNING_KEY` is
-  set, runs `node scripts/sign-sums.mjs` (the key is in that step's
-  environment only), checks that `SHA256SUMS.sig` was written, and uploads
-  it with the packages.
-- If `UPDATE_PUBKEY` is set but `UPDATE_SIGNING_KEY` is not, the release
-  fails — in the preflight, before any build, and again before publishing —
-  because those apps would refuse every update from that release. The
-  preflight sees only whether the secret exists
-  (`secrets.UPDATE_SIGNING_KEY != ''`), never its value.
+- The `assemble` job writes `SHA256SUMS` (the five packages, and one more
+  line that names the release: see "The signature names the version"
+  below). The `sign` job then, if `UPDATE_SIGNING_KEY` is set, runs
+  `node scripts/sign-sums.mjs` (the key is in that step's environment
+  only) and checks that `SHA256SUMS.sig` was written; the `publish` job
+  checks every package against `SHA256SUMS` once more and uploads
+  everything to a draft release, which it then publishes.
+- If `UPDATE_PUBKEY` is set but `UPDATE_SIGNING_KEY` is not, the `sign` job
+  fails and nothing is published, because those apps would refuse every
+  update from that release. (The preflight cannot check this any more: an
+  environment's secret is invisible outside the environment. Put the
+  secret in place and re-run the failed job; the packages are kept as
+  artifacts.)
 - Neither set: the release ships an unsigned `SHA256SUMS`, as before, with
   a notice in the run.
 
@@ -286,12 +315,35 @@ then clear the terminal. Never commit either; no key is in this repository.
   `-Dupdate-pubkey="${{ vars.UPDATE_PUBKEY }}"` to the native build. Empty
   (the variable is not set) means an unsigned-updates build, exactly as
   before v13.
-- `release.yml`, right after it writes `SHA256SUMS`, runs
-  `node scripts/sign-sums.mjs SHA256SUMS` with `UPDATE_SIGNING_KEY` (and
-  `UPDATE_PUBKEY`, so a key that does not match the shipped public key fails
-  the release instead of publishing updates nobody can install) in that
-  step's environment only, and publishes `SHA256SUMS.sig` next to
-  `SHA256SUMS`.
+- `release.yml`, in its `sign` job (the `release-signing` environment,
+  never in a rehearsal), runs `node scripts/sign-sums.mjs SHA256SUMS` with
+  `UPDATE_SIGNING_KEY` (and `UPDATE_PUBKEY`, so a key that does not match
+  the shipped public key fails the release instead of publishing updates
+  nobody can install) in that step's environment only, and publishes
+  `SHA256SUMS.sig` next to `SHA256SUMS`.
+
+**The signature names the version.** A signature over five package hashes
+says "these packages are ours", not "these packages are version X".
+Whoever controls a release could attach an old release's packages, sums
+and signature to a new tag, and every app would install the old version
+as an update (a downgrade to a known bug), or be kept from ever seeing a
+newer one. So `SHA256SUMS` has a sixth line:
+
+```
+<sha256 of "v14.0.0\n">  VERSION
+```
+
+`VERSION` is a small release file holding the tag and a newline, so
+`sha256sum -c SHA256SUMS` still works for people who check by hand
+(`--ignore-missing` if you did not download every file). The app does not
+download it: it computes the hash of the tag it is installing and compares
+(`src/install.zig` `sumsBinding`). A build with an update key refuses sums
+without the line (`NoVersion`) or with another version's
+(`VersionMismatch`). After unpacking, the package must also say itself
+that it is that version — `build-info.json` in both packages and
+`CFBundleShortVersionString` on macOS — so the right sums with an old
+package fail too. Apps older than this check skip the unknown line, as
+they skip the `.dmg` lines, and keep updating.
 
 **What the app does** (`src/install.zig`). Built with a key, it downloads
 `SHA256SUMS`, then `SHA256SUMS.sig` (one line: the base64 of the 64-byte
@@ -334,6 +386,39 @@ import("./scripts/sign-sums.mjs").then(({ publicKeyFrom, verifySums }) =>
 - **The app quits only for a helper that runs.** The embedded helper takes
   an exclusive lock for the installation (`.<name>.goban-lock` beside it; a
   second helper refuses) and then creates a "started" marker in the staging
-  directory. The app waits up to 5 s for it; otherwise it claims the marker
-  itself (a late helper then gives up), stays open and reports
-  `HelperNotStarted`.
+  directory. The app waits up to 25 s for it (a cold Windows PowerShell
+  under a virus scan is slow to run its first line; the page says
+  "installing" meanwhile); otherwise it claims the marker itself (a late
+  helper then gives up), stays open and reports `HelperNotStarted`.
+- **A launch during the swap does nothing.** While a helper holds the
+  installation's lock, starting the app again exits at once, so no second
+  process opens files in the folder being replaced. A lock older than
+  twenty minutes is taken for abandoned and ignored.
+
+## The Native SDK is pinned
+
+The shell is built with `@native-sdk/cli`, and what it produces is the
+executable users run. It is a devDependency at one exact version, and
+`package-lock.json` holds the SHA-512 of the package and of each
+per-platform package that carries the `native` binary. The workflows
+install it with `npm ci --ignore-scripts` like everything else; nothing is
+installed with `npm install -g`, and no workflow takes an SDK version as
+an input any more.
+
+The SDK's install script (which `--ignore-scripts` skips) downloads the
+SDK's own compiler toolchain. The platform builds run it explicitly
+(`node scripts/native-sdk.mjs toolchain`). It checks every download
+against a SHA-256 or SHA-512 in a manifest inside the package
+(`packages/core/scripts/scriptc-toolchain.json`); that manifest is covered
+by the lockfile, and its SHA-256 is pinned again in
+`scripts/native-sdk.mjs`, so a changed toolchain cannot arrive unnoticed.
+
+To move to a new SDK version: `npm install --save-dev --save-exact
+--ignore-scripts @native-sdk/cli@<version>`, update the manifest hash in
+`scripts/native-sdk.mjs` (the script prints the new one), check
+`scripts/patch-sdk.mjs` still applies, and let the pull request's
+`native-hosts` job compile it on macOS and Windows.
+
+Still not pinned: Zig itself (the setup action verifies it against Zig's
+signing key), the runner images, and the Homebrew packages (cmake, ninja,
+eigen) KataGo for macOS is built with.
