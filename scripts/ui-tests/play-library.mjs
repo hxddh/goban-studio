@@ -135,7 +135,8 @@ export default async function ({ check, assert, fresh, clickPoint, origin }) {
     const items = page.locator(".filters .menu [role=menuitemradio]");
     assert((await items.allTextContents()).map((s) => s.trim()).join("|") === "Newest first|Oldest first|By result", (await items.allTextContents()).join("|"));
     assert((await items.evaluateAll((els) => els.map((el) => el.getAttribute("aria-checked")))).join() === "true,false,false", "the order in force is checked");
-    assert(await page.evaluate(() => document.activeElement?.getAttribute("role") === "menuitemradio"), "the menu takes the focus");
+    // The focus moves in the menu's effect, a moment after its items are drawn.
+    await page.waitForFunction(() => document.activeElement?.getAttribute("role") === "menuitemradio", null, { timeout: 3000 }).catch(() => assert(false, "the menu takes the focus"));
     await page.keyboard.press("Escape");
     await page.waitForSelector(".filters .menu", { state: "detached" });
     assert(await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup") === "menu"), "Esc gives the focus back to the button");
