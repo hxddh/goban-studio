@@ -37,6 +37,11 @@ export function setLang(id) {
   return current;
 }
 
+/** The language in use ("zh" | "en" | "ko" | "ja"). */
+export function currentLang() {
+  return current;
+}
+
 export function available() {
   return LANG_IDS.map((id) => ({ id, name: LANG_NAMES[id] }));
 }

@@ -29,6 +29,29 @@ export const SHELL = {
   ),
   "store.readFailed": m("有些保存的数据无法读取。", "Some saved data couldn't be read.", "저장된 데이터 일부를 읽을 수 없습니다.", "保存したデータの一部を読み込めませんでした。"),
 
+  // SGF import (sgf.js): what the file as a whole needs said.
+  // {0} is the number of games in the file.
+  "sgf.warn.collection": m(
+    "这个文件里有 {0} 局棋，只导入了第 1 局。",
+    "This file holds {0} games; only the first was imported.",
+    "이 파일에는 대국이 {0}개 있습니다. 첫 번째 대국만 가져왔습니다.",
+    "このファイルには {0} 局あります。最初の1局だけを読み込みました。",
+  ),
+  // {0} is the charset's name (GBK, Big5, Shift_JIS, EUC-JP, EUC-KR).
+  "sgf.warn.guessedCharset": m(
+    "棋谱没有写明文字编码，已按 {0} 读取。如果名字是乱码，请先把文件另存为 UTF-8。",
+    "The record doesn't name its text encoding; it was read as {0}. If names look wrong, re-save the file as UTF-8 first.",
+    "기보에 문자 인코딩이 적혀 있지 않아 {0}(으)로 읽었습니다. 이름이 깨져 보이면 파일을 UTF-8로 다시 저장해 주세요.",
+    "棋譜に文字コードの指定がないため、{0} として読み込みました。名前が文字化けしている場合は、ファイルを UTF-8 で保存し直してください。",
+  ),
+  // {0} is KM as written in the record, {1} the komi used instead.
+  "sgf.warn.komi": m(
+    "棋谱里的贴目“{0}”无法识别，已按 {1} 目处理。",
+    "The record's komi \"{0}\" can't be read; {1} was used instead.",
+    "기보의 덤 \"{0}\"을(를) 알 수 없어 {1}집으로 처리했습니다.",
+    "棋譜のコミ「{0}」を読み取れないため、{1} 目として読み込みました。",
+  ),
+
   // Backups (data/backup.js): every stored file in one document.
   "backup.help": m(
     "把设置、棋力、学习记录、错题和全部对局存成一个文件；换电脑时用它恢复。",

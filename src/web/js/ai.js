@@ -9,6 +9,13 @@
  * a candidate that would repeat an earlier position is never chosen, so the
  * computer neither plays an illegal move nor passes because of one.
  *
+ * Knowing when to stop. The engine never plays a move that only costs it
+ * points (see `pointless`): into its own eye or its own sealed territory,
+ * into self-atari, or a lone stone into a small sealed area of the
+ * opponent's. When nothing else is left it passes, so a finished game ends
+ * as soon as the opponent passes instead of after the engine has filled in
+ * its own territory.
+ *
  * The search is time-sliced with setTimeout, so the board keeps painting while
  * the computer thinks. There is no worker: zero:// only loads the one classic
  * bundle, and a main-thread search with a deadline is enough for this scope.
@@ -44,6 +51,76 @@ function isEye(board, x, y, color) {
     if (!board.has([nx, ny]) || board.get([nx, ny]) === color) safeDiag++;
   }
   return safeDiag >= 3;
+}
+
+const AROUND = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+/**
+ * The empty regions of the board: for every empty point, the region it
+ * belongs to as { owner, size }. `owner` is the colour whose stones alone
+ * seal the region (rules.js territoryMap, so the open board around a few
+ * stones belongs to nobody), 0 for a region both colours touch.
+ */
+function emptyRegions(board, size) {
+  const owners = territoryMap(board);
+  const out = Array.from({ length: size }, () => Array(size).fill(null));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (board.get([x, y]) !== EMPTY || out[y][x]) continue;
+      const region = { owner: owners[y][x], size: 0 };
+      const stack = [[x, y]];
+      out[y][x] = region;
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        region.size++;
+        for (const [dx, dy] of AROUND) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+          if (board.get([nx, ny]) !== EMPTY || out[ny][nx]) continue;
+          out[ny][nx] = region;
+          stack.push([nx, ny]);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** A sealed area of the opponent's this small has no room to live in. */
+const NO_ROOM = 6;
+
+/**
+ * Would a stone of `color` at (x, y) only cost points? True for
+ *
+ *   - its own eye;
+ *   - a self-atari that captures nothing (the stone, or the group it
+ *     joins, is left with one liberty);
+ *   - its own sealed territory, unless the stone rescues a neighbouring
+ *     group of its own that is in atari;
+ *   - a sealed area of the opponent's of at most NO_ROOM points.
+ *
+ * A move that captures is never pointless. `regions` is emptyRegions() of
+ * the same board.
+ */
+function pointless(board, color, x, y, regions) {
+  if (isEye(board, x, y, color)) return true;
+  let next;
+  try {
+    next = board.makeMove(color, [x, y], { preventSuicide: true, preventOverwrite: true, preventKo: false });
+  } catch (_) {
+    return true;
+  }
+  if ((next.getCaptures(color) || 0) > (board.getCaptures(color) || 0)) return false;
+  if (next.getLiberties([x, y]).length <= 1) return true;
+  const region = regions[y][x];
+  if (!region || !region.owner) return false;
+  if (region.owner !== color) return region.size <= NO_ROOM;
+  for (const [dx, dy] of AROUND) {
+    const p = [x + dx, y + dy];
+    if (board.has(p) && board.get(p) === color && board.getLiberties(p).length === 1) return false;
+  }
+  return true;
 }
 
 function legalMoves(board, color, size) {
@@ -128,12 +205,14 @@ function moveHeuristic(board, color, x, y, size, lastMove) {
 
 function candidates(board, color, size, lastMove, limit, legal = null) {
   const list = [];
+  const regions = emptyRegions(board, size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board.get([x, y]) !== EMPTY) continue;
       const a = board.analyzeMove(color, [x, y]);
       if (a.overwrite || a.suicide || a.ko) continue;
       if (legal && !legal(x, y)) continue;
+      if (pointless(board, color, x, y, regions)) continue;
       list.push({ x, y, score: moveHeuristic(board, color, x, y, size, lastMove) });
     }
   }
@@ -223,8 +302,10 @@ export async function chooseMove(game, { level = 3, color = game.turn } = {}) {
   const neural = await chooseMoka(game, level);
   // Moka knows the moves but not the app's superko rule: its pick is
   // checked like any other, and the heuristic opponent takes over if it fails.
-  if (neural && (neural.pass || !legal || legal(neural.x, neural.y))) return neural;
+  // Nor does it get to throw points away: a pointless pick goes to the
+  // heuristics too, which pass when there is nothing worth playing.
   const board = game.board.clone();
+  if (neural && (neural.pass || ((!legal || legal(neural.x, neural.y)) && !pointless(board, color, neural.x, neural.y, emptyRegions(board, size))))) return neural;
   const lastMove = game.lastMove;
   const cfg = LEVELS.find((l) => l.id === level) || LEVELS[2];
   const started = performance.now();

@@ -329,3 +329,31 @@ await test("endgame: the monkey jump is the large knight's slide from the second
   assert.equal(m.y, first);
   assert.equal(rows[second][m.x - 3], "X", "a black second-line stone a large knight's move away");
 });
+
+await test("the solver never reports a search cut short by its budget as a result", () => {
+  const diagram = [". . . . . . . . .", ". . . . . . . . .", ". . . . . . . . .", ". . X o . . . . .", ". . . X X . . . .", ". . . . . . . . ."];
+  const pz = S.createPuzzle({ goal: "capture", diagram });
+  const st = S.initialState(pz);
+  // With the default budget the ladder is read out: one winning move, proved.
+  const full = S.winningMoves(pz, st);
+  assert.deepEqual([...full], [{ x: 3, y: 2 }]);
+  assert.equal(full.exact, true);
+  assert.equal(S.outcome(pz, st), "win");
+  // With a budget of a few nodes nothing can be proved: no move is offered
+  // as the answer and the outcome is unknown, not a win or a loss.
+  const tiny = S.createPuzzle({ goal: "capture", diagram });
+  const none = S.winningMoves(tiny, S.initialState(tiny), { budget: 3 });
+  assert.deepEqual([...none], []);
+  assert.equal(none.exact, false);
+  assert.equal(S.outcome(tiny, S.initialState(tiny), { budget: 3 }), "unknown");
+  // The tiny searches left nothing behind that a full search would trust.
+  assert.deepEqual([...S.winningMoves(tiny, S.initialState(tiny))], [{ x: 3, y: 2 }]);
+  assert.equal(S.outcome(tiny, S.initialState(tiny)), "win");
+  // A position the learner has lost is still a proved loss.
+  const wrong = S.play(pz, st, S.indexOf(pz, 4, 3));
+  const after = S.play(pz, wrong, S.indexOf(pz, 3, 2));
+  assert.equal(S.outcome(pz, after), "loss");
+  const cold = S.createPuzzle({ goal: "capture", diagram });
+  const lost = S.play(cold, S.play(cold, S.initialState(cold), S.indexOf(cold, 4, 3)), S.indexOf(cold, 3, 2));
+  assert.equal(S.outcome(cold, lost, { budget: 1 }), "unknown");
+});

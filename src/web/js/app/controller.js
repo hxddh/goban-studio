@@ -7,7 +7,7 @@
  * re-exports the play, review and learn controllers. None of it touches the DOM.
  */
 import { BLACK, formatPoints } from "../rules.js";
-import { decodeSgfBytes, loadSGF } from "../sgf.js";
+import { loadSGF } from "../sgf.js";
 import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
@@ -418,6 +418,7 @@ export async function exportRecord(id) {
   }
 }
 
+/** `text` is the record's text, or its raw bytes (loadSGF decodes them and says when it had to guess the charset). */
 export async function importSGFText(text, name = "goban-studio.sgf") {
   const { game, warnings } = loadSGF(text);
   const rec = Games.saveGame(game, { name: String(name).replace(/\.sgf$/i, ""), source: "import" });
@@ -440,7 +441,7 @@ function importErrorText(e) {
 export async function importFromFile(file) {
   if (!file) return;
   try {
-    await importSGFText(decodeSgfBytes(new Uint8Array(await file.arrayBuffer())), file.name);
+    await importSGFText(new Uint8Array(await file.arrayBuffer()), file.name);
   } catch (e) {
     toast(importErrorText(e), "error");
   }
@@ -450,7 +451,7 @@ export async function importFromPath(path) {
   try {
     const bytes = await readFileBytes(path);
     if (bytes == null) throw new Error("read failed");
-    await importSGFText(decodeSgfBytes(bytes), String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
+    await importSGFText(bytes, String(path).split(/[/\\]/).pop() || "goban-studio.sgf");
   } catch (e) {
     console.error("SGF import failed", e);
     toast(importErrorText(e), "error");
