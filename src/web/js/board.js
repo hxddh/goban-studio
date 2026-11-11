@@ -9,7 +9,7 @@
  * Details: coordinates sit outside the grid; a `view` window zooms to a
  * corner or side (problems), with lines running off the open edges so the
  * window still reads as part of a full board; stones sit slightly off-grid
- * with a contact shadow; a new stone settles in ~120 ms and captured stones
+ * with a contact shadow; a new stone settles in 140 ms and captured stones
  * fade out; the last move is a thin ring; a keyboard cursor makes the board
  * playable without a pointer.
  *

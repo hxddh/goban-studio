@@ -40,16 +40,34 @@ falls back to a Chinese face.
 | `--t-read` | 14 / 22 | 400 | lesson text and explanations (reading) |
 | `--t-small` | 12 / 17 | 400 | secondary text, metadata |
 | `--t-caption` | 11 / 14 | 500 | eyebrows, chart axes, badges |
+| `--t-label` | 13 / 18 | 500 | the one strong line of a row or a name |
 
 Rules: weights are 400, 500 (labels, buttons) and 600 (headings) only.
 Hierarchy comes from weight and colour (`--text`, `--text-2`, `--text-3`)
 before size. Numbers that change (clocks, captures, scores, move counts) use
-tabular figures. Nothing below 11 px.
+tabular figures. Nothing below 11 px. With **Larger text** every token but
+`--t-label` goes one step up (31/38, 22/28, 17/24, 15/22, 16/25, 14/20,
+12/16).
 
 ## 3. Space and layout
 
-An 8 px grid with a 4 px half-step: `--s-1` 4, `--s-2` 8, `--s-3` 12,
-`--s-4` 16, `--s-5` 24, `--s-6` 32, `--s-7` 48, `--s-8` 64.
+An 8 px grid with a 4 px half-step. The three smallest steps are for the
+inside of a control (an icon and its label, the track of a segmented
+control), never for the distance between two things on a page.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--s-05` | 2 px | between segments, tools and stacked lines of one row |
+| `--s-1` | 4 px | inside a control; a menu's inset |
+| `--s-15` | 6 px | an icon and its label |
+| `--s-2` | 8 px | between controls |
+| `--s-25` | 10 px | a control's side padding |
+| `--s-3` | 12 px | inside a row or a small card |
+| `--s-4` | 16 px | a card's padding; the panel's rhythm |
+| `--s-5` | 24 px | a page's side margin; between groups |
+| `--s-6` | 32 px | between sections |
+| `--s-7` | 48 px | an empty state's breathing room |
+| `--s-8` | 64 px | the foot of a page |
 
 The window has three columns:
 
@@ -59,8 +77,29 @@ The window has three columns:
 | Content | remaining | toolbar (52 px) on top, then the place |
 | Panel (board places) | 320 px (352 px from 1600 px) | fixed slots, see §7 |
 
-List pages (Play's home, Learn's path and catalog) centre a 880 px column. Radii:
-`--r-1` 6 px (controls), `--r-2` 10 px (cards, rows), `--r-3` 14 px (sheets).
+List pages (Play's home, Practice's path and catalog) centre a 880 px column
+(`--page`); `--sb`, `--panel` and `--tb` are the sidebar, the panel and the
+toolbar of the table above.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--r-0` | 4 px | the board, thumbnails, keys, cells of a list inside a panel |
+| `--r-1` | 6 px | controls |
+| `--r-2` | 10 px | cards, rows, menus |
+| `--r-3` | 14 px | sheets |
+| `--r-pill` | 999 px | bars and switches: fully round at any height |
+
+What sits above the page is in one of seven layers:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--z-raised` | 1 | a sticky row of actions inside the panel |
+| `--z-tip` | 5 | the chart's hover card |
+| `--z-menu` | 40 | menus |
+| `--z-tooltip` | 45 | a tool's name |
+| `--z-sheet` | 50 | the scrim and its sheet |
+| `--z-cover` | 60 | onboarding |
+| `--z-toast` | 70 | toasts |
 
 ## 4. Colour
 
@@ -72,20 +111,66 @@ Neutral greys with a faint warmth, one accent, two signals.
 | `--sidebar` | #EFEDE9 | #141413 | sidebar |
 | `--surface` | #FFFFFF | #222220 | cards, panel, sheets |
 | `--fill` | rgba(29,28,26,.05) | rgba(255,255,255,.06) | hover, selected rows, segmented track |
+| `--fill-2` | rgba(29,28,26,.09) | rgba(255,255,255,.1) | the selected row, empty tracks |
 | `--line` | rgba(29,28,26,.09) | rgba(255,255,255,.08) | hairlines |
+| `--line-2` | rgba(29,28,26,.16) | rgba(255,255,255,.15) | the border of a control |
 | `--text` | #1D1C1A | #EDEBE6 | primary text, **primary button** |
 | `--text-2` | #5F5D58 | #A9A69F | secondary text |
-| `--text-3` | #6C6964 | #8E8A82 | tertiary text, disabled (v13: ≥ 4.5:1 on every page background) |
+| `--text-3` | #6C6964 | #9C988F | tertiary text, disabled (≥ 4.5:1 on every background it is used on) |
+| `--on-primary` | #FFFFFF | #191918 | text on the primary button and on a toast |
 | `--accent` | #34529A | #8EA6E0 | focus ring, selection, progress, board hints |
+| `--accent-soft` | rgba(52,82,154,.1) | rgba(142,166,224,.14) | the ground of a selected tool or a line being tried |
 | `--good` | #2E7D4F | #6CC08F | correct, won |
+| `--good-soft` | rgba(46,125,79,.1) | rgba(108,192,143,.13) | a finished unit's number |
 | `--bad` | #B3402C | #E58A74 | wrong, lost, mistake markers |
+| `--bad-soft` | rgba(179,64,44,.09) | rgba(229,138,116,.13) | the ground of an error notice |
 | `--on-bad` | #FFFFFF | #1B1A17 | text on a `--bad` fill (an error toast, the solid danger button): 5.7:1 and 6.8:1 |
-| `--inv-good`, `--inv-warn` | #6CC08F, #E3B04B | #2E7D4F, #8A5A00 | the success and warning marks on a toast, whose background is the inverse of the page (`--text`) |
+| `--inv-good` | #6CC08F | #2E7D4F | the success mark on a toast, whose background is the inverse of the page (`--text`) |
+| `--inv-warn` | #E3B04B | #8A5A00 | the warning mark on a toast |
+| `--scrim` | rgba(20,19,17,.3) | rgba(0,0,0,.5) | behind a sheet |
 
 **The primary action is ink, not colour**: a filled `--text` button with
 `--surface` text. The accent marks attention (focus, the selected thing, a
 hint on the board), never a call to action. At most one accent element
 group per screen region.
+
+Elevation is three shadows that lift and a few rings that mark; nothing
+else casts a shadow.
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--shadow-board` | 0 0 0 1px rgba(60,40,12,.08), 0 2px 4px rgba(60,40,12,.06), 0 24px 48px -24px rgba(60,40,12,.35) | 0 0 0 1px rgba(0,0,0,.4), 0 24px 48px -24px rgba(0,0,0,.7) | the board on its stage |
+| `--shadow-pop` | 0 0 0 1px rgba(0,0,0,.06), 0 8px 24px -6px rgba(0,0,0,.18) | 0 0 0 1px rgba(255,255,255,.08), 0 8px 24px -6px rgba(0,0,0,.6) | menus, toasts, the bar floating over the board |
+| `--shadow-sheet` | 0 0 0 1px rgba(0,0,0,.06), 0 24px 64px -16px rgba(0,0,0,.32) | 0 0 0 1px rgba(255,255,255,.08), 0 24px 64px -16px rgba(0,0,0,.7) | sheets |
+| `--shadow-raised` | 0 0 0 .5px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.08) | none | the selected segment |
+| `--shadow-knob` | 0 1px 2px rgba(0,0,0,.25) | 0 1px 2px rgba(0,0,0,.25) | a switch's knob |
+| `--ring-selected` | 0 0 0 1px var(--text) | 0 0 0 1px var(--text) | the chosen card (its border, doubled) |
+| `--ring-line` | 0 0 0 1px var(--line-2) | 0 0 0 1px var(--line-2) | the running clock |
+| `--ring-track` | inset 0 0 0 1px var(--line) | 0 0 0 1px rgba(255,255,255,.14) | the win-rate bar |
+| `--ring-inset` | inset 0 0 0 1.5px | inset 0 0 0 1.5px | an outlined letter in the explorer; a colour follows |
+
+The board and what is drawn like it have their own colours. The script
+(`theme.js`) sets the first six for the theme and the board style in
+force; the table gives the light standard palette.
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--board` | #E4CB9A | #E4CB9A | the board's wood (set by the script) |
+| `--thumb-board` | #E4CB9A | #E4CB9A | thumbnails and tiles (set by the script) |
+| `--thumb-line` | rgba(60,40,20,.42) | rgba(60,40,20,.42) | their lines (set by the script) |
+| `--stone-black` | #1D1D1B | #1D1D1B | a black stone in an SVG mark (set by the script) |
+| `--stone-white` | #F7F4EC | #F7F4EC | a white stone in an SVG mark (set by the script) |
+| `--stone-rim` | rgba(40,27,12,.5) | rgba(40,27,12,.5) | its rim (set by the script) |
+| `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | the inline stone beside a name |
+| `--stone-fill-white` | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | the inline stone beside a name |
+| `--stone-edge-black` | none | inset 0 0 0 .75px rgba(255,255,255,.28) | so a black stone shows on a dark ground |
+| `--stone-edge-white` | inset 0 0 0 .75px rgba(0,0,0,.22) | inset 0 0 0 .75px rgba(0,0,0,.22) | so a white stone shows on a light ground |
+| `--tile-black` | #1B1A17 | #1B1A17 | stones on a problem's tile |
+| `--tile-white` | #FBF8F1 | #FBF8F1 | stones on a problem's tile |
+| `--tile-rim` | rgba(27,26,23,.45) | rgba(27,26,23,.45) | a white tile stone's rim |
+| `--eval-black` | #23221F | #4A4843 | Black's share of the win-rate bar |
+| `--eval-white` | #E9E6DE | #E9E6DE | White's share |
+| `--knob` | #FFF | #FFF | a switch's knob |
 
 ## 5. The board
 
@@ -155,14 +240,14 @@ group per screen region.
   the click was. A view that cannot be shown is replaced by the error card
   (a sentence, **Try again**, **Go to Today**), never left half drawn.
 * **Segmented control** — a `--fill` track; the selected segment is a raised
-  surface chip. Used for 2–4 mutually exclusive options.
+  surface chip (`--shadow-raised`; a `--fill-2` chip in the dark theme). Used for 2–4 mutually exclusive options.
 * **Rows** — lists are rows, not cards: 44 px minimum, hairline separators
   inside one rounded group (the macOS "inset grouped" list).
 * **Cards** — only for things that are a unit of their own (the hero, a
   game). Surface, hairline, `--r-2`, no shadow at rest.
-* **Sheets** — centred, `--r-3`, a soft shadow and a 30 % scrim; one primary
+* **Sheets** — centred, `--r-3`, `--shadow-sheet` and the `--scrim`; one primary
   action in the footer, right-aligned, Cancel to its left.
-* **Menus** — surface, hairline, shadow, 4 px inset; items 30 px.
+* **Menus** — surface, `--shadow-pop`, `--r-2`, a `--s-1` inset; items 30 px.
 * **Icons** — one family (`src/web/js/app/icons.js`): 20 × 20 grid, 1.5 px
   stroke, round caps and joins, solid fills only for stones. 16 px in
   buttons, 18 px in the sidebar.
@@ -472,8 +557,9 @@ group per screen region.
 | `--dur-1` | 120 ms | hover, press |
 | `--dur-2` | 200 ms | small enter/leave, menus |
 | `--dur-3` | 320 ms | place change, sheets |
+| `--ease-out` | cubic-bezier(.16,1,.3,1) | every entrance (`--ease` is the same curve) |
 
-Easing `--ease-out` (cubic-bezier(.16,1,.3,1)) for entrances; nothing
+Nothing
 bounces except a placed stone (140 ms settle). Captured stones lift off
 and drift towards the capturer's lid in 260 ms. Everything respects `prefers-reduced-motion`.
 
