@@ -9,6 +9,10 @@ const models_mod = @import("models.zig");
 const store_mod = @import("store.zig");
 const files_mod = @import("files.zig");
 const win_close = @import("win_close.zig");
+const json = @import("json.zig");
+const paths_mod = @import("paths.zig");
+const instance_mod = @import("instance.zig");
+const net_mod = @import("net.zig");
 const app_options = @import("app_options");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
@@ -62,6 +66,9 @@ const gate_timer_id: u64 = 0x6761_7465;
 const gate_timer_interval_ns: u64 = 100 * std.time.ns_per_ms;
 /// How long the page gets to write what is pending before a quit (v13).
 const flush_timeout_ms: i64 = 1_500;
+/// Timer that looks for a second launch's request (instance.zig).
+const inbox_timer_id: u64 = 0x696e_626f_78;
+const inbox_timer_interval_ns: u64 = 400 * std.time.ns_per_ms;
 
 /// What happens once the page has flushed (or its time is up).
 const AfterFlush = enum { none, quit_app, reply_terminate, close_window };
@@ -174,6 +181,14 @@ const App = struct {
     store: store_mod.Store = undefined,
     /// v13: the user's files the page may read or write (files.zig).
     grants: files_mod.Grants = undefined,
+    /// Held for the life of the process: this is the one instance that
+    /// uses the data directory (instance.zig). Null when no lock could be
+    /// taken; then nothing is handed over either.
+    instance_lock: ?std.Io.File = null,
+    inbox_timer_running: bool = false,
+    /// A quit or window close has begun: requests of a second launch are
+    /// left for it to notice that this process is going away.
+    quitting: bool = false,
     /// v13 quit gate. The page announces its flush hook
     /// (`studio.flushHook`); a quit or window close then asks it to write
     /// what is pending (`app:flush` event) and waits for
@@ -320,6 +335,7 @@ const sync_commands = [_]SyncCommand{
     .{ .name = "studio.writeTextFile", .invoke = writeTextFile },
     .{ .name = "studio.readTextFile", .invoke = readTextFile },
     .{ .name = "studio.takeOpenFiles", .invoke = takeOpenFiles },
+    .{ .name = "studio.revealDataDir", .invoke = revealDataDir },
     // Window chrome and menus.
     .{ .name = "studio.windowDrag", .invoke = windowDrag },
     .{ .name = "studio.windowChrome", .invoke = windowChrome },
@@ -389,7 +405,7 @@ fn emitOpenFiles(self: *App, runtime: *native_sdk.Runtime, payload: anytype) voi
     const P = @TypeOf(payload);
     var detail_buf: [8192]u8 = undefined;
     var n: usize = 0;
-    if (!jsonAppend(&detail_buf, &n, "{\"paths\":[")) return;
+    if (!json.append(&detail_buf, &n, "{\"paths\":[")) return;
     var count: usize = 0;
     if (comptime @typeInfo(P) == .pointer) {
         for (payload) |item| {
@@ -417,7 +433,7 @@ fn emitOpenFiles(self: *App, runtime: *native_sdk.Runtime, payload: anytype) voi
         } else return;
     } else return;
     if (count == 0) return;
-    if (!jsonAppend(&detail_buf, &n, "]}")) return;
+    if (!json.append(&detail_buf, &n, "]}")) return;
     runtime.emitWindowEvent(1, "open:files", detail_buf[0..n]) catch {};
 }
 
@@ -427,8 +443,8 @@ fn emitOpenFiles(self: *App, runtime: *native_sdk.Runtime, payload: anytype) voi
 fn appendOpenPath(self: *App, buf: []u8, n: *usize, count: *usize, path: []const u8) bool {
     if (path.len == 0 or path.len > 4096 or !std.unicode.utf8ValidateSlice(path)) return true;
     const mark = n.*;
-    if (count.* > 0 and !jsonAppend(buf, n, ",")) return false;
-    if (!jsonAppendString(buf, n, path)) {
+    if (count.* > 0 and !json.append(buf, n, ",")) return false;
+    if (!json.appendString(buf, n, path)) {
         n.* = mark;
         return false;
     }
@@ -437,44 +453,10 @@ fn appendOpenPath(self: *App, buf: []u8, n: *usize, count: *usize, path: []const
     return true;
 }
 
-fn jsonAppend(buf: []u8, n: *usize, text: []const u8) bool {
-    if (n.* + text.len > buf.len) return false;
-    @memcpy(buf[n.*..][0..text.len], text);
-    n.* += text.len;
-    return true;
-}
-
-/// A JSON string. Control characters become `\u00XX` (v13: they used to
-/// fail the whole reply, so one odd file name blocked every later open).
-/// The caller makes sure `text` is UTF-8 where that matters (paths).
-fn jsonAppendString(buf: []u8, n: *usize, text: []const u8) bool {
-    if (!jsonAppend(buf, n, "\"")) return false;
-    for (text) |c| {
-        switch (c) {
-            '"' => if (!jsonAppend(buf, n, "\\\"")) return false,
-            '\\' => if (!jsonAppend(buf, n, "\\\\")) return false,
-            '\n' => if (!jsonAppend(buf, n, "\\n")) return false,
-            '\r' => if (!jsonAppend(buf, n, "\\r")) return false,
-            '\t' => if (!jsonAppend(buf, n, "\\t")) return false,
-            else => {
-                if (c < 0x20 or c == 0x7f) {
-                    var esc: [6]u8 = undefined;
-                    const s = std.fmt.bufPrint(&esc, "\\u{x:0>4}", .{c}) catch return false;
-                    if (!jsonAppend(buf, n, s)) return false;
-                    continue;
-                }
-                if (n.* + 1 > buf.len) return false;
-                buf[n.*] = c;
-                n.* += 1;
-            },
-        }
-    }
-    return jsonAppend(buf, n, "\"");
-}
-
 fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.Event) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     self.runtime = runtime;
+    startInboxTimer(self);
     forwardOpenFiles(self, runtime, event);
     switch (event) {
         .command => |cmd| forwardCommand(runtime, cmd.name, cmd.window_id),
@@ -496,6 +478,7 @@ fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_sdk.
             if (timer.id == update_timer_id) drainUpdate(self);
             if (timer.id == install_timer_id) drainInstall(self);
             if (timer.id == gate_timer_id) runGate(self);
+            if (timer.id == inbox_timer_id) pollInbox(self);
         },
         else => {},
     }
@@ -507,18 +490,18 @@ fn forwardCommand(runtime: *native_sdk.Runtime, name: []const u8, window_id: u64
     const wid: native_sdk.WindowId = if (window_id == 0) 1 else window_id;
     var buf: [512]u8 = undefined;
     var n: usize = 0;
-    if (!jsonAppend(&buf, &n, "{\"command\":")) return;
-    if (!jsonAppendString(&buf, &n, name)) return;
+    if (!json.append(&buf, &n, "{\"command\":")) return;
+    if (!json.appendString(&buf, &n, name)) return;
     const tail = std.fmt.bufPrint(buf[n..], ",\"windowId\":{d}}}", .{wid}) catch return;
     n += tail.len;
     runtime.emitWindowEvent(wid, "menu:command", buf[0..n]) catch {};
 
     var legacy: [640]u8 = undefined;
     var m: usize = 0;
-    if (!jsonAppend(&legacy, &m, "{\"id\":")) return;
-    if (!jsonAppendString(&legacy, &m, name)) return;
-    if (!jsonAppend(&legacy, &m, ",\"command\":")) return;
-    if (!jsonAppendString(&legacy, &m, name)) return;
+    if (!json.append(&legacy, &m, "{\"id\":")) return;
+    if (!json.appendString(&legacy, &m, name)) return;
+    if (!json.append(&legacy, &m, ",\"command\":")) return;
+    if (!json.appendString(&legacy, &m, name)) return;
     const rest = std.fmt.bufPrint(legacy[m..], ",\"key\":\"\",\"windowId\":{d},\"modifiers\":{{\"primary\":false,\"command\":false,\"control\":false,\"option\":false,\"shift\":false}}}}", .{wid}) catch return;
     m += rest.len;
     runtime.emitWindowEvent(wid, "shortcut", legacy[0..m]) catch {};
@@ -608,7 +591,7 @@ fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     }, buffer);
     if (result.count == 0) return "null";
     var n: usize = 0;
-    if (!jsonAppend(output, &n, "[")) return error.HandlerFailed;
+    if (!json.append(output, &n, "[")) return error.HandlerFailed;
     var count: usize = 0;
     var it = std.mem.splitScalar(u8, result.paths, '\n');
     while (it.next()) |path| {
@@ -617,22 +600,24 @@ fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         // the page can say it could not import it; it is just not granted.
         _ = self.grants.grant(path, .read, false);
         const mark = n;
-        if (count > 0 and !jsonAppend(output, &n, ",")) break;
-        if (!jsonAppendString(output, &n, path)) {
+        if (count > 0 and !json.append(output, &n, ",")) break;
+        if (!json.appendString(output, &n, path)) {
             n = mark;
             break;
         }
         count += 1;
     }
     if (count == 0) return "null";
-    if (!jsonAppend(output, &n, "]")) return error.HandlerFailed;
+    if (!json.append(output, &n, "]")) return error.HandlerFailed;
     return output[0..n];
 }
 
 /// `studio.saveFileDialog {title?, defaultName, defaultPath?}` → the chosen
 /// path, or null when cancelled. `defaultName` must end in one of the app's
 /// extensions (.sgf, .json, .png); if the user types a name without one,
-/// that extension is added. The path may then be written through
+/// that extension is added, and if a file of that full name already exists
+/// the path gets a number instead of replacing it ("game (2).sgf"): the
+/// page should show the path it got back. The path may then be written through
 /// `studio.writeTextFile` (files.zig). A name the app will not write (a
 /// dotfile, a device name) answers `InvalidPath`.
 fn saveFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
@@ -649,11 +634,17 @@ fn saveFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
         .default_name = p.defaultName,
     }, &buffer)) orelse return "null";
     var fixed_buf: [files_mod.max_path_bytes + 8]u8 = undefined;
-    const path = files_mod.fixSavePath(chosen, ext, &fixed_buf) orelse return error.InvalidPath;
+    var path = files_mod.fixSavePath(chosen, ext, &fixed_buf) orelse return error.InvalidPath;
+    // The dialog asked about replacing the name the user typed. When the
+    // extension was added here, the file that will really be written was
+    // never asked about: an existing one is kept, and this one gets the
+    // next free name ("game (2).sgf").
+    var free_buf: [files_mod.max_path_bytes + 16]u8 = undefined;
+    if (path.len != chosen.len) path = files_mod.freeSavePath(self.io, path, &free_buf) orelse return error.InvalidPath;
     if (!std.unicode.utf8ValidateSlice(path)) return error.InvalidPath;
     if (!self.grants.grant(path, .write, false)) return error.InvalidPath;
     var n: usize = 0;
-    if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+    if (!json.appendString(output, &n, path)) return error.HandlerFailed;
     return output[0..n];
 }
 
@@ -689,12 +680,12 @@ fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
     var n: usize = 0;
-    if (!jsonAppend(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
-    if (!jsonAppend(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
-    if (!jsonAppendString(output, &n, self.katago_version)) return error.HandlerFailed;
+    if (!json.append(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
+    if (!json.append(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
+    if (!json.appendString(output, &n, self.katago_version)) return error.HandlerFailed;
     // v13: `studio.katagoHumanPolicy` needs the human SL model.
     const human = self.katago_available and self.models.isReady(.human);
-    if (!jsonAppend(output, &n, if (human) ",\"humanPolicy\":true}" else ",\"humanPolicy\":false}")) return error.HandlerFailed;
+    if (!json.append(output, &n, if (human) ",\"humanPolicy\":true}" else ",\"humanPolicy\":false}")) return error.HandlerFailed;
     return output[0..n];
 }
 
@@ -824,14 +815,14 @@ fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, re
     switch (outcome) {
         .ok => {
             const r = result.?;
-            ok = jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and
-                jsonAppendString(buf, &n, job.idText()) and
-                jsonAppend(buf, &n, ",\"engine\":") and
-                jsonAppendString(buf, &n, @tagName(job.slot)) and
-                jsonAppend(buf, &n, ",\"play\":") and
-                jsonAppendString(buf, &n, r.play()) and
-                jsonAppend(buf, &n, ",\"info\":") and
-                jsonAppendString(buf, &n, info);
+            ok = json.append(buf, &n, "{\"ok\":true,\"id\":") and
+                json.appendString(buf, &n, job.idText()) and
+                json.append(buf, &n, ",\"engine\":") and
+                json.appendString(buf, &n, @tagName(job.slot)) and
+                json.append(buf, &n, ",\"play\":") and
+                json.appendString(buf, &n, r.play()) and
+                json.append(buf, &n, ",\"info\":") and
+                json.appendString(buf, &n, info);
             if (ok) {
                 const tail = std.fmt.bufPrint(buf[n..], ",\"sync\":{{\"reset\":{s},\"undo\":{d},\"play\":{d}}}}}", .{
                     if (r.sync.reset) "true" else "false",
@@ -843,16 +834,16 @@ fn respondJob(job: *Job, outcome: engine_mod.Outcome, error_name: []const u8, re
             }
         },
         .cancelled => {
-            ok = jsonAppend(buf, &n, "{\"ok\":false,\"id\":") and
-                jsonAppendString(buf, &n, job.idText()) and
-                jsonAppend(buf, &n, ",\"cancelled\":true}");
+            ok = json.append(buf, &n, "{\"ok\":false,\"id\":") and
+                json.appendString(buf, &n, job.idText()) and
+                json.append(buf, &n, ",\"cancelled\":true}");
         },
         .failed => {
-            ok = jsonAppend(buf, &n, "{\"ok\":false,\"id\":") and
-                jsonAppendString(buf, &n, job.idText()) and
-                jsonAppend(buf, &n, ",\"error\":") and
-                jsonAppendString(buf, &n, if (error_name.len > 0) error_name else "HandlerFailed") and
-                jsonAppend(buf, &n, "}");
+            ok = json.append(buf, &n, "{\"ok\":false,\"id\":") and
+                json.appendString(buf, &n, job.idText()) and
+                json.append(buf, &n, ",\"error\":") and
+                json.appendString(buf, &n, if (error_name.len > 0) error_name else "HandlerFailed") and
+                json.append(buf, &n, "}");
         },
     }
     const body = if (ok) buf[0..n] else "{\"ok\":false,\"error\":\"ResponseTooLarge\"}";
@@ -1082,20 +1073,20 @@ fn katagoHumanPolicy(context: *anyopaque, invocation: native_sdk.bridge.Invocati
 /// `{ok:true, id, engine:"human", moves:[{index, p:{…}}], truncated}`.
 fn policyReply(buf: []u8, id: []const u8, rows: *const engine_mod.PolicyRows) ?[]const u8 {
     var n: usize = 0;
-    if (!(jsonAppend(buf, &n, "{\"ok\":true,\"id\":") and jsonAppendString(buf, &n, id) and jsonAppend(buf, &n, ",\"engine\":\"human\",\"moves\":["))) return null;
+    if (!(json.append(buf, &n, "{\"ok\":true,\"id\":") and json.appendString(buf, &n, id) and json.append(buf, &n, ",\"engine\":\"human\",\"moves\":["))) return null;
     for (0..rows.count) |r| {
-        if (r > 0 and !jsonAppend(buf, &n, ",")) return null;
+        if (r > 0 and !json.append(buf, &n, ",")) return null;
         const head = std.fmt.bufPrint(buf[n..], "{{\"index\":{d},\"p\":{{", .{rows.index[r]}) catch return null;
         n += head.len;
         for (0..rows.profiles) |k| {
-            if (k > 0 and !jsonAppend(buf, &n, ",")) return null;
-            if (!jsonAppendString(buf, &n, rows.name(k))) return null;
+            if (k > 0 and !json.append(buf, &n, ",")) return null;
+            if (!json.appendString(buf, &n, rows.name(k))) return null;
             const v = std.fmt.bufPrint(buf[n..], ":{d:.6}", .{rows.prob(r, k)}) catch return null;
             n += v.len;
         }
-        if (!jsonAppend(buf, &n, "}}")) return null;
+        if (!json.append(buf, &n, "}}")) return null;
     }
-    if (!jsonAppend(buf, &n, if (rows.truncated) "],\"truncated\":true}" else "],\"truncated\":false}")) return null;
+    if (!json.append(buf, &n, if (rows.truncated) "],\"truncated\":true}" else "],\"truncated\":false}")) return null;
     return buf[0..n];
 }
 
@@ -1140,11 +1131,11 @@ fn emitInfo(runtime: *native_sdk.Runtime, job: *const Job, info: []const u8) voi
     const buf = engine_mod.result_allocator.alloc(u8, info.len * 2 + 192) catch return;
     defer engine_mod.result_allocator.free(buf);
     var n: usize = 0;
-    const ok = jsonAppend(buf, &n, "{\"id\":") and
-        jsonAppendString(buf, &n, job.idText()) and
-        jsonAppend(buf, &n, ",\"info\":") and
-        jsonAppendString(buf, &n, info) and
-        jsonAppend(buf, &n, "}");
+    const ok = json.append(buf, &n, "{\"id\":") and
+        json.appendString(buf, &n, job.idText()) and
+        json.append(buf, &n, ",\"info\":") and
+        json.appendString(buf, &n, info) and
+        json.append(buf, &n, "}");
     if (!ok) return;
     runtime.emitWindowEvent(job.window_id, "katago:info", buf[0..n]) catch {};
 }
@@ -1298,6 +1289,149 @@ fn spawnBrowser(io: std.Io, url: []const u8) bool {
     return true;
 }
 
+/// `studio.revealDataDir` {}: show the folder that holds the player's
+/// settings, progress and games in Finder / Explorer (paths.zig). The page
+/// never names a path: it is always the app's own data directory. Replies
+/// `{ok, path}` or `{ok:false, error:"NoDataDir"}`.
+fn revealDataDir(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    _ = invocation;
+    const self: *App = @ptrCast(@alignCast(context));
+    const dir = self.store.root();
+    if (dir.len == 0 or !std.fs.path.isAbsolute(dir)) return "{\"ok\":false,\"error\":\"NoDataDir\"}";
+    // Nothing was saved yet: the folder is made so there is one to show.
+    std.Io.Dir.cwd().createDirPath(self.io, dir) catch {};
+    var opened = false;
+    if (self.runtime) |runtime| {
+        if (runtime.options.platform.services.revealPath(dir)) |_| {
+            opened = true;
+        } else |_| {}
+    }
+    if (!opened) opened = spawnFolder(self.io, dir);
+    var n: usize = 0;
+    const ok = json.append(output, &n, "{\"ok\":") and json.appendBool(output, &n, opened) and
+        json.append(output, &n, ",\"path\":") and json.appendString(output, &n, dir) and json.append(output, &n, "}");
+    if (!ok) return error.HandlerFailed;
+    return output[0..n];
+}
+
+/// Fallback when the platform's reveal service is missing or fails: open
+/// the folder itself with `open` (macOS), Explorer (Windows) or `xdg-open`.
+fn spawnFolder(io: std.Io, dir: []const u8) bool {
+    const argv: []const []const u8 = switch (builtin.os.tag) {
+        .macos => &.{ "/usr/bin/open", dir },
+        .windows => &.{ "explorer.exe", dir },
+        else => &.{ "xdg-open", dir },
+    };
+    var child = std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .ignore,
+        .stdout = .ignore,
+        .stderr = .ignore,
+        .create_no_window = true,
+    }) catch return false;
+    _ = child.wait(io) catch {};
+    return true;
+}
+
+// ------------------------------------------------------------ one instance
+//
+// instance.zig: this process holds the data directory's lock. A second
+// launch leaves a request in the inbox (the .sgf files it was given, or
+// none: "come to the front") and waits for it to be taken; a timer here
+// takes it.
+
+fn startInboxTimer(self: *App) void {
+    if (self.inbox_timer_running or self.instance_lock == null) return;
+    const runtime = self.runtime orelse return;
+    runtime.options.platform.services.startTimer(inbox_timer_id, inbox_timer_interval_ns, true) catch return;
+    self.inbox_timer_running = true;
+}
+
+const InboxBatch = struct {
+    app: *App,
+    buf: [8192]u8 = undefined,
+    n: usize = 0,
+    count: usize = 0,
+    ok: bool = true,
+
+    fn add(context: *anyopaque, path: []const u8) void {
+        const batch: *InboxBatch = @ptrCast(@alignCast(context));
+        const self = batch.app;
+        // The page is not up yet: it asks for the queue when it is.
+        if (!self.flush_hook_ready) return self.queueOpenPath(path);
+        if (!batch.ok) return;
+        if (batch.n == 0) batch.ok = json.append(&batch.buf, &batch.n, "{\"paths\":[");
+        if (batch.ok) batch.ok = appendOpenPath(self, &batch.buf, &batch.n, &batch.count, path);
+    }
+};
+
+fn pollInbox(self: *App) void {
+    // On its way out: the other launch sees its request untouched and the
+    // lock come free, and starts as the one instance.
+    if (self.quitting or self.instance_lock == null) return;
+    var batch: InboxBatch = .{ .app = self };
+    const taken = instance_mod.takeRequests(self.io, self.store.root(), &batch, InboxBatch.add);
+    if (taken.requests == 0) return;
+    const runtime = self.runtime orelse return;
+    // Someone opened the app again: show them the window that exists.
+    runtime.options.platform.services.focusWindow(1) catch {};
+    if (batch.count == 0 or !batch.ok) return;
+    if (!json.append(&batch.buf, &batch.n, "]}")) return;
+    runtime.emitWindowEvent(1, "open:files", batch.buf[0..batch.n]) catch {};
+}
+
+/// Make this process the one that uses `data_dir`, or hand its arguments
+/// to the one that does. False: this launch has nothing more to do.
+fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const u8) bool {
+    const io = init.io;
+    var note: install_mod.LaunchNote = .{};
+    var paths: instance_mod.PathList = .{};
+    var it: ?std.process.Args.Iterator = std.process.Args.Iterator.initAllocator(init.minimal.args, init.gpa) catch null;
+    defer if (it) |*args| args.deinit();
+    if (it) |*args| {
+        _ = args.next(); // executable
+        while (args.next()) |arg| {
+            note.noteArg(arg);
+            if (paths.len < paths.items.len and instance_mod.wantedPath(arg)) {
+                paths.items[paths.len] = arg;
+                paths.len += 1;
+            }
+        }
+    }
+    // An update helper is replacing this installation. It starts the app
+    // itself when it is done (with one of its two arguments); any other
+    // launch in between would hold files of the folder being swapped.
+    const by_helper = note.just_updated or note.install_failed;
+    if (!by_helper and install_mod.ownUpdateInProgress(io)) {
+        std.debug.print("goban-studio: an update is being installed; this launch does nothing\n", .{});
+        return false;
+    }
+    switch (instance_mod.acquire(io, data_dir)) {
+        .owner => |file| {
+            app_state.instance_lock = file;
+            return true;
+        },
+        // No lock to be had (no data directory): run as before.
+        .unavailable => return true,
+        .busy => {},
+    }
+    var token_bytes: [8]u8 = undefined;
+    io.random(&token_bytes);
+    const token = std.fmt.bytesToHex(token_bytes, .lower);
+    const result = instance_mod.handOver(io, data_dir, paths.slice(), &token);
+    if (result.outcome == .became_owner) {
+        app_state.instance_lock = result.lock;
+        return true;
+    }
+    // The new version did start; the helper that launched it must not
+    // take a second window for a failed update and roll back.
+    install_mod.writeAck(io, &note);
+    std.debug.print("goban-studio: already running; this launch {s}\n", .{
+        if (result.outcome == .taken) "handed over to it" else "got no answer and does nothing",
+    });
+    return false;
+}
+
 // ------------------------------------------------------------ update install
 //
 // v5: after a check found a newer release, the player may download and
@@ -1345,7 +1479,7 @@ const StatusPayload = struct {
 
 /// `studio.updateStatus` {probe?}: where an update download / install
 /// stands. Replies `{ok:true, phase, tag, asset, platform, received, total,
-/// error, canInstall, blocked, justUpdated, installFailed}`; phase is one of
+/// retries, error, canInstall, blocked, justUpdated, installFailed}`; phase is one of
 /// idle, downloading, verifying, unpacking, ready, installing, failed,
 /// cancelled. `blocked` (when canInstall is false): Unsupported,
 /// NotPackaged, Translocated, ReadOnlyLocation, NoTempDir, or NotChecked
@@ -1403,8 +1537,12 @@ fn installRefusal(self: *App, tag: []const u8) ?[]const u8 {
 /// or `{ok:false, error}` with error one of Busy, BadTag, NotChecked,
 /// NotNewer, Unsupported, NotPackaged, Translocated, ReadOnlyLocation,
 /// NoTempDir, Network, BadRedirect, HttpStatus, NoAsset, TooLarge,
-/// NoChecksum, NoSignature, BadSignature, ChecksumMismatch, Unpack,
-/// BadPackage, Disk, Stalled, Cancelled, OutOfMemory, Unavailable.
+/// NoChecksum, NoSignature, BadSignature, NoVersion (a signed build was
+/// given sums that name no version), VersionMismatch (the sums, or the
+/// package itself, are of another version than `tag`), ChecksumMismatch,
+/// Unpack, BadPackage, Disk, Stalled, Cancelled, OutOfMemory, Unavailable.
+/// A connection that breaks off or goes silent is continued from the bytes
+/// on disk a few times first (`retries` in `studio.updateStatus`).
 fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation, responder: native_sdk.bridge.AsyncResponder) anyerror!void {
     const self: *App = @ptrCast(@alignCast(context));
     const rid = invocation.request.id;
@@ -1453,8 +1591,9 @@ fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     }
 }
 
-/// Answer the open download once its thread is done; abandon it if no
-/// byte arrived for `install_mod.stall_timeout_ms`. UI thread.
+/// Answer the open download once its thread is done. A connection that
+/// brought no byte for `install_mod.stall_timeout_ms` is replaced by a new
+/// one (install.zig `checkStall`). UI thread.
 fn drainInstall(self: *App) void {
     if (!self.install_active) {
         stopInstallTimer(self);
@@ -1603,6 +1742,7 @@ fn beginFlush(self: *App, then: AfterFlush) void {
         return;
     }
     self.after_flush = then;
+    if (then != .none) self.quitting = true;
     const runtime = self.runtime orelse return finishFlush(self);
     if (!self.flush_hook_ready) return finishFlush(self);
     self.flush_id += 1;
@@ -1714,15 +1854,15 @@ fn modelStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, ou
 
 fn modelReply(self: *App, output: []u8, ok: bool, error_name: []const u8) ![]const u8 {
     var n: usize = 0;
-    if (!jsonAppend(output, &n, if (ok) "{\"ok\":true" else "{\"ok\":false")) return error.HandlerFailed;
+    if (!json.append(output, &n, if (ok) "{\"ok\":true" else "{\"ok\":false")) return error.HandlerFailed;
     if (error_name.len > 0) {
-        if (!jsonAppend(output, &n, ",\"error\":")) return error.HandlerFailed;
-        if (!jsonAppendString(output, &n, error_name)) return error.HandlerFailed;
+        if (!json.append(output, &n, ",\"error\":")) return error.HandlerFailed;
+        if (!json.appendString(output, &n, error_name)) return error.HandlerFailed;
     }
-    if (!jsonAppend(output, &n, ",\"models\":")) return error.HandlerFailed;
+    if (!json.append(output, &n, ",\"models\":")) return error.HandlerFailed;
     const status = models_mod.statusJson(self.models, output[n..]) orelse return error.HandlerFailed;
     n += status.len;
-    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    if (!json.append(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
 }
 
@@ -1830,44 +1970,6 @@ fn storeRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation, ou
     defer parsed.deinit();
     try self.store.remove(parsed.value.key);
     return "true";
-}
-
-/// `<app data>/data` (beside `models`), or GOBAN_DATA_DIR (tests, development).
-fn resolveDataDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
-    if (env_map.get("GOBAN_DATA_DIR")) |dir| {
-        if (dir.len > 0 and dir.len <= out.len and std.fs.path.isAbsolute(dir)) {
-            @memcpy(out[0..dir.len], dir);
-            return out[0..dir.len];
-        }
-    }
-    var data_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-    const data = native_sdk.app_dirs.resolveOne(
-        .{ .name = bundle_id },
-        native_sdk.app_dirs.currentPlatform(),
-        native_sdk.debug.envFromMap(env_map),
-        .data,
-        &data_buf,
-    ) catch return "";
-    return std.fmt.bufPrint(out, "{s}{c}data", .{ data, std.fs.path.sep }) catch "";
-}
-
-/// `<app data>/models`, or GOBAN_MODELS_DIR (self-test, development).
-fn resolveModelsDir(env_map: *std.process.Environ.Map, out: []u8) []const u8 {
-    if (env_map.get("GOBAN_MODELS_DIR")) |dir| {
-        if (dir.len > 0 and dir.len <= out.len and std.fs.path.isAbsolute(dir)) {
-            @memcpy(out[0..dir.len], dir);
-            return out[0..dir.len];
-        }
-    }
-    var data_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-    const data = native_sdk.app_dirs.resolveOne(
-        .{ .name = bundle_id },
-        native_sdk.app_dirs.currentPlatform(),
-        native_sdk.debug.envFromMap(env_map),
-        .data,
-        &data_buf,
-    ) catch return "";
-    return std.fmt.bufPrint(out, "{s}{c}models", .{ data, std.fs.path.sep }) catch "";
 }
 
 // ------------------------------------------------------------ native menus
@@ -1987,12 +2089,12 @@ fn openPathsJson(paths: []const []const u8, output: []u8) ?[]const u8 {
     if (output.len < tail.len) return null;
     const room = output[0 .. output.len - tail.len];
     var n: usize = 0;
-    if (!jsonAppend(room, &n, "{\"paths\":[")) return null;
+    if (!json.append(room, &n, "{\"paths\":[")) return null;
     var count: usize = 0;
     for (paths) |path| {
         if (!std.unicode.utf8ValidateSlice(path)) continue;
         const mark = n;
-        const ok = (count == 0 or jsonAppend(room, &n, ",")) and jsonAppendString(room, &n, path);
+        const ok = (count == 0 or json.append(room, &n, ",")) and json.appendString(room, &n, path);
         if (!ok) {
             n = mark;
             continue;
@@ -2019,20 +2121,20 @@ fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
     if (path.len == 0) {
-        if (!jsonAppend(output, &n, "{\"enabled\":false")) return error.HandlerFailed;
+        if (!json.append(output, &n, "{\"enabled\":false")) return error.HandlerFailed;
     } else {
-        if (!jsonAppend(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
-        if (!jsonAppendString(output, &n, path)) return error.HandlerFailed;
+        if (!json.append(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
+        if (!json.appendString(output, &n, path)) return error.HandlerFailed;
     }
     // v5: also exercise the optional downloads (GOBAN_MODELS_DIR should
     // point at an empty temporary folder).
     const models = self.env_map.get("GOBAN_SELFTEST_MODELS") orelse "";
     if (path.len > 0 and std.mem.eql(u8, models, "1")) {
-        if (!jsonAppend(output, &n, ",\"models\":true")) return error.HandlerFailed;
+        if (!json.append(output, &n, ",\"models\":true")) return error.HandlerFailed;
     }
     if (tour.len > 0) {
-        if (!jsonAppend(output, &n, ",\"tour\":")) return error.HandlerFailed;
-        if (!jsonAppendString(output, &n, tour)) return error.HandlerFailed;
+        if (!json.append(output, &n, ",\"tour\":")) return error.HandlerFailed;
+        if (!json.appendString(output, &n, tour)) return error.HandlerFailed;
     }
     // v5: GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
     // (selftest.js; scripts/test-updater.mjs), GOBAN_UPDATE_PROBE_TAG for a
@@ -2040,15 +2142,15 @@ fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation,
     // and checked by install.zig; the tag is only a tag.
     const probe = self.env_map.get("GOBAN_UPDATE_PROBE_OUT") orelse "";
     if (probe.len > 0) {
-        if (!jsonAppend(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
-        if (!jsonAppendString(output, &n, probe)) return error.HandlerFailed;
+        if (!json.append(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
+        if (!json.appendString(output, &n, probe)) return error.HandlerFailed;
         const probe_tag = self.env_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
         if (install_mod.validTag(probe_tag)) {
-            if (!jsonAppend(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
-            if (!jsonAppendString(output, &n, probe_tag)) return error.HandlerFailed;
+            if (!json.append(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
+            if (!json.appendString(output, &n, probe_tag)) return error.HandlerFailed;
         }
     }
-    if (!jsonAppend(output, &n, "}")) return error.HandlerFailed;
+    if (!json.append(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
 }
 
@@ -2092,22 +2194,27 @@ fn grantReportFiles(self: *App) void {
     }
 }
 
-const bundle_id = "dev.hxddh.gobanstudio";
-
 pub fn main(init: std.process.Init) !void {
     var app_state = App{ .env_map = init.environ_map, .io = init.io, .allocator = init.gpa };
     app_state.grants = files_mod.Grants.init(init.gpa);
     defer app_state.deinit();
     grantReportFiles(&app_state);
+    // One process per data directory: a second launch hands its files to
+    // the first and ends here, before anything is read or written.
+    var data_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const data_dir = paths_mod.dataDir(init.environ_map, &data_dir_buf);
+    if (!claimInstance(&app_state, init, data_dir)) return;
     // Optional networks (v5). Not freed at exit: a download thread may
     // still be running.
     var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const models = try std.heap.page_allocator.create(models_mod.Manager);
-    models.init(init.io, resolveModelsDir(init.environ_map, &models_dir_buf));
+    models.init(init.io, paths_mod.modelsDir(init.environ_map, &models_dir_buf));
+    // Downloads and the update check use the proxy the environment or the
+    // system names (net.zig).
+    models.env = init.environ_map;
     app_state.models = models;
     // v9 file storage: the page's settings, profile and games (store.zig).
-    var data_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-    app_state.store.init(init.io, resolveDataDir(init.environ_map, &data_dir_buf));
+    app_state.store.init(init.io, data_dir);
     var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const strong_model = models.modelPath(.strong, &strong_buf) orelse "";
@@ -2124,11 +2231,13 @@ pub fn main(init: std.process.Init) !void {
     // Not freed at exit either: a check thread may still be finishing.
     const updater = try std.heap.page_allocator.create(update_mod.Checker);
     updater.init(init.io);
+    updater.env = init.environ_map;
     app_state.updater = updater;
     // Not freed at exit either: a download thread may still be finishing.
     const installer = try std.heap.page_allocator.create(install_mod.Installer);
     installer.init(init.io);
     installer.setPublicKey(update_public_key);
+    installer.setEnv(init.environ_map);
     app_state.installer = installer;
     if (init.environ_map.get("GOBAN_UPDATE_PROBE_OUT") != null) {
         const probe_tag = init.environ_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
@@ -2143,7 +2252,7 @@ pub fn main(init: std.process.Init) !void {
     try runner.runWithOptions(app_state.app(), .{
         .app_name = "Goban Studio",
         .window_title = "Goban Studio",
-        .bundle_id = bundle_id,
+        .bundle_id = paths_mod.bundle_id,
         .icon_path = "assets/icon.png",
         .js_window_api = true,
         .bridge = app_state.bridge(),
@@ -2162,6 +2271,10 @@ test {
     std.testing.refAllDecls(store_mod);
     std.testing.refAllDecls(files_mod);
     std.testing.refAllDecls(win_close);
+    std.testing.refAllDecls(json);
+    std.testing.refAllDecls(paths_mod);
+    std.testing.refAllDecls(instance_mod);
+    std.testing.refAllDecls(net_mod);
 }
 
 test "production source uses frontend assets" {
@@ -2221,6 +2334,10 @@ test "every bridge command is registered once, with the same origins" {
     for (names, 0..) |a, i| {
         for (names[i + 1 ..]) |b| try std.testing.expect(!std.mem.eql(u8, a, b));
     }
+    // The data folder can be shown; the command takes no path from the page.
+    var has_reveal = false;
+    for (names) |n| has_reveal = has_reveal or std.mem.eql(u8, n, "studio.revealDataDir");
+    try std.testing.expect(has_reveal);
     // The v2 synchronous KataGo commands are gone.
     for (names) |n| {
         try std.testing.expect(!std.mem.eql(u8, n, "studio.katagoMove"));
