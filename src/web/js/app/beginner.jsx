@@ -1,5 +1,5 @@
 /**
- * v8 beginner path views: the lesson-complete page (with its bridge into a
+ * Beginner path views: the lesson-complete page (with its bridge into a
  * game), capture Go, and the one-time note on the first count.
  */
 import { useEffect } from "preact/hooks";

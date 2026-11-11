@@ -140,7 +140,7 @@ await test("a wall that does not separate the board earns no territory", () => {
   assert.equal(t.flat().every((v) => v === 0), true);
 });
 
-// v13: a region that reaches all four sides is territory once the other
+// A region that reaches all four sides is territory once the other
 // colour has stones in the game (they lie in a region of their own).
 const CORNER_LIFE = [
   "..OX.....",
@@ -327,7 +327,7 @@ await test("rules: rulesets, defaults and handicap compensation", () => {
   assert.equal(normalizeRules("Chinese"), "chinese");
   assert.equal(normalizeRules("aga"), "japanese");
   assert.equal(normalizeRules(undefined), "japanese");
-  // A Game without rules is Japanese with komi 6.5, as before v5.
+  // A Game without rules is Japanese with komi 6.5.
   const g = new Game({ size: 9 });
   assert.equal(g.rules, "japanese");
   assert.equal(g.komi, 6.5);

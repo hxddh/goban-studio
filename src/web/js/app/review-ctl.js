@@ -1,6 +1,6 @@
 /**
  * Review: a layer over any game, and the post-game review of your own
- * (docs/v9.md, "Two spaces → Play"; Play and the Library since v12). Whole-game analysis, the review model
+ * (docs/v9.md, "Two spaces → Play"), in Play and in the Library. Whole-game analysis, the review model
  * made from it (play/review-model.js: the result, the balance, the three
  * phases, the key moments), live analysis of the position on the board,
  * free variations, the stories of the key mistakes, editing the record
@@ -73,7 +73,7 @@ function persist(review) {
 }
 
 /**
- * v4: one deeper KataGo search of the position after each of the top three
+ * One deeper KataGo search of the position after each of the top three
  * mistakes (never more), for a sharper refutation line and ownership. Runs
  * after the whole-game pass; skipped without KataGo. Results are kept in
  * `review.refined[index]` and the key mistakes are explained again.
@@ -115,7 +115,7 @@ async function refineKeyMoves(review) {
   update();
 }
 
-/** v7: stop every search a review started (leaving it, or a new pass). */
+/** Stop every search a review started (leaving it, or a new pass). */
 function stopReviewWork(r) {
   r?.ctl?.abort();
 }
@@ -130,7 +130,7 @@ function stopReviewWork(r) {
  * ended) turns the board into its review without a history step.
  */
 export function openReview(game, meta = {}) {
-  // v13: the review open before is closed for good first, as leaving it
+  // The review open before is closed for good first, as leaving it
   // would: its tried moves dropped (settleLive), its pass handed over, its
   // edits saved, and the game in play back on its last move. Before, only
   // its searches stopped, and a live game left one move back took the next
@@ -139,7 +139,7 @@ export function openReview(game, meta = {}) {
   stopLive();
   if (!isRestoring() && !meta.inPlace) remember();
   const line = game.mainLine();
-  // v8: the game in play, still going: where it stands, so that moves tried
+  // The game in play, still going: where it stands, so that moves tried
   // in the review never become the game's own moves (settleLive).
   const end = line[line.length - 1];
   const source = meta.source || "current";
@@ -161,9 +161,9 @@ export function openReview(game, meta = {}) {
     focus: null, // highlighted key move
     live: null,
     hover: null,
-    // v7: the review owns its searches; leaving it aborts this (scheduler.js).
+    // The review owns its searches; leaving it aborts this (scheduler.js).
     ctl: new AbortController(),
-    // v4: deeper analyses after the top mistakes (index → analysis), and
+    // Deeper analyses after the top mistakes (index → analysis), and
     // whether that pass is running. See refineKeyMoves.
     refined: {},
     refining: false,
@@ -180,7 +180,7 @@ export function openReview(game, meta = {}) {
     history: { undo: [], redo: [] },
     // A finished game counted again: { dead, score, source, token }, or null.
     recount: null,
-    // v6: records open on the final position and move to the first key
+    // Records open on the final position and move to the first key
     // moment once the analysis is there, unless the player has moved.
     autoJump: !!meta.autoJump,
   };
@@ -233,7 +233,7 @@ function jumpToFirst(review) {
 }
 
 /**
- * v8: leaving a review of the game in play: moves tried from its last
+ * Leaving a review of the game in play: moves tried from its last
  * position are dropped, and its own line is the main line again, before
  * anything is saved or the game carries on.
  */
@@ -316,7 +316,7 @@ async function analyzeReview(review, { existing = null } = {}) {
     review.analyzed = existing.filter(Boolean).length;
   }
   update();
-  // v7: a background job of the scheduler, owned by this review.
+  // A background job of the scheduler, owned by this review.
   const job = Engine.sched.startJob({
     kind: "review",
     signal,
@@ -689,7 +689,7 @@ export function reviewRating(r = state.review) {
   return rt?.before && rt?.after && Number.isFinite(rt.before.rank) && Number.isFinite(rt.after.rank) ? rt : null;
 }
 
-/* ------------------------------------------ v5: editing the record */
+/* ------------------------------------------ Editing the record */
 
 /** Where edits are saved: "record" (its file), "current" (the game in play) or null (kept in memory only: classics). */
 function editTarget(r) {
@@ -756,7 +756,7 @@ function writeEdits(r) {
     if (!Games.getGame(r.meta.recordId)) return false;
     if (!saveRecord(r.meta.recordId, r.game)) return false;
   } else if (target === "current") {
-    // v8: moves tried from where the game in play stands are not saved
+    // Moves tried from where the game in play stands are not saved
     // with it (the review is still open; settleLive drops them on leaving).
     const at = r.live0;
     const all = at?.end.children;
@@ -1041,7 +1041,7 @@ export function showVariation(km, kind) {
 }
 
 /**
- * v4: play a key mistake's story up to `step` (0-based) on the board.
+ * Play a key mistake's story up to `step` (0-based) on the board.
  * `line` is "better" or "played" (km.story[line]). Sets r.variation to
  * { kind: line, index, moves, story: true, step }; moves are the story's
  * moves 0..step in the {x, y, c, n} shape the board draws.
@@ -1108,7 +1108,7 @@ const judgeVisits = (size) => (size === 19 ? 160 : size === 13 ? 200 : 240);
 
 /** The position of a node as a game of its own (root stones, then the moves to it; play-ctl playFromHere too). */
 export function gameAt(src, node) {
-  // v13: the root stones are copied, not placed again from the handicap, and
+  // The root stones are copied, not placed again from the handicap, and
   // a record's mid-game setup (node.setup) is replayed with its move.
   const game = new Game({ size: src.size, rules: src.rules, komi: src.komi, handicap: src.handicap, placeHandicap: false });
   const root = src.root.board.signMap;
@@ -1444,7 +1444,7 @@ export async function exportReviewImage() {
   const filename = `goban-studio-review-${day}.png`;
   const blob = await renderReviewPNG(model, { date, rating: reviewRating(r) });
   if (!blob) return toast(t("report.exportFailed"), "error");
-  // v13: in the app a failed write is an error, never a download link (a WebView ignores those).
+  // In the app a failed write is an error, never a download link (a WebView ignores those).
   if (hasNative()) {
     if (!hasFileDialogs()) return toast(t("report.exportFailed"), "error", 6000);
     const path = await saveFileDialog({ title: t("report.exportImage"), defaultName: filename });

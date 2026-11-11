@@ -1,4 +1,4 @@
-// v6 a11y: the in-page accessibility audit used by scripts/ui-test.mjs.
+// The in-page accessibility audit used by scripts/ui-test.mjs.
 // This file is one function expression; the test evaluates its source in
 // the page (no dependency is shipped). It returns a list of problems:
 //   name      an interactive element without an accessible name
@@ -79,7 +79,7 @@ function a11yAudit({ minContrast = 4.5, largeContrast = 3 } = {}) {
   }
   // Contrast (docs/design.md §10): WCAG AA against what is behind the text:
   // 4.5:1 for normal text, 3:1 for large text (24 px, or 18.66 px bold).
-  // v13: tertiary text (--text-3) meets 4.5:1 too; v12 allowed 3:1 for all.
+  // Tertiary text (--text-3) meets 4.5:1 too.
   // Computed colours come as rgb()/rgba(), or as color(srgb r g b / a) with
   // 0–1 channels when the stylesheet mixes them (color-mix, e.g. hover).
   const rgba = (s) => {

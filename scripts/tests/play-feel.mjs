@@ -117,7 +117,7 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------------- think time */
 
-  // v9: every rank the opponent can play at, whatever is installed (opponents.js), weakest first.
+  // Every rank the opponent can play at, whatever is installed (opponents.js), weakest first.
   const LEVELS = [...new Set([{}, { human: true }, { strong: true }, { human: true, strong: true }].flatMap((i) => E.ladder(i).map((e) => e.label)))].sort((a, b) => b - a);
 
   const obvious = { moves: [{ visits: 152, scoreLead: 2 }, { visits: 5, scoreLead: -6 }, { visits: 3, scoreLead: -9 }] };

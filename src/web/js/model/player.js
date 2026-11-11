@@ -1,9 +1,8 @@
 /**
- * v9: the one player model (docs/v9.md, "One player model").
+ * The one player model (docs/v9.md, "One player model").
  *
- * The only place that knows the player. It replaces the v3 weakness counts,
- * the v5 game records' trend data, the v6 rating, the v7 plan model and the
- * strength estimate's own store. Stored as `profile.json`:
+ * The only place that knows the player: rating, review memory, focus,
+ * lessons and game records in one profile. Stored as `profile.json`:
  *
  *   profile = {
  *     v: 13,                                         // v9–v12 files say 9
@@ -11,7 +10,7 @@
  *     history: [{ at, size, rank, pm, r?, sd? }],    // after each rated game
  *     games: [{ id, at, size, result, won, ... }],    // own games, newest 30
  *     problems: { [id]: { tries, solved, clean, last, due, streak, solvedAt?,
- *                         s, d, reps, lapses, rating, retired?,     // v13: FSRS-style
+ *                         s, d, reps, lapses, rating, retired?,     // FSRS-style memory
  *                         first?, seen? } },   // the first-sight result and when
  *     mistakes: [{ id, gameId, index, theme, loss, due, ... }],  // own games only
  *     lessons: { [id]: { done, step, at } },
@@ -30,15 +29,14 @@
  * never change the one they are given; views only read. Content (lessons,
  * problems, grades) comes in as arguments.
  *
- * Ported, not reinvented:
- *   - the rating: app/strength.js (v6 Glicko against the measured ladder,
- *     v7/v8 calibration; the tables are in model/ladder.js). Each board
- *     size keeps its own estimate, all on the 19×19 θ scale the ranks live on;
- *   - spaced review: persist.js markProblem, markSolvedLate, addMistake,
- *     markMistake; v13 replaced the 1-3-7-21 day ladder with an FSRS-style
- *     memory model (stability and difficulty per item, graded recall);
- *   - the focus: app/plan.js playerModel, weeklyModel with the v8 rule that
- *     the first focus shown in a week is kept for that week, planDaily;
+ * What it holds:
+ *   - the rating: Glicko against the measured ladder (the tables are in
+ *     model/ladder.js). Each board size keeps its own estimate, all on the
+ *     19×19 θ scale the ranks live on;
+ *   - spaced review: an FSRS-style memory model (stability and difficulty
+ *     per item, graded recall) for problems and for mistakes of own games;
+ *   - the focus: the week's weak areas; the first focus shown in a week is
+ *     kept for that week;
  *   - the next lesson: app/course-path.js pickNextLesson, and the taught
  *     problem pool of app/practice-ctl.js dailyPool;
  *   - the beginner bridges: app/beginner.js;
@@ -50,7 +48,7 @@ import { normalizeMoveRank } from "./move-rank.js";
 export * from "./ladder.js";
 
 /**
- * v13: the profile's own version. Files written by v9–v12 say 9 and are
+ * The profile's own version. Files written by v9–v12 say 9 and are
  * migrated by normalizeProfile (problem and drill records to the memory
  * model, placements capped); anything older than v9 or newer than this
  * starts empty, as before (the data layer refuses to overwrite a newer file).
@@ -73,7 +71,7 @@ export const SIGMA_LEVEL = 0.5;
 /** The estimate stays inside 30 kyu − 15 ranks … 9 dan. */
 const MU_MIN = gorToTheta(-2400);
 const MU_MAX = gorToTheta(2900);
-/** A game needs this many moves to be rated (as v6). */
+/** A game needs this many moves to be rated. */
 export const MIN_RATED_MOVES = 12;
 export const MAX_HISTORY = 200;
 
@@ -154,8 +152,8 @@ export const MAX_GAMES = 30;
 export const MAX_MISTAKES = 200;
 /**
  * The v9–v12 spaced-review ladder (1, 3, 7, 21 days after consecutive clean
- * solves). v13 schedules with the memory model below; the ladder is kept
- * only to read records written before it (migrateProblemRecord).
+ * solves). Scheduling uses the memory model below; the ladder is kept
+ * only to read records written with it (migrateProblemRecord).
  */
 export const LADDER = [1, 3, 7, 21];
 export const PHASES = ["opening", "middle", "endgame"];
@@ -190,7 +188,7 @@ export function setPriorRank(profile, rank, at = 0) {
  *     moves, confidence: "high" | "low" | null,
  *     phases: { opening|middle|endgame: { loss, mistakes, blunders, moves, accuracy } } | null,
  *     themes: { theme: count }, themeLoss?: { theme: points },
- *     moveRank?: { rank, lo, hi, n }, moveRankUsed?,  // v13: model/move-rank.js
+ *     moveRank?: { rank, lo, hi, n }, moveRankUsed?,  // model/move-rank.js
  *     assisted?: true, undos?, hints?,   // played with an undo or a hint: never rated
  *     rating: { before, after, delta } | null }   // GoR around this game's rating step
  */
@@ -245,7 +243,7 @@ export function normalizeGame(r) {
 }
 
 /**
- * v13: the reading from the player's own moves (model/move-rank.js) as a
+ * The reading from the player's own moves (model/move-rank.js) as a
  * weak prior. Only while a board's estimate rests on fewer than
  * MOVE_RANK.MAX_GAMES rated games, and as a measurement of at least
  * MOVE_RANK.SIGMA nats (about six ranks around 15 kyu): it moves a fresh
@@ -339,7 +337,7 @@ export function normalizeProfile(raw) {
   const pl = obj(raw.placement);
   let placement = null;
   if (pl && pl.skipped === true) placement = { skipped: true, at: num(pl.at, 0) };
-  // v13: a placement is never above PLACEMENT.MAX_GRADE (v10–v12 stored up to 5).
+  // A placement is never above PLACEMENT.MAX_GRADE (v10–v12 stored up to 5).
   else if (pl && finite(pl.grade) && pl.grade >= 1 && pl.grade <= 5) placement = { grade: Math.min(PLACEMENT.MAX_GRADE, Math.round(pl.grade)), at: num(pl.at, 0) };
   const days = {};
   for (const [k, v] of Object.entries(obj(raw.days) || {})) if (/^\d{8}$/.test(k) && num(v, 0) > 0) days[k] = Math.floor(num(v));
@@ -351,7 +349,7 @@ export function normalizeProfile(raw) {
 /* ======================================================= the memory model */
 
 /*
- * v13: spaced review after FSRS (the free spaced-repetition scheduler's
+ * Spaced review after FSRS (the free spaced-repetition scheduler's
  * memory model, v4.5 formulas, its published default weights rounded).
  * Every reviewed item (a problem, a drill from your games) keeps
  *
@@ -563,7 +561,7 @@ export function recordGame(profile, game) {
     merged.rated = true;
     merged.rating = { before: b, after: read.r, delta: read.r - b };
   }
-  // v13: a reading from the player's moves, once per game, as a weak prior.
+  // A reading from the player's moves, once per game, as a weak prior.
   if (merged.moveRank && !merged.assisted && !merged.moveRankUsed && !existing?.moveRankUsed) {
     const before = rating[merged.size];
     const after = applyMoveRank(before, merged.moveRank);
@@ -616,7 +614,7 @@ export function recordProblem(profile, id, { solved = false, clean = solved, lat
   if (rating === RATING.AGAIN) next.before = { s: base.s, d: base.d, reps: base.reps, lapses: base.lapses, streak: base.streak, last: prev?.tries > 0 ? base.last : null, day: dayKey(now) };
   if (solved) {
     next.solved = true;
-    next.solvedAt = now; // v12: when it was last solved (Today's week counts solves, not attempts)
+    next.solvedAt = now; // When it was last solved (Today's week counts solves, not attempts)
   }
   next.streak = solved && clean ? (base.streak || 0) + 1 : 0;
   return { ...p, problems: { ...p.problems, [id]: next }, days: countDay(p.days, now) };
@@ -835,8 +833,7 @@ export function handicapFor(playerRank, oppRank, size) {
 
 /**
  * The opponent to suggest on one board: the implementation (level, mode)
- * the player is expected to score closest to 50% against, as v6
- * recommendStrength did, with `modeOf(level)` the mode each level would be
+ * the player is expected to score closest to 50% against, with `modeOf(level)` the mode each level would be
  * played in; a handicap closes what remains at the ends of the ladder.
  */
 function opponentFor(profile, size, modeOf) {
@@ -1255,7 +1252,7 @@ function before(p, start) {
  * This week's focus: the evidence as it stood when the week began
  * (Monday 00:00), so the focus stays put for the week; the current
  * evidence when the week began without one. Once a focus has been shown
- * in a week it is kept for that week (profile.week, v8): problem records
+ * in a week it is kept for that week (profile.week): problem records
  * keep only their latest attempt, so reviewing last week's misses would
  * otherwise erase the evidence the focus came from.
  *
@@ -1503,7 +1500,7 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
   // 2. Focus problems around the level.
   const unseen = pool.filter((d) => !entry(d));
   // A level measured on a grade outranks a prior; the "nothing qualified yet"
-  // fallback (grade 1) does not outrank a placement or a rank (v10).
+  // fallback (grade 1) does not outrank a placement or a rank.
   const measured = model?.problems?.levelOnGrade || prior == null ? (model?.problems?.level ?? null) : null;
   const known = measured != null || prior != null;
   // Not measured yet: the start, a grade lower where its problems proved too hard (startGrade).
@@ -1632,7 +1629,7 @@ export function bridgeAfter(lessonId, profile, { captureWins = 0 } = {}) {
 
 /**
  * The weakest rank (kyu positive, 1 dan 0) a grade is offered to before the
- * player's solving level is measured (v13, conservative: problem grades
+ * player's solving level is measured (conservative: problem grades
  * are estimated, not measured on people, so a rank gets the grade a player
  * of that rank should solve comfortably, not the hardest one they might).
  */
@@ -1654,7 +1651,7 @@ export function gradeForRank(rank) {
 /* ============================================================ placement */
 
 /**
- * The placement quiz (v10; v13 adaptive and randomised). Someone who
+ * The placement quiz, adaptive and randomised. Someone who
  * already knows the rules answers 10–12 problems before Practice's first path,
  * and the result sets where the course starts and which problems come
  * first, until their own results measure a solving level.

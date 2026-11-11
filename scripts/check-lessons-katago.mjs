@@ -67,7 +67,7 @@ const UNIT_VIEW = {
   shape: "local",
   endgame: "local",
   fighting: "whole",
-  // v13: the ko and judgement units play on finished-looking 9×9 games.
+  // The ko and judgement units play on finished-looking 9×9 games.
   "ko-fighting": "whole",
   judgement: "whole",
   "adv-judgement": "whole",
@@ -94,7 +94,7 @@ const LESSON_VIEW = {
 const STEP_VIEW = {
   "life-eye#1": "rule",
   "life-false-eye#1": "rule",
-  // v13: White has just taken a ko, so Black may not retake; a diagram cannot
+  // White has just taken a ko, so Black may not retake; a diagram cannot
   // carry that ban, and the engine would retake at once.
   "ko-threat#1": "rule",
   "ko-threat-answer#1": "rule",
@@ -117,7 +117,7 @@ const CLAIMS = {
   "game-dead#0": [{ type: "owner", toMove: 1, what: "the marked white stone is dead", color: 1, min: 0.7, pts: [[1, 1]] }],
   "life-two-eyes#0": [{ type: "owner", toMove: -1, what: "the black group with two eyes is alive", color: 1, min: 0.8, pts: [[1, 1], [3, 1], [0, 1]] }],
   "kill-straight-three#0": [{ type: "owner", toMove: 1, what: "after Black's middle point White is dead", color: 1, min: 0.7, pts: [[0, 1], [3, 1]], after: [[1, 0, 1]] }],
-  // v13: the endgame unit's boards are sealed sides counted by the solver (no claims here).
+  // The endgame unit's boards are sealed sides counted by the solver (no claims here).
   "ko-threat#0": [{ type: "answer", toMove: 1, what: "White must answer Black's cut at the top", move: [5, 2], expect: [[6, 1]] }],
   "judge-count#0": [
     { type: "lead", toMove: 1, what: "with Black to play Black wins by 0.5", value: 0.5, tol: 1 },

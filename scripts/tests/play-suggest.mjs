@@ -84,7 +84,7 @@ await test("classics: the moments are the famous moves, written in four language
       assert.ok(Number.isInteger(mo.index) && mo.index >= 1 && mo.index <= n, `${c.id} ${mo.index}`);
       if (i) assert.ok(mo.index > ms[i - 1].index, `${c.id}: moments in game order`);
       for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
-      // v12: written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
+      // Written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
       const mv = byId[c.id].moves[mo.index - 1];
       if (mo.claim === "mistake") assert.ok(mv.loss >= 3, `${c.id} ${mo.index}: a mistake loses ${mv.loss}`);
       if (mo.claim === "best") assert.ok(mv.move === mv.best || mv.loss <= 1, `${c.id} ${mo.index}: best move loses ${mv.loss}`);

@@ -1,5 +1,5 @@
 /**
- * The shell: the sidebar with the four spaces (v12: Today, Play, Practice, Library)
+ * The shell: the sidebar with the four spaces (Today, Play, Practice, Library)
  * and Settings, the native menu bar, keyboard handling, and the space
  * itself. Each page starts with the shared toolbar (chrome.jsx).
  *
@@ -34,7 +34,7 @@ import { BootError, ReadOnlyBanner, StoreProblem } from "./safety.jsx";
 /** What Play shows: a review, the board, or (no game on it) what to play. */
 function PlaySpace() {
   if (C.playReviewing()) return <ReviewView />;
-  // The game view, or a game in progress (v13: play-ctl playShowsBoard); else what to play.
+  // The game view, or a game in progress (play-ctl playShowsBoard); else what to play.
   return C.playShowsBoard() ? <PlayView /> : <PlayStart />;
 }
 
@@ -51,8 +51,8 @@ function App() {
     document.documentElement.lang = s.settings?.lang === "zh" ? "zh-CN" : s.settings?.lang || "en";
     document.title = "Goban Studio";
   });
-  useAnnouncements(); // v6 a11y: review moves, problems, lessons
-  // v13: no bridge in the packaged app, or the store could not be read (app/safety.jsx).
+  useAnnouncements(); // Review moves, problems, lessons
+  // No bridge in the packaged app, or the store could not be read (app/safety.jsx).
   if (s.bootError) return <BootError />;
   if (!s.ready) return null;
   if (s.storeProblem && !s.storeProblem.continued) return <StoreProblem />;
@@ -276,7 +276,7 @@ function onKeyDown(e) {
     if (e.key === "Home") return C.reviewGoto(0);
     if (e.key === "End") return C.reviewGoto(Infinity);
   }
-  // v6 explorer: ← / → step through the line, Home goes back to the start.
+  // Explorer: ← / → step through the line, Home goes back to the start.
   if (!reviewing && state.space === "library" && state.play.explorer) {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
@@ -357,7 +357,7 @@ export async function start() {
       if (++n >= 6) clearInterval(timer);
     }, 1500);
     // Release checks: the packaged self-test (GOBAN_SELFTEST_OUT, or the
-    // updater's probe) and the screenshot tour (GOBAN_TOUR_OUT). v13: one
+    // updater's probe) and the screenshot tour (GOBAN_TOUR_OUT). One
     // look at the host's configuration, and their modules are evaluated
     // only when it asks for them (never in a normal launch).
     setTimeout(() => {

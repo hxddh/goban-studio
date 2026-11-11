@@ -1,5 +1,5 @@
 /**
- * v5 review: the whole game at a glance, and how your games are trending.
+ * Review: the whole game at a glance, and how your games are trending.
  *
  * summarizeGame(review) splits a reviewed game into opening, middle game and
  * endgame and says, per player and phase, how many points went where; then
@@ -68,7 +68,7 @@ export function settledShare(ownership) {
 
 /**
  * A position's settled share: from its ownership, or from `firm`, which a
- * stored analysis keeps in place of the map (v13, data/pack.js).
+ * stored analysis keeps in place of the map (data/pack.js).
  */
 export function firmOf(point) {
   if (!point) return null;

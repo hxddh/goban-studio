@@ -1,5 +1,5 @@
 /**
- * Data, v13 (docs/storage.md): the store's safe state (unreadable files
+ * Data safety (docs/storage.md): the store's safe state (unreadable files
  * are write-blocked, damaged ones copied aside first, a failed list makes
  * everything read-only, a packaged app without its bridge never falls back
  * to localStorage), versions and migrations of the stored files and of

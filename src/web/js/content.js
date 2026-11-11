@@ -1,5 +1,5 @@
 /**
- * v9: the course, the problems and the classic games, loaded in two steps.
+ * The course, the problems and the classic games, loaded in two steps.
  *
  * The first screen only needs what lists and plans read: the course's
  * units and lesson titles, each problem's id, topic, theme and shape, its

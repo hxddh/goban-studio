@@ -165,7 +165,7 @@ await test("the native-speaker review sheet matches messages.js", () => {
   assert.deepEqual(keys, Object.keys(MESSAGES), "run: node scripts/export-strings.mjs");
 });
 
-await test("every key the v3 views use is in the string table", () => {
+await test("every key the views name outright is in the string table", () => {
   const dir = path.join(root, "src/web/js/app");
   const used = new Set();
   for (const f of fs.readdirSync(dir)) {

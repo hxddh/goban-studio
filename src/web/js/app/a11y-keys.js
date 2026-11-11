@@ -1,5 +1,5 @@
 /**
- * v6 accessibility: keyboard conventions the views share.
+ * Accessibility: keyboard conventions the views share.
  *
  *  - Radio groups (segmented controls, the language grid, board swatches,
  *    filter chips, new-game choices): ← → ↑ ↓ move to the next option and

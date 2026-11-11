@@ -1,5 +1,5 @@
 /**
- * v9 browser checks: one opponent axis. Loaded by scripts/ui-test.mjs
+ * Browser checks: one opponent axis. Loaded by scripts/ui-test.mjs
  * before the visual baselines; receives its helpers (check, assert, fresh,
  * onboard, clickPoint, pointOf, origin, browser, audit).
  *

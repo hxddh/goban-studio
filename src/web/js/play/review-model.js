@@ -21,7 +21,7 @@
  *     takeaways: [{ kind, key, params, tone, index?, theme?, topic? }],
  *     moments: [{ index, color, played, best, loss, theme, why, thumb, accept }] }
  *
- * Honesty rules (v6):
+ * Honesty rules:
  *   - With the low-confidence offline estimate the per-phase numbers, the
  *     takeaways and the size of each loss are left out: the estimate can
  *     only point at the turning points (turningPoints), which keep their

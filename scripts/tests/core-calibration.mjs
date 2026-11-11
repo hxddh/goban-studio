@@ -88,7 +88,7 @@ export default async function ({ test, assert, root }) {
   });
 
   test("core calibration: handicap stones reach KataGo where the app puts them", () => {
-    // v13: a handicap of one is no stone: Black plays first, at the handicap komi.
+    // A handicap of one is no stone: Black plays first, at the handicap komi.
     const one = new Game({ size: 13, komi: handicapKomi(1), handicap: 1 });
     assert.deepEqual(rootStones(one), []);
     assert.equal(one.turn, 1);
@@ -178,7 +178,7 @@ export default async function ({ test, assert, root }) {
     }
     assert.throws(() => planMatrix({ runs: [{ id: "x y", size: 9, games: 1, pairs: "adjacent" }] }));
     assert.throws(() => planMatrix({ runs: [] }));
-    // v11: runs whose games are all committed get no jobs (the v8 runs).
+    // Runs whose games are all committed get no jobs (the v8 runs).
     for (const r of plan.runs.filter((x) => x.id.startsWith("v8-"))) assert.equal(pendingGames(r, root), 0, r.id);
     const skip = planMatrix(plan, { pending: (r) => !r.id.startsWith("v8-") });
     assert.ok(skip.include.every((j) => !j.run.startsWith("v8-")));
@@ -208,7 +208,7 @@ export default async function ({ test, assert, root }) {
   });
 
   test("core calibration: the human-style ladder has no gap and its labels follow the measurement", () => {
-    // v9: the ladder with the human-style network installed (opponents.js).
+    // The ladder with the human-style network installed (opponents.js).
     const entries = ladder({ human: true });
     for (let i = 1; i < entries.length; i++) {
       const [a, b] = [entries[i - 1].label, entries[i].label];

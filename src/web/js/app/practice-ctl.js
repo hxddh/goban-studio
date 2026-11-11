@@ -133,13 +133,13 @@ export function problemView(pz) {
 }
 
 function problemState(pz) {
-  // v13: `tok` is this attempt's own: Retry, Show answer and a new problem
+  // `tok` is this attempt's own: Retry, Show answer and a new problem
   // make a new one, and the reply timers of the old attempt see it (later).
   return { tok: {}, st: S.initialState(pz), history: [], status: "open", feedback: null, result: null, busy: false, used: false, hintAt: null, answer: null, last: null, wrongValues: null, ghost: null, openedAt: Date.now() };
 }
 
 /**
- * v9: lesson steps and problem bodies arrive after start-up (content.js);
+ * Lesson steps and problem bodies arrive after start-up (content.js);
  * whatever opens them waits for them, and runs at once when they are here.
  */
 export function openLesson(lessonId, stepIndex = null, { daily = null } = {}) {
@@ -152,7 +152,7 @@ function showLesson(lessonId, stepIndex, daily) {
   if (!isRestoring() && !daily) remember();
   const saved = state.profile.lessons[lessonId];
   const index = stepIndex ?? (saved && !saved.done ? Math.min(saved.step || 0, found.lesson.steps.length - 1) : 0);
-  // v8: back to a finished lesson (from the game it led to) shows its lesson-complete page.
+  // Back to a finished lesson (from the game it led to) shows its lesson-complete page.
   if (index >= found.lesson.steps.length) {
     update((s) => {
       s.space = "practice";
@@ -255,7 +255,7 @@ export function problemsOfTheme(theme) {
 }
 
 /**
- * v11: from a game's review to practice. A takeaway that names a theme
+ * From a game's review to practice. A takeaway that names a theme
  * ("key mistakes that look like a cut") opens a problem of that theme (or,
  * with fewer than three of them, of its topic): the first one not solved
  * yet, nearest the player's level. The problem view's Next stays in that
@@ -300,7 +300,7 @@ export function openProblem(id, { daily = null, placement = false } = {}) {
 }
 
 /**
- * v13: a problem tried before comes back turned, mirrored and sometimes in
+ * A problem tried before comes back turned, mirrored and sometimes in
  * the other colour (practice/transform.js), so a review asks for the idea, not
  * the remembered picture. The placement quiz and the first showing use the
  * problem as written. The id stays, so the result is the same problem's.
@@ -335,7 +335,7 @@ function browseList(def) {
 /* ---------------------------------------------------------- problems */
 
 /**
- * v13: run `fn` after `ms` only if the attempt that set it is still the one
+ * Run `fn` after `ms` only if the attempt that set it is still the one
  * on screen: the same problem state (not left for another page or problem)
  * and the same attempt (not retried or answered meanwhile). Before, a
  * pending reply played into a retried problem, or recorded an attempt of
@@ -376,7 +376,7 @@ export function practicePlay(x, y) {
     toast(t("practice.endgame.settled"), "warn");
     return;
   }
-  // v13: "Confirm moves in problems" — the first click shows the stone, a
+  // "Confirm moves in problems" — the first click shows the stone, a
   // second click on the same point plays it (as the two-click stone in Play).
   if (state.settings.confirmProblemMove && !(P.ghost && P.ghost.x === x && P.ghost.y === y)) {
     P.ghost = { x, y };

@@ -1,10 +1,10 @@
 /**
- * v13: versions of the stored files and the steps between them
+ * Versions of the stored files and the steps between them
  * (docs/storage.md, "Versions and migrations").
  *
  * Every file the data layer owns carries its format version as `v`:
  * settings.json, current.json, games-index.json and games/<id>.json. v9 to
- * v12 wrote them without one and in the same format, so a file without `v`
+ * Wrote them without one and in the same format, so a file without `v`
  * is a v9 file. A file is brought to STORE_V one step at a time
  * (MIGRATIONS[n] turns version n into n + 1) when it is read: when the
  * store opens or loads it (data/store.js `migrate`), and for every file of

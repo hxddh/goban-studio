@@ -8,7 +8,7 @@
  * distinguishes "the executable linked" from "the app a player double-clicks
  * actually starts".
  *
- * v5: the optional downloads are exercised too, end to end against the
+ * The optional downloads are exercised too, end to end against the
  * pinned KataGo release URLs (human model 99 MB, stronger network 48 MB:
  * seconds on a GitHub-hosted runner), into a temporary models folder that
  * is deleted afterwards. GOBAN_SELFTEST_MODELS=0 skips them (offline runs).
@@ -63,7 +63,7 @@ while (Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 200));
 }
 
-// v13: the app must quit when asked (SIGTERM → [NSApp terminate:] on macOS,
+// The app must quit when asked (SIGTERM → [NSApp terminate:] on macOS,
 // where the page first gets a bounded chance to flush its writes). A quit
 // that does not finish within 15 s is a failure, reported as such, and the
 // process is then killed so the step never hangs.
@@ -102,7 +102,7 @@ const failed = Object.entries(checks).filter(([, value]) => value !== true).map(
 // plays in a handicap game. async/stream/incremental/cancel: the search
 // runs off the UI thread (no frame gap ≥ 250 ms), reports partial results,
 // re-syncs a one-move change with one `play`, and stops within 1 s.
-// modelsResume/modelsHuman/modelsStrong/modelsRemove (v5): the pinned
+// modelsResume/modelsHuman/modelsStrong/modelsRemove: the pinned
 // downloads stop, resume, verify, run on their own KataGo processes and are
 // removed again.
 const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];

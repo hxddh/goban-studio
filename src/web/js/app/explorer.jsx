@@ -1,5 +1,5 @@
 /**
- * v6 explorer: the opening and joseki explorer (a Library page).
+ * Explorer: the opening and joseki explorer (a Library page).
  *
  * Board left, panel right, as in review. The book's continuations are
  * accent marks with letters on the board (mistakes in --bad), and the same
@@ -47,7 +47,7 @@ function lineName(mode, id) {
 
 export function ExplorerView() {
   const e = X.explorerState();
-  // v8: the book is fetched on first use; a moment's empty page until then.
+  // The book is fetched on first use; a moment's empty page until then.
   if (!e) return <Toolbar crumbs={[{ label: t("nav.library"), onClick: X.closeExplorer }]} title={t("explorer.title")} />;
   const mode = e.mode;
   const node = e.game.current;

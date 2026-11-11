@@ -1,5 +1,5 @@
 /**
- * Shell: the two spaces (docs/v9.md, "Two spaces") over the store — boot
+ * Shell: the four spaces (docs/v9.md, "Two spaces") over the store — boot
  * opens the store before anything is read, onboarding opens Play or Practice,
  * the sidebar, the keyboard and the native menus name exactly Play and
  * Practice, back and forward move between them, and a write that fails is one
@@ -27,15 +27,15 @@ const { C, state, store } = A;
 
 try {
   await test("shell: boot opens the store first, then reads settings, the player model and the game from it", async () => {
-    // A first launch: nothing stored. The onboarding sheet, on Today (v12).
+    // A first launch: nothing stored. The onboarding sheet, on Today.
     await C.boot();
     assert.equal(state.ready, true);
     assert.equal(state.space, "today");
-    // v13: no game in progress, so Play opens on its home (the suggested
+    // No game in progress, so Play opens on its home (the suggested
     // game with its handicap, and New game), not a blank board against opponentRank.
-    assert.equal(state.play.view, "home", "v13: Play's home, not an empty board");
+    assert.equal(state.play.view, "home", "Play's home, not an empty board");
     assert.equal(state.sheet?.kind, "onboarding");
-    assert.equal(state.profile.v, 13, "an empty profile (v13: the player model's own version)");
+    assert.equal(state.profile.v, 13, "an empty profile (the player model's own version)");
     assert.equal(state.profile.games.length, 0);
     assert.equal(state.game, null, "no blank game is made up");
     assert.equal(C.playShowsBoard(), false);
@@ -104,7 +104,7 @@ try {
   });
 
   await test("shell: Play is the board; the space again goes back to its top; back and forward cross spaces", () => {
-    // On the board after onboarding; Play again stays on the board (v12).
+    // On the board after onboarding; Play again stays on the board.
     assert.equal(state.play.view, "game");
     const game = state.game;
     C.goSpace("play");

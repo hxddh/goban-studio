@@ -1,5 +1,5 @@
 /**
- * v9 storage (docs/v9.md, "Storage"): every key in memory, written through.
+ * Storage (docs/v9.md, "Storage"): every key in memory, written through.
  *
  *   await store.open()        read every key into memory (once)
  *   store.get(key)            the value, synchronously (undefined when absent)
@@ -23,7 +23,7 @@
  * (the caller shows it); a failed write stays pending and is tried again
  * on the next put of that key or the next flush. Nothing fails silently.
  *
- * v13 (docs/storage.md):
+ * Safety (docs/storage.md):
  *
  *   await store.open({ lazy })  keys under a `lazy` prefix are listed, not
  *                               read (games/: read when a view needs one);
@@ -607,7 +607,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
       return [...pending.keys()].sort();
     },
 
-    /* --------------------------------------------- the safe state (v13) */
+    /* --------------------------------------------- the safe state */
 
     /** Hold every write in memory (true), or let them go again (false: what was held is written now). */
     setReadOnly(on) {
@@ -684,7 +684,7 @@ export function createStore({ backend = null, onError = null, delay = WRITE_DELA
 /** The app's store (opened by the shell at boot). */
 export const store = createStore();
 
-// v13: the host asks for a flush before the app quits or its window closes
+// The host asks for a flush before the app quits or its window closes
 // and waits (at most 1.5 s) for the answer, so the last debounced writes —
 // a game's result, a solved problem — reach the disk (host.js).
 if (hasNative()) installFlushHook(() => store.flush());

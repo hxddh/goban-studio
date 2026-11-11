@@ -64,7 +64,7 @@ const bytesOf = (value) => new TextEncoder().encode(JSON.stringify(value)).lengt
 export function checkBackup(doc) {
   if (!isObject(doc) || Array.isArray(doc) || doc.app !== BACKUP_APP) return { ok: false, error: "notBackup" };
   if (!Number.isInteger(doc.v)) return { ok: false, error: "notBackup" };
-  // v9 was the first version with this format; nothing older is read.
+  // Was the first version with this format; nothing older is read.
   if (doc.v < LEGACY_V) return { ok: false, error: "olderVersion" };
   if (doc.v > BACKUP_V) return { ok: false, error: "newerVersion" };
   if (!isObject(doc.data) || Array.isArray(doc.data)) return { ok: false, error: "damaged" };

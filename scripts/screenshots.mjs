@@ -1,5 +1,5 @@
 /**
- * Checks on OS screenshots of the packaged app (v4 release checks).
+ * Checks on OS screenshots of the packaged app (release checks).
  *
  * The packaged-app tour (scripts/tour-app.mjs) captures each screen with
  * the operating system's own tools. A capture can silently fail in ways a

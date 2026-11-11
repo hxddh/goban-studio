@@ -11,23 +11,22 @@
  * runs the search; the UI never blocks. The host keeps KataGo's board
  * between requests and only sends the moves that changed. Partial reports
  * stream in as `katago:info` window events, a request can be cancelled,
- * and a new request supersedes the previous. (v13 removed the v2
- * synchronous `studio.katagoAnalyze`, which blocked the host's UI thread;
- * the page and the host ship together, so no host without the async
- * command exists any more.) Every request has a deadline in the host: a
+ * and a new request supersedes the previous. (There is no synchronous
+ * path: it would block the host's UI thread, and the page and the host ship
+ * together.) Every request has a deadline in the host: a
  * KataGo that stops answering is killed and the request resolves null,
  * like any other failure.
  *
  * All numbers are reported from Black's point of view
  * (reportAnalysisWinratesAs = BLACK in gtp.cfg and human.cfg).
  *
- * v5: a request may name the KataGo process that serves it (`engine`):
+ * A request may name the KataGo process that serves it (`engine`):
  * "standard" (the shipped network, default), "strong" (the optional larger
  * network) or "human" (the optional human SL model, with a `profile` such
  * as "rank_12k" and a `humanStyle` "raw" | "search"). The host answers
  * `ModelMissing` when that network is not installed; callers fall back.
  *
- * Rules (v5): every request carries the game's ruleset, and KataGo is set
+ * Rules: every request carries the game's ruleset, and KataGo is set
  * to it before it searches: the `rules` field of the payload (the host sends
  * `kata-set-rules japanese|chinese|korean` when it resets the board).
  * Analysis, the computer's moves and the dead stones at the end therefore
@@ -42,8 +41,8 @@ import { BLACK, LETTERS, coordLabel, positionBase, rulesetById } from "./rules.j
 const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
 
 let probe = null;
-// v8: whether a running search can be stopped. Every host that can search
-// can (v13); the flag stays for the scheduler's sake.
+// Whether a running search can be stopped. Every host that can search
+// can; the flag stays for the scheduler's sake.
 let cancellable = true;
 
 /** False once status() has found a host that cannot cancel a search. */
@@ -84,7 +83,7 @@ export function maxTimeFor(visits) {
  * counting any of it as handicap. That is the same reading as
  * Game.handicap after SGF import, so the app's count and KataGo's agree.
  *
- * v13: the stones are those of the position's base (rules.js positionBase):
+ * The stones are those of the position's base (rules.js positionBase):
  * the root, or the board a mid-game SGF setup (AB / AW / AE) produced on
  * the line to the node, whose moves then follow.
  */
@@ -233,7 +232,7 @@ function listen() {
   } catch (_) {}
 }
 
-/** The v5 fields of a request (nothing for the standard engine, as in v4). */
+/** The engine fields of a request (nothing for the standard engine). */
 export function enginePayload({ engine = "standard", profile = "", humanStyle = "raw" } = {}) {
   if (engine === "strong") return { engine };
   if (engine === "human") return { engine, profile, humanStyle: humanStyle === "search" ? "search" : "raw" };
@@ -285,8 +284,8 @@ function analyzeAsync(game, node, visits, onInfo, signal, select) {
  *   onInfo(partial)  called with partial results (same shape) while the
  *                    search runs, about five times a second
  *   signal           AbortSignal: abort cancels the search; resolves null
- *   engine           v5: "standard" | "strong" | "human" (see above)
- *   profile, humanStyle   v5, human engine only
+ *   engine           "standard" | "strong" | "human" (see above)
+ *   profile, humanStyle   human engine only
  *
  * Resolves { moves, ownership, winrate, scoreLead, play, visits, engine }
  * or null when KataGo is not available, the request fails (including an
@@ -297,9 +296,9 @@ export async function analyze(game, { node = game.current, visits = 64, onInfo =
   if (!hasNative() || signal?.aborted) return null;
   const st = await status();
   if (!st?.available || signal?.aborted) return null;
-  // A host without the async command cannot search (v13: no sync path).
+  // A host without the async command cannot search (no sync path).
   if (!st.async) return null;
-  // Optional networks need a v5 host (with `models`).
+  // Optional networks need a host with `models`.
   if (engine !== "standard" && !st.models) return null;
   return analyzeAsync(game, node, visits, onInfo, signal, { engine, profile, humanStyle });
 }
@@ -312,10 +311,10 @@ export function cancel() {
   for (const entry of entries) entry.finish?.(null);
 }
 
-/* ------------------------------------------- v13: human policy of moves */
+/* ------------------------------------------- Human policy of moves */
 
 /**
- * v13: how likely each of one player's moves was for players of several
+ * How likely each of one player's moves was for players of several
  * ranks, from the human SL model (model/move-rank.js reads a rank from it).
  *
  * This needs a host that offers `studio.katagoHumanPolicy`, announced by

@@ -106,12 +106,12 @@ const PRESETS = [
 function NewGameSheet({ prefill }) {
   const s = state.settings;
   const rec = C.recommendedGame();
-  // The recommended board, as the strength (v11): the remembered one only with the suggestion off.
+  // The recommended board, as the strength: the remembered one only with the suggestion off.
   const [size, setSize] = useState(prefill?.size || (s.autoStrength ? rec.size : s.boardSize || rec.size));
   const [tc, setTc] = useState(s.timeControl || "none");
   const [opponent, setOpponent] = useState("ai");
   const [color, setColor] = useState(BLACK);
-  // v9: one axis, the ranks of the ladder (opponents.js); each shows the
+  // One axis, the ranks of the ladder (opponents.js); each shows the
   // measured rank of what plays it with the networks installed.
   const ranks = currentLadder();
   const startRank = nearest(prefill?.opponentRank ?? (s.autoStrength ? rec.opponentRank : s.opponentRank), installed()).rank;
@@ -864,7 +864,7 @@ function UndoRestoreRow() {
 
 /**
  * A question before an action. A dangerous one (delete, replace) starts
- * with Cancel focused (v13), so Enter or Space alone never confirms it.
+ * with Cancel focused, so Enter or Space alone never confirms it.
  */
 function ConfirmSheet({ title, body, confirm, danger, onConfirm }) {
   return (

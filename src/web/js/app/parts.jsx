@@ -212,7 +212,7 @@ export function MoreMenu({ id, items, label }) {
     const close = (e) => {
       if (ref.current && !ref.current.contains(e.target)) update({ menu: null });
     };
-    // v13: registered at once, so the cleanup always removes it. (A timer
+    // Registered at once, so the cleanup always removes it. (A timer
     // here added it after a cleanup that ran first: a listener left behind
     // for every menu closed within the same tick.) The click that opened the
     // menu has already had its pointerdown, so it does not close it.
@@ -255,7 +255,7 @@ export function MoreMenu({ id, items, label }) {
                 disabled={it.disabled}
                 onClick={() => {
                   // Focus goes back to the menu button, so a sheet the item
-                  // opens returns it there when it closes (v6 a11y).
+                  // opens returns it there when it closes.
                   ref.current?.querySelector(".icon-btn")?.focus();
                   update({ menu: null });
                   it.onClick();
@@ -301,7 +301,7 @@ export function Board({ model, onPlay, onHover, label }) {
     view.current?.setModel({ ...model, lastMark: state.settings?.lastMoveMark !== false });
     expose("__board", view.current);
   });
-  // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
+  // The board's keys and what they say (announcer.js). Arrows and
   // the reading keys work on every board, playable or not.
   const [spoken, setSpoken] = useState("");
   const onKey = (e) => {
@@ -374,7 +374,7 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
     const a = from.current;
     const b = value;
     if (a === b) return;
-    // Reduced motion (§8): the final number at once (v6 a11y).
+    // Reduced motion (§8): the final number at once.
     if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setShown(b);
       from.current = b;
@@ -395,7 +395,7 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
 }
 
 /**
- * v10: a problem's position, small: its diagram (solver.js notation, one
+ * A problem's position, small: its diagram (solver.js notation, one
  * string per row) drawn as a square tile of 32 css px, so the rows of
  * Practice's path that share a title look different. Nothing before the
  * problem's part has arrived (content.js), the caller shows its icon.

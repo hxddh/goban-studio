@@ -1,5 +1,5 @@
 /**
- * v6 explorer: the opening and joseki book.
+ * Explorer: the opening and joseki book.
  *
  * The book (content/book.json) is precomputed by scripts/make-book.mjs with
  * KataGo; it ships with the app, so the explorer works offline and in the

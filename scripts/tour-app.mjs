@@ -1,5 +1,5 @@
 /**
- * Native screenshot tour of a packaged Goban Studio (v4 release checks).
+ * Native screenshot tour of a packaged Goban Studio (release checks).
  *
  * Launches the packaged executable with GOBAN_TOUR_OUT set. The page
  * (src/web/js/tour.js) visits Play, a 19×19 game, its review, Practice and

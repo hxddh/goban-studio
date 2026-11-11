@@ -265,7 +265,7 @@ await test("describeMistakes: attribution, theme and both stories for each key m
   assert.equal(km.index, 3); // Black's 6,2 let White take the corner
   assert.equal(km.move.color, 1);
   assert.equal(km.attribution.kind, "group-died");
-  assert.ok(km.source && km.source.kind === "group", "legacy source kept for the v3 view");
+  assert.ok(km.source && km.source.kind === "group", "the source is kept for the views");
   assert.equal(km.story.summary.key, "story.sum.groupDied");
   assert.ok(km.story.better.length >= 3 && km.story.better.length <= 6);
   assert.deepEqual(km.story.better[0].move, { x: 2, y: 0 });

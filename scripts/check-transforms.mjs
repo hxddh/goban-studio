@@ -1,5 +1,5 @@
 /**
- * v13: every problem is still a proved problem after the review transform
+ * Every problem is still a proved problem after the review transform
  * (src/web/js/practice/transform.js): turned or mirrored and, except endgame
  * problems, with the colours swapped. For each problem the transformed
  * definition must pass the solver's validate() (exact first-move search,

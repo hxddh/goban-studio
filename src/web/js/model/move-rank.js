@@ -1,5 +1,5 @@
 /**
- * v13: a second reading of the player's strength, from their own moves
+ * A second reading of the player's strength, from their own moves
  * (docs/strength.md, "v13: your moves").
  *
  * KataGo's human SL model gives, for a position and a rank profile, the

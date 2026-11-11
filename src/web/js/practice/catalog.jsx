@@ -27,7 +27,7 @@ export function CatalogView() {
   );
 }
 
-/** v12: the course, the problems by topic and the shapes — on Practice's page itself. */
+/** The course, the problems by topic and the shapes — on Practice's page itself. */
 export function CatalogSections({ first = true } = {}) {
   const p = state.profile;
   const solvedOf = (list) => list.filter((x) => p.problems[x.id]?.solved).length;

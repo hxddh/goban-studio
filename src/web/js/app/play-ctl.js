@@ -25,11 +25,11 @@ import { finishedBySize, firstOffer, otherSize, suggestedSize } from "./first-ru
 
 /* ------------------------------------------------------------ state */
 
-/** v7: the signal of everything a game queued (cancelled when it is replaced). */
+/** The signal of everything a game queued (cancelled when it is replaced). */
 const gameSignal = (g) => Engine.sched.ownerSignal(g?.owner);
 
 /**
- * v9: the opponent of a game from its meta: the implementation it was
+ * The opponent of a game from its meta: the implementation it was
  * played with (`impl`) when the app still knows it, else what plays its
  * `rank` now (the New game choice, or the `opponentRank` setting).
  */
@@ -40,7 +40,7 @@ export function opponentOf(meta = {}) {
 }
 
 export function freshGameState(game, meta = {}) {
-  // v7: a new game ends whatever the last one still had queued (its
+  // A new game ends whatever the last one still had queued (its
   // pondering); the last game's analysis carries on in the background
   // (play/analysis.js).
   if (state.game?.owner) Engine.sched.cancelOwner(state.game.owner);
@@ -51,11 +51,11 @@ export function freshGameState(game, meta = {}) {
     name: meta.name || "",
     opponent: meta.opponent === "human" ? "human" : "ai",
     humanColor: meta.humanColor === WHITE ? WHITE : BLACK,
-    // v9: the opponent is a rank; `impl` is what plays it (opponents.js),
+    // The opponent is a rank; `impl` is what plays it (opponents.js),
     // `rank` the measured rank of that implementation, as shown.
     ...opponentOf(meta),
     thinking: false,
-    engineFailed: false, // v13: the computer could not move; the panel offers Retry
+    engineFailed: false, // The computer could not move; the panel offers Retry
     pondering: false,
     gen: 0,
     hint: null,
@@ -68,7 +68,7 @@ export function freshGameState(game, meta = {}) {
     before: null, // analysis of the position before the player's move (teaching)
     pending: null, // teaching warning waiting for the player's choice
     proposal: false, // "the game looks finished — count?"
-    proposalSeen: -1, // v8: the move number of the last "keep playing"
+    proposalSeen: -1, // The move number of the last "keep playing"
     aiLow: 0,
     ghost: null, // two-click placement
     redo: [], // moves taken back that Redo can play again: one list of moves per undo
@@ -86,9 +86,9 @@ export function restoreCurrent() {
     try {
       const { game } = loadSGF(saved.sgf);
       state.game = freshGameState(game, saved);
-      // v13: its Library record (game files are read when needed) is read now, for the review and the result.
+      // Its Library record (game files are read when needed) is read now, for the review and the result.
       if (saved.recordId && !Games.isLoaded(saved.recordId)) Games.loadGame(saved.recordId);
-      // v8: a game saved during the count (both passed) counts again;
+      // A game saved during the count (both passed) counts again;
       // otherwise it would have neither a count nor its play controls.
       if (game.phase === "scoring" && !game.current.result) startScoring();
       return;
@@ -96,10 +96,8 @@ export function restoreCurrent() {
       /* fall through */
     }
   }
-  // v13: nothing saved, nothing on the board: Play shows its home (the
+  // Nothing saved, nothing on the board: Play shows its home (the
   // suggested game, with its handicap, and New game) until a game starts.
-  // (v12 put a blank rated game here, against opponentRank without the
-  // suggested handicap, and showed that instead.)
   state.game = null;
 }
 
@@ -150,7 +148,7 @@ export function saveToLibrary({ quiet = false } = {}) {
   return rec;
 }
 
-/* ------------------------------------------- v13: unfinished games */
+/* ------------------------------------------- Unfinished games */
 
 /** Moves the player made in a game (both sides' in a game between two people). */
 export function humanMoves(g = state.game) {
@@ -162,7 +160,7 @@ export function humanMoves(g = state.game) {
 
 /**
  * A game in progress that replacing it would lose: no result, and at least
- * one move of the player's. v13: also what "a game in progress" means on
+ * one move of the player's. Also what "a game in progress" means on
  * Today and Play's home (play/home.jsx gameInProgress), and whether Play
  * opens on the board at launch: a board where only the computer moved is
  * not one yet.
@@ -249,7 +247,7 @@ export function playReviewing() {
 }
 
 /**
- * v12: the game's board is on screen — by the same rule Play draws it
+ * The game's board is on screen — by the same rule Play draws it
  * (app.jsx PlaySpace): in Play, no review, and the game view or a game that
  * is not over. The clock, the report and the board's keys follow this.
  */
@@ -258,7 +256,7 @@ export function boardShown() {
 }
 
 /**
- * v13: Play shows the board (else its home): the game view, or a game in
+ * Play shows the board (else its home): the game view, or a game in
  * progress (unfinishedGame). A game just started is in the game view; one
  * restored at launch with no move of the player's yet, or none at all,
  * leaves Play on its home with the suggested game.
@@ -357,12 +355,12 @@ export function newGame(opts = {}) {
     game.playerBlack = humanColor === BLACK ? t("play.you") : "KataGo";
     game.playerWhite = humanColor === WHITE ? t("play.you") : "KataGo";
   }
-  // v9: the opponent is a rank of the ladder (opts.opponentRank).
+  // The opponent is a rank of the ladder (opts.opponentRank).
   const opponentRank = opts.opponentRank ?? state.settings.opponentRank;
   if (opts.opponentRank != null) setSetting("opponentRank", opts.opponentRank);
   const tc = opts.timeControl ?? state.settings.timeControl;
   if (opts.timeControl) setSetting("timeControl", opts.timeControl);
-  // v13: the game in progress is not lost (it goes to the Library as unfinished).
+  // The game in progress is not lost (it goes to the Library as unfinished).
   parkCurrent();
   Engine.cancel();
   remember();
@@ -489,7 +487,7 @@ export async function ponder() {
 }
 
 /**
- * "Shall we count?" on a settled board (feel.js countReady). v8: after
+ * "Shall we count?" on a settled board (feel.js countReady). After
  * "keep playing" it waits three moves each before it asks again.
  */
 function proposalWaits(g) {
@@ -505,7 +503,7 @@ function checkProposal(a) {
 export { thinkTime };
 
 /**
- * v13: where the computer's move comes from. `decide` is the engine's
+ * Where the computer's move comes from. `decide` is the engine's
  * (KataGo, or the offline engine inside it); `offline` the offline engine
  * alone (ai.js), tried when `decide` gave no move. The tests replace them
  * to make each fail.
@@ -523,7 +521,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   g.engineFailed = false;
   update();
   const started = performance.now();
-  // v13: the position the move is for, fixed now (a queued search would read the board when it runs).
+  // The position the move is for, fixed now (a queued search would read the board when it runs).
   const node = g.game.current;
   let result = { move: null, analysis: null };
   try {
@@ -537,7 +535,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const a = result.analysis;
   if (a) g.eval = a;
   if (result.mode) g.opponentMode = result.mode; // "human" | "strong" | "standard" | "offline"
-  // v9: what actually played (a standard level when an optional process
+  // What actually played (a standard level when an optional process
   // could not answer): its measured rank is shown, and the game is rated
   // against it.
   if (result.impl && result.mode !== "offline") {
@@ -554,7 +552,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
       if (loss >= threshold) {
         g.thinking = false;
         const move = g.game.current.move;
-        // v8: one reason, from the two searches already made (no new search).
+        // One reason, from the two searches already made (no new search).
         const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
         g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
         announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
@@ -567,7 +565,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
 }
 
 /**
- * v13: the engine gave no move (it failed, or threw): the offline engine
+ * The engine gave no move (it failed, or threw): the offline engine
  * plays this one. Resolves the result to play, or null when that failed
  * too or the game moved on; then the game waits on Retry (engineFailed),
  * never stuck on the computer's turn without a way out.
@@ -617,9 +615,9 @@ async function reply(g, gen, result, started) {
     finishGame();
     return;
   }
-  // v8: a board settled before one of KataGo's own quiet moves is settled
+  // A board settled before one of KataGo's own quiet moves is settled
   // after it, so the count is offered on the player's turn even when
-  // nothing ponders there (before v8 it was cleared by the move itself).
+  // nothing ponders there.
   const mv = result.move;
   const quiet = !!a && !!mv && !mv.pass && a.moves.some((m) => m.visits > 0 && !m.pass && m.x === mv.x && m.y === mv.y);
   const ready = quiet && countReady(a, g.game.moveNumber + 1, g.game.size);
@@ -634,7 +632,7 @@ async function reply(g, gen, result, started) {
     update();
     return;
   }
-  // v13: no move to play (a kept teaching pause whose search had none): never stuck on the computer's turn.
+  // No move to play (a kept teaching pause whose search had none): never stuck on the computer's turn.
   if (!move) return computerFailed(g);
   if (move.pass) {
     g.game.pass();
@@ -875,7 +873,7 @@ export async function askHint() {
   const g = state.game;
   if (!g || g.thinking || g.pending || g.game.phase !== "playing" || gameOver(g)) return;
   update({ menu: null });
-  // v13: the hint is for this position: an undo, a new move or a new game
+  // The hint is for this position: an undo, a new move or a new game
   // while it is being worked out drops it (gen, node).
   const gen = g.gen;
   const node = g.game.current;
@@ -925,7 +923,7 @@ export function clockTick() {
     finishGame();
     return;
   }
-  // v13: only the clocks re-render (store.js clockChanged), not the app.
+  // Only the clocks re-render (store.js clockChanged), not the app.
   clockChanged();
 }
 
@@ -933,7 +931,7 @@ export function clockTick() {
 
 async function startScoring() {
   const g = state.game;
-  // v13: this count's own token: after Resume and a second count, the
+  // This count's own token: after Resume and a second count, the
   // first count's late answer is not this one's.
   const token = {};
   const node = g.game.current;
@@ -950,7 +948,7 @@ async function startScoring() {
 
 export function toggleDead(x, y) {
   const g = state.game;
-  // v8: not while KataGo is still marking (its answer would undo the click).
+  // Not while KataGo is still marking (its answer would undo the click).
   if (!g?.scoring || g.scoring.source === "pending") return;
   const v = g.game.board.get([x, y]);
   if (!v) return;
@@ -973,7 +971,7 @@ export function confirmScore() {
 export function resumePlay() {
   const g = state.game;
   if (!g?.scoring) return;
-  // v13: the count's search (dead stones) is stopped; its answer would belong to no count.
+  // The count's search (dead stones) is stopped; its answer would belong to no count.
   Engine.cancel();
   g.game.resumePlay();
   g.scoring = null;
@@ -1068,7 +1066,7 @@ export function openPostGame(g = state.game, { inPlace = true } = {}) {
  */
 export function showFinished() {
   const g = state.game;
-  // v12: a review left open in another space (a record or classic in the
+  // A review left open in another space (a record or classic in the
   // Library) does not hold back this game's report; it is closed first.
   if (!boardShown()) return;
   if (g?.game.mainLine().at(-1).result && !g.scoring) {
@@ -1117,7 +1115,7 @@ export async function exportSGF(game = state.game?.game, name = state.game?.name
 
 /**
  * Save text through the native save dialog, or as a browser download.
- * Resolves true when it was saved. v13: in the app a failed write is an
+ * Resolves true when it was saved. In the app a failed write is an
  * error, never a silent fallback to a download link (a WebView ignores
  * those); the link is the browser preview's only.
  */
@@ -1174,10 +1172,10 @@ export function openNewGame(prefill = null) {
 export function playFromHere() {
   const r = state.review;
   if (!r) return;
-  // v5: the record's rules and handicap carry over (the handicap is what
+  // The record's rules and handicap carry over (the handicap is what
   // the Chinese count compensates); the root stones are set up.
   const game = gameAt(r.game, r.game.current);
-  // v13: the game in progress goes to the Library as unfinished first.
+  // The game in progress goes to the Library as unfinished first.
   parkCurrent();
   dropReview(r);
   if (state.game) state.game.gen++;
@@ -1194,7 +1192,7 @@ export function playFromHere() {
   ponder();
 }
 
-// What a finished game teaches (app/learn-game.js), as before v13.
+// What a finished game teaches (app/learn-game.js).
 export { learnFromGame };
 
 // The review controller reaches the game in play through these (ctl-core setGameHooks).

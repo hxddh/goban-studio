@@ -1,4 +1,4 @@
-/* Goban Studio v4 — see docs/design.md (the specification this file follows).
+/* Goban Studio — see docs/design.md (the specification this file follows).
  *
  * System fonts; an 8 px grid; neutral greys, one accent (focus, selection,
  * hints) and two signals; the primary action is ink, not colour. */
@@ -14,7 +14,7 @@
   --line-2: rgba(29, 28, 26, 0.16);
   --text: #1d1c1a;
   --text-2: #5f5d58;
-  --text-3: #6c6964; /* v13: 4.6:1 on the sidebar, 5:1 on the page (WCAG AA for small text) */
+  --text-3: #6c6964; /* 4.6:1 on the sidebar, 5:1 on the page (WCAG AA for small text) */
   --on-primary: #ffffff;
   --accent: #34529a;
   --accent-soft: rgba(52, 82, 154, 0.1);
@@ -98,7 +98,7 @@
   --line-2: rgba(255, 255, 255, 0.15);
   --text: #edebe6;
   --text-2: #a9a69f;
-  --text-3: #9c988f; /* v13: 4.6:1 on a hovered or active row of a surface, 6:1 on the page */
+  --text-3: #9c988f; /* 4.6:1 on a hovered or active row of a surface, 6:1 on the page */
   --on-primary: #191918;
   --accent: #8ea6e0;
   --accent-soft: rgba(142, 166, 224, 0.14);
@@ -115,7 +115,7 @@
   --scrim: rgba(0, 0, 0, 0.5);
 }
 
-/* v6 a11y: Larger text (View menu, ⌘= / ⌘−). The same seven type tokens,
+/* Larger text (View menu, ⌘= / ⌘−). The same seven type tokens,
  * one step up; weights and hierarchy unchanged. */
 :root[data-text="large"] {
   --t-display: 600 31px/38px var(--font);
@@ -391,7 +391,7 @@ select, .text-input {
 .move-grid li.last button { color: var(--text); font-weight: 500; }
 .move-grid .mn { min-width: 22px; text-align: right; color: var(--text-3); }
 .moves-empty { font: var(--t-small); color: var(--text-3); margin: 0; }
-/* v8: the review's one status line: analysis progress · where the game left the book. */
+/* The review's one status line: analysis progress · where the game left the book. */
 .review-status { display: flex; flex-wrap: wrap; gap: 0 var(--s-2); margin: 0; }
 .review-status:empty { display: none; }
 .review-status > span + span::before { content: "·"; margin-right: var(--s-2); color: var(--text-3); }
@@ -710,7 +710,7 @@ button.group-row:hover { background: var(--fill); }
 .shape-chips .chip { height: 32px; padding: 0 12px; gap: 8px; font-size: 13px; }
 .chip-count { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 11px; }
 .chip.done .chip-count { color: var(--good); }
-/* v6 endgame: the values of a "how many points" question */
+/* Endgame: the values of a "how many points" question */
 .value-choices { margin: var(--s-1) 0 var(--s-2); }
 .value-choices .chip { height: 32px; padding: 0 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .value-choices .chip.off { color: var(--text-3); text-decoration: line-through; cursor: default; }
@@ -720,13 +720,13 @@ button.group-row:hover { background: var(--fill); }
 .score-detail i { font-style: normal; white-space: nowrap; }
 .celebrate .fine { display: inline-flex; align-items: center; gap: 4px; }
 
-/* v5: facts lists */
+/* Facts lists */
 .facts { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); margin: 0; padding-top: var(--s-3); border-top: 1px solid var(--line); font: var(--t-small); }
 .facts dt { color: var(--text-3); }
 .facts dd { margin: 0; display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
 .facts .link { font-size: 12px; }
 
-/* v5: the course as a map */
+/* The course as a map */
 .units.map { gap: var(--s-2); }
 .units.map .unit { padding: 0; }
 .units.map .unit-head { width: 100%; align-items: center; padding: var(--s-3) var(--s-4); border: 0; background: none; cursor: pointer; text-align: left; color: inherit; border-radius: var(--r-2); }
@@ -745,7 +745,7 @@ button.group-row:hover { background: var(--fill); }
 :root[data-theme="dark"] .sb-mark .mark-black, :root[data-board="contrast"] .sb-mark .mark-black { stroke: var(--stone-rim); stroke-width: 1.5; }
 .opening-tip { font: var(--t-small); margin-bottom: var(--s-2); }
 
-/* v5 review: summary, tree, comments */
+/* Review: summary, tree, comments */
 .phase-table { width: 100%; border-collapse: collapse; font: var(--t-small); font-variant-numeric: tabular-nums; }
 .phase-table th, .phase-table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
 .phase-table th:first-child { text-align: left; font-weight: 500; color: var(--text); }
@@ -771,7 +771,7 @@ button.group-row:hover { background: var(--fill); }
 .mark-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .mark-tools .link { margin-left: auto; font-size: 12px; }
 
-/* v5: trends on Today */
+/* Trends on Today */
 .trend-card { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
 .update-block { display: flex; flex-direction: column; gap: var(--s-2); }
 .update-progress { display: flex; align-items: center; gap: var(--s-3); }
@@ -781,7 +781,7 @@ button.group-row:hover { background: var(--fill); }
 .grade-head .fine { margin-left: auto; }
 .grade-section { margin-top: var(--s-5); }
 
-/* v5: optional downloads */
+/* Optional downloads */
 .model-row { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) 0; border-top: 1px solid var(--line); }
 .model-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .model-text strong { font: 500 13px/18px var(--font); }
@@ -791,13 +791,13 @@ button.group-row:hover { background: var(--fill); }
 .model-text .progress { margin-top: 4px; }
 .sheet:focus-visible, .sheet:focus { outline: none; }
 
-/* v6: the review panel in three tabs under the chart. */
+/* The review panel in three tabs under the chart. */
 .review-tabs { display: flex; margin-top: var(--s-1); }
 .review-tabs button { flex: 1; }
 .review-tab { display: flex; flex-direction: column; gap: var(--s-4); min-height: 0; }
 .review-tab > .quiet-note { margin-top: 0; }
 
-/* v6: settings as a two-pane window — a source list of panes, one pane shown. */
+/* Settings as a two-pane window — a source list of panes, one pane shown. */
 .sheet.settings-sheet { width: min(780px, 100%); height: min(620px, calc(100vh - 48px)); }
 /* One pane is never taller than the sheet (docs/design.md §7); its groups keep a steady rhythm. */
 .settings-pane .row > .segmented { flex: none; }
@@ -818,7 +818,7 @@ button.group-row:hover { background: var(--fill); }
   .settings-split { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .settings-nav { flex-direction: row; overflow-x: auto; border-radius: 0; }
 }
-/* ---------------------------------------- v9 the post-game review, Play's home */
+/* ---------------------------------------- The post-game review, Play's home */
 
 .review-result { display: flex; flex-direction: column; gap: 2px; }
 .review-result .fine { font-variant-numeric: tabular-nums; }
@@ -900,7 +900,7 @@ button.group-row:hover { background: var(--fill); }
   .row-continue { color: LinkText; }
 }
 
-/* v6 explorer */
+/* Explorer */
 .explorer-panel .segmented { display: flex; align-self: stretch; }
 .explorer-panel .segmented button { flex: 1; }
 .explorer-status { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -922,7 +922,7 @@ button.group-row:hover { background: var(--fill); }
 .explorer-about summary { cursor: pointer; font: var(--t-small); color: var(--text-2); }
 .explorer-about p { margin-top: var(--s-2); }
 
-/* v7 scheduler */
+/* Scheduler */
 .bg-job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .bg-job { display: flex; align-items: center; gap: var(--s-3); min-height: 44px; padding: var(--s-2) 0; border-top: 1px solid var(--line); }
 .bg-job:first-child { border-top: 0; }
@@ -1022,11 +1022,11 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
   .spark circle { fill: CanvasText; }
 }
 
-/* v8 beginner path: the lesson bridge's one line, and the first count's note */
+/* Beginner path: the lesson bridge's one line, and the first count's note */
 .celebrate .bridge-lead { max-width: 360px; font: var(--t-body); color: var(--text-2); }
 .score-card .first-count { font: var(--t-small); }
 
-/* v13 safe state (app/safety.jsx): no bridge, or the store could not be read */
+/* Safe state (app/safety.jsx): no bridge, or the store could not be read */
 .safe-screen { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--s-5); background: var(--bg); overflow: auto; }
 .safe-card { max-width: 520px; width: 100%; padding: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
 .safe-card h1 { margin: 0 0 var(--s-3); font: 600 18px/26px var(--font); }
@@ -1035,7 +1035,7 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .safe-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
 .safe-banner { display: flex; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-2) var(--s-4); background: var(--fill); color: var(--text); font: var(--t-small); border-bottom: 1px solid var(--line); }
 
-/* v13 Windows high contrast (forced colours): the system draws text and
+/* Windows high contrast (forced colours): the system draws text and
  * surfaces in its own colours and drops box shadows and backgrounds, so
  * what told focus, buttons and the selected choice apart comes back as
  * system-coloured outlines and borders. */

@@ -8,11 +8,11 @@
  *
  * Export lives on Game.toSGF(); this module only reads.
  *
- * v5: comments (C) and markup (TR, SQ, CR, MA, LB) are read on every node,
+ * Comments (C) and markup (TR, SQ, CR, MA, LB) are read on every node,
  * and properties the app does not interpret are kept on node.extra (root
  * and moves) so that toSGF() writes them back.
  *
- * v13: real-world records.
+ * Real-world records.
  *   - Bytes are decoded by the record's own CA charset (decodeSgfBytes).
  *   - Setup (AB / AW / AE) in move-less nodes right after the root belongs
  *     to the starting position; setup later in the game is applied before
@@ -645,7 +645,7 @@ export function loadSGF(input, { index = null } = {}) {
   }
   const root = roots[which];
   const data = (root.data ||= {});
-  // v8: a move written in the root node (some programs do) is the first
+  // A move written in the root node (some programs do) is the first
   // move, not an unknown root property.
   if (hasMove(data)) {
     const move = {};
@@ -657,9 +657,9 @@ export function loadSGF(input, { index = null } = {}) {
     for (const c of child.children) c.parent = child;
     root.children = [child];
   }
-  // v5: Japanese, Chinese and Korean records are read under their own
+  // Japanese, Chinese and Korean records are read under their own
   // rules (spellings and the rulesets that stay rejected are listed at
-  // rulesFromSgf). No RU means Japanese, as every record before v5.
+  // rulesFromSgf). No RU means Japanese.
   const rulesRaw = first(data, "RU").trim();
   const rules = rulesFromSgf(rulesRaw);
   if (!rules) {
@@ -686,7 +686,7 @@ export function loadSGF(input, { index = null } = {}) {
   if (decoded?.guessed) warn("sgf.warn.guessedCharset", [CHARSET_NAMES[decoded.charset] || decoded.charset]);
   const bad = (raw) => warn("sgf.warn.badPoint", [String(raw).slice(0, 12)]);
 
-  // v13: the starting position is the root's setup plus that of the
+  // The starting position is the root's setup plus that of the
   // move-less nodes that follow it on their own (several editors write a
   // problem's stones, or a handicap, in the second node).
   const signs = emptySignMap(size);
@@ -725,7 +725,7 @@ export function loadSGF(input, { index = null } = {}) {
   // matches how KataGo reads the same root: see setupStones in katago.js).
   const handicap = aw.length ? ha : ab.length >= 2 ? Math.min(9, ab.length) : ha;
   const komiRaw = first(data, "KM");
-  // A missing KM takes the ruleset's komi (6.5 before v5); v8: the komi of
+  // A missing KM takes the ruleset's komi; The komi of
   // a handicap game (0.5) when there are handicap stones.
   const fallbackKomi = defaultKomi(rules, handicap);
   let komi = fallbackKomi;

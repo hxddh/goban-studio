@@ -2,7 +2,7 @@
  * Assemble frontend/dist from src/web.
  *
  * One script, not a hand-copied list: the packaged page, styles, bundle,
- * assets and icon are copied here (v4 uses system fonts). `npm run build` must run first.
+ * assets and icon are copied here (the app uses system fonts). `npm run build` must run first.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -21,13 +21,13 @@ for (const f of ["index.html", "styles.css"]) {
 for (const f of ["bundle.js"]) {
   fs.copyFileSync(path.join(src, "js", f), path.join(dist, "js", f));
 }
-// v8: data the bundle fetches on first use instead of parsing at start-up
+// Data the bundle fetches on first use instead of parsing at start-up
 // (scripts/bundle.mjs LAZY_DATA), served beside index.html.
 fs.mkdirSync(path.join(dist, "content"), { recursive: true });
 for (const f of ["book.json"]) {
   fs.copyFileSync(path.join(src, "js", "content", f), path.join(dist, "content", f));
 }
-// v9: the course, problems and classics past the start-up index
+// The course, problems and classics past the start-up index
 // (src/web/js/content.js), written by bundle.mjs.
 for (const f of ["course.json", "problems.json", "classics.json"]) {
   const from = path.join(src, "js", "content-lazy", f);

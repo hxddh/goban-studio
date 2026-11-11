@@ -1,5 +1,5 @@
 /**
- * v4 review: the key mistakes of a game, explained.
+ * Review: the key mistakes of a game, explained.
  *
  * For each costly move: where the points went (attributeLoss, from KataGo's
  * ownership), which pattern it looks like (classifyMistake, read off the

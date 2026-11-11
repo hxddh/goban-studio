@@ -1,5 +1,5 @@
 /**
- * v4 review: turning an engine line into a short story.
+ * Review: turning an engine line into a short story.
  *
  * `simulate()` plays a line on a real board (rules.js / @sabaki/go-board, so
  * captures and ko are the rules' own) and records the plain facts of every

@@ -2,7 +2,7 @@
  * Everything the app does, as plain functions over the state.
  *
  * This file is the hub the views import: it boots the app (the store
- * first), owns the four spaces (Today, Play, Practice and Library; v12)
+ * first), owns the four spaces (Today, Play, Practice and Library)
  * and history restore, the games' history, backups and onboarding, and
  * re-exports the play, review and practice controllers. None of it touches the DOM.
  */
@@ -40,7 +40,7 @@ export * from "../play/analysis.js";
 
 export * from "./explorer-ctl.js";
 export * from "../practice/session.js"; // Practice's path, today's session
-export * from "../practice/placement.js"; // v10: the placement quiz
+export * from "../practice/placement.js"; // The placement quiz
 import { itemKey, todaysSession } from "../practice/session.js";
 export * from "./capture-ctl.js"; // the beginner bridges (Practice)
 import { resumeCapture } from "./capture-ctl.js";
@@ -127,7 +127,7 @@ async function waitForBridge(ms = 1500) {
  * themselves are read when a view needs one), bring what it read to the
  * current format (data/migrate.js), and only then decide what to show.
  *
- * v13 safety: in the packaged app a missing bridge is an error screen,
+ * Safety: in the packaged app a missing bridge is an error screen,
  * never a fresh start in the WebView's own storage; a core file that could
  * not be read puts the app in its safe state (read-only, no onboarding,
  * app/safety.jsx) instead of taking the player for a new one.
@@ -164,7 +164,7 @@ export async function boot() {
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
-  // Play opens on the board when a game is in progress (v13: one with a
+  // Play opens on the board when a game is in progress (one with a
   // move of the player's, play-ctl unfinishedGame), else on its home.
   state.space = "today";
   state.play = { ...state.play, view: unfinishedGame() ? "game" : "home" };
@@ -237,11 +237,11 @@ export async function resetDamaged() {
 
 /* --------------------------------------------------------------- spaces */
 
-/** The four spaces (v12: Today, Play, Practice, Library), in sidebar order. */
+/** The four spaces (Today, Play, Practice, Library), in sidebar order. */
 export const SPACES = ["today", "play", "practice", "library"];
 
 /**
- * Play's top: the board while a game is not over (v12, as before v9), else
+ * Play's top: the board while a game is not over, else
  * what to play next. Any review open in Play closes.
  */
 export function playHome() {
@@ -301,11 +301,10 @@ export function goSpace(space) {
     return playShowsBoard() && !playReviewingNow() ? playBoard() : playHome();
   }
   remember();
-  // v12: a record or classic is read in the Library; leaving the Library
+  // A record or classic is read in the Library; leaving the Library
   // closes it (its edits are kept), so no other space carries it along.
   if (state.review?.meta.space === "library") dropReview();
-  // Play is the board while a game is not over (v12, as before v9); v13:
-  // a game restored at launch with no move of the player's leaves Play on
+  // Play is the board while a game is not over; a game restored at launch with no move of the player's leaves Play on
   // its home (play-ctl playShowsBoard).
   const board = space === "play" && playShowsBoard() && !state.game.game.current.result && !playReviewingNow();
   update((s) => {

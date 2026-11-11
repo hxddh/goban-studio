@@ -6,7 +6,7 @@
  *
  * Pure apart from the store it is given; a missing or broken value falls
  * back to the default of that one setting, never to an error, and a number
- * outside its range is brought into it (v13). The file carries the store's
+ * outside its range is brought into it. The file carries the store's
  * format version `v` (data/migrate.js); the settings themselves do not.
  */
 import { SETTINGS_KEY, STORE_V } from "./migrate.js";
@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS = {
   largeText: false,
   teaching: null, // null = decide from the estimate (on for newer players)
   confirmMove: false, // two-click placement
-  confirmProblemMove: false, // v13: two-click placement in problems
+  confirmProblemMove: false, // Two-click placement in problems
   showEval: false, // win-rate bar while playing
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review

@@ -172,7 +172,7 @@ export function openReleasePage() {
   return Host.openReleasePage();
 }
 
-/* ------------------------------------------------------ v5 update install */
+/* ------------------------------------------------------ Update install */
 //
 // After a check found a newer release, "Download and install" asks the host
 // to fetch this platform's package of that release and the release's
@@ -190,7 +190,7 @@ export const INSTALL_BLOCKED = ["Unsupported", "NotPackaged", "Translocated", "R
 export const INSTALL_ERRORS = [
   "Busy",
   "BadTag",
-  // v13: the host installs only the tag its own last check found, and only
+  // The host installs only the tag its own last check found, and only
   // a newer one than this version.
   "NotChecked",
   "NotNewer",
@@ -200,7 +200,7 @@ export const INSTALL_ERRORS = [
   "NoAsset",
   "TooLarge",
   "NoChecksum",
-  // v13, builds with an update key (docs/signing.md): SHA256SUMS.sig is
+  // Builds with an update key (docs/signing.md): SHA256SUMS.sig is
   // missing or does not verify.
   "NoSignature",
   "BadSignature",
@@ -217,7 +217,7 @@ export const INSTALL_ERRORS = [
   "Cancelled",
   "NotReady",
   "Helper",
-  // v13: another helper is updating this installation; the helper never
+  // Another helper is updating this installation; the helper never
   // proved it started (the app stays open).
   "HelperBusy",
   "HelperNotStarted",

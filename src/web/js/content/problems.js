@@ -39,7 +39,7 @@
  * `shape` (optional) names the classic textbook shape a problem is built
  * on, from SHAPES; the app can list them as a collection.
  *
- * Endgame problems (v6, topic "endgame", goal "endgame") are proved by the
+ * Endgame problems (topic "endgame", goal "endgame") are proved by the
  * solver's counting mode (see the counting section of solver.js): exact
  * minimax counting of a sealed region under Japanese counting. Their
  * diagrams add ':' points, empty points that are counted at the end but not
@@ -109,7 +109,7 @@ const TITLE = {
   bigEye: L("大眼杀小眼", "Big eye versus small eye", "큰 눈 대 작은 눈", "大きい眼と小さい眼"),
   secondLine: L("二路七子", "Seven stones on the second line", "2선의 일곱 점", "二線の七子"),
   vitalKill: L("杀棋的要点", "Vital point for killing", "잡는 급소", "殺しの急所"),
-  // v5: the 2-1 point of the corner (first line, next to the 2-2 point).
+  // The 2-1 point of the corner (first line, next to the 2-2 point).
   twoOne: msg("problem.twoOne.title"),
 };
 
@@ -441,7 +441,7 @@ export const THEMES = [
   { id: "race-eye", name: L("有眼杀无眼", "Eye versus no eye", "유가무가", "眼あり眼なし") },
   { id: "seki", name: L("双活", "Seki", "빅", "セキ") },
   { id: "race-big-eye", name: msg("theme.race-big-eye") },
-  // v6 endgame
+  // Endgame
   ...["hane-connect", "sente-gote", "reverse-sente", "double-sente", "monkey-jump", "endgame-compare", "deiri"].map((id) => ({ id, name: msg(`theme.${id}`) })),
 ];
 
@@ -466,7 +466,7 @@ export const THEMES = [
  * second-line-seven (seven stones on the second line, ends blocked on the
  * second line) are whole-group shapes; see their problems.
  *
- * Not a shape but a v5 title: `TITLE.twoOne`, the 2-1 point of a corner
+ * Not a shape but a title: `TITLE.twoOne`, the 2-1 point of a corner
  * (first line, next to the 2-2 point), for corner kills answered there.
  * L-group, J-group, carpenter's square and the comb shape are not included:
  * their exact textbook diagrams could not be pinned down with certainty here,
@@ -486,11 +486,11 @@ export const SHAPES = [
 
 /**
  * Score thresholds for grades 2, 3, 4 and 5, applied by
- * scripts/grade-problems.mjs to each problem's human difficulty score (v13:
- * the theme's base difficulty, branching reading, plausible wrong first
+ * scripts/grade-problems.mjs to each problem's human difficulty score (the
+ * theme's base difficulty, branching reading, plausible wrong first
  * moves, alternatives; see the script and docs/problems-audit.md, "v13
- * grading"). Until v12 these were quintiles of the solver's search effort,
- * which put plain ladders at grade 5. The cuts are fixed values near this
+ * grading"). (Quintiles of the solver's search effort would put
+ * plain ladders at grade 5.) The cuts are fixed values near this
  * set's quintiles (543 problems), so grades stay roughly balanced without
  * being forced; the spot checks in the audit decide them. The check script
  * also keeps any one theme under 40% of every grade.
@@ -2747,7 +2747,7 @@ export const PROBLEMS = [
     ],
     at: [12, 15],
   },
-  // ---------------------------------------------------------------- v3: themes
+  // ------------------------------------------------------------------ themes
   {
     id: "life-ko-02",
     topic: "life",
@@ -4172,7 +4172,7 @@ export const PROBLEMS = [
     ],
     corner: "tr",
   },
-  // ------------------------------------------------------------------ v4
+  // ------------------------------------------------- hand-made, second set
   // Seki: the learner defends and the best result is seki (goal "seki").
   // Capturing races: eyes, big eyes and outside liberties. Classic textbook
   // shapes (`shape`). Like every problem, they are proved under real-board
@@ -4902,8 +4902,8 @@ export const PROBLEMS = [
     ],
     at: [6, 0],
   },
-  // ------------------------------------------------------------------ v5
-  // Added in v5 (see docs/problems-audit.md, "v5"). Positions were built by
+  // ------------------------------------------------------- generated shapes
+  // See docs/problems-audit.md, "v5". Positions were built by
   // shape generators (a sealed eye space with a solid defender wall and an
   // attacker wall outside it; races along the edge; small tesuji positions on
   // an open edge or corner), proved by the solver like every other problem,
@@ -9129,7 +9129,7 @@ export const PROBLEMS = [
     ],
     corner: "br",
   },
-  // ---------------------------------------------------------------- endgame (v6)
+  // ---------------------------------------------------------------- endgame
   {
     id: "endgame-hane-01",
     topic: "endgame",

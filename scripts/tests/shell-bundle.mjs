@@ -1,5 +1,5 @@
 /**
- * Shell, v13: the app's script is minified (names kept for stack traces),
+ * Shell: the app's script is minified (names kept for stack traces),
  * and a normal launch evaluates neither the packaged self-test nor the
  * screenshot tour: they load only when the host's self-test configuration
  * asks for them.
@@ -11,7 +11,7 @@ await test("shell bundle: the built script is minified and well under its old si
   const file = path.join(root, "src/web/js/bundle.js");
   const text = fs.readFileSync(file, "utf8");
   const kb = fs.statSync(file).size / 1024;
-  // v12 shipped 1.06–1.15 MB unminified; most of what is left is the string table and content index.
+  // Shipped 1.06–1.15 MB unminified; most of what is left is the string table and content index.
   assert.ok(kb < 900, `bundle.js is ${kb.toFixed(0)} KB`);
   const lines = text.split("\n").length;
   assert.ok(lines < 2000, `minified: ${lines} lines`);

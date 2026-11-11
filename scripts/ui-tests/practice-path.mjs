@@ -57,7 +57,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     // No Daily five, no focus card, no mistakes section, no course hero, no tiles on the page.
     assert((await page.locator(".practice-home .hero, .practice-home .problem-grid").count()) === 0, "the old sections");
     assert(!(await page.textContent(".practice-home")).includes("Daily five"), "Daily five");
-    // v12: below the path, the course, the problem topics and the basic shapes, on the same page.
+    // Below the path, the course, the problem topics and the basic shapes, on the same page.
     await page.waitForSelector(".catalog .units");
     assert((await page.locator(".catalog .unit").count()) >= 10, "the course units");
     assert((await page.locator(".catalog .unit.open .lesson-row").count()) > 0, "the unit you are in is open");

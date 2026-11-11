@@ -1,8 +1,8 @@
 /**
- * Update checks and installs for the interface (v4, v5). See ../update.js
+ * Update checks and installs for the interface. See ../update.js
  * for the rules: one request to GitHub, only when the player asks or opted
- * in to the weekly check (setting `autoUpdateCheck`, default false); in v5
- * the player may then download and install the new version.
+ * in to the weekly check (setting `autoUpdateCheck`, default false); the
+ * player may then download and install the new version.
  *
  * State for the views: `state.updateCheck` is null until a check has run,
  * then one of
@@ -90,7 +90,7 @@ export function openReleasePage() {
 }
 
 /**
- * v8: which download the interface is waiting for. A download cancelled and
+ * Which download the interface is waiting for. A download cancelled and
  * started again answers twice; only the newest answer counts.
  */
 let downloadGen = 0;
@@ -153,7 +153,7 @@ export async function applyUpdate() {
 }
 
 /**
- * Start-up (v5): say how the last install went, and pick up a download
+ * Start-up: say how the last install went, and pick up a download
  * that finished before the page was reloaded. No network request.
  */
 export async function restoreUpdateState() {

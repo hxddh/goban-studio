@@ -1,5 +1,5 @@
 /**
- * Play, v13: late answers never land on a position that is gone, and the
+ * Play: late answers never land on a position that is gone, and the
  * game is never stuck on the computer's turn.
  *
  * With a fake KataGo host whose answers the checks release by hand (and

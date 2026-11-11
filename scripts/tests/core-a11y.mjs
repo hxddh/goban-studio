@@ -90,7 +90,7 @@ await test("a11y: turn, captured stones, last move and the board's name", () => 
 await test("a11y: every a11y string exists in four languages with the same placeholders", () => {
   const keys = Object.keys(MESSAGES).filter((k) => k.startsWith("a11y."));
   assert.ok(keys.length > 40, `only ${keys.length} a11y strings`);
-  // v13: a Korean placeholder may carry its particle, {0:은/는} (i18n.js josa).
+  // A Korean placeholder may carry its particle, {0:은/는} (i18n.js josa).
   const holes = (v) => [...new Set([...v.matchAll(/\{(\d)(?::[^{}]*)?\}/g)].map((m) => m[1]))].sort().join();
   for (const k of keys) for (const lang of LANG_IDS) {
     assert.ok(MESSAGES[k][lang].length, `${k} ${lang}`);

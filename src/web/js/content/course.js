@@ -1,7 +1,7 @@
 /**
- * The course: eight beginner units (v2), then the intermediate units of
- * ./course-intermediate.js (v5) and the advanced units of
- * ./course-advanced.js (v6), appended so that saved progress, which is
+ * The course: eight beginner units, then the intermediate units of
+ * ./course-intermediate.js and the advanced units of
+ * ./course-advanced.js, appended so that saved progress, which is
  * keyed by lesson id, keeps working. Each lesson is a short list of steps.
  *
  * A lesson is a list of steps:
@@ -15,7 +15,7 @@
  *
  * Diagram notation is the solver's: X/O black/white, x/o key stones, '.'
  * empty (inside the problem region), ',' empty outside the region.
- * Rules are Japanese with 6.5 komi (v13: game-area-scoring teaches Chinese
+ * Rules are Japanese with 6.5 komi (game-area-scoring teaches Chinese
  * area scoring). `scripts/check-course.mjs` proves every
  * problem with the solver and checks every place step.
  *
@@ -78,7 +78,7 @@ const KO_TAKEN = b9({
 });
 
 // Unit 8 boards: a finished 9×9 game. Black owns the left, White the
-// right. Black 31 points, White 28 points. v8: every bend in the walls is
+// right. Black 31 points, White 28 points. Every bend in the walls is
 // solid (D7, D3 and F4); a diagonal bend left a cutting point, and KataGo
 // found the game far from over (docs/lesson-audit.md).
 const END_ROWS = {
@@ -2331,7 +2331,7 @@ const BEGINNER = [
             ),
             board: OPEN_SIDE,
             toMove: 1,
-            // v8: D7 and F7, right next to a corner stone, are too narrow (KataGo: about 4 points worse).
+            // D7 and F7, right next to a corner stone, are too narrow (KataGo: about 4 points worse).
             accept: [
               { x: 4, y: 2 },
               { x: 4, y: 3 },
@@ -2354,7 +2354,7 @@ const BEGINNER = [
             ),
             board: b9({ 2: ". . X . X . X . .", 6: ". . O . O . O . ." }),
             toMove: 1,
-            // v8: E6, on Black's own side, is about 4 points worse (KataGo); D4 and F4, facing
+            // E6, on Black's own side, is about 4 points worse (KataGo); D4 and F4, facing
             // White's line, are the best central points.
             accept: [
               { x: 4, y: 4 },

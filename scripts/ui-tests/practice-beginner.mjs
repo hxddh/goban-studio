@@ -251,7 +251,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".celebrate .btn.primary");
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.game.game.moveNumber === 0);
     const g = await page.evaluate(() => ({ size: window.__state.game.game.size, rank: window.__state.game.rank, chosen: window.__state.settings.opponentRank, opponent: window.__state.game.opponent, handicap: window.__state.game.game.handicap, rated: window.__state.game.rated }));
-    assert(g.size === 9 && g.chosen === 30 && g.rank === 29 && g.opponent === "ai" && g.handicap === 0, JSON.stringify(g)); // v9: the 30-kyu rank, played by the level that measured 29 kyu
+    assert(g.size === 9 && g.chosen === 30 && g.rank === 29 && g.opponent === "ai" && g.handicap === 0, JSON.stringify(g)); // The 30-kyu rank, played by the level that measured 29 kyu
     assert(g.rated, "a normal game is rated");
     await page.close();
   });
@@ -267,7 +267,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".today .hero .btn.primary");
     await page.waitForFunction(() => window.__state.game && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
     const g = await page.evaluate(() => ({ size: window.__state.game.game.size, opponentRank: window.__state.settings.opponentRank, rank: window.__state.settings.playerRank }));
-    assert(g.size === 9 && g.opponentRank === 30, JSON.stringify(g)); // v9: the gentlest rank
+    assert(g.size === 9 && g.opponentRank === 30, JSON.stringify(g)); // The gentlest rank
     // Nine moves each, then "Count now".
     for (let i = 0; i < 9; i++) {
       const pt = await page.evaluate(() => {

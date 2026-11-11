@@ -11,7 +11,7 @@ import * as Audio from "../audio.js";
 import { applyBoardTheme } from "../theme.js";
 import { state, update } from "./store.js";
 
-/* ----------------------------------------------- v13: the game in play */
+/* ----------------------------------------------- The game in play */
 
 /*
  * What the review (review-ctl.js) needs of the game in play: write it, and
@@ -74,7 +74,7 @@ export function applyAppearance() {
   const dark = s.appearance === "dark" || (s.appearance === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   root.dataset.theme = dark ? "dark" : "light";
   root.dataset.motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
-  root.dataset.text = s.largeText ? "large" : "normal"; // v6 a11y
+  root.dataset.text = s.largeText ? "large" : "normal"; // A11y
   // The board's colours follow the theme and the board style (theme.js).
   applyBoardTheme({ style: s.boardStyle });
 }
@@ -160,7 +160,7 @@ export function locationNow() {
       problemId: p.problem?.def?.id || null,
       mistakeId: p.mistake?.m?.id || null,
       daily: !!p.daily,
-      captureFrom: p.capture?.from || null, // v8
+      captureFrom: p.capture?.from || null,
     },
     play: { ...state.play },
     review: r

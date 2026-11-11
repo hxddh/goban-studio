@@ -1,5 +1,5 @@
 /**
- * Shell, v13 localisation: a key missing in a language falls back to
+ * Shell, localisation: a key missing in a language falls back to
  * English; counts take their plural form (tn); a label and its value use
  * each language's own colon; a Korean particle follows the word before it.
  */

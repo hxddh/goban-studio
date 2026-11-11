@@ -19,7 +19,7 @@
  *   cancel                a long search stops < 1 s after studio.katagoCancel
  *                         and the engine answers normally afterwards
  *
- * v5, when the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
+ * When the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
  * GOBAN_MODELS_DIR pointing at an empty temporary folder):
  *
  *   modelsResume          a download of the human model stops when asked,
@@ -86,7 +86,7 @@ function playAll(game, moves) {
 const validAnalysis = (a, size) => !!(a && Number.isFinite(a.winrate) && a.ownership?.length === size * size && a.moves.length > 0);
 
 /**
- * v5 updater probe (scripts/test-updater.mjs): launched with
+ * Updater probe (scripts/test-updater.mjs): launched with
  * GOBAN_UPDATE_PROBE_OUT, the page reports whether this installation can
  * update itself; with GOBAN_UPDATE_PROBE_TAG as well, it downloads,
  * verifies and unpacks that real release from GitHub, reports the outcome,
@@ -118,7 +118,7 @@ async function waitModel(kind, done, ms) {
   return st[kind];
 }
 
-/** v5: the optional downloads, end to end against the pinned URLs. */
+/** The optional downloads, end to end against the pinned URLs. */
 async function modelChecks(checks, report, cfg = {}) {
   const out = (report.models = {});
   // Breadcrumbs: if the app stalls, the runner prints how far it got.
@@ -190,7 +190,7 @@ export async function runSelfTest({ state } = {}) {
     const st = await KataGo.status();
     report.engine = { version: st.version || "", async: !!st.async, stream: !!st.stream };
 
-    // --- v2 checks (cold start happens here)
+    // --- engine checks (cold start happens here)
     const g19 = new Game({ size: 19, komi: 6.5 });
     const a19 = await KataGo.analyze(g19, { visits: 16 });
     checks.analyze19 = validAnalysis(a19, 19);

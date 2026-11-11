@@ -3,7 +3,7 @@
  *
  * The source table is messages.js: one key, four strings side by side. This
  * module turns it into per-language dictionaries, formats {0} placeholders,
- * and applies data-i18n attributes to the DOM. v13: a string missing in a
+ * and applies data-i18n attributes to the DOM. A string missing in a
  * language falls back to English; tn() picks a plural form; a Korean
  * placeholder can carry the particle that suits the word put in it
  * ({0:은/는}, see josa). It has no DOM side effects at
@@ -12,7 +12,7 @@
 import { MESSAGES } from "./messages.js";
 
 export const LANG_IDS = ["zh", "en", "ko", "ja"];
-// v13: English (zh before): a key missing in a language reads in the language most users can read.
+// English (zh before): a key missing in a language reads in the language most users can read.
 export const FALLBACK_LANG = "en";
 export const LANG_NAMES = {
   zh: "中文",
@@ -93,7 +93,7 @@ export function t(key, params) {
   return s;
 }
 
-/* -------------------------------------------- v13: plurals and particles */
+/* -------------------------------------------- Plurals and particles */
 
 const pluralRules = {};
 function pluralOf(n) {

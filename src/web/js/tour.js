@@ -1,5 +1,5 @@
 /**
- * Screenshot tour for the packaged apps (v4 release checks).
+ * Screenshot tour for the packaged apps (release checks).
  *
  * `scripts/tour-app.mjs` launches a packaged build with GOBAN_TOUR_OUT set.
  * The host reports that path through `studio.selftest` ({tour}), and the

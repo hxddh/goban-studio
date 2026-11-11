@@ -1,5 +1,5 @@
 /**
- * v13: what the app shows instead of starting over (docs/storage.md, "Safe state").
+ * What the app shows instead of starting over (docs/storage.md, "Safe state").
  *
  * - BootError: the packaged app started without its bridge to the host
  *   (no files can be read or written). Retry reloads the page.
@@ -32,7 +32,7 @@ function Screen({ title, children, actions }) {
     ref.current?.querySelector("[data-autofocus]")?.focus({ preventScroll: true });
   }, []);
   return (
-    // v13: the page's main landmark (the screen replaces the whole app), the card its dialog.
+    // The page's main landmark (the screen replaces the whole app), the card its dialog.
     <main class="safe-screen" id="main" ref={ref}>
       <div class="safe-card" role="alertdialog" aria-modal="true" aria-labelledby="safe-title" aria-describedby="safe-body">
         <h1 id="safe-title">{title}</h1>

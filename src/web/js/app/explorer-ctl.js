@@ -1,5 +1,5 @@
 /**
- * v6 explorer: the opening and joseki explorer in the Library.
+ * Explorer: the opening and joseki explorer in the Library.
  *
  * The player clicks moves on a 19×19 board. While the position is in the
  * shipped book (book.js, content/book.json) the book's continuations and
@@ -25,7 +25,7 @@ export const EXPLORER_MODES = ["whole", "corner"];
 export const CORNER_AREA = { x0: 9, y0: 0, x1: 18, y1: 9 };
 
 let book = null;
-// v8: the app bundle leaves the book out (scripts/bundle.mjs LAZY_DATA:
+// The app bundle leaves the book out (scripts/bundle.mjs LAZY_DATA:
 // BOOK_JSON is null there) and fetches content/book.json once, soon after
 // start-up or on first use, whichever comes first; tests bundle it.
 let raw = BOOK_JSON;
@@ -51,7 +51,7 @@ if (!raw && typeof window !== "undefined") {
   idle(fetchBook, { timeout: 3000 });
 }
 
-/** The indexed book, or null while it is still loading (v8). */
+/** The indexed book, or null while it is still loading. */
 export function theBook() {
   if (!book && raw) book = loadBook(raw);
   if (!book) fetchBook();
@@ -221,7 +221,7 @@ export function isLocal(mode, x, y) {
 }
 
 /**
- * v7: the corner tree zooms to its own area while every move of the line is
+ * The corner tree zooms to its own area while every move of the line is
  * in it (a tenuki shows the whole board). The player can turn it off.
  */
 export function explorerZoomable(e = explorerState()) {
@@ -366,7 +366,7 @@ export function explorerPlayFromHere() {
   const line = [];
   for (let n = src.current; n && n.parent; n = n.parent) line.unshift(n.move);
   for (const m of line) game.play(m.x, m.y, { color: m.color, force: true });
-  // v13: the game in progress goes to the Library as unfinished first.
+  // The game in progress goes to the Library as unfinished first.
   parkCurrent();
   if (state.game) state.game.gen++;
   remember();

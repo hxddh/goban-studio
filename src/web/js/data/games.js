@@ -16,7 +16,7 @@
  * `review` the post-game review built from it (play/review-model.js), so
  * both live with their game and go when it goes.
  *
- * v13: the game files are read only when one is needed (the store opens
+ * The game files are read only when one is needed (the store opens
  * `games/` lazily); the history, Today and the background analysis read
  * the index, which every save and delete keeps up to date and initIndex
  * rebuilds from the files when it is missing or behind. getGame answers at

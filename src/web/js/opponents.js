@@ -1,5 +1,5 @@
 /**
- * v9: one opponent axis. The player chooses a rank; this module says which
+ * One opponent axis. The player chooses a rank; this module says which
  * implementation plays it and how strong that implementation measured.
  * Pure: no engine, no state. engine.js plays what it returns; the rating
  * (app/strength.js, model/player.js) reads the measured strengths here.
@@ -139,7 +139,7 @@ const level = (id) => {
  * plus `human` or `strong` for those kinds.
  */
 export const IMPLS = [
-  // standard levels (v4) and the v4 bridges between them (`C:bNN` is the
+  // standard levels and the v4 bridges between them (`C:bNN` is the
   // 8-visit base level with blunder 0.NN; C:b40 was measured on 13×13 in v8)
   { id: "L:25k", kind: "standard", level: level("25k"), theta: MEASURED.standard["25k"], gor: [-1484, -520] },
   { id: "L:20k", kind: "standard", level: level("20k"), theta: MEASURED.standard["20k"], gor: [-573, 35] },
@@ -151,7 +151,7 @@ export const IMPLS = [
   { id: "C:b0", kind: "standard", level: { ...level("5k"), blunder: 0, local: 5 }, theta: { 19: 14.98 }, gor: [1456, 1733] },
   { id: "L:1k", kind: "standard", level: level("1k"), theta: MEASURED.standard["1k"], gor: [1769, 2112] },
   { id: "L:2d", kind: "standard", level: level("2d"), theta: MEASURED.standard["2d"], gor: [2310, 2601] },
-  // human-style levels (v7) and two v6 settings v7 measured again
+  // human-style levels and two v6 settings v7 measured again
   // (`CH:r20k` was v6's human `15k`, `CH:s7k24` v6's human `5k`)
   { id: "HL:25k", kind: "human", level: { human: calibrated("25k").human }, theta: MEASURED.human["25k"], gor: [-1115, -712] },
   { id: "HL:20k", kind: "human", level: { human: calibrated("20k").human }, theta: MEASURED.human["20k"], gor: [-498, -173] },
@@ -162,7 +162,7 @@ export const IMPLS = [
   { id: "CH:s7k24", kind: "human", level: { human: { profile: "rank_7k", style: "search", visits: 24 } }, theta: { 19: 16.81, 9: 11.97 }, gor: [1680, 1881] },
   { id: "HL:1k", kind: "human", level: { human: calibrated("1k").human }, theta: MEASURED.human["1k"], gor: [1867, 2066] },
   { id: "HL:2d", kind: "human", level: { human: calibrated("2d").human }, theta: MEASURED.human["2d"], gor: [2634, 2816] },
-  // the stronger network (v7): best move after its search, as the standard 2d
+  // the stronger network: best move after its search, as the standard 2d
   { id: "LS:2d", kind: "strong", level: { ...level("2d"), strong: calibrated("2d").strong }, theta: MEASURED.strong["2d"], gor: [2736, 2841] },
 ];
 

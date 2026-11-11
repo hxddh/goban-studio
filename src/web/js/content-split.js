@@ -1,5 +1,5 @@
 /**
- * v9: the content's start-up index and its parts (see content.js). Pure, no
+ * The content's start-up index and its parts (see content.js). Pure, no
  * imports: scripts/bundle.mjs splits the content modules with it at build
  * time, the app merges each part back as it arrives, and the tests check
  * that the two are one another's inverse.

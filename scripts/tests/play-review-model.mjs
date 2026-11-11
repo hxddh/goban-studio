@@ -95,7 +95,7 @@ await test("play review model: up to three moments can be tried again, each a dr
   assert.deepEqual([d.id, d.gameId, d.index, d.sgf, d.color, d.best, d.loss, d.size], ["rec-1-25", "rec-1", 25, sgf, BLACK, { x: 6, y: 6 }, 8, 13]);
   assert.deepEqual(d.played, m.moments[1].played);
   assert.ok(d.accept.some((p) => p.x === 6 && p.y === 6));
-  // In the player model like any drill: once, and each try on the review schedule (v13: the memory model).
+  // In the player model like any drill: once, and each try on the review schedule (the memory model).
   let p = addMistake(newProfile(), d, 0);
   p = addMistake(p, d, 0);
   assert.equal(p.mistakes.length, 1);

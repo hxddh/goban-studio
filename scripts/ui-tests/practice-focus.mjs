@@ -28,7 +28,7 @@ export default async function ({ check, assert, fresh, onboard }) {
     await page.waitForSelector(".practice-path");
     assert((await page.locator(".path-focus").count()) === 0, "focus shown without games");
     assert(!(await page.locator(".practice-path").innerText()).includes("This week's focus"), "a focus row without games");
-    // Today's suggested game (v12).
+    // Today's suggested game.
     await page.keyboard.press("Control+1");
     await page.waitForSelector(".today .hero");
     assert(!(await page.textContent(".today .hero")).includes("focus"), "the suggestion names a focus without games");

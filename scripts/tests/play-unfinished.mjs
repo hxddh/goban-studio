@@ -1,5 +1,5 @@
 /**
- * Play, v13: nothing replaces a game in progress silently. New game, Play
+ * Play: nothing replaces a game in progress silently. New game, Play
  * from here (a review, the explorer) and resuming another game save it to
  * the Library as unfinished; opening it there continues it with the same
  * record; it is not rated or analysed until finished. And an export that
@@ -131,7 +131,7 @@ await test("play export: in the app, a file that cannot be written is an error t
     globalThis.zero = {
       invoke: async (command) => {
         calls.push(command);
-        // v13: the save dialog is the host's own command; the write fails.
+        // The save dialog is the host's own command; the write fails.
         if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
         throw new Error("EACCES");
       },

@@ -114,7 +114,7 @@ export default async function ({ test, assert, root }) {
 
   await test("practice path: a strong player — the advanced course, problems near the top grades, the stretch at the top", () => {
     // Before any problem: their rank sets the level (gradeForRank).
-    // v13: conservative — a rank gets the grade it should solve comfortably.
+    // Conservative — a rank gets the grade it should solve comfortably.
     assert.equal(P.gradeForRank(30), 1);
     assert.equal(P.gradeForRank(19), 1);
     assert.equal(P.gradeForRank(15), 2);

@@ -9,7 +9,7 @@ await test("explorer: the shipped book has both trees, its network and a compact
   assert.ok(BOOK_RAW.visits > 0);
   assert.equal(BOOK_RAW.komi, 6.5);
   const bytes = fs.statSync(path.join(root, "src/web/js/content/book.json")).size;
-  // v7: the book grew with the stronger network; scripts/tests/core-book-build.mjs checks its gzipped size.
+  // The book grew with the stronger network; scripts/tests/core-book-build.mjs checks its gzipped size.
   assert.ok(bytes < 1024 * 1024, `book is ${bytes} bytes`);
   for (const id of ["whole", "corner"]) {
     const tree = BOOK_RAW.trees[id];

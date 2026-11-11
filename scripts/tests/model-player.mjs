@@ -52,7 +52,7 @@ export default async function ({ test, assert, root }) {
       for (const mode of ["standard", "human"]) for (let i = 1; i < P.LEVELS.length; i++) assert.ok(P.levelTheta(P.LEVELS[i], { mode, size }) > P.levelTheta(P.LEVELS[i - 1], { mode, size }), `${mode} ${P.LEVELS[i]} ${size}`);
       assert.ok(P.levelTheta("2d", { mode: "strong", size }) > P.levelTheta("2d", { size }));
     }
-    // Measured ranks are the labels v9 shows: the standard ladder reads as its v4 labels.
+    // Measured ranks are the labels shown: the standard ladder reads as its calibrated labels.
     const labels = { "30k": 30, "25k": 29, "20k": 23, "15k": 18, "10k": 12, "5k": 7, "1k": 2, "2d": -3 };
     for (const [id, rank] of Object.entries(labels)) assert.equal(P.measuredRank(id), rank, id);
     const l9 = P.ladder({ size: 9, modes: ["standard", "human", "strong"] });
@@ -452,7 +452,7 @@ export default async function ({ test, assert, root }) {
     assert.equal(n.lessons.l, undefined);
     assert.equal(n.week, null);
     assert.equal(n.games.length, 1);
-    // No v3 weakness counts and no separate rating history store.
+    // No weakness counts and no separate rating history store.
     assert.equal("weakness" in n, false);
     assert.equal("strength" in n, false);
   });
@@ -655,7 +655,7 @@ export default async function ({ test, assert, root }) {
       const { topic, theme } = P.focusTopic(key, PROBLEMS);
       assert.ok(PROBLEMS.some((x) => x.topic === topic && (!theme || x.theme === theme)), `${key} → ${topic}/${theme}`);
     }
-    // v13: the ko unit comes between the ko rule and the advanced ko life and death.
+    // The ko unit comes between the ko rule and the advanced ko life and death.
     assert.equal(P.focusLesson("ko", (id) => id === "stones-ko"), "ko-threat");
     assert.equal(P.focusLesson("ko", (id) => ["stones-ko", "ko-threat", "ko-count", "ko-resolve"].includes(id)), "adv-life-ko");
     assert.equal(P.focusLesson("nothing"), null);
@@ -663,7 +663,7 @@ export default async function ({ test, assert, root }) {
 
   /* ------------------------------------------------------ Practice's path */
 
-  // v13: the second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
+  // The second focus is snapback (ko problems are all grade 4–5 now, above this player's level).
   const cutGames = () => [0, 1, 2, 3].map((i) => game(i, { themes: { cut: 1, snapback: i < 2 ? 1 : 0 }, themeLoss: { cut: 4, snapback: i < 2 ? 5 : 0 } }));
 
   await test("model path: reviews first, focus problems at the level, one stretch, stable for the day", () => {
@@ -794,7 +794,7 @@ export default async function ({ test, assert, root }) {
       assert.doesNotMatch(src, /localStorage|document\.|window\.|Date\.now\(\)/, f);
     }
     assert.equal([...fs.readFileSync(path.join(root, "src/web/js/opponents.js"), "utf8").matchAll(/^import /gm)].length, 0, "opponents.js imports nothing");
-    // v13: the reading from your moves is pure too, with no imports.
+    // The reading from your moves is pure too, with no imports.
     const mr = fs.readFileSync(path.join(root, "src/web/js/model/move-rank.js"), "utf8");
     assert.equal([...mr.matchAll(/^import /gm)].length, 0, "move-rank.js imports nothing");
     assert.doesNotMatch(mr, /localStorage|document\.|window\.|Date\.now\(\)/);

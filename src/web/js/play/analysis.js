@@ -150,13 +150,13 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
   if (humanColor != null && resultOf(game) && !now.rec.learned && points.every((p) => p.source === "katago")) {
     learnFromGame({ game, points, humanColor, recordId });
   }
-  // v13: the second reading of the player's strength, from their own moves.
+  // The second reading of the player's strength, from their own moves.
   // Finished games only: an unfinished game in the library is never read for strength.
   if (humanColor != null && resultOf(game) && !now.rec.unfinished && !now.rec.moveRank && points.every((p) => p.source === "katago")) estimateMoveRank(recordId, game, humanColor);
   return model;
 }
 
-/* -------------------------------------- v13: your moves, read by rank */
+/* -------------------------------------- Your moves, read by rank */
 
 /**
  * After a finished game's analysis, with the human-style model installed
@@ -203,7 +203,7 @@ export function takeOver(recordId) {
 
 /**
  * Cheap check without parsing the game: an own finished game whose stored
- * review is missing or old. Works on the index's record too (v13: the game
+ * review is missing or old. Works on the index's record too (the game
  * file need not be read; data/games.js reviewV, reviewConfidence,
  * analyzed). A game left unfinished is not analysed until it is finished.
  */
@@ -241,7 +241,7 @@ export function queueAnalysis(recordId, { owner = "games", signal = null, hidden
     rec = found.rec;
     run = (me) => analyse(recordId, found.game, humanColorOf(rec), me, rec.analysis);
   } else {
-    // v13: the game's file is not read yet; the index says whether it needs
+    // The game's file is not read yet; the index says whether it needs
     // an analysis, and the job reads the file first.
     rec = Games.getGame(recordId);
     if (!rec || (!any && !isOwnGame(rec)) || !wantsAnalysis(rec)) return null;

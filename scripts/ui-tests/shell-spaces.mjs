@@ -1,5 +1,5 @@
 /**
- * Shell: the four spaces in the browser (v12) — Today, Play, Practice and
+ * Shell: the four spaces in the browser — Today, Play, Practice and
  * Library (and Settings); Today leads with one hero, Play is the board,
  * Practice has the path and the catalog, the Library the games;
  * everything survives a reload through the store, and a write that fails

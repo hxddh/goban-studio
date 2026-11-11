@@ -92,7 +92,7 @@ function assert(cond, msg) {
 
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 
-// v4 uses system fonts, which differ between machines. Visual baselines are
+// Uses system fonts, which differ between machines. Visual baselines are
 // taken with one pinned font (Inter, tests/fonts, never shipped) so they
 // compare the layout rather than the font installed on the runner.
 const PINNED_FONT = fs.readFileSync(path.join(root, "tests/fonts/inter-latin-wght-normal.woff2")).toString("base64");
@@ -166,7 +166,7 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.click(".today .hero .btn.primary");
   await page.waitForFunction(() => window.__state.space !== "today");
   await page.waitForSelector("canvas.board, .page");
-  // v10: someone who knows the rules is offered the placement quiz on Practice's
+  // Someone who knows the rules is offered the placement quiz on Practice's
   // home; checks that are not about it answer "Not now" first, then come back.
   if (choice >= 1 && !placement) {
     const space = await page.evaluate(() => window.__state.space);
@@ -385,7 +385,7 @@ await check("a wrong answer shows the refutation, then resets for another try", 
   await page.close();
 });
 
-await check("history: back and forward across the two spaces", async () => {
+await check("history: back and forward across the spaces", async () => {
   const page = await fresh();
   await onboard(page, 1);
   // Back and forward are checked every run; the timing is of Back.
@@ -454,7 +454,7 @@ await check("explorer: opens from the Library, a book move shows candidates, out
   await page.keyboard.press("Control+4");
   await page.click('.collection-row[data-explorer="whole"]');
   await page.waitForSelector(".explorer-panel");
-  // v8: onboarding plays on 9×9 now; wait for the explorer's own 19×19 board.
+  // Onboarding plays on 9×9 now; wait for the explorer's own 19×19 board.
   await page.waitForFunction(() => window.__board?.model.size === 19 && window.__board.geom?.cell > 0);
   const start = await page.locator(".explorer-row").count();
   assert(start > 0, "no candidates on the empty board");
@@ -490,7 +490,7 @@ await check("explorer: opens from the Library, a book move shows candidates, out
   await page.close();
 });
 
-/* --------------------------------------------------------- v6 a11y */
+/* --------------------------------------------------------- A11y */
 
 // The in-page audit (scripts/a11y-audit.js): names, ids, references,
 // pointer-only controls, unnamed images, landmarks, contrast.

@@ -1,5 +1,5 @@
 /**
- * The advanced course (v6): units for players around 5 kyu to 1 dan,
+ * The advanced course: units for players around 5 kyu to 1 dan,
  * appended after the intermediate units of ./course-intermediate.js. Same
  * step schema (read / place / problem; see course.js).
  *
@@ -12,7 +12,7 @@
  * right move would need a strong engine to back it was left out, see the
  * "Advanced course" section of docs/problems-audit.md.
  *
- * v13 adds three units: opening frameworks and direction and joseki choice
+ * Adds three units: opening frameworks and direction and joseki choice
  * (placed first, since they come earliest in a game) and handicap strategy
  * (last). Their opening and joseki steps follow lines of the opening book
  * (content/book.json): a joseki step is the book's corner tree move by move,
@@ -78,7 +78,7 @@ const BOTTOM_MIDDLE = box(7, 15, 11, 16);
 
 // A black wall on the fourth line of the left side, White living low under
 // it, a lone white stone on the top side and Black's upper right star point.
-// v8: White's low group has C18 and B13 too; without them KataGo kills it
+// White's low group has C18 and B13 too; without them KataGo kills it
 // (docs/lesson-audit.md), and "White has lived" would not be true.
 const WALL_BLACK = [[3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [2, 6], [15, 3], [15, 15]];
 const WALL_WHITE = [[2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [1, 6], [9, 2], [3, 15]];
@@ -127,7 +127,7 @@ const CORNER_SIX = [". . . . X , ,", ". o o o X , ,", ". o X X X , ,", "o o X , 
 const CORNER_OTHER = [". . . o X , ,", ". o o o X , ,", ". o X X X , ,", "X X X , , , ,", ", , , , , , ,"];
 const CORNER_OTHER_LONG = [". . . o X , ,", ". o o o X , ,", ". o X X X , ,", ". o X , , , ,", "X X X , , , ,", ", , , , , , ,"];
 
-/* ------------------------------------------------- v13: opening boards */
+/* ------------------------------------------------- Opening boards */
 
 // Board coordinates below are [x, y] from the top left: Q16 = [15, 3],
 // D4 = [3, 15]. The whole-board openings follow the named lines of the
@@ -172,7 +172,7 @@ const URGENT_DONE = full([...URG_B, [0, 18]], [...URG_W, [9, 2]]);
 // The corner group alone, for the solver (lower left, 7×5).
 const URG_CORNER = flipY(swap(CORNER_FIVE));
 
-/* -------------------------------------------------- v13: joseki boards */
+/* -------------------------------------------------- Joseki boards */
 
 /**
  * An 11×10 window in the upper right corner (the corner the opening book's
@@ -254,7 +254,7 @@ const CHOOSE_33 = full([...CH_B, [16, 10]], [...CH_W, [16, 2]]);
 const CHOOSE_PINCER = full(SAN_B, [...SAN_W, [16, 5]]);
 const CHOOSE_READ = full(SAN_B, [...SAN_W, [16, 5]], { marks: labels([16, 8, "A"], [13, 2, "B"]) });
 
-/* ------------------------------------------------ v13: handicap boards */
+/* ------------------------------------------------ Handicap boards */
 
 // Four and nine handicap stones (the app's handicap placement: star points).
 const H4 = [[3, 3], [15, 3], [3, 15], [15, 15]];
@@ -275,7 +275,7 @@ const H9_EMPTY_READ = full(H9, [], { marks: labels([16, 2, "A"], [16, 5, "B"]) }
 /* ---------------------------------------------------------------- units */
 
 export const ADVANCED = [
-  /* ================================================ v13 UNIT: opening */
+  /* ==================================================== UNIT: opening */
   {
     id: "adv-opening",
     level: "advanced",
@@ -596,7 +596,7 @@ export const ADVANCED = [
     ],
   },
 
-  /* ================================================= v13 UNIT: joseki */
+  /* ===================================================== UNIT: joseki */
   {
     id: "adv-joseki",
     level: "advanced",
@@ -2018,7 +2018,7 @@ export const ADVANCED = [
       },
     ],
   },
-  /* =============================================== v13 UNIT: handicap */
+  /* =================================================== UNIT: handicap */
   {
     id: "adv-handicap",
     level: "advanced",

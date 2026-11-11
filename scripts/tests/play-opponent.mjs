@@ -1,5 +1,5 @@
 /**
- * v9 tests: one opponent axis (opponents.js, engine.js decide, the play
+ * Tests: one opponent axis (opponents.js, engine.js decide, the play
  * controller). Loaded by scripts/test.mjs (every file in scripts/tests/, in
  * name order); receives the runner's helpers.
  *

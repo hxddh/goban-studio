@@ -1,5 +1,5 @@
 /**
- * v12: what was Play's home (v9–v11) is split in two, as before v9.
+ * Play without a game, and the Library.
  *
  * - Play (下棋) without a game on the board: the suggested game with the
  *   page's one primary button, a quieter 9×9 beside it, and New game for
@@ -28,7 +28,7 @@ import { useJobs } from "../app/background.jsx";
 
 /**
  * A game is in progress: on the board, not finished, and with at least one
- * move of the player's (v13: the same rule that keeps it when something
+ * move of the player's (the same rule that keeps it when something
  * replaces it, play-ctl unfinishedGame; a board where only the computer
  * moved is not one).
  */

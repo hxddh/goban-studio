@@ -1,7 +1,7 @@
 /**
- * Practice: the placement quiz in the browser (v10, practice/placement.js) —
+ * Practice: the placement quiz in the browser (practice/placement.js) —
  * someone who knows the rules finds it on Practice's home before the path,
- * with one primary and a quiet Not now; the quiz shows where it is (v13:
+ * with one primary and a quiet Not now; the quiz shows where it is (
  * 10–12 problems, ending early once the grade is stable); at the end the
  * path appears and the offer is gone. The offer and a quiz problem
  * are checked in four languages, light and dark, with larger text: the

@@ -1,7 +1,7 @@
 /**
- * v10: the placement quiz (model/player.js placementNext, placementGrade).
+ * The placement quiz (model/player.js placementNext, placementGrade).
  * Someone who knows the rules is offered it on Practice's home before the
- * first path. v13: 10–12 problems drawn per player (a seed), themes mixed,
+ * first path. 10–12 problems drawn per player (a seed), themes mixed,
  * at least three of them life and death; one grade up after each one
  * solved and one down after each one missed, ending early once the grade
  * is stable, and at once when the first four answers are all missed (the

@@ -14,11 +14,11 @@ import fs from "node:fs";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const entry = path.join(root, "src/web/js/main.jsx");
 const out = path.join(root, "src/web/js/bundle.js");
-/** v9: the content the app fetches after start-up (sync-dist copies it to content/). */
+/** The content the app fetches after start-up (sync-dist copies it to content/). */
 const LAZY_DIR = path.join(root, "src/web/js/content-lazy");
 
 /**
- * v8: data the app reads only when it is first needed stays out of the
+ * Data the app reads only when it is first needed stays out of the
  * script, so start-up does not parse it. Each import resolves to `null`
  * here; the module fetches the file (copied beside index.html by
  * sync-dist.mjs) on first use. Tests bundle the real data.
@@ -34,7 +34,7 @@ const lazyData = {
 };
 
 /**
- * v9: the course, problems and classics are split (src/web/js/content-split.js,
+ * The course, problems and classics are split (src/web/js/content-split.js,
  * loaded by content.js): the bundle's content modules hold only the start-up index,
  * and each part's bodies go to LAZY_DIR/<part>.json, fetched on idle or on
  * first use. Tests import the modules whole.
@@ -66,7 +66,7 @@ await build({
   format: "iife",
   platform: "browser",
   target: ["safari15", "chrome110"],
-  // v13: minified (about half the bytes to read and parse at start-up).
+  // Minified (about half the bytes to read and parse at start-up).
   // Names are kept, so a stack trace in a bug report still names the
   // function; GOBAN_SOURCEMAP=1 inlines a source map for local debugging
   // (never in a release: it would double the file).

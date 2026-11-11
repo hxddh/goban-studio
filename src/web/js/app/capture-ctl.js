@@ -1,5 +1,5 @@
 /**
- * v8 capture Go (吃子棋): the beginner's first game, on 9×9, against the
+ * Capture Go (吃子棋): the beginner's first game, on 9×9, against the
  * small opponent in ../capture-ai.js. The first capture wins.
  *
  * It lives in Practice (state.practice.capture), never in state.game: it is

@@ -1,5 +1,5 @@
 /**
- * v5 updater: end-to-end tests of the parts the unit tests cannot reach,
+ * Updater: end-to-end tests of the parts the unit tests cannot reach,
  * on the real OS, with the real packaged app. Run by build-macos.yml and
  * build-windows.yml after packaging:
  *
@@ -23,7 +23,7 @@
  *              app (and, on Windows, the profile) and start it again.
  *   no exit    The "app" never exits: the helper must give up and change
  *              nothing.
- *   lock       (v13) While one helper waits for the app, a second helper for
+ *   lock       While one helper waits for the app, a second helper for
  *              the same installation must refuse (exit 2) without creating
  *              its "started" marker; the first one's marker exists, and its
  *              lock is gone once it exits.

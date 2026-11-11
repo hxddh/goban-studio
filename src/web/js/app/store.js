@@ -35,8 +35,8 @@ export const state = {
   // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
   practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
   models: initialModels(), // optional downloads (app/models-ctl.js)
-  bootError: null, // v13: { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
-  storeProblem: null, // v13: the safe state, controller.js storeProblemOf (+ continued)
+  bootError: null, // { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
+  storeProblem: null, // The safe state, controller.js storeProblemOf (+ continued)
 };
 
 export function update(fn) {
@@ -63,7 +63,7 @@ export function useAppState() {
 }
 
 /*
- * v13: the game clock ticks four times a second. A tick re-renders only
+ * The game clock ticks four times a second. A tick re-renders only
  * the clocks on screen (play.jsx ClockFace, through useClockTicks), not the
  * whole app and its board; anything else the clock changes (the game ends
  * on time) goes through update() as usual.
@@ -285,7 +285,7 @@ export function runTask(key, fn, opts = {}) {
  * Screen-reader announcement (aria-live). The region is cleared first so the
  * same words are spoken again; announcements made within the same moment
  * are spoken together, in order (`first` puts one ahead: a move before the
- * verdict on it). v6 a11y.
+ * verdict on it).
  */
 let pending = [];
 let flushing = 0;

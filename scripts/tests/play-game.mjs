@@ -248,13 +248,13 @@ export default async function ({ test, assert, root }) {
         let was = left();
         await run();
         assert.ok(left() < was, "the board: the clock runs");
-        // v12: another space (Today) keeps the board off screen.
+        // Another space (Today) keeps the board off screen.
         state.space = "today";
         was = left();
         await run();
         assert.equal(left(), was, "Today: the clock waits");
         state.space = "play";
-        // v12: the explorer is in the Library; another space keeps the board off screen.
+        // The explorer is in the Library; another space keeps the board off screen.
         state.play = { ...state.play, view: "game", explorer: "whole" };
         state.space = "library";
         await run();

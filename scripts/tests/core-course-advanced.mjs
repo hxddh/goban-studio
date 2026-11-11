@@ -50,9 +50,9 @@ await test("advanced: opening and joseki come first, handicap strategy last, eve
   assert.deepEqual(unit("adv-opening").lessons.map((l) => l.id), ["adv-open-chinese", "adv-open-sanrensei", "adv-open-direction", "adv-open-urgent"]);
   assert.deepEqual(unit("adv-joseki").lessons.map((l) => l.id), ["adv-joseki-low-pincer", "adv-joseki-two-space", "adv-joseki-high-approach", "adv-joseki-knight", "adv-joseki-choose"]);
   assert.deepEqual(unit("adv-handicap").lessons.map((l) => l.id), ["adv-handicap-stones", "adv-handicap-simple", "adv-handicap-white"]);
-  // The v6 advanced units are all still there, in their order.
-  const v6 = ["adv-judgement", "adv-invasion", "adv-life", "adv-tesuji", "adv-middle"];
-  assert.deepEqual(adv.filter((id) => v6.includes(id)), v6);
+  // The units on judgement, invasion, life, tesuji and the middle game are all there, in their order.
+  const kept = ["adv-judgement", "adv-invasion", "adv-life", "adv-tesuji", "adv-middle"];
+  assert.deepEqual(adv.filter((id) => kept.includes(id)), kept);
 });
 
 await test("advanced opening: the Chinese opening is Q16, Q3 and R9 — the side stone one line below the middle, nearer the 3-4 point", () => {
@@ -190,7 +190,7 @@ await test("facts: the 1996 Fujitsu Cup note names Lee Changho's first world tit
   assert.match(CLASSICS.find((x) => x.id === "sakata-otake-1969").note.zh, /第八期/);
 });
 
-await test("docs: the glossary lists the v13 terms", () => {
+await test("docs: the glossary lists the opening, joseki and handicap terms", () => {
   const md = fs.readFileSync(path.join(root, "docs/glossary.md"), "utf8");
   for (const term of ["中国流", "三连星", "模样", "重复", "置き碁", "下ツケ", "カケツギ", "rabbity six"]) assert.ok(md.includes(term), term);
 });

@@ -1,5 +1,5 @@
 /**
- * v6 accessibility: the board for someone who cannot see it.
+ * Accessibility: the board for someone who cannot see it.
  *
  * Two small pieces, both reading the app state the views already render:
  *

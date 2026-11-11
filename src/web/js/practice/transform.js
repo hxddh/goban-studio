@@ -1,5 +1,5 @@
 /**
- * v13: problems shown again are turned, mirrored and sometimes recoloured,
+ * Problems shown again are turned, mirrored and sometimes recoloured,
  * so a review asks for the idea rather than the remembered picture
  * (docs/plan.md, "Review").
  *
@@ -113,8 +113,7 @@ export const canSwap = (def) => def?.goal !== "endgame";
  * `node scripts/check-transforms.mjs --all-syms` (every symmetry of every
  * problem): only the symmetries listed are used. capture-ladder-01
  * exceeds the first-move search's node budget in two orientations; colour
- * swap is safe. (life-vital-20 was listed until v13 fixed the solver's
- * transposition table, which had proved it differently by orientation.)
+ * swap is safe.
  */
 const ONLY_SYMS = {
   "capture-ladder-01": [0, 1, 2, 3, 4, 6],

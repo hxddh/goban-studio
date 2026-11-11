@@ -243,7 +243,7 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   assert.deepEqual(names, ["play", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
-  // v13: one look at the configuration; the tour module loads only when it asks for it.
+  // One look at the configuration; the tour module loads only when it asks for it.
   assert.match(app, /if \(c\?\.tour\)[^\n]*import\("\.\.\/tour\.js"\)/);
   const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_TOUR_OUT/);

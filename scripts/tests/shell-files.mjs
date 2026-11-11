@@ -167,7 +167,7 @@ await test("shell quit: a failed flush still answers, so the quit is never held 
   assert.equal(typeof installFlushHook(() => {}, { host: null }), "function");
 });
 
-await test("shell update: the v13 install refusals are explained, and the unfixable ones fall back to the download page", () => {
+await test("shell update: install refusals are explained, and the unfixable ones fall back to the download page", () => {
   for (const code of ["NotChecked", "NotNewer", "NoSignature", "BadSignature", "HelperBusy", "HelperNotStarted"]) assert.ok(INSTALL_ERRORS.includes(code), code);
   assert.equal(installMessageKey("NoSignature"), "update.verifyError");
   assert.equal(installMessageKey("BadSignature"), "update.verifyError");

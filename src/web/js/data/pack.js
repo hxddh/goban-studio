@@ -1,5 +1,5 @@
 /**
- * v13: an analysis as it is kept in a game's file (docs/storage.md).
+ * An analysis as it is kept in a game's file (docs/storage.md).
  *
  * KataGo gives every position an ownership map (one number per point:
  * 361 on 19×19). Stored for every position that was about 0.5 MB a game;

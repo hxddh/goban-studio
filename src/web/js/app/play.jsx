@@ -1,7 +1,7 @@
 /**
  * Play: the live game and scoring. The review over any game, which is also
  * the post-game review the board turns into when a game ends, is
- * review.jsx (v13: split out of this file).
+ * review.jsx (split out of this file).
  */
 import { useEffect, useRef } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints, rulesetById } from "../rules.js";
@@ -18,7 +18,7 @@ import { ReviewView } from "./review.jsx";
 import { classicYear, colorName, moveNumbers, rankLabel } from "./game-view.js";
 import { FirstCountNote } from "./beginner.jsx";
 
-// v13: shared with the review (review.jsx); classicYear and rankLabel are still imported from here.
+// Shared with the review (review.jsx); classicYear and rankLabel are still imported from here.
 export { classicYear, rankLabel };
 
 /* ------------------------------------------------------------------ play */
@@ -205,7 +205,7 @@ function PlayerRow({ color }) {
     sub = rankLabel(g.rank);
   } else if (g.opponent === "ai") {
     name = t("play.you");
-    // v12: your level as before v9 — the estimate once a game is rated, else what you said you are.
+    // Your level — the estimate once a game is rated, else what you said you are.
     const e = C.playerEstimate({ size: game.size });
     const rank = e.games > 0 ? e.rank : C.playerRankNow();
     if (rank != null) sub = rankLabel(rank);
@@ -235,7 +235,7 @@ function PlayerRow({ color }) {
 }
 
 /**
- * One side's clock. v13: it re-renders on each tick by itself
+ * One side's clock. It re-renders on each tick by itself
  * (store.js useClockTicks); a tick no longer re-renders the app.
  */
 function ClockFace({ color, active = false, mini = false }) {
@@ -281,7 +281,7 @@ function MoveStrip() {
     C.reviewCurrentGame();
     C.reviewGoto(i);
   };
-  // v8: before the first move, one quiet line (the opening tip while
+  // Before the first move, one quiet line (the opening tip while
   // teaching, else where to start and how to find the keys) instead of a
   // heading, "No moves yet" and a table of keys.
   const tip = line.length < 12 && C.teachingOn() && g.opponent === "ai" && game.size >= 13;

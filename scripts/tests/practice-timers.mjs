@@ -1,5 +1,5 @@
 /**
- * Practice, v13: a problem's reply timers belong to the attempt that set them.
+ * Practice: a problem's reply timers belong to the attempt that set them.
  * Retry, Show answer, another problem or another page before the reply
  * comes: nothing plays into the new attempt and nothing is recorded for the
  * problem that was left.

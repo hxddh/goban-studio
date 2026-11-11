@@ -1,5 +1,5 @@
 /**
- * What a finished game against the computer teaches (v13: out of
+ * What a finished game against the computer teaches (out of
  * play-ctl.js, so the background analysis, play/analysis.js, reaches it
  * without importing the play controller).
  */

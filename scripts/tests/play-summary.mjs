@@ -119,7 +119,7 @@ await test("play summary: takeaways and summary strings read in all four languag
   setLang("ja");
   assert.equal(storyText(first[0]), "損の多くは中盤でした。約8目（全体の59%）です。");
   setLang("en");
-  // The v5 trends were removed with the strength chart (docs/v9.md, "Removed in v9").
+  // There are no trends and no strength chart (docs/v9.md, "Removed in v9").
   const keys = Object.keys(MESSAGES).filter((k) => /^(gameSummary|edit|phase|phaseIn)\./.test(k));
   assert.ok(keys.length >= 35);
   assert.ok(!Object.keys(MESSAGES).some((k) => k.startsWith("trend.")));
