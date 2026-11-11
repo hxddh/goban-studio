@@ -836,12 +836,17 @@ test "the environment's proxy: HTTPS first, then ALL, unless NO_PROXY names the 
     try testing.expectEqualStrings("http://127.0.0.1:7890", envProxy(&env, "github.com").proxy);
     try env.put("HTTPS_PROXY", " http://proxy.example:8080 ");
     try testing.expectEqualStrings("http://proxy.example:8080", envProxy(&env, "github.com").proxy);
-    // Lower case wins, as curl has it; HTTP_PROXY is not for HTTPS.
-    try env.put("https_proxy", "http://lower.example:3128");
+    // HTTP_PROXY is not for HTTPS.
     try env.put("HTTP_PROXY", "http://plain.example:80");
-    try testing.expectEqualStrings("http://lower.example:3128", envProxy(&env, "api.github.com").proxy);
-    try env.put("https_proxy", "");
     try testing.expectEqualStrings("http://proxy.example:8080", envProxy(&env, "api.github.com").proxy);
+    // Lower case wins, as curl has it. Windows has one variable whatever
+    // the case, so there the two names cannot differ.
+    if (builtin.os.tag != .windows) {
+        try env.put("https_proxy", "http://lower.example:3128");
+        try testing.expectEqualStrings("http://lower.example:3128", envProxy(&env, "api.github.com").proxy);
+        try env.put("https_proxy", "");
+        try testing.expectEqualStrings("http://proxy.example:8080", envProxy(&env, "api.github.com").proxy);
+    }
 
     try env.put("NO_PROXY", "localhost,127.0.0.1,.internal.example");
     try testing.expect(envProxy(&env, "github.com") == .proxy);
