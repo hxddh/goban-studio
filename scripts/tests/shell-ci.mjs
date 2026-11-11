@@ -7,6 +7,7 @@
  * throws on anything else.
  */
 import crypto from "node:crypto";
+import os from "node:os";
 import { test, assert, fs, path, root } from "./helpers.mjs";
 import * as Sdk from "../native-sdk.mjs";
 
@@ -326,7 +327,7 @@ await test("ci: the Native SDK comes from the lockfile: one exact version, hashe
     assert.match(p.integrity, /^sha512-/);
   }
   // A lockfile that lost a hash, or a range in package.json, is refused.
-  const tmp = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR || "/tmp"), "goban-sdk-"));
+  const tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "goban-sdk-"));
   try {
     const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
     fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "^0.11.0" } }));
