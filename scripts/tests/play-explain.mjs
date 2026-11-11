@@ -1,7 +1,8 @@
 /**
  * Play: reading a game — atari, what a mistake cost and where, its kind, and the stories told about it.
  */
-import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, fs, keyOf, lossSource, mv, narrate, parse, path, root, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
+import { test, MESSAGES, assert, ataris, attributeLoss, classifyMistake, complexity, describe, describeMistakes, empty, keyOf, lossSource, mv, narrate, parse, setLang, settled, simulate, storyText, summaryOf, syntheticReview } from "./helpers.mjs";
+import { REVIEW } from "../../src/web/js/messages/review.js";
 
 await test("atari detection finds chains with one liberty", () => {
   const b = empty(9);
@@ -314,8 +315,6 @@ await test("story text is complete in all four languages", () => {
   setLang("en");
   assert.equal(storyText({ key: "story.capture", params: [{ key: "common.white" }, 3] }), "White captures 3 stones");
   assert.equal(storyText(null), "");
-  // The v4 strings sit in one block.
-  const src = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8");
-  const block = src.slice(src.indexOf("// v4 review"), src.indexOf("// end v4 review"));
-  for (const k of Object.keys(MESSAGES).filter((k) => k.startsWith("story.") || k.startsWith("lossKind."))) assert.ok(block.includes(`"${k}"`), k);
+  // The story's strings sit with the review's.
+  for (const k of Object.keys(MESSAGES).filter((k) => k.startsWith("story.") || k.startsWith("lossKind."))) assert.ok(REVIEW[k], k);
 });

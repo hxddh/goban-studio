@@ -133,7 +133,7 @@ function turnText(g) {
   if (g.scoring) return t("play.scoring");
   if (game.current.result) return C.resultText(game.current.result);
   if (g.pending) return t("teach.paused");
-  if (g.engineFailed && C.isComputerTurn()) return t("v13ui.engineFailed");
+  if (g.engineFailed && C.isComputerTurn()) return t("play.engineFailed");
   if (g.thinking && C.isComputerTurn()) return t("play.thinking");
   if (g.thinking) return t("play.hintThinking");
   const color = colorName(game.turn);
@@ -367,7 +367,7 @@ function PlayPanel() {
         {g.engineFailed && playing && C.isComputerTurn() && (
           <div class="actions">
             <Button kind="primary" icon="resume" onClick={C.retryComputerMove}>
-              {t("v13ui.retryMove")}
+              {t("play.retryMove")}
             </Button>
           </div>
         )}

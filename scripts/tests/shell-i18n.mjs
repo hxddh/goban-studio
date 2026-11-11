@@ -33,7 +33,7 @@ await test("i18n: counts take their plural form: 1 move, 2 moves; one form in Ch
   assert.equal(tn("report.lost", 1.5, ["1.5"]), "≈ 1.5 points lost");
   assert.equal(tn("backup.confirmFiles", 1, [1, 5]).startsWith("The backup holds 1 game in 5 files."), true);
   assert.equal(tn("explorer.inBookAll", 1), "The first move is in the opening book");
-  assert.equal(t("v13ui.week.line", [tn("v13ui.week.games", 1), tn("v13ui.week.problems", 1)]), "1 game played, 1 problem solved.");
+  assert.equal(t("today.week.line", [tn("today.week.games", 1), tn("today.week.problems", 1)]), "1 game played, 1 problem solved.");
   // A key with no plural forms of its own is itself.
   assert.equal(tn("common.cancel", 1), t("common.cancel"));
   for (const lang of ["zh", "ko", "ja"]) {
@@ -41,7 +41,7 @@ await test("i18n: counts take their plural form: 1 move, 2 moves; one form in Ch
     assert.equal(tn("play.moveN", 1), t("play.moveN", [1]), lang);
   }
   setLang("zh");
-  assert.equal(t("v13ui.week.line", [tn("v13ui.week.games", 1), tn("v13ui.week.problems", 2)]), "下了 1 盘棋，做对 2 道题。");
+  assert.equal(t("today.week.line", [tn("today.week.games", 1), tn("today.week.problems", 2)]), "下了 1 盘棋，做对 2 道题。");
   setLang("en");
 });
 
@@ -60,13 +60,13 @@ await test("i18n: every .one form has a base form; CJK repeats it (only English 
 
 await test("i18n: a label and its value: full-width colon in Chinese and Japanese, none of an ASCII colon", () => {
   setLang("zh");
-  assert.equal(t("v13ui.labelValue", [t("today.next"), "打吃"]), "下一项：打吃");
-  assert.equal(t("v13ui.label", ["你的棋力"]), "你的棋力：");
+  assert.equal(t("common.labelValue", [t("today.next"), "打吃"]), "下一项：打吃");
+  assert.equal(t("common.label", ["你的棋力"]), "你的棋力：");
   setLang("ja");
-  assert.equal(t("v13ui.labelValue", ["次", "アタリ"]), "次：アタリ");
+  assert.equal(t("common.labelValue", ["次", "アタリ"]), "次：アタリ");
   setLang("en");
-  assert.equal(t("v13ui.labelValue", ["Next", "Atari"]), "Next: Atari");
-  assert.equal(t("v13ui.label", ["Your level"]), "Your level: ");
+  assert.equal(t("common.labelValue", ["Next", "Atari"]), "Next: Atari");
+  assert.equal(t("common.label", ["Your level"]), "Your level: ");
 });
 
 await test("i18n: Korean particles follow the word before them", () => {

@@ -173,7 +173,7 @@ export async function boot() {
   state.ready = true;
   update();
   const note = takeNote();
-  if (note) toast(t("v13.note." + note), note === "restorePartial" ? "warning" : "success", 7000);
+  if (note) toast(t("backup.note." + note), note === "restorePartial" ? "warning" : "success", 7000);
   // Lesson steps, problem bodies and classic records follow on idle
   // (content.js). Nothing on screen reads them before it is opened, and
   // what opens them waits for them, so their arrival renders nothing.
@@ -753,7 +753,7 @@ export async function exportBackup() {
   await store.flush();
   const doc = await backupDoc(store);
   const day = new Date().toISOString().slice(0, 10);
-  const saved = await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json", { done: t("v13.backupSaved") });
+  const saved = await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json", { done: t("backup.saved") });
   // With a backup just saved, the copy kept from before the last restore has done its job.
   if (saved && !store.readOnly) {
     await dropSnapshots(store);
@@ -764,7 +764,7 @@ export async function exportBackup() {
 
 /** What a restore says when it cannot go ahead. */
 function restoreError(error) {
-  return t(error === "snapshot" ? "v13.restore.snapshotFailed" : error === "tooLarge" ? "v13.backup.tooLarge" : error === "noSnapshot" ? "v13.undoRestore.none" : "backup.error." + error);
+  return t(error === "snapshot" ? "backup.restore.snapshotFailed" : error === "tooLarge" ? "backup.tooLarge" : error === "noSnapshot" ? "backup.undoRestore.none" : "backup.error." + error);
 }
 
 /**
@@ -779,7 +779,7 @@ function reloadAfterRestore(note) {
 
 /** Pick a backup file, say what it holds, and replace everything on confirm. */
 export async function importBackup() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
+  if (store.readOnly) return toast(t("safe.readOnlyNow"), "warning");
   let text = null;
   if (hasNative() && hasFileDialogs()) {
     const files = await openFileDialog({ title: t("backup.import"), allowMultiple: false });
@@ -809,7 +809,7 @@ export function offerRestore(doc) {
   if (!c.ok) return toast(restoreError(c.error), "error");
   confirmAction({
     title: t("backup.confirmTitle"),
-    body: tn("backup.confirmFiles", c.summary.games, [c.summary.games, c.summary.keys]) + " " + t("v13.restore.safety"),
+    body: tn("backup.confirmFiles", c.summary.games, [c.summary.games, c.summary.keys]) + " " + t("backup.restore.safety"),
     confirm: t("backup.restore"),
     danger: true,
     onConfirm: () => restoreNow(doc),
@@ -841,12 +841,12 @@ export async function revealDataFolder() {
 
 /** Put back what was there before the last restore (Settings). */
 export function undoRestore() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
+  if (store.readOnly) return toast(t("safe.readOnlyNow"), "warning");
   if (!latestSnapshot(store, Date.now())) return toast(restoreError("noSnapshot"), "error");
   confirmAction({
-    title: t("v13.undoRestore.title"),
-    body: t("v13.undoRestore.body"),
-    confirm: t("v13.undoRestore.confirm"),
+    title: t("backup.undoRestore.title"),
+    body: t("backup.undoRestore.body"),
+    confirm: t("backup.undoRestore.confirm"),
     danger: true,
     onConfirm: () => undoRestoreNow(),
   });
@@ -859,7 +859,7 @@ export async function undoRestoreNow() {
 }
 
 export function clearData() {
-  if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
+  if (store.readOnly) return toast(t("safe.readOnlyNow"), "warning");
   confirmAction({
     title: t("settings.clearConfirm"),
     body: t("settings.clearBody"),

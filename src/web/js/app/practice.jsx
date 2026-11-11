@@ -115,7 +115,7 @@ function ProblemGrid({ items, numberOf }) {
         const n = numberOf(x);
         const name = C.nameKnown(x.id) ? C.tx(x.title) : "";
         const toMove = C.defToMove(x);
-        const label = [name ? t("v13ui.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
+        const label = [name ? t("common.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
         return (
           <button type="button" class={`problem-card ${status}`} data-status={status} tabIndex={i === at ? 0 : -1} aria-label={label} title={name || undefined} onFocus={() => setAt(i)} onClick={() => C.openProblem(x.id)}>
             <PositionTile def={x} />
@@ -411,7 +411,7 @@ function ProblemResult({ P, placing }) {
   if (!named && back == null) return null;
   return (
     <div class="result-lines">
-      {named && <p class="result-name">{t("v13ui.labelValue", [t("practice.thisProblem"), C.tx(P.def.title)])}</p>}
+      {named && <p class="result-name">{t("common.labelValue", [t("practice.thisProblem"), C.tx(P.def.title)])}</p>}
       {back != null && <p class="fine come-back">{back === 1 ? t("practice.backTomorrow") : t("practice.backInDays", [back])}</p>}
     </div>
   );

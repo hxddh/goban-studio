@@ -50,16 +50,16 @@
  * the values the app offers.
  */
 
-import { MESSAGES } from "../messages.js";
+import { CONTENT } from "../messages/content.js";
 
 const L = (zh, en, ko, ja) => ({ zh, en, ko, ja });
-/** A four-language name kept in messages.js (the v4 content block). */
+/** A four-language name kept with the content strings (messages/content.js). */
 const msg = (key) => {
-  const v = MESSAGES[key];
+  const v = CONTENT[key];
   return L(v.zh, v.en, v.ko, v.ja);
 };
 
-/** v6 endgame titles and hints (messages.js, the v6 endgame block). */
+/** Endgame titles and hints (messages/content.js, `problem.endgame.*`). */
 const EG = Object.fromEntries(
   ["haneConnect", "push", "atari", "capture", "block", "monkeyJump", "doubleSente", "value", "senteFirst", "doubleSenteFirst", "biggest"].map((k) => [
     k,

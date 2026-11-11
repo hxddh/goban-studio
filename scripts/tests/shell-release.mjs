@@ -168,8 +168,6 @@ await test("the native update commands are fixed to this repository", () => {
   assert.match(html, /connect-src 'self'/);
   const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8").replace(/\r\n/g, "\n");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
@@ -436,8 +434,6 @@ await test("the native install commands are fixed to this repository's release d
   // The helpers are embedded in the app, not downloaded.
   assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
   assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
   for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
 });
 

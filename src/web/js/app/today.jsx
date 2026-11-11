@@ -43,9 +43,9 @@ export function weekCounts(now = Date.now(), games = Games.listGames(), problems
 
 /** This week in one line, without its zero parts; the quiet empty line when there is nothing at all. */
 export function weekText(counts) {
-  const parts = weekParts(counts).map((p) => tn(p.key === "games" ? "v13ui.week.games" : "v13ui.week.problems", p.n));
+  const parts = weekParts(counts).map((p) => tn(p.key === "games" ? "today.week.games" : "today.week.problems", p.n));
   if (!parts.length) return t("today.weekNone");
-  return parts.length === 2 ? t("v13ui.week.line", parts) : t("today.weekOne", parts);
+  return parts.length === 2 ? t("today.week.line", parts) : t("today.weekOne", parts);
 }
 
 export function TodayView() {
@@ -98,7 +98,7 @@ function TodayList() {
         </span>
         <span class="gr-text">
           <strong>{t("today.practice")}</strong>
-          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? t("v13ui.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
+          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? t("common.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
         </span>
         <span class="row-count">{t("practice.ofN", [done, now.items.length])}</span>
         {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("learn.path.resume") : t("learn.path.start")}</span>}
@@ -131,7 +131,7 @@ function LevelRow({ est, trend }) {
   return (
     <li class="progress-row" data-row="level">
       <span class="gr-text">
-        <strong>{t("v13ui.labelValue", [t("play.home.level"), label])}</strong>
+        <strong>{t("common.labelValue", [t("play.home.level"), label])}</strong>
         <span>{said}</span>
       </span>
       {sp && (

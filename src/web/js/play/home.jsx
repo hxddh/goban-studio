@@ -146,7 +146,7 @@ export function Level() {
   if (!(e.games > 0)) return null;
   return (
     <p class="fine play-level">
-      {t("v13ui.label", [t("play.home.level")])}<strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {tn("play.home.levelGames", e.games)}
+      {t("common.label", [t("play.home.level")])}<strong title={t("strength.about")}>{estimateLabel(e)}</strong> · {tn("play.home.levelGames", e.games)}
     </p>
   );
 }

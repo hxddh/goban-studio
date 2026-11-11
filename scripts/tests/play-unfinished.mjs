@@ -52,7 +52,7 @@ await test("play unfinished: New game saves the game in progress to the Library 
   assert.equal(list[0].moves, 3);
   assert.equal(Lib.isUnfinished(list[0]), true);
   assert.equal(state.game.game.moveNumber, 0, "the new game is on the board");
-  assert.ok(state.toasts.some((x) => x.message === t("v13.parked")));
+  assert.ok(state.toasts.some((x) => x.message === t("data.parked")));
   // An empty board, or one where only the computer moved, has nothing to keep.
   Play.newGame({ size: 9, opponent: "human" });
   const g = new Game({ size: 9 });
@@ -143,7 +143,7 @@ await test("play export: in the app, a file that cannot be written is an error t
     assert.ok(calls.includes("studio.writeTextFile"), "the native write was tried");
     const last = state.toasts.at(-1);
     assert.equal(last.tone, "error");
-    assert.equal(last.message, t("v13.exportFailed"));
+    assert.equal(last.message, t("data.exportFailed"));
     assert.ok(!state.toasts.some((x) => x.message === t("toast.exported")), "no fake success");
     // A dialog that fails is an error too (no download link in a WebView).
     globalThis.zero = { invoke: async () => { throw new Error("no dialog"); }, on: () => () => {} };

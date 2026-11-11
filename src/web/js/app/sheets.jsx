@@ -535,7 +535,7 @@ function AboutPane() {
         <p class="about">
           <strong>Goban Studio {APP_VERSION}</strong>
           <span class="fine">{t("settings.offline")}</span>
-          <span class="fine">{t("v13ui.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
+          <span class="fine">{t("common.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
         </p>
       </section>
       <section class="settings-group">
@@ -852,7 +852,7 @@ function UndoRestoreRow() {
     <>
       <div class="actions">
         <Button kind="ghost" icon="undo" data-undo-restore onClick={C.undoRestore}>
-          {t("v13.undoRestore.row", [when])}
+          {t("backup.undoRestore.row", [when])}
         </Button>
       </div>
       <p class="fine">{t("settings.undoRestoreNote")}</p>

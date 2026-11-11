@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { MESSAGES } from "../../src/web/js/messages.js";
-import { LEARN } from "../../src/web/js/messages/learn.js";
+import { PRACTICE } from "../../src/web/js/messages/practice.js";
 
 export default async function ({ test, assert, root }) {
   const P = await import("../../src/web/js/model/player.js");
@@ -164,13 +164,13 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("learn strings: the Learn area in four languages; the removed Daily five, plan and trend strings are gone", () => {
-    for (const [key, v] of Object.entries(LEARN)) {
+    for (const [key, v] of Object.entries(PRACTICE)) {
       assert.deepEqual(MESSAGES[key], v, key);
       for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(v[lang]?.trim(), `${key} ${lang}`);
     }
-    assert.equal(LEARN["learn.path.focus"].zh, "本周重点：{0}");
-    assert.equal(LEARN["learn.path.review"].en, "Due for review");
-    assert.equal(LEARN["learn.path.next"].en, "Next lesson");
+    assert.equal(PRACTICE["learn.path.focus"].zh, "本周重点：{0}");
+    assert.equal(PRACTICE["learn.path.review"].en, "Due for review");
+    assert.equal(PRACTICE["learn.path.next"].en, "Next lesson");
     for (const key of Object.keys(MESSAGES)) assert.ok(!/^(plan\.|trend\.|practice\.daily|practice\.nextDaily|practice\.finishDaily)/.test(key), key);
     for (const f of ["app/plan-ctl.js", "messages/v7-plan.js"]) assert.ok(!fs.existsSync(path.join(root, "src/web/js", f)), f);
     // The streak stays removed: nothing in Learn counts days in a row.

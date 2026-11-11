@@ -192,7 +192,7 @@ export function parkCurrent({ quiet = false } = {}) {
   const rec = Games.saveGame(g.game, { ...recordMeta(g), clock: g.clock || null, rated: !!g.rated });
   g.recordId = rec.id;
   g.saved = true;
-  if (!quiet) toast(t("v13.parked"));
+  if (!quiet) toast(t("data.parked"));
   return rec;
 }
 
@@ -589,7 +589,7 @@ async function offlineFallback(g, gen, result) {
 function computerFailed(g) {
   g.thinking = false;
   g.engineFailed = true;
-  announce(t("v13ui.engineFailed"));
+  announce(t("play.engineFailed"));
   update();
 }
 
@@ -1124,7 +1124,7 @@ export async function exportSGF(game = state.game?.game, name = state.game?.name
 export async function saveText(filename, text, mime = "text/plain", { done = t("toast.exported") } = {}) {
   if (hasNative()) {
     if (!hasFileDialogs()) {
-      toast(t("v13.exportFailed"), "error", 6000);
+      toast(t("data.exportFailed"), "error", 6000);
       return false;
     }
     const path = await saveFileDialog({ title: t("common.export"), defaultName: filename });
@@ -1135,7 +1135,7 @@ export async function saveText(filename, text, mime = "text/plain", { done = t("
       toast(done, "success");
       return true;
     }
-    toast(t("v13.exportFailed"), "error", 6000);
+    toast(t("data.exportFailed"), "error", 6000);
     return false;
   }
   const blob = new Blob([text], { type: mime });

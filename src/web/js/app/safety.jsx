@@ -20,9 +20,9 @@ import { Button } from "./parts.jsx";
 
 /** The file names a person recognises, in their language. */
 function fileName(key) {
-  if (key === "settings.json") return t("v13.file.settings");
-  if (key === "profile.json") return t("v13.file.profile");
-  if (key === "current.json") return t("v13.file.current");
+  if (key === "settings.json") return t("data.file.settings");
+  if (key === "profile.json") return t("data.file.profile");
+  if (key === "current.json") return t("data.file.current");
   return key;
 }
 
@@ -46,35 +46,35 @@ function Screen({ title, children, actions }) {
 export function BootError() {
   return (
     <Screen
-      title={t("v13.bridge.title")}
+      title={t("bridge.title")}
       actions={
         <Button kind="primary" class="primary" data-autofocus onClick={C.retryStore}>
-          {t("v13.retry")}
+          {t("common.retry")}
         </Button>
       }
     >
-      <p class="muted">{t("v13.bridge.body")}</p>
+      <p class="muted">{t("bridge.body")}</p>
     </Screen>
   );
 }
 
 export function StoreProblem() {
   const p = state.storeProblem;
-  const body = p.kind === "list" ? t("v13.safe.list") : p.newer ? t("v13.safe.newer") : t("v13.safe.files");
+  const body = p.kind === "list" ? t("safe.list") : p.newer ? t("safe.newer") : t("safe.files");
   return (
     <Screen
-      title={t("v13.safe.title")}
+      title={t("safe.title")}
       actions={
         <>
           <Button kind="primary" class="primary" data-autofocus data-safe="retry" onClick={C.retryStore}>
-            {t("v13.retry")}
+            {t("common.retry")}
           </Button>
           <Button data-safe="readonly" onClick={C.continueReadOnly}>
-            {t("v13.safe.readOnly")}
+            {t("safe.readOnly")}
           </Button>
           {p.resettable && (
             <Button kind="ghost" data-safe="reset" onClick={C.resetDamaged}>
-              {t("v13.safe.reset")}
+              {t("safe.reset")}
             </Button>
           )}
         </>
@@ -86,7 +86,7 @@ export function StoreProblem() {
           {p.failed.map((f) => (
             <li>
               <strong>{fileName(f.key)}</strong> <span class="fine">({f.key})</span>
-              {f.preserved && <span class="fine"> · {t("v13.safe.copied", [f.preserved])}</span>}
+              {f.preserved && <span class="fine"> · {t("safe.copied", [f.preserved])}</span>}
             </li>
           ))}
         </ul>
@@ -97,8 +97,8 @@ export function StoreProblem() {
           {t("safe.resetFailed", [p.resetFailed.map(fileName).join(t("list.comma"))])}
         </p>
       )}
-      <p class="muted">{t("v13.safe.nothingWritten")}</p>
-      {p.resettable && <p class="fine">{t("v13.safe.resetHelp")}</p>}
+      <p class="muted">{t("safe.nothingWritten")}</p>
+      {p.resettable && <p class="fine">{t("safe.resetHelp")}</p>}
     </Screen>
   );
 }
@@ -106,9 +106,9 @@ export function StoreProblem() {
 export function ReadOnlyBanner() {
   return (
     <div class="safe-banner" role="status">
-      <span>{t("v13.safe.banner")}</span>
+      <span>{t("safe.banner")}</span>
       <button type="button" class="link" data-safe="banner-retry" onClick={C.retryStore}>
-        {t("v13.retry")}
+        {t("common.retry")}
       </button>
     </div>
   );
