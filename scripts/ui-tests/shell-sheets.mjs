@@ -27,7 +27,21 @@ const sources = () => {
 };
 
 /** Every kind of sheet this file opens (kept equal to sheets.jsx by the first check). */
-const SHEETS_TESTED = ["confirm", "newGame", "onboarding", "rename", "settings", "shortcuts"];
+const SHEETS_TESTED = ["confirm", "level", "newGame", "onboarding", "rename", "settings", "shortcuts"];
+/**
+ * Every pane of Settings, in order (kept equal to sheets.jsx SETTINGS_PANES
+ * by the first check), with what each must hold: selector → how many.
+ * (The fake host is a packaged app: the data folder row is there.)
+ */
+const SETTINGS_PANES_TESTED = {
+  general: { ".lang-grid button": 4, ".segmented": 2, ".segmented.volume button": 4, ".switch": 1 },
+  board: { ".segmented.board-style button": 2, ".switch": 5 },
+  playing: { ".switch": 4, ".segmented.default-rules button": 3 },
+  you: { ".level-row .level-now": 1, "[data-change-level]": 1, ".segmented.daily-size button": 3 },
+  engines: { ".model-row": 2 },
+  data: { ".btn": 4, "[data-reveal]": 1, ".btn.danger": 1 },
+  about: { ".about": 1, ".update-row .btn": 1, ".switch": 1, ".btn.ghost": 1 },
+};
 /** Every menu this file opens: the id it is given in the source → its items, in order. */
 const MENUS_TESTED = {
   '"play-more"': ["Hint", "Review so far", "Count", "Save to library", "Export SGF", "Focus mode", "Resign"],
@@ -68,7 +82,7 @@ const SEED = {
  * (window.__written), and game files that can be made slow or unreadable
  * (window.__read).
  */
-function fakeHost(seed) {
+export function fakeHost(seed) {
   window.__files = { ...seed };
   window.__dialogs = [];
   window.__written = [];
@@ -194,6 +208,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     }
     for (const k of opened) assert(kinds.includes(k), `a sheet of kind "${k}" is opened somewhere, but sheets.jsx has no such kind`);
     for (const k of kinds) assert(opened.has(k), `no code opens a "${k}" sheet`);
+    // Every pane of Settings.
+    const paneTable = /const SETTINGS_PANES = \[([\s\S]*?)\];/.exec(sheets);
+    assert(paneTable, "sheets.jsx: SETTINGS_PANES was not found");
+    const paneIds = [...paneTable[1].matchAll(/id:\s*"(\w+)"/g)].map((m) => m[1]);
+    assert(JSON.stringify(paneIds) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `Settings panes in sheets.jsx: ${paneIds} — tested here: ${Object.keys(SETTINGS_PANES_TESTED)}`);
     // Every menu.
     const menus = [];
     for (const { file, text } of all) {
@@ -203,7 +222,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const uses = all.filter((s) => s.file !== "app/parts.jsx").reduce((n, s) => n + (s.text.match(/<MoreMenu\b/g) || []).length, 0);
     assert(uses === menus.length, `${uses} <MoreMenu> in the source, ${menus.length} with an id this check can read`);
     assert(JSON.stringify(menus.sort()) === JSON.stringify(Object.keys(MENUS_TESTED).sort()), `menus in the source: ${menus} — tested here: ${Object.keys(MENUS_TESTED)}`);
-    return `${kinds.length} sheets, ${menus.length} menus`;
+    return `${kinds.length} sheets, ${paneIds.length} Settings panes, ${menus.length} menus`;
   });
 
   /* ------------------------------------------------------- the sheets */
@@ -222,16 +241,39 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await markFocus(page);
     await settings.click();
     await page.waitForSelector(".settings-sheet");
-    const panes = await page.locator(".settings-tab").count();
-    assert(panes === 5, `${panes} settings panes`);
-    for (let i = 0; i < panes; i++) {
-      await page.click(`.settings-tab >> nth=${i}`);
+    const tabs = await page.locator(".settings-tab").evaluateAll((els) => els.map((el) => el.dataset.pane));
+    assert(JSON.stringify(tabs) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `settings panes: ${tabs}`);
+    for (const [id, holds] of Object.entries(SETTINGS_PANES_TESTED)) {
+      await page.click(`.settings-tab[data-pane=${id}]`);
+      await page.waitForSelector(`.settings-pane[data-pane=${id}]`);
       const label = await page.getAttribute(".settings-pane", "aria-label");
-      const tab = (await page.textContent(`.settings-tab >> nth=${i}`)).trim();
-      assert(label === tab, `pane ${i}: named "${label}", its tab says "${tab}"`);
+      const tab = (await page.textContent(`.settings-tab[data-pane=${id}]`)).trim();
+      assert(label === tab, `pane ${id}: named "${label}", its tab says "${tab}"`);
       assert((await page.locator(".settings-pane .settings-group").count()) > 0, `pane ${tab} is empty`);
+      for (const [sel, n] of Object.entries(holds)) {
+        const got = await page.locator(`.settings-pane ${sel}`).count();
+        assert(got === n, `pane ${id}: ${got} × ${sel}, expected ${n}`);
+      }
+      // Nothing here is a native select: choices are segmented controls, switches or buttons.
+      assert((await page.locator(".settings-pane select").count()) === 0, `pane ${id} has a native select`);
+      // One pane is never taller than the sheet (docs/design.md §7).
+      const fit = await page.evaluate(() => {
+        const el = document.querySelector(".settings-pane");
+        return [el.scrollHeight, el.clientHeight];
+      });
+      assert(fit[0] <= fit[1], `pane ${id} scrolls: ${fit[0]} px of content in ${fit[1]} px`);
       noErrors(page, `settings pane ${tab}`);
     }
+    // The level sheet (You → Change…): named, modal, focused; Esc goes back to Settings → You, the focus on its button.
+    await page.click(".settings-tab[data-pane=you]");
+    await page.click("[data-change-level]");
+    await page.waitForFunction(() => window.__state.sheet?.kind === "level" && !!document.querySelector("[role=dialog]")?.contains(document.activeElement));
+    const level = await sheetInfo(page);
+    assert(level.name === "Roughly how strong are you?" && level.modal === "true" && level.focusInside, `level sheet: ${JSON.stringify(level)}`);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => window.__state.sheet?.kind === "settings" && document.activeElement?.hasAttribute("data-change-level"));
+    assert((await page.getAttribute(".settings-pane", "data-pane")) === "you", "Esc in the level sheet did not go back to its pane");
+    noErrors(page, "level sheet");
     await page.click(".settings-tab >> nth=0");
     await sheetOpensAndCloses(page, "settings", { title: "Settings" });
     // Shortcuts.
@@ -351,7 +393,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".ob-card .slider-field");
     assert((await sheetInfo(page)).name.length > 0, "the rank step has a name");
     await page.click(".ob-card .btn.primary");
-    await page.waitForFunction(() => window.__state.sheet === null && window.__state.space === "play");
+    // It ends on Today (nothing started), whose hero is the 19×19 game.
+    await page.waitForFunction(() => window.__state.sheet === null && window.__state.space === "today" && window.__state.game === null);
+    await page.click(".today .hero .btn.primary");
+    await page.waitForFunction(() => window.__state.space === "play" && window.__state.game?.game.size === 19);
     noErrors(page, "onboarding");
     await page.close();
   });
@@ -800,6 +845,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     assert(handles.length === 0, `left on window: ${handles}`);
     await plain.click(".ob-card .btn.primary");
     await plain.click(".choice >> nth=1");
+    await plain.click(".today .hero .btn.primary");
     await plain.waitForSelector("canvas.board");
     assert(await plain.evaluate(() => !("__board" in window)), "the board is not on window either");
     assert(plain.errors.length === 0, plain.errors.join("; "));

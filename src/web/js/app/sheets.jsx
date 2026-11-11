@@ -1,10 +1,12 @@
 /**
- * Modal sheets: new game, settings, onboarding, shortcuts, confirm, rename.
+ * Modal sheets: new game, settings (and the level sheet it opens),
+ * onboarding, shortcuts, confirm, rename.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, RULESETS, defaultKomi, formatPoints, rulesetById } from "../rules.js";
 import { currentLadder, installed, nearest, suggestHandicap } from "../engine.js";
-import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
+import { LANG_IDS, LANG_NAMES, t, tn } from "../i18n.js";
+import { hasNative } from "../host.js";
 import { APP_VERSION } from "../version.js";
 import * as U from "../update.js";
 import * as Models from "../models.js";
@@ -18,7 +20,7 @@ import { shortcutRows } from "./shortcuts.js";
 import { CrashProbe, ErrorBoundary } from "./feedback.jsx";
 
 /** Every kind of sheet: `state.sheet.kind` → its component. */
-const SHEETS = { newGame: NewGameSheet, settings: SettingsSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet };
+const SHEETS = { newGame: NewGameSheet, settings: SettingsSheet, level: LevelSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet };
 export const SHEET_KINDS = Object.keys(SHEETS);
 
 /** A sheet that cannot render closes itself and says so; the app behind it stays usable. */
@@ -40,7 +42,12 @@ export function Sheets() {
   );
 }
 
-function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelledBy, class: cls = "" }) {
+/**
+ * The frame of a sheet. `onClose` is what its close button and a click
+ * outside do; `onEscape` (a sheet opened from another sheet) is what Esc
+ * does instead of closing every sheet.
+ */
+function Modal({ title, children, footer, wide, onClose = C.closeSheet, onEscape, labelledBy, class: cls = "" }) {
   const ref = useRef(null);
   useEffect(() => {
     const prev = document.activeElement;
@@ -51,6 +58,12 @@ function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelled
     return () => prev?.focus?.({ preventScroll: true });
   }, []);
   const onKey = (e) => {
+    if (e.key === "Escape" && onEscape) {
+      // Before the page's own Esc (app.jsx), which would close the sheet outright.
+      e.stopPropagation();
+      e.preventDefault();
+      return onEscape();
+    }
     if (e.key !== "Tab") return;
     const items = [...ref.current.querySelectorAll("button:not([disabled]), input:not([disabled]), select, [tabindex='0']")];
     if (!items.length) return;
@@ -107,7 +120,7 @@ function NewGameSheet({ prefill }) {
   const [advanced, setAdvanced] = useState(false);
   const [handicap, setHandicap] = useState(null);
   const [komi, setKomi] = useState(null);
-  const [rules, setRules] = useState(prefill?.rules || s.defaultRules || "japanese");
+  const [rules, setRules] = useState(prefill?.rules || C.defaultRules());
   const h = handicap ?? (color === BLACK ? suggested : 0);
   const k = komi ?? defaultKomi(rules, h);
   const start = () =>
@@ -131,9 +144,7 @@ function NewGameSheet({ prefill }) {
         {PRESETS.map((p) => (
           <button type="button" role="radio" aria-checked={size === p.size} class={`preset ${size === p.size ? "on" : ""}`} onClick={() => setSize(p.size)}>
             <MiniGrid size={p.size} />
-            <strong>
-              {p.size} × {p.size}
-            </strong>
+            <strong>{t("newGame.size", [p.size])}</strong>
             <span>{t("newGame." + p.key)}</span>
           </button>
         ))}
@@ -193,18 +204,8 @@ function NewGameSheet({ prefill }) {
             </div>
           </>
         )}
-        {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
-        {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
-
-        <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
-          <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
-          <span class="fine">
-            {t(rulesetById(rules).labelKey)} · {t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}
-          </span>
-        </button>
-        {advanced && (
-          <>
-            <div class="row">
+        {/* The clock: the most-used choice after the board and the strength, so not behind More options. */}
+        <div class="row">
           <span>{t("newGame.time")}</span>
           <Segmented
             label={t("newGame.time")}
@@ -217,7 +218,17 @@ function NewGameSheet({ prefill }) {
             ]}
           />
         </div>
+        {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
+        {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
 
+        <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
+          <Icon name={advanced ? "down" : "next"} size={14} /> {t("newGame.advanced")}
+          <span class="fine">
+            {t(rulesetById(rules).labelKey)} · {t("newGame.advancedSummary", [h || t("common.none"), formatPoints(k)])}
+          </span>
+        </button>
+        {advanced && (
+          <>
             <div class="row">
               <span>{t("common.handicap")}</span>
               <Stepper
@@ -273,10 +284,12 @@ function MiniGrid({ size }) {
 
 /* --------------------------------------------------------------- settings */
 
-const SETTINGS_PANES = [
+export const SETTINGS_PANES = [
   { id: "general", icon: "gear", key: "settings.pane.general" },
   { id: "board", icon: "grid", key: "settings.pane.board" },
   { id: "playing", icon: "play", key: "settings.pane.playing" },
+  { id: "you", icon: "target", key: "settings.pane.you" },
+  { id: "engines", icon: "download", key: "settings.pane.engines" },
   { id: "data", icon: "save", key: "settings.pane.data" },
   { id: "about", icon: "info", key: "settings.pane.about" },
 ];
@@ -284,21 +297,18 @@ const SETTINGS_PANES = [
 let settingsPane = "general";
 
 /**
- * Settings (docs/design.md §6): a source list of panes on the left, one
+ * Settings (docs/design.md §7): a source list of panes on the left, one
  * pane at a time on the right — like the system's own settings window.
+ * No pane is taller than the sheet (scripts/ui-tests/shell-sheets.mjs).
  */
-function SettingsSheet({ pane: open }) {
-  const s = state.settings;
-  const set = C.setSetting;
-  // v8: the opponents' networks sit at the end of Playing (no pane of their own).
-  const want = open === "engine" ? "playing" : open;
+function SettingsSheet({ pane: open, focus }) {
+  // "engine" was the networks' place at the end of Playing; it is the Engines pane.
+  const want = open === "engine" ? "engines" : open;
   const [pane, setPane] = useState(want && SETTINGS_PANES.some((p) => p.id === want) ? want : settingsPane);
   const choose = (id) => {
     settingsPane = id;
     setPane(id);
   };
-  const rankOptions = [30, 25, 20, 15, 10, 5, 1, -1, -3];
-  const rankText = (r) => (r == null ? t("settings.rankUnknown") : r > 0 ? t("rank.kyu", [r]) : t("rank.dan", [1 - r]));
   const onListKey = (e) => {
     const i = SETTINGS_PANES.findIndex((p) => p.id === pane);
     const d = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
@@ -308,6 +318,7 @@ function SettingsSheet({ pane: open }) {
     choose(next.id);
     e.currentTarget.querySelector(`[data-pane="${next.id}"]`)?.focus();
   };
+  const Pane = PANES[pane];
   return (
     <Modal title={t("nav.settings")} wide class="settings-sheet">
       <div class="settings-split">
@@ -327,155 +338,293 @@ function SettingsSheet({ pane: open }) {
             </button>
           ))}
         </nav>
-        <div class="settings-pane" role="tabpanel" aria-label={t(SETTINGS_PANES.find((p) => p.id === pane).key)}>
-          {pane === "general" && (
-            <>
-              <section class="settings-group">
-                <h3>{t("settings.language")}</h3>
-                <div class="lang-grid" role="radiogroup" aria-label={t("settings.language")}>
-                  {LANG_IDS.map((id) => (
-                    <button type="button" role="radio" aria-checked={s.lang === id} class={s.lang === id ? "on" : ""} lang={id} onClick={() => set("lang", id)}>
-                      {LANG_NAMES[id]}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <section class="settings-group">
-                <h3>{t("settings.look")}</h3>
-                <div class="row">
-                  <span>{t("settings.appearance")}</span>
-                  <Segmented
-                    label={t("settings.appearance")}
-                    value={s.appearance}
-                    onChange={(v) => set("appearance", v)}
-                    options={[
-                      { value: "auto", label: t("settings.auto") },
-                      { value: "light", label: t("settings.light") },
-                      { value: "dark", label: t("settings.dark") },
-                    ]}
-                  />
-                </div>
-                <Switch label={t("settings.sound")} checked={s.sound} onChange={(v) => set("sound", v)} />
-                <Switch label={t("a11y.largeText")} checked={!!s.largeText} onChange={(v) => set("largeText", v)} />
-              </section>
-            </>
-          )}
-          {pane === "board" && (
-            <>
-              <section class="settings-group">
-                <h3>{t("settings.boardGroup")}</h3>
-                <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
-                <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
-              </section>
-            </>
-          )}
-          {pane === "playing" && (
-            <>
-              <section class="settings-group">
-                <h3>{t("settings.playing")}</h3>
-                <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
-                <p class="fine">{t("settings.teachingHelp")}</p>
-                <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
-                <Switch label={t("settings.confirmProblemMove")} checked={!!s.confirmProblemMove} onChange={(v) => set("confirmProblemMove", v)} />
-                <p class="fine">{t("settings.confirmProblemMoveHelp")}</p>
-                <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
-                <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
-                <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
-                <div class="row">
-                  <span>{t("rules.default")}</span>
-                  <Segmented label={t("rules.default")} value={s.defaultRules || "japanese"} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
-                </div>
-              </section>
-              <section class="settings-group">
-                <h3>{t("settings.you")}</h3>
-                {state.profile && (
-                  <div class="row">
-                    <span>{t("settings.estimated")}</span>
-                    <strong title={t("strength.about")}>{estimateLabel(state.profile)}</strong>
-                  </div>
-                )}
-                <div class="row">
-                  <span>{t("settings.yourRank")}</span>
-                  <select value={s.playerRank ?? ""} onChange={(e) => C.setPlayerRank(e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} aria-label={t("settings.yourRank")}>
-                    <option value="">{t("settings.rankUnknown")}</option>
-                    {rankOptions.map((r) => (
-                      <option value={r}>{rankText(r)}</option>
-                    ))}
-                  </select>
-                </div>
-                <p class="fine">{t("settings.rankHelp")}</p>
-              </section>
-              <ModelsGroup />
-            </>
-          )}
-          {pane === "data" && (
-            <>
-              <section class="settings-group">
-                <h3>{t("backup.title")}</h3>
-                <p class="fine">{t("backup.help")}</p>
-                <div class="actions">
-                  <Button icon="download" onClick={C.exportBackup}>
-                    {t("backup.export")}
-                  </Button>
-                  <Button kind="ghost" icon="upload" onClick={C.importBackup}>
-                    {t("backup.import")}
-                  </Button>
-                </div>
-                <UndoRestoreRow />
-                <div class="actions">
-                  <Button kind="danger" onClick={C.clearData}>
-                    {t("settings.clearData")}
-                  </Button>
-                </div>
-              </section>
-            </>
-          )}
-          {pane === "about" && (
-            <>
-              <section class="settings-group">
-                <h3>{t("settings.about")}</h3>
-                <p class="about">
-                  <strong>Goban Studio {APP_VERSION}</strong>
-                  <span class="muted">
-                    {state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}
-                  </span>
-                  <span class="fine">{t("settings.offline")}</span>
-                  <span class="fine">{t("v13ui.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
-                </p>
-                <UpdateRow />
-                <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => set("autoUpdateCheck", v)} />
-                <p class="fine">{t("update.autoHelp")}</p>
-                <div class="actions">
-                  <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
-                    {t("shortcuts.title")}
-                  </Button>
-                </div>
-              </section>
-            </>
-          )}
+        <div class="settings-pane" data-pane={pane} role="tabpanel" aria-label={t(SETTINGS_PANES.find((p) => p.id === pane).key)}>
+          <Pane focus={focus} />
         </div>
       </div>
     </Modal>
   );
 }
 
-/** Optional downloads: the human-style opponent and the stronger network. */
-function ModelsGroup() {
+/** A row: its label on the left, one control on the right. */
+function Row({ label, children }) {
+  return (
+    <div class="row">
+      <span>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function GeneralPane() {
+  const s = state.settings;
+  const set = C.setSetting;
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.language")}</h3>
+        <div class="lang-grid" role="radiogroup" aria-label={t("settings.language")}>
+          {LANG_IDS.map((id) => (
+            <button type="button" role="radio" aria-checked={s.lang === id} class={s.lang === id ? "on" : ""} lang={id} onClick={() => set("lang", id)}>
+              {LANG_NAMES[id]}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section class="settings-group">
+        <h3>{t("settings.look")}</h3>
+        <Row label={t("settings.appearance")}>
+          <Segmented
+            label={t("settings.appearance")}
+            value={s.appearance}
+            onChange={(v) => set("appearance", v)}
+            options={[
+              { value: "auto", label: t("settings.auto") },
+              { value: "light", label: t("settings.light") },
+              { value: "dark", label: t("settings.dark") },
+            ]}
+          />
+        </Row>
+        <Switch label={t("a11y.largeText")} checked={!!s.largeText} onChange={(v) => set("largeText", v)} />
+      </section>
+      <section class="settings-group">
+        <h3>{t("settings.soundGroup")}</h3>
+        <Row label={t("settings.sound")}>
+          {/* Changing it plays one stone at the new volume (ctl-core.js setSetting). */}
+          <Segmented class="volume" label={t("settings.sound")} value={s.volume} onChange={(v) => set("volume", v)} options={VOLUMES.map((v) => ({ value: v, label: t("settings.volume." + v) }))} />
+        </Row>
+      </section>
+    </>
+  );
+}
+const VOLUMES = ["off", "quiet", "normal", "loud"];
+
+function BoardPane() {
+  const s = state.settings;
+  const set = C.setSetting;
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.boardGroup")}</h3>
+        <Row label={t("settings.boardStyle")}>
+          <Segmented
+            class="board-style"
+            label={t("settings.boardStyle")}
+            value={s.boardStyle}
+            onChange={(v) => set("boardStyle", v)}
+            options={[
+              { value: "standard", label: t("settings.boardStyle.standard") },
+              { value: "contrast", label: t("settings.boardStyle.contrast") },
+            ]}
+          />
+        </Row>
+        <p class="fine">{t("settings.boardStyleHelp")}</p>
+        <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
+        <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
+        <Switch label={t("settings.lastMove")} checked={s.lastMoveMark !== false} onChange={(v) => set("lastMoveMark", v)} />
+      </section>
+      <section class="settings-group">
+        <h3>{t("settings.placing")}</h3>
+        <Switch label={t("settings.confirmMove")} checked={s.confirmMove} onChange={(v) => set("confirmMove", v)} />
+        <Switch label={t("settings.confirmProblemMove")} checked={!!s.confirmProblemMove} onChange={(v) => set("confirmProblemMove", v)} />
+        <p class="fine">{t("settings.confirmProblemMoveHelp")}</p>
+      </section>
+    </>
+  );
+}
+
+function PlayingPane() {
+  const s = state.settings;
+  const set = C.setSetting;
+  const rules = C.defaultRules();
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.playing")}</h3>
+        <Switch label={t("settings.teaching")} checked={C.teachingOn()} onChange={(v) => set("teaching", v)} />
+        <p class="fine">{t("settings.teachingHelp")}</p>
+        <Switch label={t("settings.showEval")} checked={s.showEval} onChange={(v) => set("showEval", v)} />
+        <Switch label={t("settings.liveAnalysis")} checked={s.liveAnalysis} onChange={(v) => set("liveAnalysis", v)} />
+        <Switch label={t("settings.autoStrength")} checked={s.autoStrength} onChange={(v) => set("autoStrength", v)} />
+      </section>
+      <section class="settings-group">
+        <h3>{t("rules.title")}</h3>
+        <Row label={t("rules.default")}>
+          <Segmented class="default-rules" label={t("rules.default")} value={rules} onChange={(v) => set("defaultRules", v)} options={RULESETS.map((r) => ({ value: r.id, label: t(r.labelKey) }))} />
+        </Row>
+        <p class="fine">{t(rulesetById(rules).noteKey)}</p>
+      </section>
+    </>
+  );
+}
+
+/** The estimate, where it comes from, and the way to change where it starts. */
+function YouPane({ focus }) {
+  const s = state.settings;
+  const e = state.profile ? C.playerEstimate() : null;
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.you")}</h3>
+        <div class="row level-row">
+          <span>{t("settings.estimated")}</span>
+          <strong class="level-now">{state.profile ? estimateLabel(state.profile) : t("settings.rankUnknown")}</strong>
+          <Button size="sm" data-change-level data-autofocus={focus === "level" ? true : undefined} onClick={() => C.openSheet("level")}>
+            {t("settings.level.change")}
+          </Button>
+        </div>
+        <p class="fine">{e && e.games > 0 ? `${tn("settings.level.fromGames", e.games)} ${t("strength.about")}` : `${t("settings.level.fromYou")} ${t("strength.about")}`}</p>
+      </section>
+      <section class="settings-group">
+        <h3>{t("settings.practiceGroup")}</h3>
+        <Row label={t("settings.daily")}>
+          <Segmented class="daily-size" label={t("settings.daily")} value={s.dailySize} onChange={(v) => C.setSetting("dailySize", v)} options={[3, 5, 10].map((n) => ({ value: n, label: t("settings.daily.n", [n]) }))} />
+        </Row>
+        <p class="fine">{t("settings.dailyHelp")}</p>
+      </section>
+    </>
+  );
+}
+
+function DataPane() {
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("backup.title")}</h3>
+        <p class="fine">{t("backup.help")}</p>
+        <div class="actions wrap">
+          <Button icon="download" onClick={C.exportBackup}>
+            {t("backup.export")}
+          </Button>
+          <Button kind="ghost" icon="upload" onClick={C.importBackup}>
+            {t("backup.import")}
+          </Button>
+        </div>
+        <UndoRestoreRow />
+      </section>
+      {hasNative() && (
+        <section class="settings-group">
+          <h3>{t("settings.folderGroup")}</h3>
+          <p class="fine">{t("settings.dataKept")}</p>
+          <div class="actions">
+            <Button kind="ghost" icon="folder" data-reveal onClick={C.revealDataFolder}>
+              {t("settings.reveal")}
+            </Button>
+          </div>
+        </section>
+      )}
+      <section class="settings-group">
+        <h3>{t("settings.eraseGroup")}</h3>
+        <div class="actions">
+          <Button kind="danger" onClick={C.clearData}>
+            {t("settings.clearData")}
+          </Button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function AboutPane() {
+  const s = state.settings;
+  return (
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.about")}</h3>
+        <p class="about">
+          <strong>Goban Studio {APP_VERSION}</strong>
+          <span class="fine">{t("settings.offline")}</span>
+          <span class="fine">{t("v13ui.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
+        </p>
+      </section>
+      <section class="settings-group">
+        <h3>{t("settings.updatesGroup")}</h3>
+        <UpdateRow />
+        <Switch label={t("update.auto")} checked={!!s.autoUpdateCheck} onChange={(v) => C.setSetting("autoUpdateCheck", v)} />
+        <p class="fine">{t("update.autoHelp")}</p>
+      </section>
+      <section class="settings-group">
+        <div class="actions">
+          <Button kind="ghost" icon="keyboard" onClick={() => C.openSheet("shortcuts")}>
+            {t("shortcuts.title")}
+          </Button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/**
+ * Your level, changed by hand (Settings → You → Change…): the same
+ * question onboarding asks. Saving starts the estimate again from the
+ * answer (controller.js setPlayerRank); both ways out go back to Settings.
+ */
+function LevelSheet() {
+  const start = state.profile ? C.playerEstimate().rank : state.settings.playerRank;
+  const [rank, setRank] = useState(Math.max(-8, Math.min(30, Math.round(start ?? 30))));
+  // Back to where it was opened, with the focus on the button that opened it.
+  const back = () => C.openSheet("settings", { pane: "you", focus: "level" });
+  const text = rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]);
+  return (
+    <Modal
+      title={t("onboarding.rankQuestion")}
+      onClose={back}
+      onEscape={back}
+      footer={
+        <>
+          <Button kind="ghost" onClick={back}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            kind="primary"
+            data-save-level
+            onClick={() => {
+              C.setPlayerRank(rank);
+              back();
+            }}
+          >
+            {t("common.save")}
+          </Button>
+        </>
+      }
+    >
+      <div class="slider-field big">
+        <input type="range" data-autofocus min="0" max="38" step="1" value={30 - rank} onInput={(e) => setRank(30 - Number(e.currentTarget.value))} aria-label={t("settings.you")} aria-valuetext={text} />
+        <output>{text}</output>
+      </div>
+      <p class="fine">{t("settings.level.help")}</p>
+    </Modal>
+  );
+}
+
+/**
+ * Engines: what plays and analyses now, and the optional KataGo networks
+ * (the human-style opponent and the stronger network) with their progress.
+ */
+function EnginesPane() {
   useEffect(() => {
     C.refreshModels?.();
   }, []);
   const ms = state.models;
   return (
-    <section class="settings-group">
-      <h3>{t("models.title")}</h3>
-      <p class="fine">{t("models.intro")}</p>
-      {["human", "strong"].map((kind) => (
-        <ModelRow kind={kind} one={ms?.[kind]} />
-      ))}
-      <p class="fine">{t("models.source")}</p>
-    </section>
+    <>
+      <section class="settings-group">
+        <h3>{t("settings.pane.engines")}</h3>
+        <p class="muted">{state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}</p>
+      </section>
+      <section class="settings-group">
+        <h3>{t("models.title")}</h3>
+        <p class="fine">{t("models.intro")}</p>
+        {["human", "strong"].map((kind) => (
+          <ModelRow kind={kind} one={ms?.[kind]} />
+        ))}
+        <p class="fine">{t("models.source")}</p>
+      </section>
+    </>
   );
 }
+
+const PANES = { general: GeneralPane, board: BoardPane, playing: PlayingPane, you: YouPane, engines: EnginesPane, data: DataPane, about: AboutPane };
 
 function ModelRow({ kind, one }) {
   const mb = Models.megabytes(Models.MODELS[kind].bytes);
@@ -633,7 +782,7 @@ function Onboarding({ step = 0 }) {
           <>
             <h1 id="ob-title">{t("onboarding.rankQuestion")}</h1>
             <div class="slider-field big">
-              <input type="range" min="0" max="33" step="1" value={30 - rank} onInput={(e) => setRank(30 - Number(e.currentTarget.value))} aria-label={t("settings.yourRank")} aria-valuetext={rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank])} />
+              <input type="range" min="0" max="33" step="1" value={30 - rank} onInput={(e) => setRank(30 - Number(e.currentTarget.value))} aria-label={t("settings.you")} aria-valuetext={rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank])} />
               <output>{rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank])}</output>
             </div>
             <p class="fine">{t("onboarding.rankHelp")}</p>
@@ -642,12 +791,15 @@ function Onboarding({ step = 0 }) {
                 {t("common.back")}
               </Button>
               <Button kind="primary" data-autofocus onClick={() => C.finishOnboarding("player", rank)}>
-                {t("onboarding.play19")}
+                {t("common.continue")}
               </Button>
             </div>
           </>
         )}
-        <p class="fine ob-foot">{t("onboarding.offline")}</p>
+        {/* One quiet line: offline on the first step; then which rules new games use (by language) and where to change it. */}
+        <p class="fine ob-foot" data-ob-foot={step === 0 ? "offline" : "rules"}>
+          {step === 0 ? t("onboarding.offline") : t("onboarding.rulesLine", [t(rulesetById(C.defaultRules()).labelKey)])}
+        </p>
       </div>
     </div>
   );
@@ -683,7 +835,10 @@ function ShortcutsSheet() {
   );
 }
 
-/** v13: the last backup restore can be undone from its snapshot (data/backup.js). */
+/**
+ * The last backup restore can be undone from its snapshot (data/backup.js)
+ * — for 30 days, and until a new backup is exported.
+ */
 function UndoRestoreRow() {
   const snap = C.restoreSnapshot();
   if (!snap) return null;
@@ -693,11 +848,14 @@ function UndoRestoreRow() {
     when = new Date(snap.at).toLocaleString(lang === "zh" ? "zh-CN" : lang, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   } catch (_) {}
   return (
-    <div class="actions">
-      <Button kind="ghost" icon="undo" data-undo-restore onClick={C.undoRestore}>
-        {t("v13.undoRestore.row", [when])}
-      </Button>
-    </div>
+    <>
+      <div class="actions">
+        <Button kind="ghost" icon="undo" data-undo-restore onClick={C.undoRestore}>
+          {t("v13.undoRestore.row", [when])}
+        </Button>
+      </div>
+      <p class="fine">{t("settings.undoRestoreNote")}</p>
+    </>
   );
 }
 

@@ -14,8 +14,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     const items = await page.locator(".sidebar .sb-list .sb-item").allInnerTexts();
     assert(JSON.stringify(items.map((s) => s.trim())) === JSON.stringify(["Today", "Play", "Practice", "Library"]), `sidebar: ${items.join(", ")}`);
     assert((await page.locator(".sidebar .sb-foot .sb-item").innerText()).trim() === "Settings", "Settings below");
-    // Onboarding ("I know the rules") opened the board; Play again stays on it.
-    assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "onboarding opens the board");
+    // The first game ("I know the rules", started from Today's hero) is on the board; Play again stays on it.
+    assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "the first game is on the board");
     await page.click(".sidebar .sb-item >> nth=1");
     assert(await page.evaluate(() => window.__state.space === "play" && window.__state.play.view === "game"), "Play again: the board");
     // Today: the suggested game before any move, one primary.

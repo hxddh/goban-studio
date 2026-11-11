@@ -292,11 +292,51 @@ await test("data backups: a restore snapshots what was there first, a failed sna
   const again = (await open(be, { lazy: ["games/", "backups/"] })).store;
   assert.equal(B.latestSnapshot(again).at, 7);
   assert.ok(!be.reads.some((k) => k.startsWith("backups/")), "a snapshot is not read at boot");
-  const u = await B.undoRestore(again);
+  const u = await B.undoRestore(again, { now: 9 });
   assert.equal(u.ok, true);
   assert.match(be.files.get("settings.json"), /"zh"/);
   assert.ok(be.files.has("games/old-1.json"), "the game is back");
-  assert.ok(be.files.has("backups/pre-restore-7/settings.json"), "the snapshot stays until a newer one");
+  // The undo took a snapshot of its own first (what the restore had put there), in place of the one it used.
+  assert.ok(!be.files.has("backups/pre-restore-7/settings.json"), "the snapshot that was put back is gone");
+  assert.match(be.files.get("backups/pre-restore-9/settings.json"), /"en"/, "what the undo replaced is kept");
+  // So the undo can be undone: the restored backup is back.
+  const third = (await open(be, { lazy: ["games/", "backups/"] })).store;
+  assert.equal(B.latestSnapshot(third).at, 9);
+  const redo = await B.undoRestore(third, { now: 11 });
+  assert.equal(redo.ok, true);
+  assert.match(be.files.get("settings.json"), /"en"/);
+  assert.ok(!be.files.has("games/old-1.json"));
+  assert.ok(be.files.has("backups/pre-restore-11/games/old-1.json"));
+});
+
+await test("data backups: Undo restore is offered for 30 days and until a backup is exported; an undo that cannot snapshot first changes nothing", async () => {
+  const DAY = 86400000;
+  const at = 1_800_000_000_000;
+  const be = memBackend(new Map([["settings.json", '{"v":13,"lang":"zh"}']]));
+  const { store } = await open(be, { lazy: ["games/", "backups/"] });
+  const doc = { app: "goban-studio", v: 13, at: 2, data: { "settings.json": { v: 13, lang: "en" } } };
+  assert.equal((await B.importBackup(store, doc, { now: at })).ok, true);
+  assert.equal(B.SNAPSHOT_DAYS, 30);
+  assert.equal(B.latestSnapshot(store, at + 29 * DAY).at, at, "still offered on day 29");
+  assert.equal(B.latestSnapshot(store, at + 31 * DAY), null, "not offered after 30 days");
+  assert.equal(B.latestSnapshot(store).at, at, "without a date the snapshot is still found");
+  // Launching within the 30 days keeps it; after them it is removed from disk.
+  assert.equal(await B.expireSnapshots(store, at + 29 * DAY), false);
+  assert.ok(be.files.has(`backups/pre-restore-${at}/settings.json`));
+  // A disk that refuses writes: the undo cannot copy what is there, so nothing is replaced.
+  be.fail.add("*write");
+  assert.deepEqual(await B.undoRestore(store, { now: at + DAY }), { ok: false, error: "snapshot" });
+  be.fail.delete("*write");
+  assert.match(be.files.get("settings.json"), /"en"/, "nothing was put back");
+  assert.equal(await B.expireSnapshots(store, at + 31 * DAY), true);
+  assert.ok(![...be.files.keys()].some((k) => k.startsWith("backups/")), "the expired snapshot is gone");
+  assert.equal(B.latestSnapshot(store), null);
+  // A backup exported after a restore: the snapshot has done its job.
+  assert.equal((await B.importBackup(store, doc, { now: at + 40 * DAY })).ok, true);
+  assert.ok(B.latestSnapshot(store));
+  assert.equal(await B.dropSnapshots(store), true);
+  assert.equal(B.latestSnapshot(store), null);
+  assert.ok(![...be.files.keys()].some((k) => k.startsWith("backups/")));
 });
 
 /* ------------------------------------------------ the games index (lazy) */

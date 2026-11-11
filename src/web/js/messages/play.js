@@ -10,7 +10,7 @@ export const PLAY = {
   "play.firstMove": m("点击棋盘落子。", "Click the board to play.", "바둑판을 눌러 돌을 놓으세요.", "盤をクリックして打ちます。"),
   "play.keys": m("快捷键", "Keyboard shortcuts", "단축키", "ショートカット"),
   "play.suggest.title": m("推荐一盘", "Suggested game", "추천 대국", "おすすめの対局"),
-  "play.suggest.game": m("{0} 路 · 对 {1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
+  "play.suggest.game": m("{0} 路 · 对手{1}", "{0}×{0} vs {1}", "{0}줄 · 상대 {1}", "{0}路 · 相手 {1}"),
   "play.suggest.handicap": m("让 {0} 子", "{0} handicap stones", "{0}점 접바둑", "{0}子局"),
   "play.suggest.even": m("分先", "Even game", "호선", "互先"),
   "play.suggest.because": m("练练本周重点：{0}", "works on this week's focus: {0}", "이번 주 집중 연습: {0}", "今週の重点の練習：{0}"),

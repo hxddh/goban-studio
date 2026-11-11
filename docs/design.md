@@ -89,8 +89,23 @@ group per screen region.
 
 ## 5. The board
 
-* **Surface.** One board (v9): a flat warm honey (#E5CB98 light) with a
-  3 % centre-to-edge falloff. No grain, no alternative materials.
+* **Surface.** One board: a flat warm honey (#E4CB9A) with a faint
+  centre-to-edge falloff. No grain, no alternative materials. In the dark
+  theme it is the same board, dimmer — lower luminance and saturation
+  (#927D58, about a third of the light board's luminance), white stones
+  toned down about 14 % so they do not glare, black stones with a faint
+  light rim so they still part from the surface, signals on the board as
+  light tints. Black stones stand at ≥ 3:1 and white at ≥ 2:1 against it.
+  All board colours live in one place, `src/web/js/theme.js`; the board,
+  thumbnails, the New game size cards, a hero's empty board and the app's
+  mark in the sidebar read it, and follow the theme live (also when
+  *System* switches while the app is open).
+* **High contrast (Settings → Board).** One optional style for bright or
+  dim rooms and low vision: a plain near-white (light) or near-black (dark)
+  surface, full-strength lines 1.5× as heavy, flat stones with clear rims
+  (the white stone's rim on white, the black stone's on black), no sprites
+  and no shadows. Used by itself when the system forces colours (Windows
+  high contrast).
 * **Lines.** Inner lines are whole device pixels (1 px at ≤ 30 px cells,
   2 px above on Retina), snapped to the pixel grid so they never blur. The
   outer frame is 1.6× the inner width. Line colour is 70 % ink, not black.
@@ -99,9 +114,24 @@ group per screen region.
   cell so neighbours never touch. Contact shadow: short (offset 0.08 r),
   soft, 25 % opacity — stones sit, they do not float.
 * **Coordinates.** Outside the grid, 0.3 × cell (11–13 px), `--text-3`-like
-  colour, tabular figures. On by default for 19×19 and 13×13.
-* **Marks.** Last move: a small dot (0.2 × cell). Hints, cursor and the
-  pending stone use the accent. Mistakes use `--bad`.
+  colour, each centred on its line. On by default for 19×19 and 13×13.
+* **Marks.** Last move: a thin ring on the stone, 0.4 × cell across, its
+  line 5 % of a cell and never under 1.25 px, in the stone's opposite tone
+  (light on black, dark on white) — it reads on both colours in every
+  palette where a filled dot sat heavily on a white stone; a numbered stone
+  carries no ring; Settings → Board can leave it out. Hints, cursor and the
+  pending stone use the accent. Mistakes use `--bad`. A mark on a white
+  stone uses the light theme's signal colours and on a black stone the dark
+  theme's, whatever the board.
+* **Thumbnails.** One renderer (`src/web/js/thumb.js`) for every small
+  board (Library and Today rows 44 px, heroes 96 px, the chart's hover
+  76 px, path tiles 32 px), drawn at device pixels in the board's colours
+  and cached. What is drawn follows the cell size, not the board size:
+  cells are whole device pixels; grid lines (one device pixel) appear from
+  4 px a cell and star points from 8 px; stones are flat discs that fill
+  their cell (crisp squares under 4 px), and a white stone always has a
+  hairline rim drawn around it, so a 19×19 at 44 px still reads at 1× and
+  2×.
 
 ## 6. Components
 
@@ -185,6 +215,27 @@ group per screen region.
   whole group is: a new player sees no empty chart. Then this week in one
   line — a part that is zero is not said — and the last three games. A
   milestone reached is said once, in one success toast.
+  On the first day too: after onboarding every new player lands on Today,
+  never straight on a board or in a lesson, and the hero is what the
+  onboarding answer asked for, one click away: lesson one for someone who
+  never played (*Start here*), the gentlest 9×9 game for someone who knows
+  the rules, an even 19×19 game for a player. After three finished 9×9
+  games a beginner's suggested game is 13×13, and two games there come
+  before 19×19; the quieter second offer beside the hero is the next board
+  up (a quick 9×9 beside the full board).
+* **Onboarding.** Three short steps on a plain page: the language; *Have
+  you played Go before?* (three answers); for a player, a level. One quiet
+  line at the foot: offline on the first step, then which rules new games
+  use (those of the language: Chinese rules in Chinese, Korean in Korean,
+  Japanese otherwise) and that Settings changes it.
+* **Narrow windows (720–860 px).** A board place keeps the board on top
+  and turns its panel into a compact bar under it, so nothing needed is
+  below the fold and nothing scrolls: in a game the two players side by
+  side with their clocks, then the status with *Pass*, *Undo* and *More*
+  on one row, and the move list behind a disclosure (*Moves*); in a lesson
+  or a problem the text or goal with its buttons, the buttons staying in
+  view when a long text scrolls. The panel's own title is dropped (the
+  toolbar names the place). The bar is at most 46 % of the height.
 * **Play (v12).** The board. With no game on it: the suggested game (the
   one primary) and *New game* in the toolbar. v13: "no game on it" is
   literal — with nothing saved, Play opens on that home (the suggested
@@ -255,17 +306,39 @@ group per screen region.
   Library; Esc or the Library again comes back to the list. The player's games are analysed in the background by
   themselves; a row says so only while it is being analysed.
 * **Settings.** A wide sheet with two panes: a source list on the left
-  (General, Board, Playing, Data, About; the opponents' networks close the
-  Playing pane; arrow keys
-  move through it) and one pane on the right. Nothing scrolls past more
-  than one pane's worth of rows.
+  (arrow keys move through it) and one pane on the right. No pane is
+  taller than the sheet — at 1200 × 800, in four languages, with larger
+  text (`scripts/ui-tests/shell-settings.mjs`); a pane that would grow past
+  it is split. Choices are segmented controls, switches and buttons, never
+  a native select. The panes:
+  *General* — language; theme and larger text; sound (Off / Quiet / Normal
+  / Loud; a change plays one stone at the new level).
+  *Board* — Standard or High contrast, coordinates, move numbers, the
+  last-move mark; confirming moves in games and in problems (one pair,
+  phrased alike).
+  *Playing* — teaching mode, the balance while playing, live analysis in
+  review, matching the opponent to your level; the rules for new games,
+  with what they mean in one line.
+  *You* — one row for your level: the estimate with its ±, and *Change…*,
+  which asks the level question again in a sheet of its own (Save and
+  Cancel both come back here); one line says where the estimate comes from
+  and what ± means. Then the daily practice size (3 / 5 / 10).
+  *Engines* — what plays now, and the optional KataGo networks with their
+  progress.
+  *Data* — backup and restore; *Undo the last restore* for 30 days or until
+  a backup is exported (the undo can itself be undone); the data folder
+  (*Show data folder*, the packaged app only, with what uninstalling
+  leaves); erase all data.
+  *About* — version, the offline line, licences; updates; shortcuts.
 * **Problems.** A problem window is widened towards the open side to at
   least eight lines, so stones keep a natural size and the corner keeps its
   surroundings.
 * **New game.** The recommended game is pre-selected and *Start* is the
-  only primary action; size cards (19×19 first and standard; 13×13 and 9×9
-  as quicker games); opponent, strength and colour on one row each; time,
-  handicap and komi under *More options*.
+  only primary action; size cards labelled by what they are (19×19, the
+  standard board, about an hour; 13×13, about 25 minutes; 9×9, quick, about
+  10 minutes); opponent, strength, colour and the clock on one row each;
+  handicap, komi and rules under *More options*, whose closed row sums
+  them up.
 
 * **Unfinished games (v13).** Nothing replaces a game in progress
   silently. A game with at least one move of the player's and no result
@@ -311,8 +384,10 @@ and drift towards the capturer's lid in 260 ms. Everything respects `prefers-red
 ## 9. Sound
 
 Stone click on placement (≤ 40 ms attack), a softer click for captures,
-nothing for UI. Volume is fixed relative to the stone (captures −6 dB,
-result −3 dB). Sound can be turned off in Settings.
+nothing for UI. Levels are fixed relative to the stone (captures −6 dB,
+result −3 dB). The volume is a setting (Settings → General): Off, Quiet
+(about −10 dB), Normal and Loud; changing it plays one stone at the new
+level.
 
 ## 10. Visual acceptance checklist
 

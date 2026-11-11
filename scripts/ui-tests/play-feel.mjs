@@ -113,6 +113,7 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     await page.waitForSelector(".ob-card");
     await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
+    await page.click(".today .hero .btn.primary");
     await page.waitForSelector("canvas.board");
     await page.keyboard.press("Control+1");
     await page.waitForSelector(".today .page-head h1");

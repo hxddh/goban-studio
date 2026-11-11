@@ -263,6 +263,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.click(".ob-card .btn.primary");
     assert((await page.textContent(".choice >> nth=1")).includes("9×9"), "the help text names 9×9");
     await page.click(".choice >> nth=1");
+    // Today first; its hero is that game, one click away.
+    await page.click(".today .hero .btn.primary");
     await page.waitForFunction(() => window.__state.game && window.__board?.model.size === 9 && window.__board.geom?.cell > 20);
     const g = await page.evaluate(() => ({ size: window.__state.game.game.size, opponentRank: window.__state.settings.opponentRank, rank: window.__state.settings.playerRank }));
     assert(g.size === 9 && g.opponentRank === 30, JSON.stringify(g)); // v9: the gentlest rank

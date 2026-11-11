@@ -8,8 +8,9 @@
  * instead, so every call always makes an appropriate sound (or none when
  * sound is off).
  *
- * Exports: setSound(on), setVolume(v), stone(capture),
- * capture(count), pass(), correct(), wrong(), gameEnd(), win(), lose().
+ * Exports: setLevel(name) (Settings: off | quiet | normal | loud),
+ * setSound(on), setVolume(v), stone(capture), capture(count), pass(),
+ * correct(), wrong(), gameEnd(), win(), lose().
  */
 let ctx = null;
 let master = null;
@@ -142,6 +143,30 @@ function play(key, { gain = 1, delay = 0, detune = 0.03 } = {}) {
 
 export function setSound(on) {
   enabled = !!on;
+}
+
+/**
+ * The volume levels of Settings → General, as master gains. "normal" is
+ * the level the app always had; "quiet" is about −10 dB and "loud" +2 dB.
+ */
+export const VOLUME_LEVELS = { off: 0, quiet: 0.25, normal: 0.8, loud: 1 };
+
+/** The master gain of a stored volume setting; an unknown value is "normal". */
+export function levelGain(name) {
+  return Object.prototype.hasOwnProperty.call(VOLUME_LEVELS, name) ? VOLUME_LEVELS[name] : VOLUME_LEVELS.normal;
+}
+
+/** Apply the volume setting: "off" turns sound off, the others set the master gain. */
+export function setLevel(name) {
+  const gain = levelGain(name);
+  setSound(gain > 0);
+  if (gain > 0) setVolume(gain);
+  return gain;
+}
+
+/** What is in force now: { enabled, volume } (for tests and the self-test). */
+export function soundState() {
+  return { enabled, volume };
 }
 
 /** Master volume, 0..1. */

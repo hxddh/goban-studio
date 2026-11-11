@@ -13,15 +13,15 @@ import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
 import { SETTINGS_KEY, loadSettings } from "../data/settings.js";
 import { CURRENT_KEY, GAMES_PREFIX, migrateFile } from "../data/migrate.js";
-import { BACKUPS_PREFIX, exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, latestSnapshot, parseBackup, undoRestore as undoRestoreDoc } from "../data/backup.js";
+import { BACKUPS_PREFIX, dropSnapshots, expireSnapshots, exportBackup as backupDoc, checkBackup, importBackup as restoreDoc, latestSnapshot, parseBackup, undoRestore as undoRestoreDoc } from "../data/backup.js";
 import { normalizeProfile, recordClassic, setPriorRank } from "../model/player.js";
 import { detectLang, setLang, t, tn } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, readFileBytes, readTextFile } from "../host.js";
+import { hasFileDialogs, hasNative, isPackaged, normalizePaths, openFileDialog, readFileBytes, readTextFile, revealDataDir } from "../host.js";
 import { CLASSICS, onContentWait, preload as preloadContent, withContent } from "../content.js";
 import { state, update, toast, dismissToastKey, runTask } from "./store.js";
 import { PROFILE_KEY, applyAppearance, changeProfile, confirmAction, remember, setRestorer, setSetting, syncMenus } from "./ctl-core.js";
-import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, ponder, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
+import { boardShown, playShowsBoard, exportSGF, maybeComputerMove, newGame, ponder, recommendedGame, restoreCurrent, resumeRecord, reviewCurrentGame, saveText, showFinished, suggestedOpponent, unfinishedGame } from "./play-ctl.js";
 import { closeReview, dropReview, openReview, reviewGoto } from "./review-ctl.js";
 import { allLessons, learnHome, openCatalog, openLesson, openMistakeDrill, openProblem, openShape, openTopic } from "./practice-ctl.js";
 import { autoCheckForUpdates, restoreUpdateState } from "./update-ctl.js";
@@ -159,7 +159,7 @@ export async function boot() {
   state.profile = normalizeProfile(store.get(PROFILE_KEY));
   state.storeProblem = problem ? { ...problem, continued: false } : null;
   setLang(settings.lang);
-  Audio.setSound(settings.sound);
+  Audio.setLevel(settings.volume);
   applyAppearance();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyAppearance);
   restoreCurrent();
@@ -184,6 +184,8 @@ export async function boot() {
     // The background analyses quitting interrupted (play/analysis.js).
     resumeBackground();
   });
+  // A restore snapshot nobody can undo any more is removed.
+  if (!problem) expireSnapshots(store).catch(() => {});
   // Which optional networks are installed (a local status call).
   initModels().catch(() => {});
   // The opt-in weekly update check (no request unless it is on and due).
@@ -508,7 +510,13 @@ export async function exportBackup() {
   await store.flush();
   const doc = await backupDoc(store);
   const day = new Date().toISOString().slice(0, 10);
-  await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json", { done: t("v13.backupSaved") });
+  const saved = await saveText(`goban-studio-backup-${day}.json`, JSON.stringify(doc), "application/json", { done: t("v13.backupSaved") });
+  // With a backup just saved, the copy kept from before the last restore has done its job.
+  if (saved && !store.readOnly) {
+    await dropSnapshots(store);
+    update();
+  }
+  return saved;
 }
 
 /** What a restore says when it cannot go ahead. */
@@ -572,15 +580,26 @@ export async function restoreNow(doc) {
   reloadAfterRestore(r.written ? "restored" : "restorePartial");
 }
 
-/** The latest restore snapshot ({ at, keys }), for Settings' "Undo restore"; null when there is none. */
-export function restoreSnapshot() {
-  return latestSnapshot(store);
+/**
+ * The latest restore snapshot ({ at, keys }), for Settings' "Undo restore";
+ * null when there is none, or it is older than 30 days (data/backup.js
+ * SNAPSHOT_DAYS).
+ */
+export function restoreSnapshot(now = Date.now()) {
+  return latestSnapshot(store, now);
+}
+
+/** Show the folder that holds the player's data in Finder / Explorer (Settings → Data; the packaged app only). */
+export async function revealDataFolder() {
+  const r = await revealDataDir();
+  if (!r.ok) toast(t("settings.reveal.failed"), "error");
+  return r.ok;
 }
 
 /** Put back what was there before the last restore (Settings). */
 export function undoRestore() {
   if (store.readOnly) return toast(t("v13.readOnlyNow"), "warning");
-  if (!latestSnapshot(store)) return toast(restoreError("noSnapshot"), "error");
+  if (!latestSnapshot(store, Date.now())) return toast(restoreError("noSnapshot"), "error");
   confirmAction({
     title: t("v13.undoRestore.title"),
     body: t("v13.undoRestore.body"),
@@ -621,10 +640,12 @@ export async function clearDataNow() {
 /* ----------------------------------------------------------- onboarding */
 
 /**
- * The last onboarding answer: language and experience are known; open
- * Learn for a new player (lesson one, with the beginner bridges after it),
- * Play for everyone else (a 9×9 game for someone who knows the rules, the
- * full board for a player).
+ * The last onboarding answer: language and experience are known. Every
+ * new player lands on Today, whose hero offers what the answer asked for
+ * in one click (startFirstRun): lesson one for someone who never played,
+ * a gentle 9×9 game for someone who knows the rules, the full board for a
+ * player. Nobody is dropped onto a board or into a lesson before seeing
+ * the app's home.
  */
 export function finishOnboarding(choice, rank = null) {
   const s = state.settings;
@@ -639,19 +660,25 @@ export function finishOnboarding(choice, rank = null) {
   update((st) => {
     st.settings = next;
     st.sheet = null;
+    st.space = "today";
   });
   setSetting("onboarded", true);
-  if (choice === "new") {
-    withContent("course", () => {
+}
+
+/**
+ * Start what onboarding promised (the primary of Today's first hero):
+ * lesson one, or the suggested first game — the small board against the
+ * gentlest level with teaching on, or an even game on the full board.
+ */
+export function startFirstRun() {
+  const rec = recommendedGame();
+  if (rec.first === "lesson") {
+    return withContent("course", () => {
       const first = allLessons()[0];
       if (first) openLesson(first.lesson.id, 0);
     });
-  } else if (choice === "rules") {
-    // The small board first, against a gentle level, teaching on (teachingOn).
-    newGame({ size: 9, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
-  } else {
-    newGame({ size: 19, opponent: "ai", color: BLACK, opponentRank, handicap: 0 });
   }
+  return newGame({ size: rec.size, opponent: "ai", color: BLACK, opponentRank: rec.opponentRank, handicap: rec.handicap });
 }
 
 /** Your level changed by hand in Settings: the estimate starts from it again. */

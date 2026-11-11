@@ -22,6 +22,7 @@ import { ContinueHero, SuggestedHero, gameInProgress, outcome, recordTitle } fro
 import { pathRows } from "../learn/path.jsx";
 import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../learn/progress.js";
 import { milestoneText, reachedMilestones } from "../learn/milestones.js";
+import { FirstLessonHero } from "./first-run.jsx";
 
 const DAY = 86400000;
 
@@ -57,7 +58,7 @@ export function TodayView() {
           <span class="eyebrow">{date}</span>
           <h1>{greeting()}</h1>
         </header>
-        {gameInProgress() ? <ContinueHero /> : <SuggestedHero />}
+        {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
         <TodayList />
         <Progress />
         <Week />

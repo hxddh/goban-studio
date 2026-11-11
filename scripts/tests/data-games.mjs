@@ -35,14 +35,15 @@ const finished = (result = "B+R") => {
 await test("data settings: defaults, the three rulesets, and anything broken falls back per setting", () => {
   const { store } = memStore();
   assert.deepEqual(loadSettings(store), DEFAULT_SETTINGS);
-  assert.equal(DEFAULT_SETTINGS.defaultRules, "japanese");
+  // No rules chosen yet: they follow the interface language (scripts/tests/shell-settings.mjs).
+  assert.equal(DEFAULT_SETTINGS.defaultRules, null);
   assert.equal(DEFAULT_SETTINGS.autoUpdateCheck, false, "the update check is opt-in");
   assert.ok(Number.isFinite(DEFAULT_SETTINGS.opponentRank) && !("strength" in DEFAULT_SETTINGS) && !("humanStyle" in DEFAULT_SETTINGS));
   saveSettings(store, { ...DEFAULT_SETTINGS, defaultRules: "chinese", lang: "ko" });
   assert.equal(loadSettings(store).defaultRules, "chinese");
   assert.equal(store.get(SETTINGS_KEY).lang, "ko");
   const bad = normalizeSettings({ defaultRules: "aga", boardSize: 7, appearance: "neon", coords: "yes", opponentRank: "x", playerRank: "y", captureWins: -3, teaching: 1 });
-  assert.deepEqual([bad.defaultRules, bad.boardSize, bad.appearance, bad.coords, bad.opponentRank, bad.playerRank, bad.captureWins, bad.teaching], ["japanese", 19, "auto", true, 30, null, 0, null]);
+  assert.deepEqual([bad.defaultRules, bad.boardSize, bad.appearance, bad.coords, bad.opponentRank, bad.playerRank, bad.captureWins, bad.teaching], [null, 19, "auto", true, 30, null, 0, null]);
   assert.deepEqual(normalizeSettings(null), DEFAULT_SETTINGS);
   assert.deepEqual(normalizeSettings([1, 2]), DEFAULT_SETTINGS);
 });

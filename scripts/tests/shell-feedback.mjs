@@ -551,7 +551,7 @@ try {
   });
 
   await test("sheets: the kinds a test must open are the kinds the app has", () => {
-    assert.deepEqual([...A.SHEET_KINDS].sort(), ["confirm", "newGame", "onboarding", "rename", "settings", "shortcuts"]);
+    assert.deepEqual([...A.SHEET_KINDS].sort(), ["confirm", "level", "newGame", "onboarding", "rename", "settings", "shortcuts"]);
   });
 } finally {
   mock.timers.reset();

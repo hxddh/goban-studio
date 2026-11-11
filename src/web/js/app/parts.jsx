@@ -35,6 +35,8 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BoardView, frameAspect } from "../board.js";
+import { currentPalette, onBoardTheme } from "../theme.js";
+import { fromDiagram as thumbFromDiagram, fromString as thumbFromString, paintThumb } from "../thumb.js";
 import { t } from "../i18n.js";
 import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
@@ -294,7 +296,8 @@ export function Board({ model, onPlay, onHover, label }) {
     return () => view.current?.destroy();
   }, []);
   useEffect(() => {
-    view.current?.setModel(model);
+    // The last-move mark is a setting of the board, whatever the page.
+    view.current?.setModel({ ...model, lastMark: state.settings?.lastMoveMark !== false });
     expose("__board", view.current);
   });
   // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
@@ -339,48 +342,25 @@ export function Board({ model, onPlay, onHover, label }) {
   );
 }
 
-/** Mini board thumbnail from a compact "b/w/." string. */
+/** The board palette in force (theme.js), as a key that changes with the theme and the board style. */
+function usePaletteKey() {
+  const [key, setKey] = useState(currentPalette().key);
+  useEffect(() => onBoardTheme(() => setKey(currentPalette().key)), []);
+  return key;
+}
+
+/**
+ * Mini board thumbnail from a compact "b/w/." string (one character per
+ * point, data/games.js thumbnail). Drawn by the shared renderer (thumb.js)
+ * at the size CSS gives the canvas, in the board's colours.
+ */
 export function Thumb({ thumb, size }) {
   const ref = useRef(null);
+  const palette = usePaletteKey();
   useEffect(() => {
-    const c = ref.current;
-    if (!c || !thumb || !size) return;
-    const px = 76;
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    c.width = px * dpr;
-    c.height = px * dpr;
-    const g = c.getContext("2d");
-    g.scale(dpr, dpr);
-    const cell = px / size;
-    const css = getComputedStyle(c);
-    g.fillStyle = css.getPropertyValue("--thumb-board").trim() || "#e4cb9a";
-    g.fillRect(0, 0, px, px);
-    g.strokeStyle = css.getPropertyValue("--thumb-line").trim() || "rgba(60,40,20,0.35)";
-    g.lineWidth = 0.5;
-    g.beginPath();
-    for (let i = 0; i < size; i++) {
-      const p = cell * (i + 0.5);
-      g.moveTo(cell / 2, p);
-      g.lineTo(px - cell / 2, p);
-      g.moveTo(p, cell / 2);
-      g.lineTo(p, px - cell / 2);
-    }
-    g.stroke();
-    for (let i = 0; i < thumb.length; i++) {
-      const ch = thumb[i];
-      if (ch === ".") continue;
-      const x = i % size;
-      const y = Math.floor(i / size);
-      g.fillStyle = ch === "b" ? "#1d1d1b" : "#f7f4ec";
-      g.beginPath();
-      g.arc(cell * (x + 0.5), cell * (y + 0.5), cell * 0.47, 0, Math.PI * 2);
-      g.fill();
-      if (ch === "w") {
-        g.strokeStyle = "rgba(0,0,0,0.25)";
-        g.stroke();
-      }
-    }
-  }, [thumb, size, state.settings?.appearance]);
+    if (!thumb || !size) return;
+    paintThumb(ref.current, thumbFromString(thumb, size), 76);
+  }, [thumb, size, palette]);
   return <canvas ref={ref} class="thumb" aria-hidden="true" />;
 }
 
@@ -422,53 +402,10 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
 export function DiagramThumb({ diagram, label = "" }) {
   const ref = useRef(null);
   const key = Array.isArray(diagram) ? diagram.join("|") : "";
+  const palette = usePaletteKey();
   useEffect(() => {
-    const c = ref.current;
-    if (!c || !key) return;
-    const rows = diagram.map((r) => r.replace(/\s+/g, "").split(""));
-    const h = rows.length;
-    const w = Math.max(...rows.map((r) => r.length));
-    const px = 32;
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    c.width = px * dpr;
-    c.height = px * dpr;
-    const g = c.getContext("2d");
-    g.scale(dpr, dpr);
-    const css = getComputedStyle(c);
-    const n = Math.max(w, h);
-    const cell = px / n;
-    const ox = (px - w * cell) / 2;
-    const oy = (px - h * cell) / 2;
-    g.fillStyle = css.getPropertyValue("--thumb-board").trim() || "#e4cb9a";
-    g.fillRect(0, 0, px, px);
-    g.strokeStyle = css.getPropertyValue("--thumb-line").trim() || "rgba(60,40,20,0.35)";
-    g.lineWidth = 0.5;
-    g.beginPath();
-    for (let y = 0; y < h; y++) {
-      g.moveTo(ox + cell / 2, oy + cell * (y + 0.5));
-      g.lineTo(ox + cell * (w - 0.5), oy + cell * (y + 0.5));
-    }
-    for (let x = 0; x < w; x++) {
-      g.moveTo(ox + cell * (x + 0.5), oy + cell / 2);
-      g.lineTo(ox + cell * (x + 0.5), oy + cell * (h - 0.5));
-    }
-    g.stroke();
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const ch = rows[y][x];
-        const black = ch === "X" || ch === "x";
-        if (!black && ch !== "O" && ch !== "o") continue;
-        g.beginPath();
-        g.arc(ox + cell * (x + 0.5), oy + cell * (y + 0.5), cell * 0.46, 0, Math.PI * 2);
-        g.fillStyle = black ? "#1b1a17" : "#fbf8f1";
-        g.fill();
-        if (!black) {
-          g.lineWidth = Math.max(0.5, cell * 0.08);
-          g.strokeStyle = "rgba(27,26,23,0.45)";
-          g.stroke();
-        }
-      }
-    }
-  }, [key]);
+    if (!key) return;
+    paintThumb(ref.current, thumbFromDiagram(diagram), 32);
+  }, [key, palette]);
   return <canvas ref={ref} class="dthumb" width="32" height="32" role="img" aria-label={label} />;
 }
