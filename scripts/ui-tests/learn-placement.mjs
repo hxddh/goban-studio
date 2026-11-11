@@ -41,7 +41,7 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
     return page;
   }
 
-  await check("learn placement: offered before the path with one primary; 10–12 problems; then the path, and no offer", async () => {
+  await check("learn placement: offered before the path with one primary; four misses end it at grade 1; then the path, and no offer", async () => {
     const page = await knowsRules();
     assert((await page.locator(".learn-path").count()) === 0, "no path before the placement");
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary");
@@ -58,8 +58,8 @@ export default async function ({ check, assert, fresh, onboard, audit }) {
       await page.click('.panel .actions .btn:has-text("Show answer")');
       await page.click(".panel .actions .btn.primary");
     }
-    // Every answer missed: the grade stays at 1, so the quiz ends at the shortest length.
-    assert(asked === 10, `${asked} problems`);
+    // Every answer missed: after the first four the quiz stops there, at grade 1.
+    assert(asked === 4, `${asked} problems`);
     await page.waitForSelector(".learn-path .path-row");
     assert((await page.locator(".placement-offer").count()) === 0, "the offer is gone");
     const placed = await page.evaluate(() => window.__state.profile.placement);
