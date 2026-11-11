@@ -128,10 +128,13 @@ export default async function ({ test, assert, root }) {
     wellFormed(fresh, "strong, new to the app");
     assert.equal(fresh[0].id, firstOf("advanced"));
     for (const it of fresh.filter((i) => i.kind === "problem")) assert.ok(gradeOf(it.id) >= 3, `${it.id} grade ${gradeOf(it.id)} for a 2 kyu`);
-    assert.equal(fresh.filter((i) => i.role === "stretch").length, 1);
+    assert.equal(fresh.filter((i) => i.role === "stretch").length, 0, "at the top grade there is nothing a grade above");
     // Measured: clean solves up to grade 4 put the level at 4 — new problems within a grade, the stretch at 5.
     const p = record(P.newProfile({ rank: 2 }), [3, 4]);
-    assert.equal(P.focus(p, NOW, { problems: PROBLEMS, grades: GRADES }).problems.level, 4);
+    // The grades below the one their rank starts at need no results (levelPrior, evidence's cover).
+    assert.equal(P.levelPrior(p, STRONG, NOW), 5);
+    assert.equal(P.focus(p, NOW, { problems: PROBLEMS, grades: GRADES, cover: P.levelPrior(p, STRONG, NOW) }).problems.level, 4);
+    assert.equal(P.focus(p, NOW, { problems: PROBLEMS, grades: GRADES }).problems.level, 1, "without it, grades 1 and 2 are unknown");
     const list = P.learnPath(p, content(STRONG), NOW);
     wellFormed(list, "strong");
     for (const it of list.filter((i) => i.role === "new")) assert.ok(gradeOf(it.id) >= 3, `${it.id} grade ${gradeOf(it.id)}`);

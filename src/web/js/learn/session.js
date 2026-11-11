@@ -3,7 +3,9 @@
  * chosen for you (model/player.js learnPath — the next lesson, capture Go
  * while it applies, your mistakes and problems due for review, the week's
  * focus around your solving level, one stretch problem, new problems, the
- * first 9×9 game while it applies), played in order. Finishing an item
+ * first 9×9 game while it applies), played in order. The number of problem
+ * items is the day's size the player chose (settings.dailySize: 3, 5 or
+ * 10). Finishing an item
  * moves to the next; after the last one, a quiet "done for today".
  *
  * The session is the path as it stood when it started, kept for the day
@@ -28,7 +30,7 @@ import { startCapture, startFirstGame } from "../app/capture-ctl.js";
 /** The model's list for this player now, each item with its key. */
 export function learnPath(now = Date.now()) {
   const s = state.settings;
-  const list = pathOf(state.profile, { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: s.experience, playerRank: s.playerRank }, captureWins: s.captureWins || 0 }, now);
+  const list = pathOf(state.profile, { course: COURSE, problems: PROBLEMS, grades: GRADES, settings: { experience: s.experience, playerRank: s.playerRank }, captureWins: s.captureWins || 0, limit: s.dailySize }, now);
   return list.map(keyed);
 }
 

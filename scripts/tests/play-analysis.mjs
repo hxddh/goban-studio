@@ -192,6 +192,31 @@ export default async function ({ test, assert, root }) {
       await idle();
     });
 
+    await test("play analysis: a game finished after an undo is kept in the player's games but does not move the rating", async () => {
+      state.profile = PM.newProfile();
+      const rating = JSON.stringify(state.profile.rating);
+      C.newGame({ size: 19, color: BLACK, opponentRank: 30 });
+      const g = state.game;
+      fill(g.game, 20);
+      C.undo();
+      assert.equal(g.undos, 1);
+      fill(g.game, 30);
+      C.requestResign();
+      state.sheet.onConfirm();
+      state.sheet = null;
+      const rec = state.profile.games.find((x) => x.id === g.recordId);
+      assert.ok(rec, "the game is in the player's list");
+      assert.equal(rec.assisted, true);
+      assert.equal(rec.undos, 1);
+      assert.equal(rec.rated, false);
+      assert.equal(rec.rating, null);
+      assert.equal(JSON.stringify(state.profile.rating), rating, "the estimate did not move");
+      assert.deepEqual(state.profile.history, []);
+      assert.ok(!g.ratingChange, "no rating change to show");
+      C.dropReview();
+      await idle();
+    });
+
     await test("play analysis: try again from the position — KataGo judges, a miss shows its better move, each try is a drill", async () => {
       state.profile = PM.newProfile();
       const g = finishRatedGame(40);

@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS = {
   autoUpdateCheck: false, // opt-in: ask GitHub for the latest release once a week
   defaultRules: "japanese", // japanese | chinese | korean
   captureWins: 0, // capture Go games won (the beginner bridge, Learn)
+  dailySize: 5, // problem items in a day of Learn: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
   firstCountSeen: false, // the one-time note on the first count was shown
 };
 
@@ -57,6 +58,7 @@ const ONE_OF = {
   defaultRules: ["japanese", "chinese", "korean"],
   timeControl: ["none", "move30", "byoyomi"],
   experience: [null, "new", "rules", "player"],
+  dailySize: [3, 5, 10],
   lang: [null, "zh", "en", "ko", "ja"], // i18n.js LANG_IDS (null: detect)
 };
 

@@ -868,7 +868,7 @@ function finishGame() {
     const now = Date.now();
     const before = estimate(state.profile, { size, now });
     const id = g.recordId || String(now);
-    changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent: implOpponent(impl, { size, handicap }) }));
+    changeProfile((p) => recordGame(p, { id, at: now, size, won, result, moves: g.game.moveNumber, color: g.humanColor, handicap, opponent: implOpponent(impl, { size, handicap }), undos: g.undos, hints: g.hints }));
     const rec = state.profile.games.find((x) => x.id === id);
     g.rated = false;
     g.trendId = id;

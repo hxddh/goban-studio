@@ -4,8 +4,10 @@
  * first path. v13: 10–12 problems drawn per player (a seed), themes mixed,
  * at least three of them life and death; one grade up after each one
  * solved and one down after each one missed, ending early once the grade
- * is stable. A grade counts as passed with two solves and no more misses
- * than solves there. The first answer to each counts, as everywhere in
+ * is stable, and at once when the first four answers are all missed (the
+ * player is placed at grade 1; more problems would only be more misses).
+ * A grade counts as passed with two solves and no more misses than solves
+ * there; from grade 3 up, more solves than misses. The first answer to each counts, as everywhere in
  * Learn; a hint or the answer counts as missed. The grade it ends on (never
  * above the grade of about 10 kyu) sets where the course starts and which
  * problems come first, until the player's own results measure a solving
