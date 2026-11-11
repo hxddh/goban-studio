@@ -16,9 +16,10 @@ import { Button, Icon, IconButton, MOD, SHIFT, Segmented, Stepper, Switch } from
 import { boardKeyRows, a11yKeyRows } from "../a11y.js";
 import { shortcutRows } from "./shortcuts.js";
 import { CrashProbe, ErrorBoundary } from "./feedback.jsx";
+import { ImportReportSheet, SgfGamesSheet } from "./import-sheet.jsx";
 
 /** Every kind of sheet: `state.sheet.kind` → its component. */
-const SHEETS = { newGame: NewGameSheet, settings: SettingsSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet };
+const SHEETS = { newGame: NewGameSheet, settings: SettingsSheet, onboarding: Onboarding, shortcuts: ShortcutsSheet, confirm: ConfirmSheet, rename: RenameSheet, sgfGames: SgfGamesSheet, importReport: ImportReportSheet };
 export const SHEET_KINDS = Object.keys(SHEETS);
 
 /** A sheet that cannot render closes itself and says so; the app behind it stays usable. */
@@ -40,7 +41,7 @@ export function Sheets() {
   );
 }
 
-function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelledBy, class: cls = "" }) {
+export function Modal({ title, children, footer, wide, onClose = C.closeSheet, labelledBy, class: cls = "" }) {
   const ref = useRef(null);
   useEffect(() => {
     const prev = document.activeElement;
