@@ -120,9 +120,25 @@ export default async function ({ check, assert, fresh, clickPoint, origin }) {
     const page = await open(library({ finished: 7 }));
     await page.waitForSelector(".filters");
     assert((await page.locator(".filters .chip").count()) === 4 && (await page.locator(".filters input[type=search]").count()) === 1, "filter and search from six games");
-    const sort = page.locator(".filters select.sort-select");
-    assert((await sort.getAttribute("aria-label")) === "Sort", "the order has a name");
-    assert((await sort.locator("option").allTextContents()).join("|") === "Newest first|Oldest first|By result", (await sort.locator("option").allTextContents()).join("|"));
+    // The order is the house menu (no native select): its button says the order in force.
+    assert((await page.locator(".filters select").count()) === 0, "a native select in the filters");
+    const sort = page.locator(".filters .menu-wrap [aria-haspopup=menu]");
+    assert((await sort.getAttribute("aria-label")) === "Sort: Newest first", "the order has a name: " + (await sort.getAttribute("aria-label")));
+    assert((await sort.textContent()).trim() === "Newest first", "the button says the order in force");
+    const choose = async (name) => {
+      await sort.click();
+      await page.waitForSelector(".filters .menu [role=menuitemradio]");
+      await page.locator(".filters .menu [role=menuitemradio]", { hasText: name }).click();
+      await page.waitForSelector(".filters .menu", { state: "detached" });
+    };
+    await sort.click();
+    const items = page.locator(".filters .menu [role=menuitemradio]");
+    assert((await items.allTextContents()).map((s) => s.trim()).join("|") === "Newest first|Oldest first|By result", (await items.allTextContents()).join("|"));
+    assert((await items.evaluateAll((els) => els.map((el) => el.getAttribute("aria-checked")))).join() === "true,false,false", "the order in force is checked");
+    assert(await page.evaluate(() => document.activeElement?.getAttribute("role") === "menuitemradio"), "the menu takes the focus");
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".filters .menu", { state: "detached" });
+    assert(await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup") === "menu"), "Esc gives the focus back to the button");
     assert((await titles(page)).join("|") === "Game 1|Game 2|Game 3|Game 4|Game 5|Game 6|Game 7", "newest first: " + (await titles(page)).join("|"));
     // The rows.
     const row = (name) => page.locator(".game-item", { hasText: name }).first();
@@ -134,9 +150,10 @@ export default async function ({ check, assert, fresh, clickPoint, origin }) {
     assert((await row("Game 1").locator(".outcome").textContent()).trim() === "Won" && (await row("Game 2").locator(".outcome").textContent()).trim() === "Lost", "the result, from the player's side");
     assert((await row("Game 4").locator(".outcome").textContent()).trim() === "Black wins by 0.5", "an imported record says its result as written");
     // Oldest first, then by result.
-    await sort.selectOption("oldest");
+    await choose("Oldest first");
     await page.waitForFunction(() => document.querySelector(".games-group .game-item strong").textContent === "Game 7");
-    await sort.selectOption("result");
+    await choose("By result");
+    assert((await sort.textContent()).trim() === "By result", "the button follows the choice");
     await page.waitForFunction(() => document.querySelector(".games-group .game-item strong").textContent === "Game 1");
     const byResult = (await titles(page)).join("|");
     assert(byResult === "Game 1|Game 3|Game 6|Game 2|Game 5|Game 7|Game 4", "wins, losses, then the rest: " + byResult);

@@ -46,7 +46,8 @@ const SETTINGS_PANES_TESTED = {
 const MENUS_TESTED = {
   '"play-more"': ["Redo", "Hint", "Review so far", "Count", "Save to library", "Export SGF", "Focus mode", "Resign"],
   '"rec-" + g.id': ["Rename", "Export SGF", "Delete"],
-  // These three are opened, item by item, in play-library.mjs and play-edits.mjs.
+  // These four are opened, item by item, in play-library.mjs and play-edits.mjs.
+  '"lib-sort"': ["Newest first", "Oldest first", "By result"],
   '"unf-" + g.id': ["Look at it", "Export SGF", "Delete"],
   '"lib-import"': ["Choose files…", "Paste SGF"],
   '"review-result"': ["Count again"],

@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { areaOf } from "../engine.js";
-import { t, tn } from "../i18n.js";
+import { t, textLang, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { storyText } from "./story.js";
@@ -91,7 +91,7 @@ export function ReviewView() {
   const h = reviewHeading(r);
   return (
     <>
-      <Toolbar crumbs={h.crumbs} title={h.title} sub={h.sub}>
+      <Toolbar crumbs={h.crumbs} title={h.title} titleLang={h.titleLang} sub={h.sub}>
         <ReviewTools />
       </Toolbar>
       <div class="workspace review-layer">
@@ -117,7 +117,8 @@ function reviewHeading(r) {
     sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${classicYear(meta.classic.date)}`;
   } else if (meta.name) title = meta.name;
   else if (meta.free) title = t("board.free");
-  return { crumbs, title, sub };
+  // A record's own name (often its players) is set in the faces of its script.
+  return { crumbs, title, titleLang: meta.name && !meta.classic ? textLang(meta.name) : null, sub };
 }
 
 /**

@@ -114,7 +114,7 @@ export function Sidebar() {
  * current place (list pages leave it out and show a large title instead);
  * children are the actions, right-aligned — at most one primary.
  */
-export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) {
+export function Toolbar({ crumbs = [], title, titleLang = null, sub, children, class: cls = "" }) {
   return (
     <header class={`toolbar ${cls}`} data-drag>
       <div class="tb-nav">
@@ -130,7 +130,7 @@ export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) 
             <Icon name="next" size={12} />
           </>
         ))}
-        {title && <h1>{title}</h1>}
+        {title && <h1 lang={titleLang || undefined}>{title}</h1>}
         {sub && <span class="tb-sub">{sub}</span>}
       </div>
       <div class="tb-actions">{children}</div>

@@ -248,6 +248,8 @@ force; the table gives the light standard palette.
 * **Sheets** — centred, `--r-3`, `--shadow-sheet` and the `--scrim`; one primary
   action in the footer, right-aligned, Cancel to its left.
 * **Menus** — surface, `--shadow-pop`, `--r-2`, a `--s-1` inset; items 30 px.
+  A menu of choices (an order) opens from a quiet button that names the
+  choice in force, and checks it in the list.
 * **Icons** — one family (`src/web/js/app/icons.js`): 20 × 20 grid, 1.5 px
   stroke, round caps and joins, solid fills only for stones. 16 px in
   buttons, 18 px in the sidebar.
@@ -423,7 +425,9 @@ force; the table gives the light standard palette.
   heading's right, which asks first); then the finished games and records
   as compact rows with a thumbnail (the first eight until *Show all*).
   From six games on, one line above the list has the filter chips, the
-  search field and the order (newest, oldest, by result). A row says the
+  search field and the order: a quiet button that names the order in
+  force and opens a menu (newest, oldest, by result), never a native
+  select. A row says the
   title (the opponent, or the record's name), then on one line when
   ("Today", "Yesterday", "3 days ago" within the week, then the date), the
   board, the moves, who played when the title does not say, and — quietly,

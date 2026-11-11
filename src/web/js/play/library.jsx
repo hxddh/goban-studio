@@ -6,7 +6,7 @@
  * review as after a game (app/review-ctl.js), its stored analysis at once.
  */
 import * as Games from "../data/games.js";
-import { t, tn } from "../i18n.js";
+import { t, textLang, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { classicYear, rankLabel } from "../app/play.jsx";
@@ -105,10 +105,24 @@ function whoText(g) {
   return g.opponent === "ai" ? t("library.vsEngine", [g.rank != null ? rankLabel(g.rank) : "KataGo"]) : t("library.twoPlayers");
 }
 
-/** A row's facts, in one line: when, the board, the moves, who (when the title does not say), and the biggest swing of an analysed game. */
-function factsText(g, { swing = true } = {}) {
+/**
+ * A row's facts, in one line: when, the board, the moves, who (when the
+ * title does not say), and the biggest swing of an analysed game. The
+ * names of a record are tagged with their script's language (a Japanese
+ * or Korean name keeps its own glyphs whatever the interface language).
+ */
+function Facts({ g, swing = true }) {
   const turn = swing && g.swing ? t("library.swing", [g.swing.index, formatPoints(g.swing.loss)]) : "";
-  return [whenText(g.updatedAt), `${g.size} × ${g.size}`, tn("play.moveN", g.moves), whoText(g), turn].filter(Boolean).join(" · ");
+  const who = whoText(g);
+  const before = [whenText(g.updatedAt), `${g.size} × ${g.size}`, tn("play.moveN", g.moves)].join(" · ");
+  return (
+    <>
+      {before}
+      {who && " · "}
+      {who && <bdi lang={textLang(who) || undefined}>{who}</bdi>}
+      {turn && " · " + turn}
+    </>
+  );
 }
 
 /** One game of the list. `unfinished`: its click continues the game, and its menu offers a look instead. */
@@ -123,9 +137,9 @@ function GameRow({ g, unfinished = false }) {
       <button type="button" class="group-row game-row" onClick={() => C.openRecord(g.id)} aria-label={unfinished ? `${t("library.continue")}: ${title}` : [title, o.label].filter(Boolean).join(" · ")}>
         <Thumb thumb={g.thumb} size={g.size} />
         <span class="gr-text">
-          <strong>{title}</strong>
+          <strong lang={textLang(title) || undefined}>{title}</strong>
           <span>
-            {factsText(g, { swing: !unfinished })}
+            <Facts g={g} swing={!unfinished} />
             {rowNote(g.id)}
           </span>
         </span>
@@ -218,11 +232,7 @@ function MyGames() {
                 <Icon name="search" size={15} />
                 <input type="search" placeholder={t("library.search")} aria-label={t("library.search")} value={P.query} onInput={(e) => set({ query: e.currentTarget.value })} />
               </label>
-              <select class="sort-select" aria-label={t("library.sort")} value={sort} onChange={(e) => set({ sort: e.currentTarget.value })}>
-                {Games.SORTS.map((k) => (
-                  <option value={k}>{t("library.sort." + k)}</option>
-                ))}
-              </select>
+              <MoreMenu id="lib-sort" icon="sort" label={t("library.sort")} text={t("library.sort." + sort)} items={Games.SORTS.map((k) => ({ label: t("library.sort." + k), checked: sort === k, onClick: () => set({ sort: k }) }))} />
             </div>
           )}
           {games.length === 0 && <p class="muted center-text">{t("library.noMatch")}</p>}

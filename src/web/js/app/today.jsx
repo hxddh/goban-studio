@@ -14,7 +14,7 @@ import { PLACEMENT } from "../model/profile.js";
 import { masteryByTheme } from "../model/review.js";
 import { practiceDays, ratingHistory } from "../model/level.js";
 import { GRADES, PROBLEMS } from "../content.js";
-import { t, tn } from "../i18n.js";
+import { t, textLang, tn } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, Thumb } from "./parts.jsx";
@@ -278,7 +278,7 @@ function Recent() {
               <button type="button" class="group-row game-row" onClick={() => C.openRecord(g.id)} aria-label={`${recordTitle(g)} · ${o.label}`}>
                 <Thumb thumb={g.thumb} size={g.size} />
                 <span class="gr-text">
-                  <strong>{recordTitle(g)}</strong>
+                  <strong lang={textLang(recordTitle(g)) || undefined}>{recordTitle(g)}</strong>
                   <span>
                     {g.size} × {g.size} · {tn("play.moveN", g.moves)}
                   </span>

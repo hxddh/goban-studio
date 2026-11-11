@@ -204,7 +204,13 @@ export function Async({ state: s, label, error, children }) {
 }
 
 /** Popover menu anchored to a "more" button. */
-export function MoreMenu({ id, items, label }) {
+/**
+ * A menu under a button: the "more" button of a row by default; with
+ * `text`, a quiet button that says the choice in force (an order). An item
+ * with `checked` (true or false) is one of a set of choices and shows a
+ * check when it is the one.
+ */
+export function MoreMenu({ id, items, label, icon = "more", text = null }) {
   const open = state.menu === id;
   const ref = useRef(null);
   useEffect(() => {
@@ -218,14 +224,14 @@ export function MoreMenu({ id, items, label }) {
     // menu has already had its pointerdown, so it does not close it.
     document.addEventListener("pointerdown", close);
     // The first item that can be chosen (a disabled first item cannot take the focus).
-    ref.current?.querySelector("[role=menuitem]:not([disabled])")?.focus();
+    ref.current?.querySelector("[role^=menuitem]:not([disabled])")?.focus();
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   const onKey = (e) => {
     // Only an open menu takes keys: with the menu closed and the focus on
     // its button, Esc and the arrows belong to the page (a sheet, a review).
     if (!open) return;
-    const list = [...ref.current.querySelectorAll("[role=menuitem]:not([disabled])")];
+    const list = [...ref.current.querySelectorAll("[role^=menuitem]:not([disabled])")];
     const i = list.indexOf(document.activeElement);
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -235,13 +241,21 @@ export function MoreMenu({ id, items, label }) {
       list[(i - 1 + list.length) % list.length]?.focus();
     } else if (e.key === "Escape") {
       e.stopPropagation();
-      ref.current.querySelector(".icon-btn")?.focus();
+      ref.current.querySelector("[aria-haspopup]")?.focus();
       update({ menu: null });
     }
   };
+  const toggle = () => update({ menu: open ? null : id });
   return (
     <div class="menu-wrap" ref={ref} onKeyDown={onKey}>
-      <IconButton icon="more" label={label || t("common.more")} aria-haspopup="menu" aria-expanded={open} onClick={() => update({ menu: open ? null : id })} />
+      {text ? (
+        <button type="button" class="btn ghost sm menu-btn" aria-label={t("common.labelValue", [label, text])} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+          <Icon name={icon} size={16} />
+          <span>{text}</span>
+        </button>
+      ) : (
+        <IconButton icon={icon} label={label || t("common.more")} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />
+      )}
       {open && (
         <div class="menu" role="menu">
           {items.filter(Boolean).map((it) =>
@@ -250,17 +264,19 @@ export function MoreMenu({ id, items, label }) {
             ) : (
               <button
                 type="button"
-                role="menuitem"
+                role={it.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={it.checked === undefined ? undefined : !!it.checked}
                 class={it.danger ? "danger" : ""}
                 disabled={it.disabled}
                 onClick={() => {
                   // Focus goes back to the menu button, so a sheet the item
                   // opens returns it there when it closes.
-                  ref.current?.querySelector(".icon-btn")?.focus();
+                  ref.current?.querySelector("[aria-haspopup]")?.focus();
                   update({ menu: null });
                   it.onClick();
                 }}
               >
+                {it.checked !== undefined && (it.checked ? <Icon name="check" size={16} /> : <span class="menu-blank" />)}
                 {it.icon && <Icon name={it.icon} size={16} />}
                 <span>{it.label}</span>
                 {it.kbd && <kbd>{it.kbd}</kbd>}
