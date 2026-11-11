@@ -12,7 +12,7 @@
  * elsewhere, and `info()` says so, so the UI never presents a fallback as
  * the real thing.
  *
- * v9: one opponent axis. The player chooses a rank; `levelFor(rank,
+ * One opponent axis. The player chooses a rank; `levelFor(rank,
  * installed())` (opponents.js) names the implementation that measured
  * closest with the networks installed — human-style where it measured
  * well, the stronger network at the top, the standard ladder otherwise —
@@ -33,7 +33,7 @@ export const HUMAN_VISITS = 40;
 /**
  * Analysis with the stronger network uses this share of the visits asked
  * for: it is several times slower per visit on a laptop CPU and much
- * stronger per visit, and the review should not get slower than v4's.
+ * stronger per visit, and the review should not get slower for it.
  */
 export const STRONG_VISIT_SCALE = 0.5;
 
@@ -60,7 +60,7 @@ export function suggestHandicap(playerRank, opponentRank, size) {
 }
 
 /**
- * One search at a time, by priority (v7, scheduler.js): the computer's move
+ * One search at a time, by priority (scheduler.js): the computer's move
  * first, then what the player is looking at, then pondering, then batch
  * work. The sidecar supersedes a running search with a new one, so nothing
  * else may reach KataGo. Every call takes `{ signal, lane }`; a caller that
@@ -112,7 +112,7 @@ export async function info() {
   return cached;
 }
 
-/* ------------------------------------------------- optional networks (v5) */
+/* ------------------------------------------------- optional networks */
 
 /**
  * Which optional networks are installed. Set by the models controller
@@ -406,7 +406,7 @@ export async function decide(game, opponent, { signal, lane = "move", node = gam
 }
 
 /**
- * v13: the offline engine's move (ai.js) at the local level of what plays
+ * The offline engine's move (ai.js) at the local level of what plays
  * `opponent` here: the computer's move when the search could not give one
  * (app/play-ctl.js falls back to it before it offers Retry).
  */
@@ -447,7 +447,7 @@ export async function chooseMove(game, opponent, opts = {}) {
 
 /** The engine's suggestion for the side to move, with a short line (the player waits on it). */
 export async function hint(game, { signal, lane = "move", node = game.current } = {}) {
-  // v13: the position asked about, fixed now (a queued search would otherwise read the board when it runs).
+  // The position asked about, fixed now (a queued search would otherwise read the board when it runs).
   const { analysis, cancelled } = await analysisR(game, { node, visits: 200, signal, lane });
   if (analysis?.moves?.length) {
     const top = analysis.moves[0];
@@ -502,7 +502,7 @@ export async function deadStones(game, { signal, lane = "interactive", node = ga
 }
 
 /**
- * v8: the dead stones of a finished board from KataGo's ownership (Black's
+ * The dead stones of a finished board from KataGo's ownership (Black's
  * point of view, row-major), decided chain by chain: a chain is dead when
  * the mean ownership under it clearly belongs to the other colour, so a
  * chain is never split into dead and living stones. Seki stones (ownership

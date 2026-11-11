@@ -1,6 +1,6 @@
 /**
  * Small view helpers the live game (play.jsx) and the review (review.jsx)
- * share (v13: out of play.jsx when the review moved to its own file).
+ * share (out of play.jsx when the review moved to its own file).
  */
 import { BLACK } from "../rules.js";
 import { t } from "../i18n.js";

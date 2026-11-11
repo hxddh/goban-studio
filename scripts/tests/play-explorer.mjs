@@ -18,7 +18,7 @@ await test("play explorer: book moves, out of the book, back/forward, reset and 
   state.profile = PM.newProfile();
   state.engine = { available: false };
   X.openExplorer("whole");
-  assert.equal(state.space, "library", "v12: the explorer is part of the Library");
+  assert.equal(state.space, "library", "the explorer is part of the Library");
   assert.equal(state.play.explorer, "whole");
   assert.ok(X.explorerBook(), "the empty board is in the book");
   const first = X.explorerCandidates();

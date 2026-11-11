@@ -9,7 +9,7 @@ export function hasNative() {
 }
 
 /**
- * v13: the page runs inside the packaged app rather than the browser
+ * The page runs inside the packaged app rather than the browser
  * preview: the shell serves it from its own zero:// origin (macOS, Linux)
  * or from WebView2's virtual host native-sdk-app.localhost (Windows).
  * Packaged, a missing bridge is an error to show, never a reason to fall
@@ -33,7 +33,7 @@ export async function nativeInvoke(command, payload) {
   return invoke(command, payload);
 }
 
-export async function windowChrome() {
+async function windowChrome() {
   if (!hasNative()) return { top: 0, left: 0, right: 0 };
   try {
     const r = await invoke("studio.windowChrome");
@@ -43,13 +43,13 @@ export async function windowChrome() {
   }
 }
 
-export function windowDrag() {
+function windowDrag() {
   if (hasNative()) invoke("studio.windowDrag").catch(() => {});
 }
 
 /* ------------------------------------------------------- the user's files */
 //
-// v13: the host reads and writes only files it handed out itself — what
+// The host reads and writes only files it handed out itself — what
 // the open / save dialogs below returned, documents the OS opened with the
 // app, files dropped on the window — and only .sgf, .json and .png
 // (src/files.zig). Any other path is refused (`AccessDenied`), so these
@@ -116,7 +116,7 @@ export async function writeTextFile(path, text) {
   return writeBinaryFile(path, new TextEncoder().encode(text));
 }
 
-/** v6: write bytes (a Uint8Array) through the same native file command. */
+/** Write bytes (a Uint8Array) through the same native file command. */
 export async function writeBinaryFile(path, bytes) {
   if (!hasNative()) return false;
   try {
@@ -132,7 +132,7 @@ export async function readTextFile(path) {
   return bytes ? new TextDecoder().decode(bytes) : null;
 }
 
-/** v13: the file's raw bytes (a Uint8Array), or null; SGF import decodes them by CA. */
+/** The file's raw bytes (a Uint8Array), or null; SGF import decodes them by CA. */
 export async function readFileBytes(path) {
   if (!hasNative()) return null;
   try {
@@ -159,7 +159,7 @@ export function normalizePaths(input) {
     .filter(Boolean);
 }
 
-/** The host's own dialogs (v13) exist wherever the host does. */
+/** The host's own dialogs exist wherever the host does. */
 export function hasFileDialogs() {
   return hasNative();
 }
@@ -320,7 +320,7 @@ export function onMenuCommand(handler) {
   }
 }
 
-/* ---------------------------------------------------- v13 quit flush */
+/* ---------------------------------------------------- Quit flush */
 
 /**
  * Before the app quits or its window closes (⌘Q, the window's close button
@@ -360,7 +360,7 @@ export async function selftestConfig() {
   }
 }
 
-/* ---------------------------------------------------------- v4 updates */
+/* ---------------------------------------------------------- Updates */
 
 /** How long the page waits for `studio.checkUpdate` (the host gives up at 15 s). */
 const UPDATE_TIMEOUT_MS = 20000;
@@ -413,7 +413,7 @@ export async function openReleasePage() {
   }
 }
 
-/* ---------------------------------------------------- v5 update install */
+/* ---------------------------------------------------- Update install */
 
 /** How the bridge reports a command an older host does not have. */
 function missingCommand(e) {

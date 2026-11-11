@@ -1,6 +1,6 @@
 /**
- * v13: every problem is still a proved problem after the review transform
- * (src/web/js/learn/transform.js): turned or mirrored and, except endgame
+ * Every problem is still a proved problem after the review transform
+ * (src/web/js/practice/transform.js): turned or mirrored and, except endgame
  * problems, with the colours swapped. For each problem the transformed
  * definition must pass the solver's validate() (exact first-move search,
  * 1–3 correct moves, a winning answer line, ko and seki results kept),
@@ -13,7 +13,7 @@
  *                                            problem (about 3 minutes), to keep
  *                                            the exceptions in transform.js exact
  *
- * The unit tests (scripts/tests/learn-transform.mjs) run the sample.
+ * The unit tests (scripts/tests/practice-transform.mjs) run the sample.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -21,7 +21,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { PROBLEMS } from "../src/web/js/content/problems.js";
 import { createPuzzle, difficulty, validate } from "../src/web/js/solver.js";
-import { allowedSyms, canSwap, hash, mapPoint, transformProblem } from "../src/web/js/learn/transform.js";
+import { allowedSyms, canSwap, hash, mapPoint, transformProblem } from "../src/web/js/practice/transform.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GRADES = JSON.parse(fs.readFileSync(path.join(root, "src/web/js/content/problem-grades.json"), "utf8"));

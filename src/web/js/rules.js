@@ -11,7 +11,7 @@
  *
  * Coordinates are zero-based from the top-left: x = column, y = row.
  *
- * v5: three rulesets, chosen per game (`Game.rules`). See RULESETS below
+ * Three rulesets, chosen per game (`Game.rules`). See RULESETS below
  * for what each one means here and how it differs from the official text.
  */
 import GoBoard from "@sabaki/go-board";
@@ -19,7 +19,7 @@ import { APP_VERSION } from "./version.js";
 
 /* -------------------------------------------------------------- rulesets
  *
- * v5 rules. A game is played under one of three rulesets:
+ * Rules. A game is played under one of three rulesets:
  *
  *   japanese  Territory scoring (Nihon Ki-in 1989 rules): empty points
  *             surrounded by one colour's living stones, plus prisoners
@@ -114,12 +114,12 @@ export function handicapCompensation(rules, handicap = 0) {
 /**
  * The ruleset an SGF RU value names: "japanese" | "chinese" | "korean", or
  * null when the app cannot score the record faithfully. No RU at all means
- * Japanese (records saved before v5 have none or RU[Japanese]).
+ * Japanese (older records have none or RU[Japanese]).
  *
  *   Japanese  Japanese, JP, JA, JPN, Nihon, uchikomi, 日本, 日本ルール, 日本规则
  *   Chinese   Chinese, CN, ZH, CHN, China, 中国, 中国规则, 中國規則
  *   Korean    Korean, KR, KO, KOR, Korea, 한국, 한국 규칙, 韓国, 韩国规则
- * (case-insensitive; "uchikomi" was accepted before v5 and stays Japanese).
+ * (case-insensitive; "uchikomi" has always been read as Japanese).
  *
  * Rejected on purpose, because no preset scores them the same way and
  * mapping them would change the record's result:
@@ -211,7 +211,7 @@ function zobristTable(size) {
 }
 
 /** The board's Zobrist hash, as a string of two 32-bit halves. */
-export function boardHash(board) {
+function boardHash(board) {
   const size = board.width;
   const table = zobristTable(size);
   const map = board.signMap;
@@ -255,7 +255,7 @@ function nodeHash(node) {
  * applied to a copy of `board`: { black: [{x, y}], white: [...], empty: [...] }.
  * AE first, then AB, then AW.
  */
-export function applySetup(board, setup) {
+function applySetup(board, setup) {
   const out = board.clone();
   if (!setup) return out;
   for (const p of setup.empty || []) out.set([p.x, p.y], EMPTY);
@@ -498,7 +498,7 @@ export class Game {
     placeHandicap = true,
   } = {}) {
     this.size = size;
-    // v5: "japanese" | "chinese" | "korean" (see RULESETS). Unknown values
+    // "japanese" | "chinese" | "korean" (see RULESETS). Unknown values
     // fall back to Japanese, the default.
     this.rules = normalizeRules(rules);
     this.handicap = Math.max(0, Math.min(9, Math.floor(Number(handicap) || 0)));
@@ -554,10 +554,10 @@ export class Game {
       result: fields.result || null,
       comment: fields.comment || "",
       marks: fields.marks || [],
-      // v5: SGF properties this app does not interpret, kept for the round
+      // SGF properties this app does not interpret, kept for the round
       // trip ({ KEY: [raw values] }), or null.
       extra: fields.extra || null,
-      // v13: stones the record set up just before this node's move (SGF
+      // Stones the record set up just before this node's move (SGF
       // AB / AW / AE in the middle of a game; see applySetup), or null. The
       // board above already includes them.
       setup: fields.setup || null,
@@ -756,7 +756,7 @@ export class Game {
     this.root.comment = String(text || "");
   }
 
-  /* ------------------------------------------------ v5: node editing */
+  /* ------------------------------------------------ Node editing */
 
   /** Set (or clear, with "") the comment of a node (object or id). */
   setComment(node, text) {
@@ -988,7 +988,7 @@ export class Game {
     }
     const rules = this.ruleset.sgf;
     // SGF columns run a, b, c … with the i included (FF[4]); only board
-    // labels skip I. (Before v7 this skipped the i too; see sgf.js.)
+    // labels skip I. (Records written with the i skipped too are still read; see sgf.js.)
     const sgfColumn = (x) => String.fromCharCode(97 + x);
     const sgfCoord = (x, y) => sgfColumn(x) + String.fromCharCode(97 + y);
     let head =
@@ -1037,7 +1037,7 @@ export class Game {
     const nodeText = (n) => {
       if (!n.move) return "";
       let s = "";
-      // v13: a mid-game setup is a move-less node of its own before the move.
+      // A mid-game setup is a move-less node of its own before the move.
       if (n.setup) {
         let props = "";
         for (const [key, list] of [["AE", n.setup.empty], ["AB", n.setup.black], ["AW", n.setup.white]]) {
@@ -1053,7 +1053,7 @@ export class Game {
       s += marksText(n.marks, sgfCoord, esc) + extraText(n.extra, esc);
       return s;
     };
-    // v13: iterative, so a record of any length or depth cannot overflow the
+    // Iterative, so a record of any length or depth cannot overflow the
     // stack. A string on the stack is a parenthesis to write.
     const parts = [];
     const stack = [root];
@@ -1075,12 +1075,12 @@ export class Game {
   }
 }
 
-/* ------------------------------------------------------ v5: markup */
+/* ------------------------------------------------------ Markup */
 
 /** Board marks a node can carry, as stored in node.marks[].type. */
 export const MARK_KINDS = ["triangle", "square", "circle", "cross", "label"];
 /** SGF property for each mark kind. */
-export const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
+const MARK_PROPS = { triangle: "TR", square: "SQ", circle: "CR", cross: "MA", label: "LB" };
 
 function nextLabel(marks) {
   const used = new Set(marks.filter((m) => m.type === "label").map((m) => m.text));
@@ -1111,7 +1111,7 @@ function extraText(extra, esc) {
 }
 
 /**
- * v5: layout of the whole game tree for a variation mini-map.
+ * Layout of the whole game tree for a variation mini-map.
  *
  *   x  depth (0 = root, so a move's x is its move number in its line)
  *   y  row (0 = main line); each variation takes the first row below its
@@ -1150,7 +1150,7 @@ export function treeLayout(game) {
   };
 
   // Places the first-child chain from `start` and returns a frame for its
-  // variations (v13: an explicit stack of frames, so a record nested
+  // variations (an explicit stack of frames, so a record nested
   // thousands of variations deep cannot overflow the call stack).
   const placeChain = (start, x0, row, main) => {
     const chain = [];

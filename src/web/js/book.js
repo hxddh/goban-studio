@@ -1,5 +1,5 @@
 /**
- * v6 explorer: the opening and joseki book.
+ * Explorer: the opening and joseki book.
  *
  * The book (content/book.json) is precomputed by scripts/make-book.mjs with
  * KataGo; it ships with the app, so the explorer works offline and in the
@@ -337,7 +337,7 @@ export function lookup(book, signMap, toMove) {
 }
 
 /** The symmetries of the group that leave this position unchanged. */
-export function stabilizer(signMap, toMove, group = GROUPS.all, n = 19) {
+function stabilizer(signMap, toMove, group = GROUPS.all, n = 19) {
   const stones = stonesOf(signMap);
   const id = keyUnder(stones, toMove, 0, n);
   return group.filter((s) => s !== 0 && keyUnder(stones, toMove, s, n) === id);

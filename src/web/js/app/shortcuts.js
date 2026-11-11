@@ -1,7 +1,7 @@
 /**
  * The keyboard shortcuts, once: the key handler (app.jsx) matches a key
  * press against this table, the native menu bar takes its keys from it,
- * and the shortcuts sheet (sheets.jsx) lists it. A shortcut added here
+ * and the shortcuts sheet (shortcuts-sheet.jsx) lists it. A shortcut added here
  * works, shows in the menu and is documented; none can be in one place and
  * not the others.
  *
@@ -27,7 +27,7 @@ export const SHORTCUTS = [
   { command: "app.settings", key: ",", label: "nav.settings", when: "always" },
   { command: "go.today", key: "1", label: "nav.today", when: "noSheet", group: "spaces" },
   { command: "go.play", key: "2", label: "nav.play", when: "noSheet", group: "spaces" },
-  { command: "go.learn", key: "3", label: "nav.learn", when: "noSheet", group: "spaces" },
+  { command: "go.practice", key: "3", label: "nav.practice", when: "noSheet", group: "spaces" },
   { command: "go.library", key: "4", label: "nav.library", when: "noSheet", group: "spaces" },
   { command: "go.back", key: "[", label: "shortcuts.history", when: "always", group: "history" },
   { command: "go.forward", key: "]", label: "shortcuts.history", when: "always", group: "history" },

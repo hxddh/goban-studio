@@ -64,7 +64,7 @@ await test("advanced: the advanced units follow the intermediate ones and keep e
   const order = ["beginner", "intermediate", "advanced"];
   for (let i = 1; i < levels.length; i++) assert.ok(order.indexOf(levels[i]) >= order.indexOf(levels[i - 1]), `unit ${COURSE[i].id} out of order`);
   const adv = COURSE.filter((u) => u.level === "advanced");
-  // v13: opening frameworks, joseki choice and handicap strategy joined the v6 units.
+  // Opening frameworks, joseki choice and handicap strategy sit with the other advanced units.
   assert.ok(adv.length >= 8 && adv.length <= 10, `${adv.length} advanced units`);
   const lessons = adv.flatMap((u) => u.lessons);
   assert.ok(lessons.length >= 27 && lessons.length <= 40, `${lessons.length} advanced lessons`);
@@ -96,11 +96,11 @@ await test("endgame: at least 30 endgame problems over grades 1–5, with their 
   for (const t of ["hane-connect", "monkey-jump", "double-sente", "sente-gote", "reverse-sente", "endgame-compare", "deiri"]) assert.ok(themes.has(t), t);
   for (const p of eg.filter((x) => x.ask === "value")) assert.ok(p.choices.includes(p.value), p.id);
   assert.ok(eg.some((p) => S.countAreas(S.createPuzzle(p)) >= 3), "some problems compare three areas");
-  const jsx = fs.readFileSync(path.join(root, "src/web/js/learn/catalog.jsx"), "utf8");
+  const jsx = fs.readFileSync(path.join(root, "src/web/js/practice/catalog.jsx"), "utf8");
   assert.match(jsx, /export const TOPICS = \[[^\]]*"endgame"\]/);
 });
 
-await test("endgame: the fighting unit teaches the leaning attack and sabaki, after the v5 lessons", () => {
+await test("endgame: the fighting unit teaches the leaning attack and sabaki, after its first lessons", () => {
   const unit = COURSE.find((u) => u.id === "fighting");
   const ids = unit.lessons.map((l) => l.id);
   assert.deepEqual(ids, ["fight-cutting-stones", "fight-attack-distance", "fight-split", "fight-leaning", "fight-sabaki"]);

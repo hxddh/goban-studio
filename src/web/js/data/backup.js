@@ -23,18 +23,18 @@
 import { BAD_PREFIX, MAX_BYTES, validKey } from "./store.js";
 import { INDEX_KEY, LEGACY_V, STORE_V, migrateFile } from "./migrate.js";
 
-export const BACKUP_APP = "goban-studio";
-export const BACKUP_V = STORE_V;
+const BACKUP_APP = "goban-studio";
+const BACKUP_V = STORE_V;
 /** Restore snapshots: `backups/pre-restore-<time>/<key>`. */
 export const BACKUPS_PREFIX = "backups/";
-export const SNAPSHOT_PREFIX = "backups/pre-restore-";
+const SNAPSHOT_PREFIX = "backups/pre-restore-";
 
 /** How long "Undo restore" is offered. */
 export const SNAPSHOT_DAYS = 30;
 const DAY_MS = 86400000;
 
 /** Keys a backup leaves out. */
-export const NOT_BACKED_UP = [BAD_PREFIX, BACKUPS_PREFIX, INDEX_KEY];
+const NOT_BACKED_UP = [BAD_PREFIX, BACKUPS_PREFIX, INDEX_KEY];
 const leftOut = (key) => NOT_BACKED_UP.some((p) => key.startsWith(p));
 
 /**
@@ -47,7 +47,7 @@ export async function exportBackup(store, now = Date.now()) {
 }
 
 /** The backup document of what the store has in memory (exportBackup reads the rest first). */
-export function backupOf(store, now = Date.now()) {
+function backupOf(store, now = Date.now()) {
   return { app: BACKUP_APP, v: BACKUP_V, at: now, data: JSON.parse(JSON.stringify(store.snapshot({ except: NOT_BACKED_UP }))) };
 }
 
@@ -64,7 +64,7 @@ const bytesOf = (value) => new TextEncoder().encode(JSON.stringify(value)).lengt
 export function checkBackup(doc) {
   if (!isObject(doc) || Array.isArray(doc) || doc.app !== BACKUP_APP) return { ok: false, error: "notBackup" };
   if (!Number.isInteger(doc.v)) return { ok: false, error: "notBackup" };
-  // v9 was the first version with this format; nothing older is read.
+  // Was the first version with this format; nothing older is read.
   if (doc.v < LEGACY_V) return { ok: false, error: "olderVersion" };
   if (doc.v > BACKUP_V) return { ok: false, error: "newerVersion" };
   if (!isObject(doc.data) || Array.isArray(doc.data)) return { ok: false, error: "damaged" };
@@ -109,7 +109,7 @@ export function latestSnapshot(store, now = null) {
  * resolves to the snapshot's prefix, or null when it could not be written
  * (nothing is restored then).
  */
-export async function writeSnapshot(store, now = Date.now()) {
+async function writeSnapshot(store, now = Date.now()) {
   if (!(await store.flush())) return null;
   await store.loadAll("", { except: [BAD_PREFIX, BACKUPS_PREFIX] });
   const prefix = `${SNAPSHOT_PREFIX}${now}/`;

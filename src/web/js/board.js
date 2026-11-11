@@ -6,10 +6,10 @@
  * testing rounds to the nearest intersection; the caller decides whether the
  * point is legal.
  *
- * v2 details: coordinates sit outside the grid; a `view` window zooms to a
+ * Details: coordinates sit outside the grid; a `view` window zooms to a
  * corner or side (problems), with lines running off the open edges so the
  * window still reads as part of a full board; stones sit slightly off-grid
- * with a contact shadow; a new stone settles in ~120 ms and captured stones
+ * with a contact shadow; a new stone settles in 140 ms and captured stones
  * fade out; the last move is a thin ring; a keyboard cursor makes the board
  * playable without a pointer.
  *
@@ -165,7 +165,7 @@ export class BoardView {
 
   /**
    * Board text follows the interface font (per language, docs/design.md §2).
-   * v13: read once per language, text size and appearance (and again after
+   * Read once per language, text size and appearance (and again after
    * a resize), not on every model update: getComputedStyle forces a style
    * recalculation, and setModel runs on every render of a board place.
    */
@@ -191,7 +191,7 @@ export class BoardView {
       this.model.hover = null;
     }
     // Only when the board stops taking moves: a board that never did keeps
-    // the keyboard cursor, so it can still be read point by point (v6 a11y).
+    // the keyboard cursor, so it can still be read point by point.
     if (patch.interactive === false && wasInteractive) {
       this.model.hover = null;
       this.model.cursor = null;
@@ -280,7 +280,7 @@ export class BoardView {
     const wantCells = wantCellsFor(this.model);
     const band = bandFor(this.model);
     if (this.model.view && this.model.showCoords) {
-      // v7: a zoomed window with coordinates. The labels on an open side
+      // A zoomed window with coordinates. The labels on an open side
       // sit past the lines that run off the window, so each side gets its
       // own margin (in cells) and nothing is clipped.
       const size = this.model.size;
@@ -733,7 +733,7 @@ export class BoardView {
       return;
     }
     if (mark.type === "book") {
-      // v6 explorer: book continuations in the accent (a filled disc for
+      // Explorer: book continuations in the accent (a filled disc for
       // book moves, a ring for KataGo's other candidates); mistakes in
       // --bad. The letter matches the row in the panel.
       const bad = mark.tag === "mistake";

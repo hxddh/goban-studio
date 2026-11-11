@@ -1,6 +1,6 @@
 /**
  * Window chrome (docs/design.md §3, §7): the sidebar with the four spaces
- * (v12: Today, Play, Practice, Library) and Settings,
+ * (Today, Play, Practice, Library) and Settings,
  * and the toolbar every place starts with — back/forward, breadcrumbs and
  * title, then the place's own actions. On macOS the toolbar shares its row
  * with the traffic lights and drags the window.
@@ -12,11 +12,11 @@ import * as C from "./controller.js";
 import { Icon, IconButton, MOD } from "./parts.jsx";
 import { StatusChip } from "./status-chip.jsx";
 
-/** How each space looks in the sidebar; which spaces there are, and their order, is controller.js SPACES (v13: one list). */
+/** How each space looks in the sidebar; which spaces there are, and their order, is spaces.js SPACES (one list). */
 const SPACE_LOOK = {
   today: { icon: "today", key: "nav.today" },
   play: { icon: "play", key: "nav.play" },
-  learn: { icon: "practice", key: "nav.learn" },
+  practice: { icon: "practice", key: "nav.practice" },
   library: { icon: "library", key: "nav.library" },
 };
 export const SPACES = C.SPACES.map((id) => ({ id, ...SPACE_LOOK[id] }));
@@ -38,10 +38,10 @@ export function Mark({ size = 18 }) {
 }
 
 /** Narrow windows (the board's panel is a bar under the board): styles.css uses the same width. */
-export const NARROW_QUERY = "(max-width: 860px)";
+const NARROW_QUERY = "(max-width: 860px)";
 
 /** Whether the window is narrow now; follows resizes. */
-export function useNarrow() {
+function useNarrow() {
   const mq = typeof matchMedia === "function" ? matchMedia(NARROW_QUERY) : null;
   const [narrow, setNarrow] = useState(!!mq?.matches);
   useEffect(() => {
@@ -114,7 +114,7 @@ export function Sidebar() {
  * current place (list pages leave it out and show a large title instead);
  * children are the actions, right-aligned — at most one primary.
  */
-export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) {
+export function Toolbar({ crumbs = [], title, titleLang = null, sub, children, class: cls = "" }) {
   return (
     <header class={`toolbar ${cls}`} data-drag>
       <div class="tb-nav">
@@ -130,7 +130,7 @@ export function Toolbar({ crumbs = [], title, sub, children, class: cls = "" }) 
             <Icon name="next" size={12} />
           </>
         ))}
-        {title && <h1>{title}</h1>}
+        {title && <h1 lang={titleLang || undefined}>{title}</h1>}
         {sub && <span class="tb-sub">{sub}</span>}
       </div>
       <div class="tb-actions">{children}</div>

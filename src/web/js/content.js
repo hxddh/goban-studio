@@ -1,5 +1,5 @@
 /**
- * v9: the course, the problems and the classic games, loaded in two steps.
+ * The course, the problems and the classic games, loaded in two steps.
  *
  * The first screen only needs what lists and plans read: the course's
  * units and lesson titles, each problem's id, topic, theme and shape, its
@@ -101,7 +101,7 @@ export function withContent(part, fn) {
 /**
  * Load every part on idle, one after the other (started once at boot).
  * `onArrive(part)` runs after each part is merged, so a view that showed
- * the index alone (Learn's path reads problem titles) can draw again.
+ * the index alone (Practice's path reads problem titles) can draw again.
  */
 export function preload(onArrive = () => {}) {
   if (have.size === PARTS.length || typeof window === "undefined") return;

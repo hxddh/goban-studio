@@ -195,7 +195,7 @@ export function goToday() {
     s.space = "today";
     s.sheet = null;
     s.menu = null;
-    s.learn = { ...s.learn, view: "home" };
+    s.practice = { ...s.practice, view: "home" };
     s.play = { ...s.play, view: "home", explorer: null };
   });
   C.syncMenus();

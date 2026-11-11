@@ -168,8 +168,6 @@ await test("the native update commands are fixed to this repository", () => {
   assert.match(html, /connect-src 'self'/);
   const zon = fs.readFileSync(path.join(root, "app.zon"), "utf8").replace(/\r\n/g, "\n");
   assert.match(zon, /external_links = \.\{ \.action = "deny" \}/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(messages, /\/\/ v4 release\r?\n/);
   for (const key of ["update.check", "update.auto", "update.available", "update.current", "update.error", "update.unavailable", "update.download"]) assert.ok(MESSAGES[key], key);
 });
 
@@ -283,10 +281,10 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   const tour = fs.readFileSync(path.join(root, "src/web/js/tour.js"), "utf8").replace(/\r\n/g, "\n");
   const steps = tour.slice(tour.indexOf("export const STEPS"), tour.indexOf("async function waitForAck"));
   const names = [...steps.matchAll(/name: "([a-z0-9]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["play", "game19", "review", "learn", "settings"]);
+  assert.deepEqual(names, ["play", "game19", "review", "practice", "settings"]);
   for (const fn of ["C.goSpace(", "C.newGame(", "C.reviewCurrentGame(", "C.openSheet(\"settings\")"]) assert.ok(tour.includes(fn), fn);
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
-  // v13: one look at the configuration; the tour module loads only when it asks for it.
+  // One look at the configuration; the tour module loads only when it asks for it.
   assert.match(app, /if \(c\?\.tour\)[^\n]*import\("\.\.\/tour\.js"\)/);
   const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /GOBAN_TOUR_OUT/);
@@ -477,8 +475,6 @@ await test("the native install commands are fixed to this repository's release d
   // The helpers are embedded in the app, not downloaded.
   assert.match(zig, /@embedFile\("updater\/apply-macos\.sh"\)/);
   assert.match(zig, /@embedFile\("updater\/apply-windows\.ps1"\)/);
-  const messages = fs.readFileSync(path.join(root, "src/web/js/messages.js"), "utf8").replace(/\r\n/g, "\n");
-  assert.equal(messages.split("// v5 updater\n").length, 2, "one v5 updater block");
   for (const key of ["update.install", "update.restart", "update.ready", "update.installed", "update.rolledBack", "update.readOnly"]) assert.ok(MESSAGES[key], key);
 });
 

@@ -1,6 +1,6 @@
 /**
- * v8: how the computer opponent feels to play against, as pure functions
- * of its search (play-ctl.js applies them; scripts/tests/v8-feel.mjs pins
+ * How the computer opponent feels to play against, as pure functions
+ * of its search (play-ctl.js applies them; scripts/tests/play-feel.mjs pins
  * them):
  *
  *   thinkTime     how long it seems to think: quick when the move is
@@ -26,7 +26,7 @@ export const THINK_MAX = 3500;
  * is the default: the opening is brisk, fighting takes longer, the endgame
  * is quicker again (docs/design.md §8). Stronger levels take a little
  * longer; a jitter of ±15% keeps it from feeling mechanical. `rank` is
- * the rank the opponent plays at (v9: the measured rank shown).
+ * the rank the opponent plays at (the measured rank shown).
  */
 export function thinkTime(rank, a, moveNumber, size, rnd = Math.random) {
   const base = rank >= 20 ? 520 : rank >= 10 ? 820 : rank >= 1 ? 1150 : 1500;
@@ -40,7 +40,7 @@ export function thinkTime(rank, a, moveNumber, size, rnd = Math.random) {
 /** Opponents weaker than this rank (kyu) play every game out; from this rank up they may resign. */
 export const RESIGN_FROM_RANK = 15;
 /** Consecutive hopeless searches before the computer resigns. */
-export const RESIGN_STREAK = 3;
+const RESIGN_STREAK = 3;
 
 /** Points whose owner is still open (|ownership| < 0.5); null without ownership. */
 export function openPoints(ownership) {

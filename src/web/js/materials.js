@@ -19,11 +19,11 @@
  * the variant arrays), and callers keep their procedural fallback.
  */
 
-export const STONE_COUNTS = { black: 4, white: 8 };
+const STONE_COUNTS = { black: 4, white: 8 };
 
 let base = "assets/";
 
-export function assetURL(rel) {
+function assetURL(rel) {
   return base + rel;
 }
 

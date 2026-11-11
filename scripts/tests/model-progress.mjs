@@ -20,7 +20,7 @@ export default async function ({ test, assert, root }) {
   const content = { problems: PROBLEMS, grades: GRADES };
   const levelOf = (p, now = NOW, cover = null) => P.evidence(p, { ...content, now, cover }).problems;
   const PLAYER = { experience: "player", playerRank: 12 };
-  const pathOf = (p, now = NOW, extra = {}) => P.learnPath(p, { ...content, course: COURSE, settings: PLAYER, ...extra }, now);
+  const pathOf = (p, now = NOW, extra = {}) => P.practicePath(p, { ...content, course: COURSE, settings: PLAYER, ...extra }, now);
   /** A deterministic generator. */
   const lcg = (seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
 
@@ -83,7 +83,7 @@ export default async function ({ test, assert, root }) {
     let worst = 0;
     for (let d = 0; d < 60; d++) {
       const now = NOW + d * DAY;
-      const list = P.learnPath(p, { ...content, course: COURSE, settings }, now);
+      const list = P.practicePath(p, { ...content, course: COURSE, settings }, now);
       const ev = levelOf(p, now);
       const level = ev.levelOnGrade ? ev.level : 2; // until a grade measures it, the placement stands
       for (const it of list) {

@@ -1,5 +1,5 @@
 /**
- * v6 accessibility: the board for someone who cannot see it.
+ * Accessibility: the board for someone who cannot see it.
  *
  * Two small pieces, both reading the app state the views already render:
  *
@@ -33,8 +33,8 @@ function boardContext() {
   const r = activeReview();
   if (r) return { kind: "review", game: r.game };
   if (state.space === "play" && state.game) return { kind: "play", game: state.game.game };
-  if (state.space !== "learn") return null;
-  const pr = state.learn;
+  if (state.space !== "practice") return null;
+  const pr = state.practice;
   if (pr.view === "problem" && pr.problem) return { kind: "problem", P: pr.problem };
   if (pr.view === "mistake" && pr.mistake) return { kind: "drill", D: pr.mistake, game: pr.mistake.game };
   if (pr.view === "lesson" && pr.lesson?.cur) {
@@ -150,7 +150,7 @@ export function boardKey(e, bv) {
 /* ------------------------------------------------------ announcements */
 
 /** The words for the node the review is on. */
-export function reviewNodeText(r) {
+function reviewNodeText(r) {
   const game = r.game;
   const node = game.current;
   let number = 0;
@@ -192,8 +192,8 @@ export function watch() {
       while (up && up !== now.node) up = up.parent;
       if (up) announce(t("a11y.undone") + t("a11y.sentence") + A.turnText(g.game.turn));
     }
-  } else if (state.space === "learn") {
-    const pr = state.learn;
+  } else if (state.space === "practice") {
+    const pr = state.practice;
     const L = pr.view === "lesson" ? pr.lesson : null;
     if (L) {
       now.lesson = L;

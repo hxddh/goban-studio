@@ -15,7 +15,8 @@
  * A game that was never rated and has no base (assisted, too short, a
  * draw) can always be recorded again: nothing has to be taken back.
  */
-import { normalizeProfile, recordGame } from "./player.js";
+import { normalizeProfile } from "./profile.js";
+import { recordGame } from "./record.js";
 
 /** The state to put back if a game recorded next is counted again. */
 export function rateBase(profile, size) {

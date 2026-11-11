@@ -1,11 +1,11 @@
 /**
- * Screenshot tour for the packaged apps (v4 release checks).
+ * Screenshot tour for the packaged apps (release checks).
  *
  * `scripts/tour-app.mjs` launches a packaged build with GOBAN_TOUR_OUT set.
  * The host reports that path through `studio.selftest` ({tour}), and the
  * page walks through its main screens with the app's own controller:
  *
- *   Play → a 19×19 game → its review → Learn → Settings
+ *   Play → a 19×19 game → its review → Practice → Settings
  *
  * For each screen it writes `{step, name, total}` to the tour path and
  * waits until the script has captured the window and written the same
@@ -47,8 +47,8 @@ export const STEPS = [
     go: () => C.reviewCurrentGame(),
   },
   {
-    name: "learn",
-    go: () => C.goSpace("learn"),
+    name: "practice",
+    go: () => C.goSpace("practice"),
   },
   {
     name: "settings",

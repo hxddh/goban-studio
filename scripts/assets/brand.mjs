@@ -1,5 +1,5 @@
 /**
- * The Goban Studio mark (v10): two stones in kosumi, the diagonal step, on a
+ * The Goban Studio mark: two stones in kosumi, the diagonal step, on a
  * plain board seen from straight above. One wide cell of grid (two lines
  * each way), a matte slate black stone at the upper left and a shell white
  * stone at the lower right, each on an intersection, each with a soft

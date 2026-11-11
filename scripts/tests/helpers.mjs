@@ -120,7 +120,7 @@ export async function teardown() {
     if (st) {
       st.game = null;
       st.review = null;
-      if (st.learn) st.learn = { ...st.learn, capture: null };
+      if (st.practice) st.practice = { ...st.practice, capture: null };
       if (st.play) st.play = { ...st.play, explorer: null };
       if (st.settings) st.settings = { ...st.settings, liveAnalysis: false };
     }
@@ -351,7 +351,7 @@ export function reportGame({ losses = {}, source = "katago", result = "W+R" } = 
 }
 
 
-/* ------------------------------------------------------------ v6 a11y */
+/* ------------------------------------------------------------ A11y */
 
 // A small 9×9 position, rows as drawn (y = 0 is row 9 at the top):
 // black D6 E6 (a group of two), white F6 in atari from black G6 and F7.
@@ -424,7 +424,7 @@ export const EG_DOUBLE = [
 
 
 
-/* ------------------------------------------------- v4 review: stories */
+/* ------------------------------------------------- Review: stories */
 
 /** Sign map from rows of X (Black), O (White) and . (empty), padded to `n`. */
 export function parse(rows, n = 9) {

@@ -1,5 +1,5 @@
 /**
- * Shell: the JS ↔ native contract of `studio.katagoHumanPolicy` (v13,
+ * Shell: the JS ↔ native contract of `studio.katagoHumanPolicy` (
  * docs/strength.md "your moves"). The fake host checks the payload the way
  * src/main.zig parsePolicyRequest does and answers with the exact reply the
  * Zig test "human policy replies are JSON the page reads" expects from

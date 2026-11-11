@@ -3,8 +3,7 @@
  * size and in each mode, and the scales the player's rating lives on.
  * Pure; knows nothing about the player (model/player.js does).
  *
- * Ported from app/strength.js (v6, with the v7 human/strong and v8 13×13
- * measurements) and app/rating.js. Units: θ, Bradley–Terry strength in
+ * Units: θ, Bradley–Terry strength in
  * natural-log units, one fit per board size with the weakest standard level
  * at 0; GoR on the EGF scale (1 dan = 2100, each kyu 100 below). The
  * calibration itself is documented in docs/strength.md.
@@ -35,7 +34,7 @@ export function rankParts(rank) {
  * GoR(θ) = 4100 − K·e^(−θ/20): the EGF curve, anchored as the ladder is
  * (KataGo's human SL rank_10k profile at θ = 11.65 is 10 kyu, GoR 1100).
  */
-// v9: one source for the calibration (opponents.js): the measured levels,
+// One source for the calibration (opponents.js): the measured levels,
 // the θ ↔ GoR scale and its anchor.
 import { ANCHOR_K, MEASURED, gorToTheta, implTheta, thetaToGoR } from "../opponents.js";
 export { ANCHOR_K, MEASURED, gorToTheta, thetaToGoR };
@@ -110,7 +109,7 @@ export function levelTheta(id, { mode = "standard", size = 19, handicap = 0 } = 
 
 /**
  * The measured rank a level plays at (rank encoding as above), on the
- * 19×19 scale the ranks live on: the label v9 shows for that opponent.
+ * 19×19 scale the ranks live on: the label shown for that opponent.
  */
 export function measuredRank(id, { mode = "standard", size = 19 } = {}) {
   const t = levelTheta(id, { mode, size });

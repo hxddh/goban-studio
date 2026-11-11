@@ -29,7 +29,7 @@ const sources = () => {
 /** Every kind of sheet this file opens (kept equal to sheets.jsx by the first check). */
 const SHEETS_TESTED = ["confirm", "importReport", "level", "newGame", "onboarding", "rename", "settings", "sgfGames", "shortcuts"];
 /**
- * Every pane of Settings, in order (kept equal to sheets.jsx SETTINGS_PANES
+ * Every pane of Settings, in order (kept equal to settings-sheet.jsx SETTINGS_PANES
  * by the first check), with what each must hold: selector → how many.
  * (The fake host is a packaged app: the data folder row is there.)
  */
@@ -46,7 +46,8 @@ const SETTINGS_PANES_TESTED = {
 const MENUS_TESTED = {
   '"play-more"': ["Redo", "Hint", "Review so far", "Count", "Save to library", "Export SGF", "Focus mode", "Resign"],
   '"rec-" + g.id': ["Rename", "Export SGF", "Delete"],
-  // These three are opened, item by item, in play-library.mjs and play-edits.mjs.
+  // These four are opened, item by item, in play-library.mjs and play-edits.mjs.
+  '"lib-sort"': ["Newest first", "Oldest first", "By result"],
   '"unf-" + g.id': ["Look at it", "Export SGF", "Delete"],
   '"lib-import"': ["Choose files…", "Paste SGF"],
   '"review-result"': ["Count again"],
@@ -223,10 +224,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     for (const k of opened) assert(kinds.includes(k), `a sheet of kind "${k}" is opened somewhere, but sheets.jsx has no such kind`);
     for (const k of kinds) assert(opened.has(k), `no code opens a "${k}" sheet`);
     // Every pane of Settings.
-    const paneTable = /const SETTINGS_PANES = \[([\s\S]*?)\];/.exec(sheets);
-    assert(paneTable, "sheets.jsx: SETTINGS_PANES was not found");
+    const paneTable = /const SETTINGS_PANES = \[([\s\S]*?)\];/.exec(all.find((s) => s.file === "app/settings-sheet.jsx").text);
+    assert(paneTable, "settings-sheet.jsx: SETTINGS_PANES was not found");
     const paneIds = [...paneTable[1].matchAll(/id:\s*"(\w+)"/g)].map((m) => m[1]);
-    assert(JSON.stringify(paneIds) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `Settings panes in sheets.jsx: ${paneIds} — tested here: ${Object.keys(SETTINGS_PANES_TESTED)}`);
+    assert(JSON.stringify(paneIds) === JSON.stringify(Object.keys(SETTINGS_PANES_TESTED)), `Settings panes in settings-sheet.jsx: ${paneIds} — tested here: ${Object.keys(SETTINGS_PANES_TESTED)}`);
     // Every menu.
     const menus = [];
     for (const { file, text } of all) {
@@ -866,7 +867,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await seeded();
     // A lesson's text.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-home");
+    await page.waitForSelector(".practice-home");
     const sel = (s) => page.evaluate((q) => getComputedStyle(document.querySelector(q)).userSelect, s);
     assert((await sel(".sidebar .sb-item")) === "none", "a button is not selectable");
     assert((await sel("body")) === "none", "the page as a whole is not");
@@ -892,7 +893,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForFunction((n) => Object.keys(window.__files).filter((k) => k.startsWith("games/")).length === n + 1, before, { timeout: 3000 });
     // A lesson's text is selectable; the board is not.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-home");
+    await page.waitForSelector(".practice-home");
     await page.close();
 
     // A browser that is not driven by a test: nothing on window.

@@ -15,7 +15,7 @@ let scheduled = false;
 
 export const state = {
   ready: false,
-  space: "today", // today | play | learn | library (v12)
+  space: "today", // today | play | practice | library
   settings: null, // data/settings.js
   profile: null, // the one player model (model/player.js), stored as profile.json
   engine: { kind: "offline", name: "", available: false },
@@ -31,12 +31,15 @@ export const state = {
   // finished game turns into its review); kind and query filter the
   // history; explorer is the opening explorer.
   play: { view: "home", kind: "all", query: "" },
-  // Learn: view "home" (the path) or one of its pages (catalog,
+  // Practice: view "home" (the path) or one of its pages (catalog,
   // lesson, problem, topic, mistake, capture, dailyDone); daily is today's session.
-  learn: { view: "home", topic: null, lesson: null, problem: null, daily: null },
+  practice: { view: "home", topic: null, lesson: null, problem: null, daily: null },
+  // What the views remember for the session, not saved: the review's tab,
+  // the Settings pane last shown, the lists opened in full.
+  ui: { reviewTab: "analysis", settingsPane: "general", allGames: false, allUnfinished: false, allClassics: false },
   models: initialModels(), // optional downloads (app/models-ctl.js)
-  bootError: null, // v13: { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
-  storeProblem: null, // v13: the safe state, controller.js storeProblemOf (+ continued)
+  bootError: null, // { kind: "bridge" } when the packaged app has no bridge (app/safety.jsx)
+  storeProblem: null, // The safe state, boot.js storeProblemOf (+ continued)
 };
 
 export function update(fn) {
@@ -63,7 +66,7 @@ export function useAppState() {
 }
 
 /*
- * v13: the game clock ticks four times a second. A tick re-renders only
+ * The game clock ticks four times a second. A tick re-renders only
  * the clocks on screen (play.jsx ClockFace, through useClockTicks), not the
  * whole app and its board; anything else the clock changes (the game ends
  * on time) goes through update() as usual.
@@ -285,7 +288,7 @@ export function runTask(key, fn, opts = {}) {
  * Screen-reader announcement (aria-live). The region is cleared first so the
  * same words are spoken again; announcements made within the same moment
  * are spoken together, in order (`first` puts one ahead: a move before the
- * verdict on it). v6 a11y.
+ * verdict on it).
  */
 let pending = [];
 let flushing = 0;

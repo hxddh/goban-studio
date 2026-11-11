@@ -204,7 +204,13 @@ export function Async({ state: s, label, error, children }) {
 }
 
 /** Popover menu anchored to a "more" button. */
-export function MoreMenu({ id, items, label }) {
+/**
+ * A menu under a button: the "more" button of a row by default; with
+ * `text`, a quiet button that says the choice in force (an order). An item
+ * with `checked` (true or false) is one of a set of choices and shows a
+ * check when it is the one.
+ */
+export function MoreMenu({ id, items, label, icon = "more", text = null }) {
   const open = state.menu === id;
   const ref = useRef(null);
   useEffect(() => {
@@ -212,20 +218,20 @@ export function MoreMenu({ id, items, label }) {
     const close = (e) => {
       if (ref.current && !ref.current.contains(e.target)) update({ menu: null });
     };
-    // v13: registered at once, so the cleanup always removes it. (A timer
+    // Registered at once, so the cleanup always removes it. (A timer
     // here added it after a cleanup that ran first: a listener left behind
     // for every menu closed within the same tick.) The click that opened the
     // menu has already had its pointerdown, so it does not close it.
     document.addEventListener("pointerdown", close);
     // The first item that can be chosen (a disabled first item cannot take the focus).
-    ref.current?.querySelector("[role=menuitem]:not([disabled])")?.focus();
+    ref.current?.querySelector("[role^=menuitem]:not([disabled])")?.focus();
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   const onKey = (e) => {
     // Only an open menu takes keys: with the menu closed and the focus on
     // its button, Esc and the arrows belong to the page (a sheet, a review).
     if (!open) return;
-    const list = [...ref.current.querySelectorAll("[role=menuitem]:not([disabled])")];
+    const list = [...ref.current.querySelectorAll("[role^=menuitem]:not([disabled])")];
     const i = list.indexOf(document.activeElement);
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -235,13 +241,21 @@ export function MoreMenu({ id, items, label }) {
       list[(i - 1 + list.length) % list.length]?.focus();
     } else if (e.key === "Escape") {
       e.stopPropagation();
-      ref.current.querySelector(".icon-btn")?.focus();
+      ref.current.querySelector("[aria-haspopup]")?.focus();
       update({ menu: null });
     }
   };
+  const toggle = () => update({ menu: open ? null : id });
   return (
     <div class="menu-wrap" ref={ref} onKeyDown={onKey}>
-      <IconButton icon="more" label={label || t("common.more")} aria-haspopup="menu" aria-expanded={open} onClick={() => update({ menu: open ? null : id })} />
+      {text ? (
+        <button type="button" class="btn ghost sm menu-btn" aria-label={t("common.labelValue", [label, text])} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+          <Icon name={icon} size={16} />
+          <span>{text}</span>
+        </button>
+      ) : (
+        <IconButton icon={icon} label={label || t("common.more")} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />
+      )}
       {open && (
         <div class="menu" role="menu">
           {items.filter(Boolean).map((it) =>
@@ -250,17 +264,19 @@ export function MoreMenu({ id, items, label }) {
             ) : (
               <button
                 type="button"
-                role="menuitem"
+                role={it.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={it.checked === undefined ? undefined : !!it.checked}
                 class={it.danger ? "danger" : ""}
                 disabled={it.disabled}
                 onClick={() => {
                   // Focus goes back to the menu button, so a sheet the item
-                  // opens returns it there when it closes (v6 a11y).
-                  ref.current?.querySelector(".icon-btn")?.focus();
+                  // opens returns it there when it closes.
+                  ref.current?.querySelector("[aria-haspopup]")?.focus();
                   update({ menu: null });
                   it.onClick();
                 }}
               >
+                {it.checked !== undefined && (it.checked ? <Icon name="check" size={16} /> : <span class="menu-blank" />)}
                 {it.icon && <Icon name={it.icon} size={16} />}
                 <span>{it.label}</span>
                 {it.kbd && <kbd>{it.kbd}</kbd>}
@@ -301,7 +317,7 @@ export function Board({ model, onPlay, onHover, label }) {
     view.current?.setModel({ ...model, lastMark: state.settings?.lastMoveMark !== false });
     expose("__board", view.current);
   });
-  // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
+  // The board's keys and what they say (announcer.js). Arrows and
   // the reading keys work on every board, playable or not.
   const [spoken, setSpoken] = useState("");
   const onKey = (e) => {
@@ -374,7 +390,7 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
     const a = from.current;
     const b = value;
     if (a === b) return;
-    // Reduced motion (§8): the final number at once (v6 a11y).
+    // Reduced motion (§8): the final number at once.
     if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setShown(b);
       from.current = b;
@@ -395,9 +411,9 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
 }
 
 /**
- * v10: a problem's position, small: its diagram (solver.js notation, one
+ * A problem's position, small: its diagram (solver.js notation, one
  * string per row) drawn as a square tile of 32 css px, so the rows of
- * Learn's path that share a title look different. Nothing before the
+ * Practice's path that share a title look different. Nothing before the
  * problem's part has arrived (content.js), the caller shows its icon.
  */
 export function DiagramThumb({ diagram, label = "" }) {

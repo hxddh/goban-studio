@@ -1,5 +1,5 @@
 /**
- * Data, v13 (docs/storage.md): the store's safe state (unreadable files
+ * Data safety (docs/storage.md): the store's safe state (unreadable files
  * are write-blocked, damaged ones copied aside first, a failed list makes
  * everything read-only, a packaged app without its bridge never falls back
  * to localStorage), versions and migrations of the stored files and of
@@ -183,7 +183,7 @@ await test("data safety: a packaged app without its bridge never opens the brows
 });
 
 await test("data safety: storeProblemOf — only the core files put the app in its safe state; resettable only when every one was copied aside", async () => {
-  const { storeProblemOf, CORE_KEYS } = await bundle(['export { storeProblemOf, CORE_KEYS } from "./src/web/js/app/controller.js";']);
+  const { storeProblemOf, CORE_KEYS } = await bundle(['export { storeProblemOf, CORE_KEYS } from "./src/web/js/app/boot.js";']);
   assert.deepEqual(CORE_KEYS, ["settings.json", "profile.json", "current.json"]);
   assert.equal(storeProblemOf({ listFailed: false, failed: [] }), null);
   assert.equal(storeProblemOf({ listFailed: false, failed: [{ key: "batch.json", kind: "read" }] }), null, "a side file is a toast, not the safe state");

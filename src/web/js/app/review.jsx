@@ -3,12 +3,12 @@
  * turns into when a game ends (docs/v9.md, "Two spaces → Play"): the
  * result, the balance chart, the three phases when KataGo analysed the
  * game, the key moments with their stories, trying a moment again,
- * comments and variations. v13: out of play.jsx.
+ * comments and variations. Out of play.jsx.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BLACK, WHITE, coordLabel, formatPoints } from "../rules.js";
 import { areaOf } from "../engine.js";
-import { t, tn } from "../i18n.js";
+import { t, textLang, tn } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { storyText } from "./story.js";
@@ -91,7 +91,7 @@ export function ReviewView() {
   const h = reviewHeading(r);
   return (
     <>
-      <Toolbar crumbs={h.crumbs} title={h.title} sub={h.sub}>
+      <Toolbar crumbs={h.crumbs} title={h.title} titleLang={h.titleLang} sub={h.sub}>
         <ReviewTools />
       </Toolbar>
       <div class="workspace review-layer">
@@ -108,7 +108,7 @@ export function ReviewView() {
 function reviewHeading(r) {
   const meta = r.meta;
   const space = meta.space || "play";
-  const crumbs = [{ label: t(space === "learn" ? "nav.learn" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
+  const crumbs = [{ label: t(space === "practice" ? "nav.practice" : space === "library" ? "nav.library" : "nav.play"), onClick: C.closeReview }];
   let title = t("review.title");
   // A game with a result says it at the top of the panel (ResultLine).
   let sub = "";
@@ -117,7 +117,8 @@ function reviewHeading(r) {
     sub = `${C.tx(meta.classic.blackName)} · ${C.tx(meta.classic.whiteName)} · ${classicYear(meta.classic.date)}`;
   } else if (meta.name) title = meta.name;
   else if (meta.free) title = t("board.free");
-  return { crumbs, title, sub };
+  // A record's own name (often its players) is set in the faces of its script.
+  return { crumbs, title, titleLang: meta.name && !meta.classic ? textLang(meta.name) : null, sub };
 }
 
 /**
@@ -184,7 +185,7 @@ function ReviewNav() {
 
 /**
  * The moments the chart marks: KataGo's key mistakes (with their stories),
- * or the offline estimate's turning points (v6: nothing more), never while
+ * or the offline estimate's turning points (nothing more), never while
  * the analysis is still running.
  */
 function chartMoments(r) {
@@ -579,7 +580,7 @@ function FreeBoardPanel() {
 }
 
 /**
- * A classic's famous moves (v11; v12: written ones only — KataGo's swings
+ * A classic's famous moves (Written ones only — KataGo's swings
  * read as noise, docs/classics-katago.json keeps them for writing more).
  * Each row goes to its move; the note of the move on the board is shown.
  */
@@ -623,7 +624,7 @@ function Moments() {
   if (r.analyzing) return null;
   if (!m || m.confidence === "none") return <p class="muted">{t("report.noAnalysis")}</p>;
   if (m.confidence !== "high") {
-    // v6 honesty: no loss and no better move from the estimate.
+    // Honesty: no loss and no better move from the estimate.
     if (!m.moments.length) return <p class="muted">{t("review.noTurningPoints")}</p>;
     return (
       <section class="key-moves turning-points">
@@ -711,9 +712,6 @@ function TryCard() {
   );
 }
 
-/** Which review tab is open; remembered for the session, not saved. */
-let reviewTab = "analysis";
-
 function ReviewPanel() {
   const r = state.review;
   const meta = r.meta;
@@ -727,9 +725,9 @@ function ReviewPanel() {
     ...(hasSummary ? [{ value: "summary", label: t("review.tab.summary") }] : []),
     { value: "notes", label: t("review.tab.notes") },
   ];
-  const tab = tabs.some((x) => x.value === reviewTab) ? reviewTab : "analysis";
+  const tab = tabs.some((x) => x.value === state.ui.reviewTab) ? state.ui.reviewTab : "analysis";
   const setTab = (v) => {
-    reviewTab = v;
+    state.ui.reviewTab = v;
     update();
   };
   return (
@@ -737,7 +735,7 @@ function ReviewPanel() {
       <ResultLine />
       <Chart />
       <LiveLine />
-      {/* v8: one quiet status line — the analysis, then where the game left the book. */}
+      {/* One quiet status line — the analysis, then where the game left the book. */}
       <p class="fine review-status" aria-live="polite">
         {(r.analyzing || r.engine !== "katago") && (
           <span>{r.analyzing ? t(r.engine === "estimate" ? "review.estimating" : "review.analyzing", [progress]) : t("review.estimateNote")}</span>
@@ -787,7 +785,7 @@ function ReviewPanel() {
 }
 
 /** The game in three phases (KataGo only), per player, and three things to remember. */
-/** v13: "Your moves look like ≈ 12 kyu (8 kyu to 15 kyu)", from the human-style model, when there is a reading. */
+/** "Your moves look like ≈ 12 kyu (8 kyu to 15 kyu)", from the human-style model, when there is a reading. */
 function MoveRankLine() {
   const mr = C.moveRankOf(state.review);
   if (!mr) return null;

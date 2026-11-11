@@ -1,5 +1,5 @@
 /**
- * Optional downloads for the interface (v5). See ../models.js for the
+ * Optional downloads for the interface. See ../models.js for the
  * rules: nothing is fetched unless the player starts a download here; the
  * host fetches only pinned URLs, verifies them and keeps them in the app's
  * data directory.
@@ -18,7 +18,7 @@
  *   stalled   downloading with no progress for 30 s
  *   needed    bytes the disk needs (DiskFull)
  *
- * The engine is told what is installed (`Engine.setModels`); v9: that only
+ * The engine is told what is installed (`Engine.setModels`); That only
  * changes which implementations the opponent ladder can reach
  * (opponents.js), never a mode the player picks.
  */

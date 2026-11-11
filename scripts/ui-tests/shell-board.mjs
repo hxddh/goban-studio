@@ -366,7 +366,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click(".topic-row >> nth=0");
     await page.waitForSelector(".problem-card, .problem-row, .problem-tile");
     await page.click(".problem-card, .problem-row, .problem-tile >> nth=0");
-    await page.waitForFunction(() => window.__state.learn.view === "problem", null, { timeout: 5000 });
+    await page.waitForFunction(() => window.__state.practice.view === "problem", null, { timeout: 5000 });
     await page.waitForSelector(".panel .goal");
     const problem = await inView(page, ["canvas.board", ".panel .goal", ".panel .actions .btn"]);
     assert(allIn(problem).length === 0, `problem: ${allIn(problem).join("; ")}`);

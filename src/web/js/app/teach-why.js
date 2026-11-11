@@ -1,5 +1,5 @@
 /**
- * v8: one plain reason for the teaching warning ("why might this move cost
+ * One plain reason for the teaching warning ("why might this move cost
  * points?") and for the hint ("why this point?").
  *
  * The warning reuses the review's explanation (explain.js explainMistake:

@@ -6,7 +6,7 @@
  *
  * Pure apart from the store it is given; a missing or broken value falls
  * back to the default of that one setting, never to an error, and a number
- * outside its range is brought into it (v13). The file carries the store's
+ * outside its range is brought into it. The file carries the store's
  * format version `v` (data/migrate.js); the settings themselves do not.
  */
 import { SETTINGS_KEY, STORE_V } from "./migrate.js";
@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS = {
   largeText: false,
   teaching: null, // null = decide from the estimate (on for newer players)
   confirmMove: false, // two-click placement
-  confirmProblemMove: false, // v13: two-click placement in problems
+  confirmProblemMove: false, // Two-click placement in problems
   showEval: false, // win-rate bar while playing
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
@@ -39,8 +39,8 @@ export const DEFAULT_SETTINGS = {
   // japanese | chinese | korean; null = never chosen: the rules of the
   // interface language (rulesForLang), read through defaultRulesOf.
   defaultRules: null,
-  captureWins: 0, // capture Go games won (the beginner bridge, Learn)
-  dailySize: 5, // problem items in a day of Learn: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
+  captureWins: 0, // capture Go games won (the beginner bridge, Practice)
+  dailySize: 5, // problem items in a day of Practice: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
   firstCountSeen: false, // the one-time note on the first count was shown
 };
 
@@ -49,8 +49,8 @@ export const DEFAULT_SETTINGS = {
  * opponent is a rank of the ladder (opponents.js RANKS, 30 … 6 dan), the
  * player's own rank 30 kyu … 9 dan.
  */
-export const OPPONENT_RANKS = [-6, 30];
-export const PLAYER_RANKS = [-8, 30];
+const OPPONENT_RANKS = [-6, 30];
+const PLAYER_RANKS = [-8, 30];
 /** Capture Go games won: a count, kept to a sane size. */
 const MAX_COUNT = 1e6;
 

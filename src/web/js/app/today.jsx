@@ -10,18 +10,21 @@
  */
 import { useState } from "preact/hooks";
 import * as Games from "../data/games.js";
-import { PLACEMENT, masteryByTheme, practiceDays, ratingHistory } from "../model/player.js";
+import { PLACEMENT } from "../model/profile.js";
+import { masteryByTheme } from "../model/review.js";
+import { practiceDays, ratingHistory } from "../model/level.js";
 import { GRADES, PROBLEMS } from "../content.js";
-import { t, tn } from "../i18n.js";
+import { t, textLang, tn } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
 import { Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { estimateLabel } from "./estimate-label.js";
-import { ContinueHero, SuggestedHero, gameInProgress, outcome, recordTitle } from "../play/home.jsx";
-import { pathRows } from "../learn/path.jsx";
-import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../learn/progress.js";
-import { milestoneText, reachedMilestones } from "../learn/milestones.js";
+import { ContinueHero, SuggestedHero, gameInProgress } from "../play/home.jsx";
+import { outcome, recordTitle } from "../play/library.jsx";
+import { pathRows } from "../practice/path.jsx";
+import { activeDays, masteryTotals, ratingTrend, recentMilestones, sparkline, themesMet, weekParts } from "../practice/progress.js";
+import { milestoneText, reachedMilestones } from "../practice/milestones.js";
 import { FirstLessonHero } from "./first-run.jsx";
 
 const DAY = 86400000;
@@ -43,9 +46,9 @@ export function weekCounts(now = Date.now(), games = Games.listGames(), problems
 
 /** This week in one line, without its zero parts; the quiet empty line when there is nothing at all. */
 export function weekText(counts) {
-  const parts = weekParts(counts).map((p) => tn(p.key === "games" ? "v13ui.week.games" : "v13ui.week.problems", p.n));
+  const parts = weekParts(counts).map((p) => tn(p.key === "games" ? "today.week.games" : "today.week.problems", p.n));
   if (!parts.length) return t("today.weekNone");
-  return parts.length === 2 ? t("v13ui.week.line", parts) : t("today.weekOne", parts);
+  return parts.length === 2 ? t("today.week.line", parts) : t("today.weekOne", parts);
 }
 
 export function TodayView() {
@@ -92,16 +95,16 @@ function TodayList() {
     // The row the next item is in: a problem is named by its theme there, never by its own name.
     const nextRow = rows.find((r) => r.items.some((it) => !now.done.has(it.key)));
     row = (
-      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""}`} data-row="path" onClick={now.finished ? C.learnHome : C.startPath}>
+      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""}`} data-row="path" onClick={now.finished ? C.practiceHome : C.startPath}>
         <span class="gr-icon">
           <Icon name="practice" size={18} />
         </span>
         <span class="gr-text">
           <strong>{t("today.practice")}</strong>
-          <span>{now.finished ? t("learn.path.doneLine") : nextRow ? t("v13ui.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
+          <span>{now.finished ? t("practice.path.doneLine") : nextRow ? t("common.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
         </span>
         <span class="row-count">{t("practice.ofN", [done, now.items.length])}</span>
-        {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("learn.path.resume") : t("learn.path.start")}</span>}
+        {now.finished ? <Icon name="check" size={16} /> : <span class="row-action">{now.started ? t("practice.path.resume") : t("practice.path.start")}</span>}
       </button>
     );
   }
@@ -131,7 +134,7 @@ function LevelRow({ est, trend }) {
   return (
     <li class="progress-row" data-row="level">
       <span class="gr-text">
-        <strong>{t("v13ui.labelValue", [t("play.home.level"), label])}</strong>
+        <strong>{t("common.labelValue", [t("play.home.level"), label])}</strong>
         <span>{said}</span>
       </span>
       {sp && (
@@ -275,7 +278,7 @@ function Recent() {
               <button type="button" class="group-row game-row" onClick={() => C.openRecord(g.id)} aria-label={`${recordTitle(g)} · ${o.label}`}>
                 <Thumb thumb={g.thumb} size={g.size} />
                 <span class="gr-text">
-                  <strong>{recordTitle(g)}</strong>
+                  <strong lang={textLang(recordTitle(g)) || undefined}>{recordTitle(g)}</strong>
                   <span>
                     {g.size} × {g.size} · {tn("play.moveN", g.moves)}
                   </span>

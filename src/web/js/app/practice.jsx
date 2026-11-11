@@ -1,5 +1,5 @@
 /**
- * Practice's pages (its home is the path, learn/path.jsx, with the catalog
+ * Practice's pages (its home is the path, practice/path.jsx, with the catalog
  * below it): lessons, problems, a topic as a grid of positions, drills of
  * your own mistakes, and the quiet end of today's session.
  *
@@ -13,14 +13,14 @@ import { state, update } from "./store.js";
 import * as C from "./controller.js";
 import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
-import { LearnHome, whyText } from "../learn/path.jsx";
-import { CatalogView } from "../learn/catalog.jsx";
-import { PositionTile } from "../learn/tile.jsx";
-import { cleanFirst, comesBackIn, problemStatus } from "../learn/progress.js";
+import { PracticeHome, whyText } from "../practice/path.jsx";
+import { CatalogView } from "../practice/catalog.jsx";
+import { PositionTile } from "../practice/tile.jsx";
+import { cleanFirst, comesBackIn, problemStatus } from "../practice/progress.js";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
 export function PracticeView() {
-  const v = state.learn.view;
+  const v = state.practice.view;
   if (v === "lesson") return <LessonView />;
   if (v === "problem") return <ProblemView />;
   if (v === "topic") return <TopicPage />;
@@ -28,13 +28,13 @@ export function PracticeView() {
   if (v === "dailyDone") return <SessionDone />;
   if (v === "capture") return <CaptureView />;
   if (v === "catalog") return <CatalogView />;
-  return <LearnHome />;
+  return <PracticeHome />;
 }
 
 /** The toolbar's subtitle inside today's session: "Today 2 of 6". */
-export function sessionSub() {
+function sessionSub() {
   const at = C.sessionPlace();
-  return at ? t("learn.session.of", [at.n, at.total]) : "";
+  return at ? t("practice.session.of", [at.n, at.total]) : "";
 }
 
 /** The panel's eyebrow inside today's session: why this item is in the path. */
@@ -115,7 +115,7 @@ function ProblemGrid({ items, numberOf }) {
         const n = numberOf(x);
         const name = C.nameKnown(x.id) ? C.tx(x.title) : "";
         const toMove = C.defToMove(x);
-        const label = [name ? t("v13ui.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
+        const label = [name ? t("common.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
         return (
           <button type="button" class={`problem-card ${status}`} data-status={status} tabIndex={i === at ? 0 : -1} aria-label={label} title={name || undefined} onFocus={() => setAt(i)} onClick={() => C.openProblem(x.id)}>
             <PositionTile def={x} />
@@ -133,22 +133,22 @@ function ProblemGrid({ items, numberOf }) {
 }
 
 function TopicPage() {
-  const topic = state.learn.topic;
-  const theme = state.learn.theme;
-  const shape = state.learn.shape;
+  const topic = state.practice.topic;
+  const theme = state.practice.theme;
+  const shape = state.practice.shape;
   const all = shape ? C.problemsOfShape(shape) : C.problemsOfTopic(topic);
   const themes = [...new Set(all.map((x) => x.theme).filter(Boolean))];
   const list = theme ? all.filter((x) => x.theme === theme) : all;
   const p = state.profile;
   const byGrade = [1, 2, 3, 4, 5].map((g) => ({ g, items: list.filter((x) => C.gradeOf(x.id) === g) })).filter((x) => x.items.length);
-  const setTheme = (th) => update((s) => (s.learn = { ...s.learn, theme: th }));
+  const setTheme = (th) => update((s) => (s.practice = { ...s.practice, theme: th }));
   // Grades fold away: the first grade with unsolved problems starts open.
   const firstOpen = byGrade.find(({ items }) => items.some((x) => !p.problems[x.id]?.solved))?.g ?? byGrade[0]?.g;
   const [openGrades, setOpenGrades] = useState([firstOpen]);
   const numbers = new Map(all.map((x, i) => [x.id, i + 1]));
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={shape ? C.shapeName(shape) : t("topic." + topic)} />
     <div class="page topic-page">
       <header class="page-head">
         <h1>{shape ? C.shapeName(shape) : t("topic." + topic)}</h1>
@@ -187,11 +187,11 @@ function TopicPage() {
 }
 
 function MistakeView() {
-  const D = state.learn.mistake;
+  const D = state.practice.mistake;
   const m = D.m;
   const game = D.game;
   const node = game.current;
-  const daily = state.learn.daily;
+  const daily = state.practice.daily;
   const marks = [];
   if (D.status === "wrong" || D.status === "same") marks.push({ ...D.last, type: "cross", tone: "bad" });
   if (D.status === "revealed" || D.status === "right") for (const a of m.accept || [m.best]) marks.push({ ...a, type: "circle", tone: "good" });
@@ -213,7 +213,7 @@ function MistakeView() {
     D.status === "right" ? t("mistakes.right") : D.status === "same" ? t("mistakes.same") : D.status === "wrong" ? t("mistakes.wrong") : D.status === "revealed" ? t("mistakes.revealed") : t("mistakes.prompt", [formatLoss(m.loss)]);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("mistakes.title")} sub={sessionSub()} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("mistakes.title")} sub={sessionSub()} />
     <div class="workspace">
       <section class="stage" aria-label={t("mistakes.title")}>
         <Board model={model} onPlay={C.practicePlay} />
@@ -411,25 +411,25 @@ function ProblemResult({ P, placing }) {
   if (!named && back == null) return null;
   return (
     <div class="result-lines">
-      {named && <p class="result-name">{t("v13ui.labelValue", [t("practice.thisProblem"), C.tx(P.def.title)])}</p>}
+      {named && <p class="result-name">{t("common.labelValue", [t("practice.thisProblem"), C.tx(P.def.title)])}</p>}
       {back != null && <p class="fine come-back">{back === 1 ? t("practice.backTomorrow") : t("practice.backInDays", [back])}</p>}
     </div>
   );
 }
 
 function ProblemView() {
-  const pr = state.learn;
+  const pr = state.practice;
   const P = pr.problem;
   const def = P.def;
   const placing = C.placementPlace();
   const daily = pr.daily || placing;
-  const list = state.learn.theme ? C.problemsOfTheme(state.learn.theme) : C.problemsOfTopic(def.topic);
+  const list = state.practice.theme ? C.problemsOfTheme(state.practice.theme) : C.problemsOfTopic(def.topic);
   const n = list.findIndex((x) => x.id === def.id) + 1;
   const grade = C.gradeOf(def.id);
   const named = C.problemNamed(P);
   const done = P.status === "won" || !!P.answer;
   useEnterToContinue(done, C.nextProblem);
-  const crumbs = [{ label: t("nav.learn"), onClick: C.learnHome }];
+  const crumbs = [{ label: t("nav.practice"), onClick: C.practiceHome }];
   if (!daily) crumbs.push({ label: t("topic." + def.topic), onClick: () => C.openTopic(def.topic) });
   return (
     <>
@@ -471,7 +471,7 @@ function ProblemView() {
 }
 
 function LessonView() {
-  const L = state.learn.lesson;
+  const L = state.practice.lesson;
   // Lesson complete, with its bridge into a game (beginner.jsx).
   return L.finished ? <LessonDone L={L} /> : <LessonStep L={L} />;
 }
@@ -518,7 +518,7 @@ function LessonStep({ L }) {
   const goal = C.stepGoalText(cur);
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={C.tx(L.lesson.title)} sub={sessionSub() || C.tx(L.unit.title)} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={C.tx(L.lesson.title)} sub={sessionSub() || C.tx(L.unit.title)} />
     <div class="workspace">
       <section class="stage" aria-label={C.tx(L.lesson.title)}>
         {model ? <Board model={model} onPlay={onPlay} /> : <div class="board-placeholder" />}
@@ -580,17 +580,17 @@ function LessonStep({ L }) {
 function SessionDone() {
   return (
     <>
-    <Toolbar crumbs={[{ label: t("nav.learn"), onClick: C.learnHome }]} title={t("learn.path.doneToday")} />
+    <Toolbar crumbs={[{ label: t("nav.practice"), onClick: C.practiceHome }]} title={t("practice.path.doneToday")} />
     <div class="page center-page">
       <section class="card celebrate session-done">
-        <h1>{t("learn.path.doneToday")}</h1>
-        <p class="muted">{t("learn.path.doneLine")}</p>
+        <h1>{t("practice.path.doneToday")}</h1>
+        <p class="muted">{t("practice.path.doneLine")}</p>
         <div class="actions center wrap">
-          <Button kind="primary" onClick={C.learnHome}>
-            {t("learn.backHome")}
+          <Button kind="primary" onClick={C.practiceHome}>
+            {t("practice.backHome")}
           </Button>
           <Button kind="ghost" onClick={C.openCatalog}>
-            {t("learn.catalog")}
+            {t("practice.catalog")}
           </Button>
         </div>
       </section>

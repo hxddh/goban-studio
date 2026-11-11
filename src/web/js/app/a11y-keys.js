@@ -1,5 +1,5 @@
 /**
- * v6 accessibility: keyboard conventions the views share.
+ * Accessibility: keyboard conventions the views share.
  *
  *  - Radio groups (segmented controls, the language grid, board swatches,
  *    filter chips, new-game choices): ← → ↑ ↓ move to the next option and
@@ -12,7 +12,7 @@ import { setSetting } from "./ctl-core.js";
 
 const NEXT = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
-export function radioKeys(e) {
+function radioKeys(e) {
   const d = NEXT[e.key];
   if (!d || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
   const el = e.target;

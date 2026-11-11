@@ -1,5 +1,5 @@
 /**
- * Shell, v13 data safety in the browser (docs/storage.md): a settings file
+ * Shell, data safety in the browser (docs/storage.md): a settings file
  * that cannot be read puts the app in its safe state (no onboarding,
  * nothing written, Retry / Continue read-only / Start over, the damaged
  * file copied aside first); a game in progress replaced by New game waits
@@ -37,7 +37,7 @@ function failingExportHost() {
         delete window.__files[p.key];
         return true;
       }
-      // The save dialog is the host's own command (v13); the write then fails.
+      // The save dialog is the host's own command; the write then fails.
       if (command === "studio.saveFileDialog") return "/read-only/game.sgf";
       if (command === "studio.writeTextFile") {
         window.__writes.push(p.path);
@@ -73,7 +73,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.click("[data-safe=readonly]");
     await page.waitForSelector(".safe-banner");
     await page.keyboard.press("Control+2");
-    // v13: no game is made up at launch; Play's home offers the suggested game.
+    // No game is made up at launch; Play's home offers the suggested game.
     await page.click(".play-home .hero .btn.primary");
     await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 10);
     await clickPoint(page, 3, 3);

@@ -1,14 +1,14 @@
 /**
- * The intermediate course (v5): units 9–15 (v13 adds ko fighting and judging
- * the position), appended to the beginner course
+ * The intermediate course: units 9–15 (ko fighting and judging
+ * the position among them), appended to the beginner course
  * in ./course.js. Same step schema (read / place / problem; see course.js).
- * v6 adds two lessons to the fighting unit: the leaning attack and sabaki.
+ * Adds two lessons to the fighting unit: the leaning attack and sabaki.
  *
  * Opening and joseki steps are drawn on a 19×19 board: a whole-board
  * diagram shows the whole board, a smaller diagram in a corner shows a
  * window around it (the app frames the diagram's '.' points, its stones,
  * its marks and every accept point). Joseki diagrams number the moves of
- * the sequence with label marks. v13: endgame steps are endgame problems
+ * the sequence with label marks. Endgame steps are endgame problems
  * on sealed sides of a 19×19 board, counted exactly by the solver; the ko
  * and judgement units (14–15) play on closed 9×9 games.
  *
@@ -127,14 +127,14 @@ const J33_MIRROR = win(9, 9, [[3, 3], [2, 3], [4, 2], [5, 1]], [[2, 2], [3, 2], 
 /* --------------------------------------------------------- endgame boards */
 
 /*
- * v13: the endgame unit is rebuilt on closed positions. Every interactive
+ * The endgame unit is rebuilt on closed positions. Every interactive
  * step is an endgame problem (goal "endgame"): a stretch of the lower side
  * where the walls are settled and only the boundary is open, counted
  * exactly by the solver's counting mode (Japanese counting, see solver.js),
  * so the best move, its margin and every value in the text are proved by
  * scripts/check-course.mjs. ':' points are territory that is counted but
- * never played. The v5 boards were a few stones on an open 9×9, where
- * KataGo's best move was an invasion the lesson was not about
+ * never played. A few stones on an open 9×9 would not do: there
+ * KataGo's best move is an invasion the lesson is not about
  * (docs/lesson-audit.md).
  */
 
@@ -279,7 +279,7 @@ function egBoard(diagram, marks = [], stones = []) {
 /* ------------------------------------------------------ ko and judgement boards */
 
 /*
- * v13: the ko and judgement units are played on finished-looking 9×9 games
+ * The ko and judgement units are played on finished-looking 9×9 games
  * (the walls of unit 8's game, every area closed), so a place step's answer
  * is the move that matters on the whole board, not a local idea on an empty
  * board. The problem steps are proved by the solver on the whole 9×9.
@@ -1205,7 +1205,7 @@ export const INTERMEDIATE = [
             ),
             board: J33_MIRROR,
             toMove: BLACK,
-            // v8: E16 (the other cutting point, between the hane and the block) is as good (KataGo).
+            // E16 (the other cutting point, between the hane and the block) is as good (KataGo).
             accept: pts([5, 2], [5, 3], [4, 3]),
             success: L("方向不同，道理一样。", "A different direction, the same reasoning.", "방향은 달라도 이치는 같습니다.", "向きが違っても、理屈は同じです。"),
             wrong: L(
@@ -2111,7 +2111,7 @@ export const INTERMEDIATE = [
           },
         ],
       },
-      // v6: leaning attack and sabaki. The tactical steps are proved by the
+      // Leaning attack and sabaki. The tactical steps are proved by the
       // solver; the claims about the stones gained by leaning were checked
       // too (without them, the capture fails).
       {
@@ -2236,7 +2236,7 @@ export const INTERMEDIATE = [
       },
     ],
   },
-  /* ======================================================== UNIT 14 (v13) */
+  /* ======================================================== UNIT 14 */
   {
     id: "ko-fighting",
     level: "intermediate",
@@ -2449,7 +2449,7 @@ export const INTERMEDIATE = [
       },
     ],
   },
-  /* ======================================================== UNIT 15 (v13) */
+  /* ======================================================== UNIT 15 */
   {
     id: "judgement",
     level: "intermediate",

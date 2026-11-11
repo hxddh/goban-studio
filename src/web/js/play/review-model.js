@@ -21,7 +21,7 @@
  *     takeaways: [{ kind, key, params, tone, index?, theme?, topic? }],
  *     moments: [{ index, color, played, best, loss, theme, why, thumb, accept }] }
  *
- * Honesty rules (v6):
+ * Honesty rules:
  *   - With the low-confidence offline estimate the per-phase numbers, the
  *     takeaways and the size of each loss are left out: the estimate can
  *     only point at the turning points (turningPoints), which keep their
@@ -36,7 +36,7 @@ import { MISTAKE, summarizeGame } from "../app/summary.js";
 export { MISTAKE };
 export const REVIEW_VERSION = 2;
 /** At most this many key moments, and this many of them to try again. */
-export const MOMENTS = 3;
+const MOMENTS = 3;
 export const MAX_TRIES = 3;
 
 const KEY = { [BLACK]: "black", [WHITE]: "white" };

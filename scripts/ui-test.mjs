@@ -92,7 +92,7 @@ function assert(cond, msg) {
 
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 
-// v4 uses system fonts, which differ between machines. Visual baselines are
+// Uses system fonts, which differ between machines. Visual baselines are
 // taken with one pinned font (Inter, tests/fonts, never shipped) so they
 // compare the layout rather than the font installed on the runner.
 const PINNED_FONT = fs.readFileSync(path.join(root, "tests/fonts/inter-latin-wght-normal.woff2")).toString("base64");
@@ -166,15 +166,15 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.click(".today .hero .btn.primary");
   await page.waitForFunction(() => window.__state.space !== "today");
   await page.waitForSelector("canvas.board, .page");
-  // v10: someone who knows the rules is offered the placement quiz on Learn's
+  // Someone who knows the rules is offered the placement quiz on Practice's
   // home; checks that are not about it answer "Not now" first, then come back.
   if (choice >= 1 && !placement) {
     const space = await page.evaluate(() => window.__state.space);
     await page.keyboard.press("Control+3");
     await page.click(".placement-offer .link");
-    await page.waitForSelector(".learn-path .path-row");
+    await page.waitForSelector(".practice-path .path-row");
     await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:profile.json") || "{}").placement?.skipped === true, null, { timeout: 3000 });
-    await page.keyboard.press(space === "play" ? "Control+2" : space === "learn" ? "Control+3" : space === "library" ? "Control+4" : "Control+1");
+    await page.keyboard.press(space === "play" ? "Control+2" : space === "practice" ? "Control+3" : space === "library" ? "Control+4" : "Control+1");
     await page.waitForFunction((sp) => window.__state.space === sp, space);
   }
   // The store writes a moment later (data/store.js): onboarding is on disk before a test reloads.
@@ -365,7 +365,7 @@ await check("a wrong answer shows the refutation, then resets for another try", 
   await page.click(".topic-row >> nth=0");
   await page.click(".problem-card >> nth=0");
   const wrong = await page.evaluate(() => {
-    const P = window.__state.learn.problem;
+    const P = window.__state.practice.problem;
     const S = window.__solver;
     const correct = S.solveFirstMoves(P.pz).correct.map((m) => m.x + "," + m.y);
     const st = P.st;
@@ -381,11 +381,11 @@ await check("a wrong answer shows the refutation, then resets for another try", 
   assert(wrong, "no wrong move found");
   await clickPoint(page, wrong.x, wrong.y);
   await page.waitForSelector(".feedback.bad");
-  await page.waitForFunction(() => window.__state.learn.problem.feedback === "retry", null, { timeout: 4000 });
+  await page.waitForFunction(() => window.__state.practice.problem.feedback === "retry", null, { timeout: 4000 });
   await page.close();
 });
 
-await check("history: back and forward across the two spaces", async () => {
+await check("history: back and forward across the spaces", async () => {
   const page = await fresh();
   await onboard(page, 1);
   // Back and forward are checked every run; the timing is of Back.
@@ -395,7 +395,7 @@ await check("history: back and forward across the two spaces", async () => {
     await page.waitForFunction(() => window.__state.space === "play");
     const t0 = Date.now();
     await page.keyboard.press("Control+[");
-    await page.waitForFunction(() => window.__state.space === "learn");
+    await page.waitForFunction(() => window.__state.space === "practice");
     const ms = Date.now() - t0;
     await page.keyboard.press("Control+]");
     await page.waitForFunction(() => window.__state.space === "play" && window.__state.play.view === "game");
@@ -413,11 +413,11 @@ await check("history: Back from a shape problem returns to its collection", asyn
   await page.waitForSelector(".problem-card");
   const before = await page.locator(".problem-card").count();
   await page.click(".problem-card >> nth=0");
-  await page.waitForFunction(() => window.__state.learn.view === "problem");
+  await page.waitForFunction(() => window.__state.practice.view === "problem");
   await page.keyboard.press("Control+[");
-  await page.waitForFunction(() => window.__state.learn.view === "topic");
+  await page.waitForFunction(() => window.__state.practice.view === "topic");
   const after = await page.locator(".problem-card").count();
-  const shape = await page.evaluate(() => window.__state.learn.shape);
+  const shape = await page.evaluate(() => window.__state.practice.shape);
   assert(shape && after === before && after > 0, `collection lost on Back: shape=${shape}, ${after} of ${before} problems`);
   await page.close();
 });
@@ -432,7 +432,7 @@ await check("all four languages render every place without overflow or missing s
       await page.waitForTimeout(50);
       const bad = await page.evaluate(() => {
         const text = document.body.innerText;
-        const raw = text.match(/\b[a-z]+\.[a-zA-Z]+(\.[a-zA-Z]+)?\b/g)?.filter((s) => /^(nav|play|review|practice|library|learn|settings|teach|summary|common|score|error|goal|grade|topic|mistakes|explain|time|newGame|menu|store)\./.test(s));
+        const raw = text.match(/\b[a-z]+\.[a-zA-Z]+(\.[a-zA-Z]+)?\b/g)?.filter((s) => /^(nav|play|review|practice|library|settings|teach|summary|common|score|error|goal|grade|topic|mistakes|explain|time|newGame|menu|store)\./.test(s));
         const over = [...document.querySelectorAll(".btn, .sb-item, .chip, .segmented button")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim());
         // docs/design.md §1: one primary action per screen.
         const visible = (el) => el.offsetParent !== null && el.getBoundingClientRect().width > 0;
@@ -448,13 +448,13 @@ await check("all four languages render every place without overflow or missing s
   }
 });
 
-await check("v6 explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
+await check("explorer: opens from the Library, a book move shows candidates, out of the book is said", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+4");
   await page.click('.collection-row[data-explorer="whole"]');
   await page.waitForSelector(".explorer-panel");
-  // v8: onboarding plays on 9×9 now; wait for the explorer's own 19×19 board.
+  // Onboarding plays on 9×9 now; wait for the explorer's own 19×19 board.
   await page.waitForFunction(() => window.__board?.model.size === 19 && window.__board.geom?.cell > 0);
   const start = await page.locator(".explorer-row").count();
   assert(start > 0, "no candidates on the empty board");
@@ -490,7 +490,7 @@ await check("v6 explorer: opens from the Library, a book move shows candidates, 
   await page.close();
 });
 
-/* --------------------------------------------------------- v6 a11y */
+/* --------------------------------------------------------- A11y */
 
 // The in-page audit (scripts/a11y-audit.js): names, ids, references,
 // pointer-only controls, unnamed images, landmarks, contrast.
@@ -547,7 +547,7 @@ async function newTwoPlayer9(page) {
 }
 
 for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
-  await check(`v6 a11y: every place passes the audit (${locale}, ${scheme})`, async () => {
+  await check(`a11y: every place passes the audit (${locale}, ${scheme})`, async () => {
     const page = await fresh(locale);
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto(origin + "/");
@@ -599,7 +599,7 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
   });
 }
 
-await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
+await check("a11y: every Tab stop shows a focus ring (§10)", async () => {
   const page = await fresh();
   await onboard(page, 1);
   const missing = [];
@@ -637,7 +637,7 @@ await check("v6 a11y: every Tab stop shows a focus ring (§10)", async () => {
 });
 
 for (const locale of ["en-US", "zh-CN"]) {
-  await check(`v6 a11y: the board speaks — moves, points, last move, turn, rows (${locale})`, async () => {
+  await check(`a11y: the board speaks — moves, points, last move, turn, rows (${locale})`, async () => {
     const page = await fresh(locale);
     await onboard(page, 1);
     const L = await page.evaluate(() => window.__state.settings.lang);
@@ -678,7 +678,7 @@ for (const locale of ["en-US", "zh-CN"]) {
   });
 }
 
-await check("v6 a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
+await check("a11y: problems say the goal, the reply and the verdict; lessons read their step", async () => {
   const page = await fresh();
   await onboard(page, 1);
   await page.keyboard.press("Control+3");
@@ -690,12 +690,12 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   await page.keyboard.press("t");
   await hear(page, "board", goal, "T");
   const right = await page.evaluate(() => {
-    const P = window.__state.learn.problem;
+    const P = window.__state.practice.problem;
     return window.__solver.solveFirstMoves(P.pz).correct[0];
   });
   await listen(page);
   await clickPoint(page, right.x, right.y);
-  await page.waitForFunction(() => window.__state.learn.problem.status !== "open" || window.__state.learn.problem.feedback === "keep", null, { timeout: 4000 });
+  await page.waitForFunction(() => window.__state.practice.problem.status !== "open" || window.__state.practice.problem.feedback === "keep", null, { timeout: 4000 });
   await page.waitForTimeout(150);
   const heard = await page.evaluate(() => window.__heard);
   const verdict = await page.evaluate(() => document.querySelector(".feedback")?.textContent.trim());
@@ -708,7 +708,7 @@ await check("v6 a11y: problems say the goal, the reply and the verdict; lessons 
   await page.close();
 });
 
-await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc", async () => {
+await check("a11y: radio groups take arrow keys, menus give focus back on Esc", async () => {
   const page = await fresh();
   await onboard(page, 1);
   // A segmented control (New game: the opponent).
@@ -750,7 +750,7 @@ await check("v6 a11y: radio groups take arrow keys, menus give focus back on Esc
 });
 
 /* ---------------------------------------------------------- area checks */
-// Each area keeps its browser checks in scripts/ui-tests/*.mjs (by area: shell-*, play-*, learn-*).
+// Each area keeps its browser checks in scripts/ui-tests/*.mjs (by area: shell-*, play-*, practice-*).
 for (const f of fs.readdirSync(path.join(root, "scripts/ui-tests")).filter((n) => n.endsWith(".mjs")).sort()) {
   const mod = await import("./ui-tests/" + f);
   await mod.default({ check, assert, fresh, onboard, firstLanding, clickPoint, pointOf, origin, browser, audit, medianOf });
@@ -788,8 +788,8 @@ for (const vp of [
     out.push(await snap(page, `today-${vp.tag}`, [".today .page-head", ".today-row .gr-text span"]));
     // Practice: the path (its problems change with the day), then the course and the problems.
     await page.keyboard.press("Control+3");
-    await page.waitForSelector(".learn-home .catalog .topic-row");
-    out.push(await snap(page, `learn-${vp.tag}`, [".learn-path .path-list"]));
+    await page.waitForSelector(".practice-home .catalog .topic-row");
+    out.push(await snap(page, `practice-${vp.tag}`, [".practice-path .path-list"]));
     // The Library: your games (empty: nothing saved), the classics, the explorer.
     await page.keyboard.press("Control+4");
     await page.waitForSelector(".library-home");

@@ -10,7 +10,8 @@ const A = await bundle([
   'export { state } from "./src/web/js/app/store.js";',
   'export { DEFAULT_SETTINGS } from "./src/web/js/data/settings.js";',
   'export * as PM from "./src/web/js/model/player.js";',
-  'export { classicYear, CLASSICS_SHOWN } from "./src/web/js/play/home.jsx";',
+  'export { classicYear } from "./src/web/js/app/play.jsx";',
+  'export { CLASSICS_SHOWN } from "./src/web/js/play/library.jsx";',
   'export { CLASSICS } from "./src/web/js/content/classics.js";',
   'export { weekCounts } from "./src/web/js/app/today.jsx";',
 ]);
@@ -84,7 +85,7 @@ await test("classics: the moments are the famous moves, written in four language
       assert.ok(Number.isInteger(mo.index) && mo.index >= 1 && mo.index <= n, `${c.id} ${mo.index}`);
       if (i) assert.ok(mo.index > ms[i - 1].index, `${c.id}: moments in game order`);
       for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
-      // v12: written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
+      // Written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
       const mv = byId[c.id].moves[mo.index - 1];
       if (mo.claim === "mistake") assert.ok(mv.loss >= 3, `${c.id} ${mo.index}: a mistake loses ${mv.loss}`);
       if (mo.claim === "best") assert.ok(mv.move === mv.best || mv.loss <= 1, `${c.id} ${mo.index}: best move loses ${mv.loss}`);
@@ -96,20 +97,20 @@ await test("classics: the moments are the famous moves, written in four language
 
 await test("play review to practice: a theme takeaway opens an unsolved problem of that theme near the level; Next stays in the theme", async () => {
   player(12);
-  state.learn = { view: "home", topic: null, theme: null, lesson: null, problem: null, daily: null, placement: null };
+  state.practice = { view: "home", topic: null, theme: null, lesson: null, problem: null, daily: null, placement: null };
   await C.practiseTheme("cut", "connect");
-  assert.equal(state.learn.view, "problem");
-  const first = state.learn.problem.def;
+  assert.equal(state.practice.view, "problem");
+  const first = state.practice.problem.def;
   assert.equal(first.theme, "cut");
-  assert.equal(state.learn.theme, "cut");
+  assert.equal(state.practice.theme, "cut");
   // Solved ones are passed over.
   state.profile = { ...state.profile, problems: { ...state.profile.problems, [first.id]: { solved: true, tries: 1, last: 1 } } };
   await C.practiseTheme("cut", "connect");
-  assert.notEqual(state.learn.problem.def.id, first.id);
+  assert.notEqual(state.practice.problem.def.id, first.id);
   C.nextProblem();
-  assert.equal(state.learn.problem.def.theme, "cut", "Next stays in the theme");
+  assert.equal(state.practice.problem.def.theme, "cut", "Next stays in the theme");
   // A theme with too few problems falls back to its topic.
   await C.practiseTheme("no-such-theme", "capture");
-  assert.equal(state.learn.problem.def.topic, "capture");
-  assert.equal(state.learn.theme, null);
+  assert.equal(state.practice.problem.def.topic, "capture");
+  assert.equal(state.practice.theme, null);
 });

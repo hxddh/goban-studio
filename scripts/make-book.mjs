@@ -2,7 +2,7 @@
  * Build the opening and joseki book (src/web/js/content/book.json) with
  * KataGo's analysis engine.
  *
- * v7: the book is built on GitHub's runners (.github/workflows/book.yml) in
+ * The book is built on GitHub's runners (.github/workflows/book.yml) in
  * three phases, so the work splits over parallel jobs:
  *
  *   seed    one tree's top levels, searched in full; the positions just
