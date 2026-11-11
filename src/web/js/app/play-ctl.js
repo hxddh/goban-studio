@@ -140,7 +140,7 @@ export function saveToLibrary({ quiet = false } = {}) {
   g.saved = true;
   persistCurrent();
   update();
-  if (!quiet) toast(t("toast.saved"));
+  if (!quiet) toast(t("toast.saved"), "success");
   return rec;
 }
 
@@ -958,7 +958,7 @@ export async function saveText(filename, text, mime = "text/plain", { done = t("
     const chosen = normalizePaths(path)[0];
     if (chosen && (await writeTextFile(chosen, text))) {
       revealPath(chosen);
-      toast(done);
+      toast(done, "success");
       return true;
     }
     toast(t("v13.exportFailed"), "error", 6000);
@@ -973,7 +973,7 @@ export async function saveText(filename, text, mime = "text/plain", { done = t("
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast(done);
+  toast(done, "success");
   return true;
 }
 

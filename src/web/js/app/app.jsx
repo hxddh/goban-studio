@@ -13,32 +13,23 @@ import { t } from "../i18n.js";
 import * as Host from "../host.js";
 import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeOpenFiles } from "../host.js";
 import { state, update, useAppState, toast } from "./store.js";
+import { CrashProbe, ErrorBoundary, TaskNotice, Toasts, crashRender, installErrorHandlers } from "./feedback.jsx";
+import { matchShortcut, menuKey } from "./shortcuts.js";
+import { expose } from "./debug.js";
 import { store } from "../data/store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
-import { SPACES, Sidebar, isFocus } from "./chrome.jsx";
+import { Sidebar, isFocus } from "./chrome.jsx";
 import { PlayView } from "./play.jsx";
 import { ReviewView } from "./review.jsx";
 import { PracticeView } from "./practice.jsx";
-import { LibraryHome, PlayStart, gameInProgress } from "../play/home.jsx";
+import { LibraryHome, PlayStart } from "../play/home.jsx";
 import { TodayView } from "./today.jsx";
 import { Sheets } from "./sheets.jsx";
 import { ExplorerView } from "./explorer.jsx";
 import { useAnnouncements } from "./announcer.js";
 import { installKeys, textSizeKeys } from "./a11y-keys.js";
 import { BootError, ReadOnlyBanner, StoreProblem } from "./safety.jsx";
-
-function Toasts() {
-  return (
-    <div class="toasts" role="status" aria-live="polite">
-      {state.toasts.map((x) => (
-        <div class={`toast ${x.tone}`} key={x.id}>
-          {x.message}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /** What Play shows: a review, the board, or (no game on it) what to play. */
 function PlaySpace() {
@@ -65,21 +56,32 @@ function App() {
   if (s.bootError) return <BootError />;
   if (!s.ready) return null;
   if (s.storeProblem && !s.storeProblem.continued) return <StoreProblem />;
+  return <Shell s={s} />;
+}
+
+/** The app itself: the sidebar, the page of the space, and what lies over them. */
+function Shell({ s }) {
   const focus = isFocus();
   // The game that ends turns into its review on the same page (no new place).
   const reviewKey = s.review && !(s.review.source === "current" && s.review.meta.inPlace) ? "review-" + s.review.source : "";
   const page = s.space === "learn" ? s.learn.view : s.space === "library" ? (s.play.explorer ? "explorer" : "list") : s.space === "play" ? s.play.view : "today";
+  const place = s.space + reviewKey + page;
   return (
     <div class={`app ${focus ? "focus" : ""}`} data-space={s.space}>
       {!focus && <Sidebar />}
       <main class="main" id="main">
         {s.storeProblem && <ReadOnlyBanner />}
-        <div class="place" key={s.space + reviewKey + page}>
-          {s.space === "today" && <TodayView />}
-          {s.space === "play" && <PlaySpace />}
-          {s.space === "learn" && <PracticeView />}
-          {s.space === "library" && <LibrarySpace />}
-        </div>
+        <TaskNotice />
+        {/* A page that throws is replaced by an error card; the sidebar stays (feedback.jsx). */}
+        <ErrorBoundary resetKey={place}>
+          <div class="place" key={place}>
+            <CrashProbe at="page" />
+            {s.space === "today" && <TodayView />}
+            {s.space === "play" && <PlaySpace />}
+            {s.space === "learn" && <PracticeView />}
+            {s.space === "library" && <LibrarySpace />}
+          </div>
+        </ErrorBoundary>
       </main>
       <Sheets />
       <Toasts />
@@ -121,7 +123,9 @@ const COMMANDS = {
   "game.hint": () => (onBoard() ? C.askHint() : state.space === "learn" ? C.problemHint() : null),
   "game.resign": () => onBoard() && C.requestResign(),
   "game.review": () => C.reviewCurrentGame(),
-  "game.save": () => C.saveToLibrary(),
+  // Only where the game is: in another space the board is not on screen,
+  // and saving a game you cannot see would be a surprise.
+  "game.save": () => state.space === "play" && !!state.game && C.saveToLibrary(),
   "view.focus": () => C.toggleFocus(),
   "view.coords": () => C.setSetting("coords", !state.settings.coords),
   "view.numbers": () => C.setSetting("numbers", !state.settings.numbers),
@@ -148,15 +152,15 @@ function menuSpec() {
     {
       title: t("menu.game"),
       items: [
-        { label: t("common.newGame"), command: "file.new", key: "n" },
-        { label: t("library.import"), command: "file.import", key: "o" },
-        { label: t("common.exportSgf"), command: "file.export", key: "e", shift: true },
+        { label: t("common.newGame"), command: "file.new", ...menuKey("file.new") },
+        { label: t("library.import"), command: "file.import", ...menuKey("file.import") },
+        { label: t("common.exportSgf"), command: "file.export", ...menuKey("file.export") },
         { separator: true },
-        { label: t("common.pass"), command: "game.pass", key: "p", shift: true },
+        { label: t("common.pass"), command: "game.pass", ...menuKey("game.pass") },
         { label: t("common.undo"), command: "game.undo" },
-        { label: t("common.hint"), command: "game.hint", key: "h", shift: true },
-        { label: t("play.reviewSoFar"), command: "game.review", key: "r", shift: true },
-        { label: t("play.save"), command: "game.save", key: "s" },
+        { label: t("common.hint"), command: "game.hint", ...menuKey("game.hint") },
+        { label: t("play.reviewSoFar"), command: "game.review", ...menuKey("game.review") },
+        { label: t("play.save"), command: "game.save", ...menuKey("game.save") },
         { separator: true },
         { label: t("common.resign"), command: "game.resign" },
       ],
@@ -164,7 +168,7 @@ function menuSpec() {
     {
       title: t("menu.view"),
       items: [
-        { label: t("play.focus"), command: "view.focus", key: ".", checked: !!s.focus },
+        { label: t("play.focus"), command: "view.focus", ...menuKey("view.focus"), checked: !!s.focus },
         { label: t("settings.coordinates"), command: "view.coords", checked: !!s.coords },
         { label: t("settings.moveNumbers"), command: "view.numbers", checked: !!s.numbers },
         { label: t("settings.showEval"), command: "view.eval", checked: !!s.showEval },
@@ -176,20 +180,20 @@ function menuSpec() {
     {
       title: t("menu.go"),
       items: [
-        { label: t("nav.today"), command: "go.today", key: "1" },
-        { label: t("nav.play"), command: "go.play", key: "2" },
-        { label: t("nav.learn"), command: "go.learn", key: "3" },
-        { label: t("nav.library"), command: "go.library", key: "4" },
+        { label: t("nav.today"), command: "go.today", ...menuKey("go.today") },
+        { label: t("nav.play"), command: "go.play", ...menuKey("go.play") },
+        { label: t("nav.learn"), command: "go.learn", ...menuKey("go.learn") },
+        { label: t("nav.library"), command: "go.library", ...menuKey("go.library") },
         { separator: true },
-        { label: t("nav.back"), command: "go.back", key: "[" },
-        { label: t("nav.forward"), command: "go.forward", key: "]" },
+        { label: t("nav.back"), command: "go.back", ...menuKey("go.back") },
+        { label: t("nav.forward"), command: "go.forward", ...menuKey("go.forward") },
       ],
     },
     {
       title: t("menu.help"),
       items: [
-        { label: t("nav.settings"), command: "app.settings", key: "," },
-        { label: t("shortcuts.title"), command: "help.shortcuts", key: "/" },
+        { label: t("nav.settings"), command: "app.settings", ...menuKey("app.settings") },
+        { label: t("shortcuts.title"), command: "help.shortcuts", ...menuKey("help.shortcuts") },
         { separator: true },
         { label: t("update.check"), command: "help.checkUpdates" },
       ],
@@ -209,7 +213,6 @@ function installMenus() {
 function onKeyDown(e) {
   const typing = e.target.closest?.("input, select, textarea") && !(e.target.type === "range" || e.target.type === "checkbox");
   const mod = e.metaKey || e.ctrlKey;
-  const k = e.key.toLowerCase();
   if (e.key === "Escape") {
     if (state.menu) return update({ menu: null });
     if (state.sheet) return C.closeSheet();
@@ -230,44 +233,12 @@ function onKeyDown(e) {
   if (state.sheet?.kind === "onboarding") return;
   if (mod && !e.altKey) {
     if (textSizeKeys(e)) return;
-    const map = { n: "file.new", ",": "app.settings", "/": "help.shortcuts", "?": "help.shortcuts", o: "file.import", "[": "go.back", "]": "go.forward" };
-    if (!e.shiftKey && map[k]) {
+    // Every ⌘/Ctrl shortcut is in one table (shortcuts.js), which the
+    // shortcuts sheet and the menu bar read too.
+    const sc = matchShortcut(e, { sheet: !!state.sheet, typing: !!typing });
+    if (sc) {
       e.preventDefault();
-      return runCommand(map[k]);
-    }
-    if (state.sheet) return;
-    if (k === ".") {
-      e.preventDefault();
-      return runCommand("view.focus");
-    }
-    if (k >= "1" && k <= "4" && k.length === 1) {
-      e.preventDefault();
-      return C.goSpace(SPACES[Number(k) - 1].id);
-    }
-    if (typing) return;
-    if (k === "z" && !e.shiftKey) {
-      e.preventDefault();
-      return runCommand("game.undo");
-    }
-    if (k === "s" && !e.shiftKey) {
-      e.preventDefault();
-      return runCommand("game.save");
-    }
-    if (e.shiftKey && k === "p") {
-      e.preventDefault();
-      return runCommand("game.pass");
-    }
-    if (e.shiftKey && k === "h") {
-      e.preventDefault();
-      return runCommand("game.hint");
-    }
-    if (e.shiftKey && k === "r") {
-      e.preventDefault();
-      return runCommand("game.review");
-    }
-    if (e.shiftKey && k === "e") {
-      e.preventDefault();
-      return runCommand("file.export");
+      runCommand(sc.command);
     }
     return;
   }
@@ -307,7 +278,8 @@ function onKeyDown(e) {
     C.reviewCurrentGame();
     return C.reviewStep(-1);
   }
-  if (state.space === "learn" && state.learn.view === "lesson" && e.key === "Enter" && !e.target.closest("button, canvas")) {
+  // (Not the Enter that confirms an input method's candidate.)
+  if (state.space === "learn" && state.learn.view === "lesson" && e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && !e.target.closest("button, canvas")) {
     const cur = state.learn.lesson?.cur;
     if (cur && (cur.kind === "read" || cur.result === "right" || cur.status === "won" || cur.answer)) C.lessonContinue();
   }
@@ -329,13 +301,22 @@ function importPaths(detail) {
 }
 
 export async function start() {
+  // First, so nothing that goes wrong from here on is silent (feedback.jsx).
+  installErrorHandlers();
   // The store opens before the first render (docs/v9.md, "Storage").
   await C.boot();
-  // Handles for the interface tests (scripts/ui-test.mjs); harmless in use.
-  window.__state = state;
-  window.__solver = S;
-  window.__autoAnalyse = () => C.autoAnalyse({ offline: true });
-  render(<App />, document.getElementById("root"));
+  // Handles for the interface tests (scripts/ui-test.mjs), only in a
+  // browser a test drives (debug.js): nothing is put on window otherwise.
+  expose("__state", state);
+  expose("__solver", S);
+  expose("__autoAnalyse", () => C.autoAnalyse({ offline: true }));
+  expose("__crashRender", crashRender);
+  render(
+    <ErrorBoundary scope="app">
+      <App />
+    </ErrorBoundary>,
+    document.getElementById("root"),
+  );
   document.addEventListener("keydown", onKeyDown);
   installKeys();
   // Mouse back/forward buttons move through history.

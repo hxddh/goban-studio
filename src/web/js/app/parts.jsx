@@ -1,5 +1,37 @@
 /**
- * Small shared pieces: icons, buttons, segmented controls, the board.
+ * Small shared pieces: icons, buttons, segmented controls, the board, and
+ * the pieces every view uses to say "loading", "that failed" and "done".
+ *
+ * Feedback, in one place (use these rather than inventing a local one):
+ *
+ * - Something happened, briefly: `toast(message, tone, ms?, opts?)` from
+ *   store.js. Tones: "info", "success", "warning", "error" (an error stays
+ *   until dismissed). One optional button:
+ *     toast(t("library.deleted"), "info", { action: { label: t("common.undoAction"), run: restore }, onClose: (reason) => … })
+ *   `key` shows one toast per key; `replace` swaps the old one for the new.
+ *
+ * - A view loads something itself: useAsync + <Async>.
+ *     const games = useAsync(() => loadSomething(id), [id]);
+ *     <Async state={games} label={t("task.loading")} error={t("task.failed")}>{(value) => <List items={value} />}</Async>
+ *   useAsync returns { status: "loading" | "ready" | "error", slow, value,
+ *   error, retry }. `slow` turns true ASYNC_DELAY ms after the load began,
+ *   so a fast load never flashes a spinner; <Async> draws nothing until
+ *   then, a <Loading> line after, an <ErrorCard compact> with Retry on
+ *   failure, and children(value) once ready.
+ *
+ * - A click starts something in a controller (a file read, a content part
+ *   fetched): `runTask(key, fn, { label, error })` from store.js. The shell
+ *   shows it (feedback.jsx TaskNotice): nothing for 300 ms, then the label
+ *   with a spinner, and on failure the error with Retry. To draw it in
+ *   place instead (a spinner in the row that was clicked), read
+ *   `taskOf(key)`: null, or { status: "loading" | "error", label, message,
+ *   retry }.
+ *
+ * - Something broke: <ErrorCard title body actions /> is the one error
+ *   surface (a page that could not render, a list that could not load).
+ *   `actions` is [{ label, onClick, primary }]; `compact` is the inline
+ *   size. feedback.jsx wraps pages and sheets in an <ErrorBoundary> that
+ *   shows it, so a view does not need its own try/catch around rendering.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BoardView, frameAspect } from "../board.js";
@@ -8,6 +40,7 @@ import { state, update } from "./store.js";
 import { ICONS } from "./icons.js";
 import { boardName } from "../a11y.js";
 import { boardKey } from "./announcer.js";
+import { expose } from "./debug.js";
 
 export function Icon({ name, size = 18 }) {
   return (
@@ -80,6 +113,92 @@ export function GradeDots({ grade, max = 5 }) {
       ))}
     </span>
   );
+}
+
+/* ----------------------------------------------- loading, errors, async */
+
+/** A small turning ring (still, with reduced motion). */
+export function Spinner({ size = 14 }) {
+  return <span class="spinner" style={{ width: size + "px", height: size + "px" }} aria-hidden="true" />;
+}
+
+/** "Loading…" with a spinner, announced politely. */
+export function Loading({ label }) {
+  return (
+    <p class="loading-line" role="status">
+      <Spinner />
+      <span>{label || t("task.loading")}</span>
+    </p>
+  );
+}
+
+/**
+ * The one error surface: what happened in a sentence, and what to do.
+ * `actions`: [{ label, onClick, primary }]. `compact`: the inline size (a
+ * section that could not load), without the icon and the card's padding.
+ */
+export function ErrorCard({ title, body, actions = [], compact = false, ...rest }) {
+  return (
+    <div class={`error-card ${compact ? "compact" : ""}`} role="alert" {...rest}>
+      {!compact && <Icon name="error" size={22} />}
+      <div class="error-text">
+        {title && <strong>{title}</strong>}
+        {body && <p>{body}</p>}
+      </div>
+      {actions.length > 0 && (
+        <div class="actions">
+          {actions.map((a) => (
+            <Button kind={a.primary ? "primary" : "secondary"} size={compact ? "sm" : undefined} onClick={a.onClick}>
+              {a.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** How long a load runs before it is called slow (and shows a spinner). */
+export const ASYNC_DELAY = 300;
+
+/**
+ * Run `fn()` (a promise) when the component mounts and whenever `deps`
+ * change. Returns { status, slow, value, error, retry }; see the top of
+ * this file. A result that arrives after the deps changed is dropped.
+ */
+export function useAsync(fn, deps = []) {
+  const [turn, setTurn] = useState(0);
+  const [s, setS] = useState({ status: "loading", slow: false, value: undefined, error: null });
+  useEffect(() => {
+    let live = true;
+    setS((prev) => ({ ...prev, status: "loading", slow: false, error: null }));
+    const timer = setTimeout(() => live && setS((prev) => (prev.status === "loading" ? { ...prev, slow: true } : prev)), ASYNC_DELAY);
+    let p;
+    try {
+      p = Promise.resolve(fn());
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    p.then(
+      (value) => live && setS({ status: "ready", slow: false, value, error: null }),
+      (error) => {
+        console.warn("load failed:", error);
+        if (live) setS({ status: "error", slow: false, value: undefined, error });
+      },
+    ).finally(() => clearTimeout(timer));
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [...deps, turn]);
+  return { ...s, retry: () => setTurn((n) => n + 1) };
+}
+
+/** Draw a useAsync state: nothing, then <Loading>, then the error with Retry or children(value). */
+export function Async({ state: s, label, error, children }) {
+  if (s.status === "ready") return typeof children === "function" ? children(s.value) : children;
+  if (s.status === "error") return <ErrorCard compact body={error || t("task.failed")} actions={[{ label: t("common.retry"), onClick: s.retry }]} />;
+  return s.slow ? <Loading label={label} /> : null;
 }
 
 /** Popover menu anchored to a "more" button. */
@@ -173,7 +292,7 @@ export function Board({ model, onPlay, onHover, label }) {
   }, []);
   useEffect(() => {
     view.current?.setModel(model);
-    window.__board = view.current;
+    expose("__board", view.current);
   });
   // v6 a11y: the board's keys and what they say (announcer.js). Arrows and
   // the reading keys work on every board, playable or not.

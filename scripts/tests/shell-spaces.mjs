@@ -20,7 +20,8 @@ const A = await bundle([
   'export { store, createStore } from "./src/web/js/data/store.js";',
   'export { SPACES } from "./src/web/js/app/chrome.jsx";',
   'export { COMMANDS, menuSpec } from "./src/web/js/app/app.jsx";',
-  'export { setLang } from "./src/web/js/i18n.js";',
+  'export { setLang, t } from "./src/web/js/i18n.js";',
+  'export { matchShortcut, shortcutRows } from "./src/web/js/app/shortcuts.js";',
 ]);
 const { C, state, store } = A;
 
@@ -46,7 +47,7 @@ try {
     const body = ctl.slice(at, ctl.indexOf("\n}\n", at));
     assert.ok(body.indexOf("await store.open()") < body.indexOf("loadSettings(store)"), "the store opens before the settings are read");
     const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
-    assert.ok(app.indexOf("await C.boot()") < app.indexOf("render(<App />"), "the first render waits for boot");
+    assert.ok(app.indexOf("await C.boot()") > 0 && app.indexOf("await C.boot()") < app.indexOf("  render(\n"), "the first render waits for boot");
   });
 
   await test("shell: four spaces, Today, Play, Practice and Library, in the sidebar, the keyboard and the native menus (v12)", () => {
@@ -57,10 +58,10 @@ try {
     const items = go.items.filter((i) => i.command?.startsWith("go.") && i.key && /^\d$/.test(i.key));
     assert.deepEqual(items.map((i) => [i.label, i.command, i.key]), [["Today", "go.today", "1"], ["Play", "go.play", "2"], ["Practice", "go.learn", "3"], ["Library", "go.library", "4"]]);
     for (const c of ["go.today", "go.play", "go.learn", "go.library"]) assert.ok(c in A.COMMANDS, c);
-    const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8");
-    assert.match(app, /k >= "1" && k <= "4"/, "Cmd+1 to Cmd+4");
-    const sheets = fs.readFileSync(path.join(root, "src/web/js/app/sheets.jsx"), "utf8");
-    assert.match(sheets, /\$\{MOD\}1 – 4`/, "the shortcuts sheet says so");
+    // Cmd+1 to Cmd+4, from the one table the key handler, the menus and the shortcuts sheet share.
+    for (const [k, c] of [["1", "go.today"], ["2", "go.play"], ["3", "go.learn"], ["4", "go.library"]]) assert.equal(A.matchShortcut({ key: k, shiftKey: false })?.command, c, "Cmd+" + k);
+    const row = A.shortcutRows({ mod: "⌘", shift: "⇧", t: A.t }).find(([keys]) => keys === "⌘1 – 4");
+    assert.equal(row?.[1], "Today / Play / Practice / Library", "the shortcuts sheet says so");
   });
 
   await test("shell: onboarding asks experience, then opens Learn for a new player and Play for everyone else", async () => {

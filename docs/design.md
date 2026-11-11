@@ -79,6 +79,8 @@ Neutral greys with a faint warmth, one accent, two signals.
 | `--accent` | #34529A | #8EA6E0 | focus ring, selection, progress, board hints |
 | `--good` | #2E7D4F | #6CC08F | correct, won |
 | `--bad` | #B3402C | #E58A74 | wrong, lost, mistake markers |
+| `--on-bad` | #FFFFFF | #1B1A17 | text on a `--bad` fill (an error toast, the solid danger button): 5.7:1 and 6.8:1 |
+| `--inv-good`, `--inv-warn` | #6CC08F, #E3B04B | #2E7D4F, #8A5A00 | the success and warning marks on a toast, whose background is the inverse of the page (`--text`) |
 
 **The primary action is ink, not colour**: a filled `--text` button with
 `--surface` text. The accent marks attention (focus, the selected thing, a
@@ -106,6 +108,22 @@ group per screen region.
 * **Buttons** — heights 28 (sm), 32 (md), 40 (lg). Kinds: `primary` (ink),
   `secondary` (surface with hairline), `ghost` (text only, fill on hover),
   `danger` (text in `--bad`). Icon 16 px, gap 6 px, label weight 500.
+* **Danger, solid** — only inside a confirmation of something that cannot
+  be undone (clear all data, restore a backup): a `--bad` fill with
+  `--on-bad` text. What can be undone is not confirmed: it happens, and a
+  toast offers **Undo**.
+* **Toasts** — one line at the bottom centre, on the inverse of the page
+  (`--text` with `--on-primary`). Four tones: info (no mark), success (a
+  check in `--inv-good`), warning (a triangle in `--inv-warn`) and error
+  (`--bad` fill, `--on-bad` text). Each has a close button; at most one
+  action ("Undo"); at most three on screen. Info, success and warning go
+  after a time that follows the length of the text (3 s at least, 8 s with
+  an action) and wait while pointed at or focused; an error stays until it
+  is closed. A plain message never blocks the board under it.
+* **Loading and errors** — nothing for the first 300 ms; then one quiet
+  line with a small spinner; on failure one sentence and **Retry**, where
+  the click was. A view that cannot be shown is replaced by the error card
+  (a sentence, **Try again**, **Go to Today**), never left half drawn.
 * **Segmented control** — a `--fill` track; the selected segment is a raised
   surface chip. Used for 2–4 mutually exclusive options.
 * **Rows** — lists are rows, not cards: 44 px minimum, hairline separators
