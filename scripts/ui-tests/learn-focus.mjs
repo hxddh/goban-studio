@@ -43,16 +43,19 @@ export default async function ({ check, assert, fresh, onboard }) {
     await page.keyboard.press("Control+3");
     await page.waitForSelector(".learn-path .path-focus");
     const line = await page.textContent(".learn-path .path-focus");
-    assert(line.includes("This week's focus: Cutting") && line.includes("Lost ≈20 points here in your last 4 games"), `the line: ${line}`);
+    assert(line.includes("This week's focus: Cutting"), `the line: ${line}`);
     assert((await page.locator(".learn-path .path-focus .link").count()) === 1, "its lesson as a quiet link");
     const rows = await page.locator(".learn-path .path-row").allInnerTexts();
-    assert(rows.some((r) => r.includes("This week's focus: Cutting")), `no focus problem in the path: ${rows.join(" | ")}`);
-    assert(rows.length >= 5 && rows.length <= 8, `${rows.length} rows`);
+    // The focus's problems are one row, named after the theme, and the row says what the games showed (once: not in the line too).
+    const focusRow = rows.find((r) => r.includes("Cutting ·"));
+    assert(focusRow && focusRow.includes("Lost ≈20 points here in your last 4 games"), `no focus row with its reason: ${rows.join(" | ")}`);
+    assert(!line.includes("Lost ≈20 points"), `the reason twice: ${line}`);
+    assert(rows.length >= 2 && rows.length <= 8, `${rows.length} rows`);
     assert((await page.locator(".btn.primary:visible").count()) === 1, "one primary action on Learn");
     // The focus is kept for the week in the player model's file.
     await page.waitForFunction(() => JSON.parse(localStorage.getItem("goban9:profile.json")).week?.focus?.[0] === "cut", null, { timeout: 2000 });
     // A focus row opens its problem, in today's session, saying why it is there.
-    const i = rows.findIndex((r) => r.includes("This week's focus"));
+    const i = rows.indexOf(focusRow);
     await page.locator(".learn-path .path-row").nth(i).click();
     await page.waitForFunction(() => window.__state.learn.view === "problem" && window.__state.learn.problem.def.theme === "cut" && !!window.__state.learn.daily);
     assert((await page.textContent(".panel .eyebrow")).includes("This week's focus: Cutting"), "the panel says why");

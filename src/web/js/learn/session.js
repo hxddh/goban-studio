@@ -20,8 +20,8 @@
  */
 import { t, tn } from "../i18n.js";
 import { state, update } from "../app/store.js";
-import { changeProfile, isRestoring, remember } from "../app/ctl-core.js";
-import { bridgeAfter, evidenceOf, focus, focusLesson, keepFocus, learnPath as pathOf } from "../model/player.js";
+import { changeProfile, isRestoring, remember, setSetting } from "../app/ctl-core.js";
+import { bridgeAfter, dailySize, evidenceOf, focus, focusLesson, keepFocus, learnPath as pathOf } from "../model/player.js";
 import { COURSE, GRADES, PROBLEMS, withContent } from "../content.js";
 import { store } from "../data/store.js";
 import { allLessons, openLesson, openMistakeDrill, openProblem, themeName } from "../app/practice-ctl.js";
@@ -58,11 +58,14 @@ export function weekFocus(now = Date.now()) {
   const done = (id) => !!state.profile.lessons?.[id]?.done;
   const known = new Set(allLessons().map(({ lesson }) => lesson.id));
   const lesson = view.focus.map((a) => focusLesson(a.key, done)).find((id) => id && known.has(id) && !done(id)) || null;
+  // "came up 1 times" reads "came up once" (i18n.js tn, by the first count).
+  const said = view.focus.map((a) => evidenceOf(a)[0]).map((e) => (e ? tn(e.key, e.params?.[0], e.params) : ""));
   return {
     keys: view.focus.map((a) => a.key),
     names: view.focus.map((a) => focusName(a.key)),
-    // v13: "came up 1 times" reads "came up once" (i18n.js tn, by the first count).
-    why: view.focus.map((a) => evidenceOf(a)[0]).filter(Boolean).map((e) => tn(e.key, e.params?.[0], e.params)),
+    why: said.filter(Boolean),
+    // The same evidence by focus key, for the path's rows.
+    reasons: Object.fromEntries(view.focus.map((a, i) => [a.key, said[i]]).filter(([, text]) => text)),
     lesson,
   };
 }
@@ -138,6 +141,44 @@ function begin(now = Date.now()) {
   session = { date: dayOf(now), items, done: (before?.done || []).filter((k) => items.some((it) => it.key === k)), current: null };
   save();
   return session;
+}
+
+const isPick = (it) => it.kind === "problem" || it.kind === "mistake";
+
+/**
+ * The day's size, chosen on the path (3, 5 or 10 problem items; kept in
+ * the settings). A session nobody has started yet is simply made again at
+ * the new size. One under way keeps what is done and what is open: a
+ * smaller day drops problems not done from its end, a larger one takes
+ * more from the path as it stands now.
+ */
+export function setDailySize(n, now = Date.now()) {
+  const size = dailySize(n);
+  if (size === state.settings.dailySize) return;
+  setSetting("dailySize", size);
+  const s = todaysSession(now);
+  if (!s) return;
+  if (!s.done.length && !s.current) {
+    resetSession();
+    update();
+    return;
+  }
+  let picks = s.items.filter(isPick).length;
+  for (let i = s.items.length - 1; i >= 0 && picks > size; i--) {
+    const it = s.items[i];
+    if (!isPick(it) || isDone(s, it) || it.key === s.current) continue;
+    s.items.splice(i, 1);
+    picks--;
+  }
+  if (picks < size) {
+    const have = new Set(s.items.map((it) => it.key));
+    const more = learnPath(now).filter((it) => isPick(it) && !have.has(it.key)).slice(0, size - picks);
+    // Before the first game, which leaves Practice for Play.
+    const game = s.items.findIndex((it) => it.kind === "game");
+    s.items.splice(game >= 0 ? game : s.items.length, 0, ...more);
+  }
+  save(s);
+  update();
 }
 
 /** The first item not done after the one open now, else the first not done. */
