@@ -192,14 +192,15 @@ function notify() {
 export function applyBoardTheme({ style = "standard" } = {}) {
   const root = typeof document !== "undefined" ? document.documentElement : null;
   if (!root) return;
-  root.dataset.board = style === "contrast" ? "contrast" : "standard";
+  if (root.dataset) root.dataset.board = style === "contrast" ? "contrast" : "standard";
   const p = currentPalette();
-  root.style.setProperty("--board", p.base);
-  root.style.setProperty("--thumb-board", p.base);
-  root.style.setProperty("--thumb-line", p.thumb.line);
-  root.style.setProperty("--stone-black", p.stone.black.fill);
-  root.style.setProperty("--stone-white", p.stone.white.fill);
-  root.style.setProperty("--stone-rim", (p.dark ? p.stone.black.rim : p.stone.white.rim) || "transparent");
+  const set = (name, value) => root.style?.setProperty?.(name, value);
+  set("--board", p.base);
+  set("--thumb-board", p.base);
+  set("--thumb-line", p.thumb.line);
+  set("--stone-black", p.stone.black.fill);
+  set("--stone-white", p.stone.white.fill);
+  set("--stone-rim", (p.dark ? p.stone.black.rim : p.stone.white.rim) || "transparent");
   notify();
 }
 

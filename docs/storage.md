@@ -172,8 +172,20 @@ migrations (a newer file inside is refused too). Then:
    after the reload says whether it worked.
 
 Settings → Data then offers *Undo the last restore*, which puts the
-snapshot back the same way (and reloads). The snapshot stays until a newer
-restore replaces it.
+snapshot back the same way (and reloads). The undo first takes a snapshot
+of its own — what the restore had put there — in place of the one it uses,
+so an undo can be undone the same way; if that snapshot cannot be written,
+nothing is replaced. The offer ends when the snapshot is 30 days old (it is
+removed at the next launch) or when a backup is exported (the player then
+holds a newer copy than the snapshot), whichever comes first.
+
+`settings.json` — two settings changed shape and are migrated when read
+(`data/settings.js`): the `sound` switch became `volume` (`off`, `quiet`,
+`normal`, `loud`; `sound: false` reads as `off`), and `defaultRules` may be
+`null`, meaning "never chosen": new games then use the rules of the
+interface language (Chinese rules in Chinese, Korean rules in Korean,
+Japanese rules otherwise). A file written by an earlier version always
+carries the rules it played with, so an existing player keeps them.
 
 ## Safe state
 

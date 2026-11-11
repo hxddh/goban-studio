@@ -25,7 +25,7 @@ Each session 40 minutes, moderated, think-aloud, screen recorded.
 | T5 | Try your own variation in the review and go back to the game | Variation played, returned to main line | ≥ 4/5 players |
 | T6 | Do today's five problems | Daily set completed | ≥ 4/5 within 10 min |
 | T7 | Open an SGF from disk, rename it, export it | Record renamed and exported | ≥ 4/5 players |
-| T8 | Change the board to Ink and turn coordinates off and on | Both visible | 10/10 within 1 min |
+| T8 | Change the board to High contrast (Settings → Board) and back, and turn coordinates off and on | Both visible on the board at once, without a reload | 10/10 within 1 min |
 
 **Measures.** Task success, time on task, errors (wrong place visited,
 undo of an unintended action), SEQ (single ease question, 1–7) after each

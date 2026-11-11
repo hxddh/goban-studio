@@ -85,5 +85,5 @@ await test("i18n: Korean particles follow the word before them", () => {
   assert.equal(t("update.installed", ["13.1.0"]), "Goban Studio 13.1.0으로 업데이트했습니다");
   setLang("en");
   // The particle marker is Korean's only: other languages keep plain placeholders.
-  assert.equal(t("library.vsEngine", ["≈ 12 kyu"]), "vs computer ≈ 12 kyu");
+  assert.equal(t("library.vsEngine", ["≈ 12 kyu"]), "Computer, ≈ 12 kyu");
 });

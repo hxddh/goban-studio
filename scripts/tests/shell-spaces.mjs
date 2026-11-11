@@ -64,19 +64,26 @@ try {
     assert.equal(row?.[1], "Today / Play / Practice / Library", "the shortcuts sheet says so");
   });
 
-  await test("shell: onboarding asks experience, then opens Learn for a new player and Play for everyone else", async () => {
-    // A new player: Learn, at lesson one; the prior is 30 kyu on every board.
+  await test("shell: onboarding asks experience and ends on Today; its first offer opens lesson one for a new player and a game for everyone else", async () => {
+    // A new player: Today, nothing started; the offer is lesson one; the prior is 30 kyu on every board.
     C.finishOnboarding("new");
-    await sleep(0);
     assert.equal(state.sheet, null);
+    assert.equal(state.space, "today");
+    assert.equal(state.learn.view, "home");
+    assert.equal(C.firstRunOffer(), "lesson");
+    C.startFirstRun();
+    await sleep(0);
     assert.equal(state.space, "learn");
     assert.equal(state.learn.view, "lesson");
     assert.equal(state.learn.lesson.index, 0);
     assert.equal(state.settings.onboarded, true);
     assert.equal(state.settings.experience, "new");
     assert.equal(C.playerEstimate().rank, 30);
-    // Someone who knows the rules: Play, a 9×9 game against the gentlest rank, teaching on.
+    // Someone who knows the rules: Today, then a 9×9 game against the gentlest rank, teaching on.
     C.finishOnboarding("rules");
+    assert.equal(state.space, "today");
+    assert.equal(state.game, null);
+    C.startFirstRun();
     assert.equal(state.space, "play");
     assert.equal(state.play.view, "game");
     assert.equal(state.game.game.size, 9);
@@ -84,6 +91,8 @@ try {
     assert.equal(C.teachingOn(), true);
     // A player: the full board, against the suggested opponent for the rank they gave.
     C.finishOnboarding("player", 10);
+    assert.equal(state.space, "today");
+    C.startFirstRun();
     assert.equal(state.game.game.size, 19);
     assert.equal(C.playerEstimate().rank, 10);
     assert.equal(state.settings.opponentRank, C.suggestedOpponent(19).opponentRank);
