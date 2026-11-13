@@ -187,7 +187,7 @@
 | --- | --- | --- | --- | --- |
 | @native-sdk/cli（Vercel Labs） | 0.11.0 | **0.11.1**（2026-11-09） | 窗口外框跟随应用的明暗主题；release 构建关闭 WebView 调试；全局快捷键。之前版本已有但没用上的：可操作的系统通知（“复习到期”）、Ed25519 签名的 macOS 自动更新、notarytool Keychain profile | **现在升**。要同步更新 `scripts/native-sdk.mjs` 的 `TOOLCHAIN_MANIFEST_SHA256`（实测新值是 `82630c69…3057`）。注意 npm 的 `latest` 标签指向 0.9.3，`npm outdated` 会误报 |
 | Zig | 0.16.0 | 0.17.1（2026-11-02） | 构建系统变化大（`b.root`、`*2` API、移除 `@cImport`）；x86_64-macos 被标为 obsolescent | **不能升**：SDK 0.11.1 写死只接受 0.16.x |
-| Node | 24（已进入维护期） | 26（2026-10-28 成为 Active LTS） | — | CI 先加一个 Node 26 的测试任务；SDK 自带的工具链仍用 24 |
+| Node | 24（已进入维护期） | 26（2026-10-28 成为 Active LTS） | CI 的 web 任务已同时跑 24 和 26 | `.nvmrc` 和构建可以改到 26，前提是 SDK 自带的工具链（仍用 24）不受影响 |
 | Actions | checkout v7.0.1 等 | 都是最新 | — | 不变 |
 | macOS 运行器 | macos-15 / macos-15-intel | `macos-26` 已可用；`macos-15-intel` 是最后一个 Intel 镜像，2027 年秋退役 | — | arm64 迁到 macos-26；**规划 2027 年中停止发布 Intel Mac 版** |
 
@@ -241,7 +241,7 @@
 | 对局反馈 | 提子数、计时、形势条；每手的“好 / 缓 / 失误”反馈（可关）；终局数地动画和结果页 | 走查：下棋时右栏不再有大块空白 |
 | 复盘 | 平滑曲线、标出关键手、每个关键手写出亏了几目和正解小图 | — |
 | 视觉第二轮 | 深色棋盘配色；宽窗口两栏；字号阶梯；统一单选和次级按钮；课程、名局配缩略图；View Transitions 和 `@starting-style` | 视觉基线全部重拍；四语言截图 |
-| 工程 | Preact 11 + signals 的 store 切片；求解器移到 Worker；拆 `main.zig`；Playwright 1.65 + pixelmatch 8；CI 加 Node 26 和 macos-26 | `main.zig` 不超过 800 行；难题时主线程长任务不超过 50 ms |
+| 工程 | Preact 11 + signals 的 store 切片；求解器移到 Worker；拆 `main.zig`；Playwright 1.65 + pixelmatch 8；`.nvmrc` 改到 Node 26；arm64 构建改用 macos-26 | `main.zig` 不超过 800 行；难题时主线程长任务不超过 50 ms |
 | 发布 | 申请 SignPath（Windows）；最低 macOS 定为 13；规划停止 Intel Mac 版 | 首次启动不再需要“仍要打开” |
 
 **不做：** 升级 Zig 0.17（SDK 不允许）；升级 KataGo 1.18.2（只改了 CUDA）；不重新校准就替换默认 b6c96。
