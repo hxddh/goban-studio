@@ -765,6 +765,10 @@ for (const vp of [
 ]) {
   await check(`visual: places at ${vp.tag}`, async () => {
     const page = await fresh("en-US", { width: vp.width, height: vp.height }, { pinFont: true });
+    // One fixed day: Practice's path is drawn from the date, and its rows
+    // (masked below, but not their height) would move the course under them.
+    // Only the date is fixed; timers run as usual.
+    await page.clock.setFixedTime(new Date("2026-11-11T12:00:00"));
     await page.evaluate(() => document.fonts.ready);
     await onboard(page, 1);
     // A fixed two-player position so the board is deterministic.
