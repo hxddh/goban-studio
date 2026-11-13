@@ -279,7 +279,10 @@ await test("practice progress: the path's rows — problems of one theme as one 
     assert.equal(r.why, { new: "New at your level", stretch: "A step up" }[r.role], r.role);
     assert.match(r.more, /^Level \d(–\d)?$/);
     assert.equal(r.diagrams.length, defs.length);
-    for (const d of defs) if (d.title.en !== C.themeName(d.theme)) assert.ok(!r.title.includes(d.title.en), `${r.title} names ${d.title.en}`);
+    // The theme's own name is the row's label ("Cutting"); a problem named by a
+    // part of it ("Cut") is in the row only if it appears outside that label.
+    const unlabelled = r.title.replace(C.themeName(defs[0].theme), "");
+    for (const d of defs) if (d.title.en !== C.themeName(d.theme)) assert.ok(!unlabelled.includes(d.title.en), `${r.title} names ${d.title.en}`);
   }
   // No two neighbouring problem rows could have been one.
   for (let i = 1; i < rows.length; i++) {
