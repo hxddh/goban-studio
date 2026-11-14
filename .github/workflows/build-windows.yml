@@ -322,11 +322,11 @@ jobs:
               assert any(n.endswith(f"frontend/dist/content/{part}.json") for n in names), f"missing content/{part}.json"
           assert not any(".WebView2/" in n or "/EBWebView/" in n for n in names), "WebView2 test profile leaked"
           # v5: the in-app updater unpacks this archive and expects every
-          # entry under GobanStudio/ (src/install.zig safeEntryName).
+          # entry under GobanStudio/ (src/install_package.zig safeEntryName).
           assert all(n.startswith("GobanStudio/") and ":" not in n and "/../" not in n for n in names), "entry outside GobanStudio/"
           assert any(n == "GobanStudio/resources/frontend/dist/index.html" for n in names), "missing index.html"
           # The updater installs a package only if the package itself says
-          # it is the release's version (src/install.zig stagedVersionMatches).
+          # it is the release's version (src/install_package.zig stagedVersionMatches).
           import json
           built = json.loads(z.read("GobanStudio/resources/frontend/dist/build-info.json"))["app"]
           wanted = json.load(open("package.json", encoding="utf-8"))["version"]

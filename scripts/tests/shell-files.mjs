@@ -8,7 +8,7 @@ import { test, assert, fs, path, root } from "./helpers.mjs";
 import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, revealDataDir, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
 import { INSTALL_ERRORS, installFallsBack, installMessageKey, interpretInstallStatus } from "../../src/web/js/update.js";
 import * as Sign from "../signing-notes.mjs";
-import { SHELL_FILES, shellSource } from "../shell-source.mjs";
+import { ENGINE_FILES, INSTALL_FILES, SHELL_FILES, shellSource } from "../shell-source.mjs";
 
 function fakeHost() {
   const files = new Map();
@@ -238,7 +238,7 @@ await test("shell files: every text that says where the data is names the folder
   assert.ok(paths.includes('"/Users/a/Library/Application Support/dev.hxddh.gobanstudio"'));
   assert.ok(paths.includes('"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\dev.hxddh.gobanstudio\\\\Data"'));
   // The id is spelled once in the shell (tests aside).
-  for (const f of [...SHELL_FILES, "src/install.zig", "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
+  for (const f of [...SHELL_FILES, ...INSTALL_FILES, ...ENGINE_FILES, "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
     const code = read(f).split("// ------------------------------------------------------------ tests")[0].split("// ------------------------------------------------------------------ tests")[0];
     assert.doesNotMatch(code, /"dev\.hxddh\.gobanstudio"/, `${f} takes the id from paths.zig`);
   }
@@ -310,7 +310,7 @@ await test("shell files: one instance per data folder is documented where the lo
   const main = read("src/main.zig");
   assert.match(main, /if \(!lifecycle\.claimInstance\(&app_state, init, data_dir\)\) return;/);
   assert.ok(main.indexOf("if (!lifecycle.claimInstance(&app_state, init, data_dir)) return;") < main.indexOf("app_state.store.init(init.io, data_dir);"), "before the store is opened");
-  assert.match(read("src/lifecycle.zig"), /if \(!by_helper and install_mod\.ownUpdateInProgress\(io\)\)/, "a launch during an update stays out of the helper's way");
+  assert.match(read("src/lifecycle.zig"), /if \(!by_helper and install_apply\.ownUpdateInProgress\(io\)\)/, "a launch during an update stays out of the helper's way");
   for (const text of [read("packaging/README-macOS.txt"), read("packaging/README-Windows.txt")]) assert.doesNotMatch(text, /instance\.lock/, "an implementation detail, not in the user's README");
   assert.match(read("packaging/README-Windows.txt"), /Only one copy runs at a time/);
 });

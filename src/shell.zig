@@ -6,8 +6,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
+const engine_request = @import("engine_request.zig");
+const engine_worker = @import("engine_worker.zig");
 const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
+const install_apply = @import("install_apply.zig");
 const models_mod = @import("models.zig");
 const store_mod = @import("store.zig");
 const files_mod = @import("files.zig");
@@ -73,10 +76,10 @@ pub const Job = struct {
     cancelled: bool = false,
     /// The KataGo process that serves it (echoed as `engine`).
     slot: engine_mod.Slot = .standard,
-    kind: engine_mod.Kind = .analyze,
+    kind: engine_request.Kind = .analyze,
     /// Backstop (v13): past this the page is answered `Timeout` whatever
     /// the worker is doing, so no request can hang. The worker's own
-    /// watchdog (engine.zig) normally fires long before.
+    /// watchdog (engine_worker.zig) normally fires long before.
     deadline_ms: i64 = 0,
 
     pub fn idText(self: *const Job) []const u8 {
@@ -116,10 +119,10 @@ pub const App = struct {
     /// KataGo: the worker thread owns the GTP process for async requests;
     /// legacy sync calls borrow it with `lockExclusive`. Heap-allocated
     /// (large buffers) in `main`.
-    katago: *engine_mod.Worker = undefined,
+    katago: *engine_worker.Worker = undefined,
     /// Scratch for parsing one async request (it is copied into the
     /// worker's queue), so the bridge handler does not hold it on the stack.
-    request_scratch: *engine_mod.Request = undefined,
+    request_scratch: *engine_request.Request = undefined,
     katago_available: bool = false,
     katago_version_buf: [128]u8 = undefined,
     katago_version: []const u8 = "",
@@ -155,7 +158,7 @@ pub const App = struct {
     install_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
     install_bridge_id_len: usize = 0,
     /// Whether this installation can be replaced in place, decided once.
-    install_target: install_mod.Target = .{},
+    install_target: install_apply.Target = .{},
     install_target_known: bool = false,
     staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     /// Optional networks (v5, models.zig): the page polls their state.
@@ -228,7 +231,7 @@ pub const App = struct {
         _ = it.next(); // executable
         while (it.next()) |arg| {
             if (std.ascii.endsWithIgnoreCase(arg, ".sgf")) self.queueOpenPath(arg);
-            // Launched by the update helper (install.zig).
+            // Launched by the update helper (install_apply.zig).
             self.installer.note.noteArg(arg);
         }
     }

@@ -5,7 +5,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const native_sdk = @import("native_sdk");
-const install_mod = @import("install.zig");
+const install_apply = @import("install_apply.zig");
+const install_verify = @import("install_verify.zig");
 const store_mod = @import("store.zig");
 const files_mod = @import("files.zig");
 const json = @import("json.zig");
@@ -318,7 +319,7 @@ pub fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
     // The page is up: tell a waiting update helper (if it launched us).
-    install_mod.writeAck(self.io, &self.installer.note);
+    install_apply.writeAck(self.io, &self.installer.note);
     const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
     const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
@@ -341,13 +342,13 @@ pub fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     // v5: GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
     // (selftest.js; scripts/test-updater.mjs), GOBAN_UPDATE_PROBE_TAG for a
     // real download of that release. The download address is still built
-    // and checked by install.zig; the tag is only a tag.
+    // and checked by install_verify.zig; the tag is only a tag.
     const probe = self.env_map.get("GOBAN_UPDATE_PROBE_OUT") orelse "";
     if (probe.len > 0) {
         if (!json.append(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
         if (!json.appendString(output, &n, probe)) return error.HandlerFailed;
         const probe_tag = self.env_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
-        if (install_mod.validTag(probe_tag)) {
+        if (install_verify.validTag(probe_tag)) {
             if (!json.append(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
             if (!json.appendString(output, &n, probe_tag)) return error.HandlerFailed;
         }

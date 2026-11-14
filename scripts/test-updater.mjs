@@ -6,7 +6,7 @@
  *   node scripts/test-updater.mjs <dist/GobanStudio.app | dist/GobanStudio> [--live <tag>]
  *
  * What is tested, and how (nothing here changes what the app trusts: the
- * download address is fixed to GitHub in src/install.zig and is not
+ * download address is fixed to GitHub in src/install_verify.zig and is not
  * configurable, so these tests drive the stages around it):
  *
  *   swap       The helper the app embeds (src/updater/apply-*.{sh,ps1}) is
@@ -43,7 +43,8 @@
  *
  * Verification of the bytes (SHA256SUMS parsing, hash comparison, zip
  * entry checks, CPU architecture, ditto + codesign, no quarantine flag) is
- * covered by the Zig tests in src/install.zig (`native test`).
+ * covered by the Zig tests in src/install_verify.zig and
+ * src/install_package.zig (`native test`).
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";

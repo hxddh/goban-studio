@@ -127,7 +127,7 @@ that search source text. `docs/QA.md` lists what each gate covers.
   until a strong player (for Go content) or a native speaker (for text)
   has reviewed them. Say in the pull request who reviewed what.
 - **No telemetry, no new network access.** The app is offline; the only
-  downloads are the pinned ones in `src/install.zig` and `src/models.zig`.
+  downloads are the pinned ones in `src/install_verify.zig` and `src/models.zig`.
 
 ## Changes and versions
 

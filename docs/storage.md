@@ -51,7 +51,7 @@ happens within four seconds it exits. Neither name is a valid store key,
 so the store never lists them.
 
 A launch while the update helper is replacing the app exits at once
-(`src/install.zig ownUpdateInProgress`).
+(`src/install_apply.zig ownUpdateInProgress`).
 
 ## Files
 

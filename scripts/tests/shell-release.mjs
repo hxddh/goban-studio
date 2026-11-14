@@ -2,7 +2,7 @@
  * Shell: release — the static page, updates, signing notes, screenshots, the tour, the updater and the optional networks.
  */
 import { test, APP_VERSION, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, fs, normalizeSettings, path, root, t } from "./helpers.mjs";
-import { shellSource } from "../shell-source.mjs";
+import { engineSource, installSource, shellSource } from "../shell-source.mjs";
 
 await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
@@ -50,8 +50,8 @@ await test("removing a network retries while the engine is busy, without blockin
   assert.equal(calls, 3);
   const main = shellSource();
   assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
-  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
+  const engine = engineSource();
+  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: engine_mod\.Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
 });
 
 await test("static page inputs and build script are present", () => {
@@ -460,7 +460,7 @@ await test("the interface goes available → downloading → ready → installin
 
 await test("the native install commands are fixed to this repository's release downloads", () => {
   const main = shellSource();
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8").replace(/\r\n/g, "\n");
+  const zig = installSource();
   for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
   assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
   // The page's payload carries a tag and nothing else; no URL is ever read from it.
@@ -606,7 +606,7 @@ await test("the downloader fetches only pinned KataGo files, verified before use
     assert.ok(cfg.includes(line), line);
   }
   assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
-  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
+  const engineZig = engineSource();
   assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
 });
 
