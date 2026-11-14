@@ -83,7 +83,7 @@ export function ReviewView() {
     deadStones: rc ? rc.dead : [],
     variation: rc ? null : varMoves,
     moveNumbers: r.variation || tr || rc ? null : moveNumbers(game),
-    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround,
+    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround, tall: s.settings.tallBoard,
     view: null,
     hoverColor: rc ? null : tr ? tr.color : game.turn,
     interactive: !tr || tr.status === "open",

@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
   coords: true,
+  tallBoard: false, // a traditional board: rows a little further apart than columns (board-surface.js TALL_RATIO)
   coordsAround: false, // coordinates on all four sides of the board, not only below and on the left
   volume: "normal", // off | quiet | normal | loud (audio.js VOLUME_LEVELS)
   numbers: false,
@@ -95,7 +96,7 @@ export function normalizeSettings(raw) {
   // (older still) played Japanese rules. Only a new profile has none.
   if (s.defaultRules === undefined && s.onboarded === true) out.defaultRules = "japanese";
   for (const [k, allowed] of Object.entries(ONE_OF)) if (!allowed.includes(out[k])) out[k] = DEFAULT_SETTINGS[k];
-  for (const k of ["coords", "coordsAround", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
+  for (const k of ["coords", "coordsAround", "tallBoard", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
     if (typeof out[k] !== "boolean") out[k] = DEFAULT_SETTINGS[k];
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;

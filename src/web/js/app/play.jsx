@@ -53,7 +53,7 @@ export function PlayView() {
     deadStones: scoring ? scoring.dead : [],
     variation: null,
     moveNumbers: moveNumbers(game),
-    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround,
+    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround, tall: s.settings.tallBoard,
     view: null,
     ghost: g.ghost ? { ...g.ghost, color: game.turn } : null,
     hoverColor: scoring ? null : game.turn,

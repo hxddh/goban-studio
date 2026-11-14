@@ -116,6 +116,7 @@ export const SHELL = {
   "settings.teaching": m("指导棋模式", "Teaching mode", "지도 모드", "指導碁モード"),
   "settings.teachingHelp": m("大的失误前提醒你、标出被打吃的棋子、赛后三点讲评。", "Warns before big mistakes, marks stones in atari, three takeaways after the game.", "큰 실수 전에 알려 주고, 단수인 돌을 표시하며, 대국 후 세 가지 강평을 합니다.", "大きな悪手の前に知らせ、アタリの石を示し、対局後に三つのポイントを講評します。"),
   "settings.confirmMove": m("对局时点两次落子", "Confirm moves in games", "대국에서 두 번 눌러 착수", "対局では2回クリックで着手"),
+  "settings.tallBoard": m("传统棋盘比例（纵向略长）", "Traditional proportions (a little taller)", "전통 바둑판 비율(세로가 약간 김)", "伝統的な盤の比率（縦が少し長い）"),
   "settings.coordsAround": m("四边都显示坐标", "Coordinates on all four sides", "네 변 모두 좌표 표시", "四辺すべてに座標を表示"),
   "settings.showEval": m("对局时显示形势", "Show the balance while playing", "대국 중 형세 표시", "対局中に形勢を表示"),
   "settings.liveAnalysis": m("复盘时实时分析", "Live analysis in review", "복기 중 실시간 분석", "検討中のリアルタイム解析"),

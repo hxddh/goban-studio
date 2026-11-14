@@ -7,7 +7,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import * as Book from "../../src/web/js/book.js";
 import { BLACK, WHITE, LETTERS } from "../../src/web/js/rules.js";
-import { windowOf } from "../../src/web/js/board.js";
+import { windowOf } from "../../src/web/js/board-surface.js";
 
 export default async function ({ test, assert, root }) {
   const file = path.join(root, "src/web/js/content/book.json");

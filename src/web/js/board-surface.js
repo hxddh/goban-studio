@@ -38,6 +38,62 @@ export function drawPreviewEdge(ctx, cx, cy, cell, black) {
 }
 
 /**
+ * The part of the board a problem window shows. A tight window is widened
+ * towards the open side to at least MIN_SPAN lines apart, so a corner problem
+ * keeps its surroundings and stones stay a natural size instead of filling
+ * the frame.
+ */
+const MIN_SPAN = 8;
+export function windowOf(view, size) {
+  if (!view) return { x0: 0, y0: 0, x1: size - 1, y1: size - 1 };
+  const want = Math.min(size - 1, MIN_SPAN);
+  const grow = (a, b) => {
+    a = Math.max(0, a);
+    b = Math.min(size - 1, b);
+    let need = want - (b - a);
+    while (need > 0) {
+      // Grow evenly, but never past an edge: what one side cannot take goes
+      // to the other.
+      if (a > 0 && (b >= size - 1 || (need & 1) === 0)) a--;
+      else if (b < size - 1) b++;
+      else break;
+      need--;
+    }
+    return [a, b];
+  };
+  const [x0, x1] = grow(view.x0, view.x1);
+  const [y0, y1] = grow(view.y0, view.y1);
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * A traditional board (Settings → Board): its lines are about 22 mm apart
+ * across and 23.7 mm down, so that seen from the player's seat its squares
+ * look square. Only a whole board; a problem window stays square.
+ */
+export const TALL_RATIO = 1.07;
+export function gridRatioOf(model) {
+  return model?.tall && !model.view ? TALL_RATIO : 1;
+}
+
+/**
+ * Width / height of the board frame for a model: 1 for a whole board (a
+ * little less for a traditional one), the window's own proportion
+ * (clamped) for a problem window.
+ */
+export function frameAspect(model) {
+  const v0 = model?.view;
+  if (!v0) {
+    const n = (model?.size || 19) - 1;
+    const m = model?.showCoords ? 2.5 : 1.6;
+    return (n + m) / (n * gridRatioOf(model) + m);
+  }
+  const v = windowOf(v0, model.size || 19);
+  const m = model.showCoords ? 2.5 : 1.6;
+  const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
+  return Math.max(0.6, Math.min(1.7, r));
+}
+/**
  * Grid strokes for a cell size (css px) and device pixel ratio, in whole
  * device pixels: the inner line is 2.2 % of a cell, at least 1 css px and
  * at most 1.5 (a 19×19 board keeps a line that holds its stones; a 9×9 one

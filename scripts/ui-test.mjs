@@ -127,7 +127,7 @@ async function pointOf(page, x, y) {
       const r = c.getBoundingClientRect();
       const g = window.__board?.geom;
       if (!g) return null;
-      return { x: r.left + g.ox + x * g.cell, y: r.top + g.oy + y * g.cell };
+      return { x: r.left + g.ox + x * g.cell, y: r.top + g.oy + y * (g.cellY ?? g.cell) };
     },
     [x, y],
   );

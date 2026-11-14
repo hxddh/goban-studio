@@ -34,7 +34,8 @@
  *   shows it, so a view does not need its own try/catch around rendering.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BoardView, frameAspect } from "../board.js";
+import { BoardView } from "../board.js";
+import { frameAspect } from "../board-surface.js";
 import { currentPalette, onBoardTheme } from "../theme.js";
 import { fromDiagram as thumbFromDiagram, fromString as thumbFromString, paintThumb } from "../thumb.js";
 import { t } from "../i18n.js";

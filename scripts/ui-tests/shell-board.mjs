@@ -212,6 +212,35 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.close();
   });
 
+  await check("shell board: a traditional board, from Settings → Board, is a little taller, and a click still lands on its point", async () => {
+    const page = await fresh();
+    await onboard(page, 1);
+    await page.waitForFunction(() => window.__board?.geom?.cell > 10);
+    await page.keyboard.press("Control+,");
+    await page.click(".settings-tab[data-pane=board]");
+    await page.locator(".settings-pane .switch", { hasText: "Traditional proportions" }).click();
+    await page.waitForFunction(() => window.__state.settings.tallBoard === true);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => window.__board.geom.cellY > window.__board.geom.cell * 1.05);
+    const frame = await page.evaluate(() => {
+      const r = document.querySelector(".board-frame").getBoundingClientRect();
+      return r.height / r.width;
+    });
+    assert(frame > 1.03 && frame < 1.08, `the frame is taller than wide (${frame.toFixed(3)})`);
+    const n = await page.evaluate(() => window.__state.game.game.moveNumber);
+    const p = await page.evaluate(() => {
+      const g = window.__state.game.game;
+      for (const [x, y] of [[2, 6], [6, 2], [2, 2], [6, 6]]) if (g.canPlay(x, y).ok) return [x, y];
+      return null;
+    });
+    await clickPoint(page, ...p);
+    await page.waitForFunction((n) => window.__state.game.game.moveNumber > n, n);
+    const placed = await page.evaluate((n) => window.__state.game.game.mainLine()[n + 1].move, n);
+    assert(placed.x === p[0] && placed.y === p[1], `played ${placed.x},${placed.y}, clicked ${p}`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   await check("shell board: the last move is a thin ring on the stone, not a filled dot; Settings can leave it out", async () => {
     const page = await seededPage({ appearance: "light" });
     await position(page);

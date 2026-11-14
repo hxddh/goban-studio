@@ -19,7 +19,7 @@
  */
 import { t } from "./i18n.js";
 import { LETTERS } from "./rules.js";
-import { windowOf } from "./board.js";
+import { windowOf } from "./board-surface.js";
 
 const BLACK = 1;
 const WHITE = -1;

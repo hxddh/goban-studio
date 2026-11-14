@@ -21,7 +21,7 @@
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
 import { loadMaterials, stoneVariant } from "./materials.js";
 import { currentPalette, onBoardTheme } from "./theme.js";
-import { drawBoardEdge, drawPreviewEdge, drawWood, finishStone, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "./board-surface.js";
+import { drawBoardEdge, gridRatioOf, windowOf, drawPreviewEdge, drawWood, finishStone, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "./board-surface.js";
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
@@ -29,47 +29,6 @@ const DPR_LIMIT = 2;
 const wantCellsFor = (m) => (m.showCoords ? 1.25 : 0.8);
 const bandFor = (m) => (m.showCoords ? 28 : 14);
 
-/**
- * Width / height of the board frame for a model: 1 for a whole board, the
- * window's own proportion (clamped) for a problem window.
- */
-/**
- * The part of the board a problem window shows. A tight window is widened
- * towards the open side to at least MIN_SPAN lines apart, so a corner problem
- * keeps its surroundings and stones stay a natural size instead of filling
- * the frame.
- */
-const MIN_SPAN = 8;
-export function windowOf(view, size) {
-  if (!view) return { x0: 0, y0: 0, x1: size - 1, y1: size - 1 };
-  const want = Math.min(size - 1, MIN_SPAN);
-  const grow = (a, b) => {
-    a = Math.max(0, a);
-    b = Math.min(size - 1, b);
-    let need = want - (b - a);
-    while (need > 0) {
-      // Grow evenly, but never past an edge: what one side cannot take goes
-      // to the other.
-      if (a > 0 && (b >= size - 1 || (need & 1) === 0)) a--;
-      else if (b < size - 1) b++;
-      else break;
-      need--;
-    }
-    return [a, b];
-  };
-  const [x0, x1] = grow(view.x0, view.x1);
-  const [y0, y1] = grow(view.y0, view.y1);
-  return { x0, y0, x1, y1 };
-}
-
-export function frameAspect(model) {
-  const v0 = model?.view;
-  if (!v0) return 1;
-  const v = windowOf(v0, model.size || 19);
-  const m = model.showCoords ? 2.5 : 1.6;
-  const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
-  return Math.max(0.6, Math.min(1.7, r));
-}
 /**
  * docs/design.md §4: the accent marks attention; good/bad are signals.
  * These are the tones on a light surface (a white stone in any theme); on
@@ -278,24 +237,25 @@ export class BoardView {
       const cell = Math.max(0.001, Math.min(w / (Math.max(1, cols) + mL + mR), h / (Math.max(1, rows) + mT + mB)));
       const ox = (w - (cols + mL + mR) * cell) / 2 + mL * cell - win.x0 * cell;
       const oy = (h - (rows + mT + mB) * cell) / 2 + mT * cell - win.y0 * cell;
-      return { w, h, cell, ox, oy, win, marginCells: Math.min(mL, mR, mT, mB) };
+      return { w, h, cell, cellY: cell, ox, oy, win, marginCells: Math.min(mL, mR, mT, mB) };
     }
-    const cell = Math.max(0.001, Math.min(fit(w, Math.max(1, cols)), fit(h, Math.max(1, rows))));
+    // A traditional board's rows are a little further apart than its columns (gridRatioOf).
+    const ratio = gridRatioOf(this.model);
+    const cell = Math.max(0.001, Math.min(fit(w, Math.max(1, cols)), fit(h, Math.max(1, rows) * ratio)));
+    const cellY = cell * ratio;
     const marginCells = Math.min(wantCells, 0.5 + band / cell);
-    const gridW = cell * cols;
-    const gridH = cell * rows;
-    const ox = (w - gridW) / 2 - win.x0 * cell;
-    const oy = (h - gridH) / 2 - win.y0 * cell;
-    return { w, h, cell, ox, oy, win, marginCells };
+    const ox = (w - cell * cols) / 2 - win.x0 * cell;
+    const oy = (h - cellY * rows) / 2 - win.y0 * cellY;
+    return { w, h, cell, cellY, ox, oy, win, marginCells };
   }
 
   pointToVertex(px, py) {
     const g = this.geom || this.geometry();
     const x = Math.round((px - g.ox) / g.cell);
-    const y = Math.round((py - g.oy) / g.cell);
+    const y = Math.round((py - g.oy) / g.cellY);
     if (x < g.win.x0 || y < g.win.y0 || x > g.win.x1 || y > g.win.y1) return null;
     const dx = px - (g.ox + x * g.cell);
-    const dy = py - (g.oy + y * g.cell);
+    const dy = py - (g.oy + y * g.cellY);
     if (Math.hypot(dx, dy) > g.cell * 0.55) return null;
     return { x, y };
   }
@@ -376,7 +336,7 @@ export class BoardView {
     const { size } = m;
     const { cell, ox, oy, w, h, win } = g;
     const px = (x) => ox + x * cell;
-    const py = (y) => oy + y * cell;
+    const py = (y) => oy + y * g.cellY;
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
@@ -602,7 +562,7 @@ export class BoardView {
     const j = jitter ? this.jitter(x, y) : { dx: 0, dy: 0 };
     const cx = g.ox + x * g.cell + j.dx;
     const r = g.cell * 0.475 * scale;
-    const cy = g.oy + y * g.cell + j.dy - lift * r * 0.08;
+    const cy = g.oy + y * g.cellY + j.dy - lift * r * 0.08;
     ctx.save();
     ctx.globalAlpha = alpha;
     if (shadow) {
@@ -696,7 +656,7 @@ export class BoardView {
     ctx.font = `600 ${Math.max(8, fs)}px ${this.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, g.ox + x * g.cell + j.dx, g.oy + y * g.cell + j.dy + 0.5);
+    ctx.fillText(text, g.ox + x * g.cell + j.dx, g.oy + y * g.cellY + j.dy + 0.5);
   }
 
   mark(ctx, mark, theme) {
@@ -704,7 +664,7 @@ export class BoardView {
     const stoneColor = this.model.board?.[mark.y]?.[mark.x] || 0;
     const j = stoneColor ? this.jitter(mark.x, mark.y) : { dx: 0, dy: 0 };
     const cx = g.ox + mark.x * g.cell + j.dx;
-    const cy = g.oy + mark.y * g.cell + j.dy;
+    const cy = g.oy + mark.y * g.cellY + j.dy;
     const r = g.cell * 0.27;
     // A white stone is a light surface in every theme, a black stone a dark one.
     const tones = stoneColor === WHITE ? ON_LIGHT : stoneColor === BLACK ? ON_DARK : theme.tones;
