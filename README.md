@@ -54,8 +54,8 @@ Downloads are on the [releases page](https://github.com/hxddh/goban-studio/relea
 
 | Platform | File | First launch |
 | --- | --- | --- |
-| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` or `.zip` | Drag the app to Applications and open it from there. macOS says it cannot verify the app: close the message, then on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open. |
-| macOS (Intel) | `GobanStudio-macOS-x64.dmg` or `.zip` | As for Apple Silicon. |
+| macOS 13 or later (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` or `.zip` | Drag the app to Applications and open it from there. macOS says it cannot verify the app: close the message, then on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open. |
+| macOS 13 or later (Intel) | `GobanStudio-macOS-x64.dmg` or `.zip` | As for Apple Silicon. |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | Unzip it and run `bin\goban-studio.exe`. If SmartScreen appears: More info → Run anyway. WebView2 is preinstalled on Windows 10 and 11. |
 
 **The builds are not code-signed.** macOS builds are ad-hoc signed and not
@@ -173,9 +173,12 @@ is verified and what is not.
 ## Engine
 
 The packaged app ships KataGo 1.18.1 (the Eigen CPU build) with the b6c96
-network, on every board size. On Windows it also ships KataGo's AVX2 build
-and starts that one when the processor has AVX2, falling back to the plain
-build if it does not start. The opponent's strength comes from the
+network, on every board size. Two platforms also ship a faster build and
+start it when the machine can run it, falling back to the plain build if it
+does not start: KataGo's AVX2 build on Windows (when the processor has
+AVX2), and a Metal build (GPU and Neural Engine) on Apple Silicon Macs.
+macOS 13 is the oldest supported release: Zig 0.16, which builds the
+shell, and KataGo's Metal backend both need it. The opponent's strength comes from the
 search budget, from choosing among KataGo's candidates within a loss
 window and, for the weaker ranks, from a share of deliberate beginner's
 moves.

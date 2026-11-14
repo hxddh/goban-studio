@@ -248,7 +248,9 @@ fn nativeSdkTarget(b: *std.Build) std.Build.ResolvedTarget {
 
     var query = target.query;
     query.os_tag = .macos;
-    query.os_version_min = .{ .semver = .{ .major = 11, .minor = 0, .patch = 0 } };
+    // macOS 13: the oldest Zig 0.16 supports, and the one KataGo's Metal
+    // build needs (build-macos.yml MACOS_MIN; Info.plist says the same).
+    query.os_version_min = .{ .semver = .{ .major = 13, .minor = 0, .patch = 0 } };
     return b.resolveTargetQuery(query);
 }
 

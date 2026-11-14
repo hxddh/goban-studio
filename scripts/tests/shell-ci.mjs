@@ -502,6 +502,21 @@ await test("ci: downloaded and built third-party code is pinned", () => {
   assert.match(kg, /fetch -q --depth 1 https:\/\/github\.com\/lightvector\/KataGo\.git "\$KATAGO_COMMIT"/);
   assert.match(kg, /test "\$\(git -C "\$RUNNER_TEMP\/KataGo" rev-parse HEAD\)" = "\$KATAGO_COMMIT"/);
   assert.doesNotMatch(kg, /--branch/);
+  // v15: both macOS builds target macOS 13, and the Metal build's libraries
+  // are built from pinned commits, statically, and nothing else is linked.
+  assert.equal(mac.env.MACOS_MIN, "13.0");
+  assert.match(kg, /-DCMAKE_OSX_DEPLOYMENT_TARGET="\$MACOS_MIN"/);
+  assert.match(mac.env.ABSEIL_COMMIT, /^[0-9a-f]{40}$/);
+  assert.match(mac.env.PROTOBUF_COMMIT, /^[0-9a-f]{40}$/);
+  const deps = steps(mac.jobs.build).find((s) => s.name === "build Protocol Buffers and Abseil for the Metal sidecar (static, macOS 13)").run;
+  assert.match(deps, /test "\$\(git -C "\$dir" rev-parse HEAD\)" = "\$commit"/);
+  assert.match(deps, /-DBUILD_SHARED_LIBS=OFF/);
+  const metal = steps(mac.jobs.build).find((s) => s.name === "build KataGo Metal sidecar");
+  assert.equal(metal.if, "${{ env.ARCH == 'arm64' }}");
+  assert.match(metal.run, /-DUSE_BACKEND=METAL/);
+  assert.match(metal.run, /export PKG_CONFIG_LIBDIR="\$METAL_DEPS\/lib\/pkgconfig"/);
+  assert.match(metal.run, /grep -vE '\^\(\/usr\/lib\/\|\/System\/Library\/\|@rpath\/libswift\)'/);
+  assert.match(raw["build-macos.yml"], /plutil -replace LSMinimumSystemVersion -string "\$MACOS_MIN"/);
   // Every other KataGo download is checked against its hash.
   for (const f of ["book.yml", "calibrate.yml", "classics-check.yml", "lesson-check.yml"]) {
     assert.match(wf[f].env.KATAGO_SHA256, /^[0-9a-f]{64}$/, f);

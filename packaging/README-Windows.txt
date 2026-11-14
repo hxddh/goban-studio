@@ -15,7 +15,9 @@ The app works offline and needs no account. It makes no network request
 unless you choose Check for updates, or turn on the weekly update check in
 Settings (off by default), or download an optional KataGo network; the
 first two ask GitHub for the latest version and send nothing about you or
-your games. These requests use your Windows proxy setting (Settings >
+your games. The networks come from KataGo's GitHub releases (the human
+model) and from katagotraining.org, KataGo's own network site (the
+stronger network). These requests use your Windows proxy setting (Settings >
 Network & Internet > Proxy, manual setup) or the HTTPS_PROXY environment
 variable, if you have one.
 

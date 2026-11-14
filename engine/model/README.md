@@ -11,6 +11,12 @@ build for the rest of the session if it does not answer its first command:
 | Platform | Plain build (always) | Faster build | Used when |
 | --- | --- | --- | --- |
 | Windows x64 | `katago.exe` (official `eigen` zip) | `katago-avx2.exe` (official `eigenavx2` zip; same DLLs) | the CPU has AVX2 and FMA and the OS saves the AVX state |
+| macOS arm64 | `katago` (Eigen, built from the pinned commit) | `katago-metal` (`-DUSE_BACKEND=METAL`, same commit; protobuf and abseil linked in statically) | macOS 13 or later |
+| macOS x64 | `katago` (Eigen, SSE only) | none | |
+
+Both macOS builds target macOS 13 (`build-macos.yml`, `MACOS_MIN`). The
+licences of what the Metal build links in besides KataGo (Protocol
+Buffers, Abseil, katagocoreml) ship beside it in `engine/macos/licenses/`.
 
 `model.txt.gz` is the public b6c96 network (KataGo model version 8). It is
 one of the networks of KataGo's "g170" run, which are under CC0 (effectively

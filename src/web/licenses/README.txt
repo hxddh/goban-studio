@@ -11,6 +11,11 @@ components; their licence texts sit beside this file.
   KataGo 1.18.1 (the engine) — MIT — KataGo-MIT.txt
   The built-in b6c96 network (KataGo's g170 run) — CC0 — KataGo-networks.txt
 
+On Apple Silicon Macs the Metal build of KataGo (engine/macos/katago-metal)
+also contains Protocol Buffers (BSD-3-Clause), Abseil (Apache-2.0) and
+katagocoreml (BSD-3-Clause); their licence texts are in engine/macos/licenses/
+inside the app's frontend/dist folder.
+
 The optional networks the app can download on request are not part of the
 package: KataGo's human model (b18c384nbt-humanv0) and the stronger network
 (kata1-b18c384nbt) are under the KataGo Neural Network License, whose
