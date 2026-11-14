@@ -16,6 +16,8 @@ src/web/js/content-lazy/
 # KataGo platform binaries are fetched/built by the release workflows
 engine/*/katago
 engine/*/katago.exe
+engine/*/katago-*
+engine/macos/licenses/
 engine/*/*.dll
 .claude/worktrees/
 tests/visual/diff/

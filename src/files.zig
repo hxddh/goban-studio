@@ -1,5 +1,5 @@
 //! Which of the user's own files the page may read or write
-//! (`studio.readTextFile` / `studio.writeTextFile`, main.zig).
+//! (`studio.readTextFile` / `studio.writeTextFile`, bridge_files.zig).
 //!
 //! The page never names a file on its own authority. A path becomes usable
 //! only when native code handed it out:
@@ -330,7 +330,7 @@ test "a completed save name never replaces a file nobody was asked about" {
     try testing.expectEqualStrings("(;GM[1])", try tmp.dir.readFile(io, "game.sgf", &read_buf));
 
     // A name the user typed in full was the dialog's to ask about: it is
-    // returned as it is, and main.zig does not call this at all.
+    // returned as it is, and the shell does not call this at all.
     const full = try std.fmt.bufPrint(&typed_buf, "{s}{c}game.sgf", .{ dir, sep });
     try testing.expectEqualStrings(full, fixSavePath(full, ".sgf", &fixed_buf).?);
 }

@@ -35,7 +35,7 @@ export const KINDS = ["human", "strong"];
 /** What the page may say about each download before the host answers. */
 export const MODELS = Object.freeze({
   human: Object.freeze({ kind: "human", name: "b18c384nbt-humanv0", bytes: 99_066_230 }),
-  strong: Object.freeze({ kind: "strong", name: "g170e-b15c192-s1672170752-d466197061", bytes: 48_038_914 }),
+  strong: Object.freeze({ kind: "strong", name: "kata1-b18c384nbt-s9996604416-d4316597426", bytes: 97_898_094 }),
 });
 
 /** No progress for this long while downloading: show "stalled". */

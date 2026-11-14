@@ -18,6 +18,7 @@ import { COURSE } from "../src/web/js/content/course.js";
 import { PROBLEMS, THEMES } from "../src/web/js/content/problems.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { APP_VERSION } from "../src/web/js/version.js";
+import { shellSource } from "./shell-source.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const langs = ["zh", "en", "ko", "ja"];
@@ -62,6 +63,7 @@ for (const file of [
   "engine/model/model.txt.gz",
   "engine/model/gtp.cfg",
   "engine/model/LICENSE-KataGo.txt",
+  "engine/model/LICENSE-KataGo-networks.txt",
   "engine/model/version.txt",
   "src/macos_open.m",
   "src/web/licenses/README.txt",
@@ -85,7 +87,7 @@ assert.match(cfg, /rules = japanese/);
 assert.match(cfg, /reportAnalysisWinratesAs = BLACK/, "the page reads analysis from Black's point of view");
 
 const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
-const mainZig = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
+const mainZig = shellSource(root);
 assert.match(engineZig, /kata-search_analyze/);
 for (const rules of ["japanese", "chinese", "korean"]) {
   assert.match(engineZig, new RegExp(`"kata-set-rules ${rules}"`), `the host sends kata-set-rules ${rules}`);

@@ -37,11 +37,11 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SDK_NAME = "@native-sdk/cli";
 /** SHA-256 of the toolchain manifest shipped in the pinned SDK version. */
 export const TOOLCHAIN_MANIFEST = "packages/core/scripts/scriptc-toolchain.json";
-export const TOOLCHAIN_MANIFEST_SHA256 = "cf40a71c2f628603b485834a2acca59380f9b72b6142a6326deb7c5f515e812c";
+export const TOOLCHAIN_MANIFEST_SHA256 = "82630c695b5538607d18476613bbe77e7fbfe6db0a3d75a79776907cd8f23057";
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
-/** The exact version package.json asks for ("0.11.0", never a range). */
+/** The exact version package.json asks for ("0.11.1", never a range). */
 export function pinnedVersion(dir = root) {
   const version = readJson(path.join(dir, "package.json")).devDependencies?.[SDK_NAME];
   if (!/^\d+\.\d+\.\d+$/.test(version || "")) throw new Error(`package.json must pin ${SDK_NAME} to one exact version (found ${JSON.stringify(version)})`);

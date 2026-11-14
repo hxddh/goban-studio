@@ -49,6 +49,17 @@ env:
   NPM_CONFIG_ENGINE_STRICT: "true"
   # KataGo v1.18.1, checked out by commit (a tag can be moved).
   KATAGO_COMMIT: 92ee95c0a4b25fec214da00951ab69e97e207729
+  # v15, Apple Silicon only: the Metal build of KataGo needs Protocol
+  # Buffers and Abseil. They are built from these commits as static
+  # libraries for macOS 13 (KataGo's Metal deployment target) and linked
+  # into katago-metal, so nothing from Homebrew (whose bottles target the
+  # runner's macOS) is loaded at run time and no dylib has to be bundled.
+  # Abseil 20250127.1 (LTS) is the version protobuf v31.1 is built against.
+  ABSEIL_COMMIT: d9e4955c65cd4367dd6bf46f4ccb8cd3d100540b
+  PROTOBUF_COMMIT: 74211c0dfc2777318ab53c2cd2c317a2ef9012de
+  # The oldest macOS the app, both KataGo builds and the bundled libraries
+  # run on (Zig 0.16 and KataGo's Metal backend both need 13).
+  MACOS_MIN: "13.0"
 
 jobs:
   build:
@@ -87,7 +98,7 @@ jobs:
       - name: install build dependencies
         run: |
           npm ci --ignore-scripts
-          brew install cmake ninja eigen
+          brew install cmake ninja eigen pkgconf
       - name: content gate
         run: npm run release-check
       - name: unit tests
@@ -95,7 +106,8 @@ jobs:
       - name: build KataGo Eigen sidecar
         # Built from source on the runner's own CPU (arm64, or x86_64 on the
         # Intel runner); USE_AVX2=OFF keeps the Intel build to SSE so it runs
-        # on every Intel Mac that runs macOS 11+.
+        # on every Intel Mac that runs macOS 13+. The deployment target is
+        # set explicitly: left alone it is the runner's own macOS.
         run: |
           set -euo pipefail
           # Fetch exactly the pinned commit and check that is what we got.
@@ -110,6 +122,7 @@ jobs:
             "$RUNNER_TEMP/KataGo/cpp/core/global.cpp"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build" \
             -G Ninja -DUSE_BACKEND=EIGEN -DUSE_AVX2=OFF -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN" \
             -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
             -DEIGEN3_INCLUDE_DIRS="$(brew --prefix eigen)/include/eigen3" \
             -DCMAKE_BUILD_TYPE=Release
@@ -119,7 +132,80 @@ jobs:
           chmod +x engine/macos/katago
           file engine/macos/katago
           lipo -archs engine/macos/katago | grep -qw "$([ "$ARCH" = x64 ] && echo x86_64 || echo arm64)"
+          vtool -show-build engine/macos/katago | grep -E "minos $MACOS_MIN( |$)"
           codesign --force --sign - engine/macos/katago
+      - name: build Protocol Buffers and Abseil for the Metal sidecar (static, macOS 13)
+        if: ${{ env.ARCH == 'arm64' }}
+        run: |
+          set -euo pipefail
+          deps="$RUNNER_TEMP/metal-deps"
+          for repo in abseil/abseil-cpp:"$ABSEIL_COMMIT" protocolbuffers/protobuf:"$PROTOBUF_COMMIT"; do
+            name="${repo%%:*}"; commit="${repo##*:}"; dir="$RUNNER_TEMP/src/${name##*/}"
+            git init -q "$dir"
+            git -C "$dir" fetch -q --depth 1 "https://github.com/$name.git" "$commit"
+            git -C "$dir" checkout -q --detach FETCH_HEAD
+            test "$(git -C "$dir" rev-parse HEAD)" = "$commit"
+          done
+          common=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN"
+            -DCMAKE_CXX_STANDARD=17 -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF
+            -DCMAKE_INSTALL_PREFIX="$deps" -DCMAKE_PREFIX_PATH="$deps")
+          cmake -S "$RUNNER_TEMP/src/abseil-cpp" -B "$RUNNER_TEMP/build/abseil" "${common[@]}" \
+            -DABSL_PROPAGATE_CXX_STD=ON -DABSL_BUILD_TESTING=OFF -DABSL_ENABLE_INSTALL=ON
+          cmake --build "$RUNNER_TEMP/build/abseil" --parallel 4
+          cmake --install "$RUNNER_TEMP/build/abseil"
+          cmake -S "$RUNNER_TEMP/src/protobuf" -B "$RUNNER_TEMP/build/protobuf" "${common[@]}" \
+            -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package \
+            -Dprotobuf_INSTALL=ON -Dutf8_range_ENABLE_INSTALL=ON -Dprotobuf_BUILD_LIBUPB=OFF
+          cmake --build "$RUNNER_TEMP/build/protobuf" --parallel 4
+          cmake --install "$RUNNER_TEMP/build/protobuf"
+          # Static only: a dylib here would be linked instead and then be
+          # missing on the player's Mac.
+          test -f "$deps/lib/libprotobuf.a"
+          test -x "$deps/bin/protoc"
+          if ls "$deps"/lib/*.dylib > /dev/null 2>&1; then echo "a shared library was built"; exit 1; fi
+          ls "$deps/lib/pkgconfig" | head -50
+          echo "METAL_DEPS=$deps" >> "$GITHUB_ENV"
+      - name: build KataGo Metal sidecar
+        # KataGo's own instructions (Compiling.md, CMakeLists.txt at the
+        # pinned commit): Ninja, AppleClang and Swift (Xcode's), deployment
+        # target 13.0, protobuf and abseil found through pkg-config. Same
+        # checkout and quick_exit patch as the Eigen build above; a separate
+        # build directory. Shipped as engine/macos/katago-metal, preferred
+        # by the app on macOS 13+ (src/engine_build.zig), with the Eigen
+        # build as the fallback.
+        if: ${{ env.ARCH == 'arm64' }}
+        run: |
+          set -euo pipefail
+          # pkg-config sees only the libraries built above, never Homebrew's.
+          export PKG_CONFIG_LIBDIR="$METAL_DEPS/lib/pkgconfig"
+          cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build-metal" \
+            -G Ninja -DUSE_BACKEND=METAL -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN" \
+            -DCMAKE_PREFIX_PATH="$METAL_DEPS" \
+            -DProtobuf_PROTOC_EXECUTABLE="$METAL_DEPS/bin/protoc" \
+            -DProtobuf_INCLUDE_DIR="$METAL_DEPS/include" \
+            -DProtobuf_LIBRARY="$METAL_DEPS/lib/libprotobuf.a" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/KataGo/cpp/build-metal" --parallel 4
+          cp "$RUNNER_TEMP/KataGo/cpp/build-metal/katago" engine/macos/katago-metal
+          chmod +x engine/macos/katago-metal
+          file engine/macos/katago-metal
+          lipo -archs engine/macos/katago-metal | grep -qw arm64
+          vtool -show-build engine/macos/katago-metal | grep -E "minos $MACOS_MIN( |$)"
+          # Only the system's libraries and frameworks (and Swift's runtime,
+          # part of macOS 13): nothing that would be missing on a player's Mac.
+          otool -L engine/macos/katago-metal
+          if otool -L engine/macos/katago-metal | tail -n +2 | awk '{print $1}' | \
+            grep -vE '^(/usr/lib/|/System/Library/|@rpath/libswift)'; then
+            echo "katago-metal links a library outside the system"; exit 1
+          fi
+          codesign --force --sign - engine/macos/katago-metal
+          engine/macos/katago-metal version
+          # Licences of what is linked into it besides KataGo's own code.
+          mkdir -p engine/macos/licenses
+          cp "$RUNNER_TEMP/src/protobuf/LICENSE" engine/macos/licenses/protobuf-LICENSE.txt
+          cp "$RUNNER_TEMP/src/abseil-cpp/LICENSE" engine/macos/licenses/abseil-LICENSE.txt
+          cp "$RUNNER_TEMP/KataGo/cpp/external/katagocoreml/LICENSE" engine/macos/licenses/katagocoreml-LICENSE.txt
       - name: KataGo smoke test
         run: |
           set -euo pipefail
@@ -129,6 +215,25 @@ jobs:
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
           test -n "$move"
           echo "KataGo answered: $move"
+      - name: KataGo Metal smoke test (informational)
+        # GitHub's Apple Silicon runners are virtual machines whose GPU may
+        # not run MPSGraph or Core ML. A failure here is reported, not
+        # fatal: the app falls back to the Eigen build when the Metal one
+        # does not start. `katago-metal version` above must pass.
+        if: ${{ env.ARCH == 'arm64' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          move=$(printf 'boardsize 19\nkomi 6.5\nkata-set-rules japanese\nplay B Q16\ngenmove W\nquit\n' | \
+            engine/macos/katago-metal gtp -model engine/model/model.txt.gz -config engine/model/gtp.cfg \
+            -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
+            | grep -E '^= [A-HJ-T][0-9]+' | tail -1) || true
+          if [ -n "$move" ]; then
+            echo "KataGo (Metal) answered: $move"
+          else
+            echo "::warning title=KataGo Metal::the Metal build did not answer on this runner; the app will fall back to the Eigen build where that happens"
+            exit 1
+          fi
       - name: Native SDK from the lockfile
         # `npm ci` above installed @native-sdk/cli and the `native` binary
         # for this runner at the version and hashes in package-lock.json.
@@ -200,10 +305,20 @@ jobs:
           native package --target macos --signing adhoc --assets frontend/dist \
             --output dist/GobanStudio.app --binary zig-out/bin/goban-studio
           node scripts/install-engine.mjs dist/GobanStudio.app macos
+          # The SDK writes LSMinimumSystemVersion 11.0; the app needs 13.0
+          # (Zig 0.16, KataGo's Metal build). Before signing: the plist is
+          # sealed by the signature.
+          plutil -replace LSMinimumSystemVersion -string "$MACOS_MIN" dist/GobanStudio.app/Contents/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' dist/GobanStudio.app/Contents/Info.plist)" = "$MACOS_MIN"
           # Ad-hoc ("-") without the secrets; Developer ID + hardened runtime
           # + packaging/entitlements.plist with them. KataGo is signed first.
           bash scripts/macos-sign.sh sign dist/GobanStudio.app
           test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
+          if [ "$ARCH" = arm64 ]; then
+            test -x "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago-metal"
+            test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/licenses/protobuf-LICENSE.txt"
+          fi
+          vtool -show-build "dist/GobanStudio.app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' dist/GobanStudio.app/Contents/Info.plist)" | grep -E "minos $MACOS_MIN( |$)"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/model/model.txt.gz"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
           test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/content/book.json"
@@ -223,8 +338,8 @@ jobs:
             -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
             | grep -E '^= [A-HJ-T][0-9]+' | tail -1
       - name: self-test the packaged app
-        # v5: includes the optional downloads end to end (pinned KataGo
-        # release assets, 99 MB + 48 MB, into a temporary folder; see
+        # v5: includes the optional downloads end to end (the pinned
+        # KataGo files, 99 MB + 98 MB, into a temporary folder; see
         # scripts/selftest-app.mjs). GOBAN_SELFTEST_MODELS=0 skips them.
         timeout-minutes: 10
         run: |

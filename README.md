@@ -54,8 +54,8 @@ Downloads are on the [releases page](https://github.com/hxddh/goban-studio/relea
 
 | Platform | File | First launch |
 | --- | --- | --- |
-| macOS (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` or `.zip` | Drag the app to Applications and open it from there. macOS says it cannot verify the app: close the message, then on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open. |
-| macOS (Intel) | `GobanStudio-macOS-x64.dmg` or `.zip` | As for Apple Silicon. |
+| macOS 13 or later (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` or `.zip` | Drag the app to Applications and open it from there. macOS says it cannot verify the app: close the message, then on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open. |
+| macOS 13 or later (Intel) | `GobanStudio-macOS-x64.dmg` or `.zip` | As for Apple Silicon. |
 | Windows (x64) | `GobanStudio-Windows-x64.zip` | Unzip it and run `bin\goban-studio.exe`. If SmartScreen appears: More info → Run anyway. WebView2 is preinstalled on Windows 10 and 11. |
 
 **The builds are not code-signed.** macOS builds are ad-hoc signed and not
@@ -96,11 +96,14 @@ No account, no telemetry, and no network request unless you ask for one:
   release. The weekly automatic check is off until you turn it on.
 - **Download and install** fetches that release's package and its
   `SHA256SUMS` from GitHub.
-- **The optional KataGo networks** (Settings → Engines) are fetched from
-  KataGo's GitHub releases when you choose them.
+- **The optional KataGo networks** (Settings → Engines) are fetched when
+  you choose them: the human model from KataGo's GitHub releases, the
+  stronger network from KataGo's own network server,
+  `media.katagotraining.org`.
 
 The addresses are fixed in the native code, and redirects are followed
-only to GitHub's own download hosts over HTTPS. If your system, or the
+only over HTTPS: for updates only to GitHub's own download hosts, for the
+networks to those and `media.katagotraining.org`. If your system, or the
 `HTTPS_PROXY` variable, names an HTTP proxy, these requests go through it
 as a tunnel, with TLS still verified end to end. SOCKS proxies and proxy
 auto-config (PAC) scripts are not used. An interrupted download continues
@@ -170,7 +173,12 @@ is verified and what is not.
 ## Engine
 
 The packaged app ships KataGo 1.18.1 (the Eigen CPU build) with the b6c96
-network, on every board size. The opponent's strength comes from the
+network, on every board size. Two platforms also ship a faster build and
+start it when the machine can run it, falling back to the plain build if it
+does not start: KataGo's AVX2 build on Windows (when the processor has
+AVX2), and a Metal build (GPU and Neural Engine) on Apple Silicon Macs.
+macOS 13 is the oldest supported release: Zig 0.16, which builds the
+shell, and KataGo's Metal backend both need it. The opponent's strength comes from the
 search budget, from choosing among KataGo's candidates within a loss
 window and, for the weaker ranks, from a share of deliberate beginner's
 moves.
@@ -184,8 +192,10 @@ is a model, not people. Method, results and limits:
 
 Two optional networks can be added in Settings → Engines, each pinned by
 address, size and SHA-256 and removable again: KataGo's human model
-(99 MB; the opponent then plays in a human style) and a larger network
-(48 MB; used for analysis, hints, counting and the strongest ranks).
+(99 MB; the opponent then plays in a human style) and a current strong
+network, kata1-b18c384nbt (98 MB; used for analysis, hints, counting and
+the strongest ranks; it is much larger than the built-in one, so analysis
+is slower on older computers).
 
 In the browser preview there is no KataGo: a small offline engine plays,
 and the interface says so where it matters.
@@ -296,10 +306,13 @@ src/web/js/model/        the player model: rating, spaced review, focus, the pat
 src/web/js/content/      course, problems and their levels, classics, opening book
 src/web/js/messages/     every interface string in four languages, by area
 
-src/main.zig             the shell: window, the bridge's commands, menus
+src/main.zig, shell.zig  the shell: start-up and its state
+src/commands.zig         the bridge's command table; events.zig: platform events
+src/bridge_*.zig         the commands: files, window and menus, KataGo, updates, networks
+src/lifecycle.zig        one running copy, and the save before a quit
 src/store.zig, files.zig, paths.zig      the data folder, file dialogs, paths
 src/instance.zig         one running copy; a second launch hands over its file
-src/engine.zig           the KataGo child process
+src/engine.zig, engine_build.zig         the KataGo child process; which build starts
 src/net.zig              one HTTPS client: proxy, redirects, resume
 src/update.zig, install.zig, updater/    update check, download and checks, the swap helpers
 src/models.zig           the optional network downloads
@@ -317,5 +330,9 @@ Each version's notes are in [`.github/release-notes/`](.github/release-notes/).
 
 ## Licence
 
-MIT. KataGo, Moka and @sabaki/go-board are MIT; Inter is under the SIL
-Open Font License 1.1. The licences ship inside the app.
+MIT. KataGo, Moka and @sabaki/go-board are MIT; the built-in KataGo network
+(g170 b6c96) is CC0, and the optional networks (the human model and
+kata1-b18c384nbt) are under the
+[KataGo Neural Network License](https://katagotraining.org/network_license/)
+(`engine/model/LICENSE-KataGo-networks.txt`); Inter is under the SIL Open
+Font License 1.1. The licences ship inside the app.

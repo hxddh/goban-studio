@@ -11,7 +11,8 @@ name: lesson-check
 # KataGo (official 1.18.1 Linux release, Eigen AVX2 CPU build) and the two
 # optional networks (the URLs pinned in src/models.zig) are downloaded and
 # checked against their SHA-256; none of them is committed. The check uses
-# the stronger network (g170e-b15c192).
+# the stronger network (kata1-b18c384nbt since v15; earlier runs used
+# g170e-b15c192, and their recorded results say so).
 on:
   push:
     branches: ["check/**"]
@@ -61,7 +62,7 @@ jobs:
             echo "$sha  $f" | sha256sum -c -
           done < nets.txt
           echo "KATAGO=$RUNNER_TEMP/kg/squashfs-root/AppRun" >> "$GITHUB_ENV"
-          echo "KATAGO_STRONG_MODEL=$RUNNER_TEMP/kg/g170e-b15c192-s1672170752-d466197061.txt.gz" >> "$GITHUB_ENV"
+          echo "KATAGO_STRONG_MODEL=$RUNNER_TEMP/kg/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz" >> "$GITHUB_ENV"
           "$RUNNER_TEMP/kg/squashfs-root/AppRun" version
           nproc
       - name: check shard ${{ matrix.shard }}

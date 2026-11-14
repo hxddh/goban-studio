@@ -26,7 +26,7 @@ allows fails there even if it works on your machine.
 ## Set up: the native shell (Zig + Native SDK)
 
 The shell needs **Zig 0.16.0** exactly (the SDK pins it) and
-**`@native-sdk/cli` 0.11.0**. The SDK is a devDependency at that exact
+**`@native-sdk/cli` 0.11.1**. The SDK is a devDependency at that exact
 version, so `npm ci` installs it — and the `native` binary for your
 platform — with the hashes in `package-lock.json`; do not install it
 globally. It is patched by `scripts/patch-sdk.mjs` (it keeps the system

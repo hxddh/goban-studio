@@ -40,5 +40,8 @@ if (platform !== "windows") {
     process.exit(1);
   }
   fs.chmodSync(binary, 0o755);
+  // v15: the Metal build beside it on Apple Silicon (src/engine_build.zig).
+  const metal = path.join(destination, "katago-metal");
+  if (fs.existsSync(metal)) fs.chmodSync(metal, 0o755);
 }
 console.log(`${platform} engine → ${destination}`);

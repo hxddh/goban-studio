@@ -13,9 +13,9 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 585 checks in 69 files |
+| Unit and data tests | `npm test` | 586 checks in 69 files |
 | Interface tests | `npm run ui-test` | 141 checks, 18 visual baselines |
-| Zig tests | `npm run test:native` | 72 pass on Linux, 3 more are skipped there |
+| Zig tests | `npm run test:native` | 79 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
 <!-- /counts -->
 
@@ -141,7 +141,9 @@ allow-list, `SHA256SUMS` parsing, the signature and the version it names,
 zip entry checks and extraction, CPU checks, the model downloader's pins,
 proxy choice and parsing (environment, `scutil`, registry), resuming a
 download, the single-instance lock and inbox, save-path handling, the
-JSON writer and the engine's command vocabulary. On Linux they run against
+JSON writer, the engine's command vocabulary, and which KataGo build
+starts (AVX2 detection, the macOS version check, and falling back to the
+plain build, with stand-in executables). On Linux they run against
 the SDK's null platform (no window system); three are skipped there (one
 needs macOS's `codesign`, two the network — `CONTRIBUTING.md` says how to
 run those). The `native-hosts` job and the platform builds run them on
@@ -215,10 +217,22 @@ No machine can check these, and none has been done yet:
   platform proves that the shell compiles and its tests pass, not that a
   window works.
 - **Real touch hardware, Safari outside WKWebView, Windows on ARM.**
+- **The faster KataGo builds (v15).** The Windows AVX2 build is
+  smoke-tested on GitHub's runner; the Metal build on Apple Silicon is
+  built and its `version` checked there, but whether it answers a move on
+  the runner's virtual GPU is informational, and neither the speed-up nor
+  the fallback on a real Mac or PC has been tried. Nor has the Metal build
+  under the hardened runtime of a Developer ID build.
+- **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192;
+  the top level and the analysis budget that use it have not been measured
+  again (`docs/strength.md`, "v15").
 
 ## Dependency notes
 
-- Zig stays at 0.16.0: Native SDK 0.11.0 pins that toolchain.
+- Zig stays at 0.16.0: Native SDK 0.11.1 pins that toolchain (0.16.x only).
+- macOS 13 is the minimum (v15): the shell is built for it (`build.zig`),
+  both KataGo builds target it, and the packaged Info.plist says so (the
+  SDK writes 11.0; `build-macos.yml` replaces it before signing).
 - Node.js 24 is the floor (the Native SDK's own); CI also runs 26.
 - KataGo 1.18.1 is the latest release with official Eigen CPU builds.
 - The b6c96 network stays deliberately: larger current networks would make

@@ -3,7 +3,7 @@ name: build-windows
 on:
   workflow_dispatch:
   workflow_call:
-    # Optional: with both, the exe and katago.exe are Authenticode-signed;
+    # Optional: with both, the exe and both KataGo builds are Authenticode-signed;
     # without them the build is unsigned (docs/signing.md). release.yml
     # passes them with `secrets: inherit`.
     secrets:
@@ -21,10 +21,17 @@ permissions:
 
 env:
   NPM_CONFIG_ENGINE_STRICT: "true"
-  # The official KataGo Windows release, pinned by its SHA-256 (computed from
-  # the release asset; KataGo publishes no checksum file).
+  # The official KataGo Windows releases, pinned by their SHA-256 (computed
+  # from the release assets; KataGo publishes no checksum file). The plain
+  # Eigen build runs on any x64 CPU and is installed as katago.exe; the
+  # eigenavx2 build is installed beside it as katago-avx2.exe, and the app
+  # starts it instead when the CPU has AVX2 and FMA (src/engine_build.zig),
+  # falling back to katago.exe if it does not start. Both zips carry the
+  # same DLLs, byte for byte (checked below).
   KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigen-windows-x64.zip
   KATAGO_SHA256: 074485cf150c38aa3bb14ac9f54f2952ffefbceb44673709bbb8a83650bf95d6
+  KATAGO_AVX2_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-windows-x64.zip
+  KATAGO_AVX2_SHA256: 0d62ffa41ee04dd89dd1b80fe45e306c837231cb1e2dccb4f5780d0ca7c313db
 
 jobs:
   build:
@@ -54,27 +61,39 @@ jobs:
         run: npm run release-check
       - name: unit tests
         run: npm test
-      - name: download KataGo Eigen sidecar
+      - name: download KataGo Eigen sidecars (plain and AVX2)
         run: |
           set -euo pipefail
           curl -L --fail -sS --retry 5 --retry-all-errors -o "$RUNNER_TEMP/katago.zip" "$KATAGO_URL"
-          # Checked before anything is unpacked (relative name: RUNNER_TEMP
+          curl -L --fail -sS --retry 5 --retry-all-errors -o "$RUNNER_TEMP/katago-avx2.zip" "$KATAGO_AVX2_URL"
+          # Checked before anything is unpacked (relative names: RUNNER_TEMP
           # is a Windows path here).
           (cd "$RUNNER_TEMP" && echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -)
-          mkdir -p engine/windows
+          (cd "$RUNNER_TEMP" && echo "$KATAGO_AVX2_SHA256  katago-avx2.zip" | sha256sum -c -)
+          mkdir -p engine/windows "$RUNNER_TEMP/katago-avx2"
           powershell -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/katago.zip' -DestinationPath 'engine/windows' -Force"
+          powershell -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/katago-avx2.zip' -DestinationPath '$RUNNER_TEMP/katago-avx2' -Force"
+          # The AVX2 build uses the plain build's DLLs: they must be the same files.
+          for dll in "$RUNNER_TEMP"/katago-avx2/*.dll; do
+            cmp "$dll" "engine/windows/$(basename "$dll")"
+          done
+          cp "$RUNNER_TEMP/katago-avx2/katago.exe" engine/windows/katago-avx2.exe
           test -f engine/windows/katago.exe
+          test -f engine/windows/katago-avx2.exe
           test -f engine/windows/msvcp140.dll
           test -f engine/windows/libcrypto-3-x64.dll
       - name: KataGo smoke test
+        # Both builds: GitHub's Windows runners have AVX2.
         run: |
           set -euo pipefail
-          move=$(printf 'boardsize 19\nkomi 6.5\nkata-set-rules japanese\nplay B Q16\ngenmove W\nquit\n' | \
-            ./engine/windows/katago.exe gtp -model engine/model/model.txt.gz -config engine/model/gtp.cfg \
-            -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
-            | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
-          test -n "$move"
-          echo "KataGo answered: $move"
+          for exe in katago.exe katago-avx2.exe; do
+            move=$(printf 'boardsize 19\nkomi 6.5\nkata-set-rules japanese\nplay B Q16\ngenmove W\nquit\n' | \
+              "./engine/windows/$exe" gtp -model engine/model/model.txt.gz -config engine/model/gtp.cfg \
+              -override-config "logDir=$RUNNER_TEMP,homeDataDir=$RUNNER_TEMP,logAllGTPCommunication=false,logSearchInfo=false,logToStderr=false,ponderingEnabled=false,allowResignation=false" \
+              | grep -E '^= [A-HJ-T][0-9]+' | tail -1)
+            test -n "$move"
+            echo "KataGo ($exe) answered: $move"
+          done
       - name: Native SDK from the lockfile
         # `npm ci` above installed @native-sdk/cli and the `native` binary
         # for this runner at the version and hashes in package-lock.json.
@@ -118,6 +137,7 @@ jobs:
           node scripts/install-engine.mjs dist/GobanStudio windows
           cp packaging/README-Windows.txt dist/GobanStudio/README-Windows.txt
           test -f dist/GobanStudio/resources/frontend/dist/engine/windows/katago.exe
+          test -f dist/GobanStudio/resources/frontend/dist/engine/windows/katago-avx2.exe
           test -f dist/GobanStudio/resources/frontend/dist/engine/windows/msvcp140.dll
           test -f dist/GobanStudio/resources/frontend/dist/engine/windows/libcrypto-3-x64.dll
           test -f dist/GobanStudio/resources/frontend/dist/engine/model/model.txt.gz
@@ -139,7 +159,7 @@ jobs:
             echo "mode=unsigned" >> "$GITHUB_OUTPUT"
             echo "::notice title=Windows signing::WINDOWS_CERT_PFX_BASE64 / WINDOWS_CERT_PASSWORD not set; building an UNSIGNED package. See docs/signing.md."
           fi
-      - name: Authenticode-sign goban-studio.exe and katago.exe
+      - name: Authenticode-sign goban-studio.exe and the KataGo builds
         if: ${{ steps.mode.outputs.mode == 'authenticode' }}
         shell: pwsh
         env:
@@ -156,7 +176,8 @@ jobs:
             Write-Host "signtool: $($signtool.FullName)"
             $files = @(
               (Get-ChildItem -Recurse -Filter goban-studio.exe dist/GobanStudio | Select-Object -First 1).FullName,
-              (Get-ChildItem -Recurse -Filter katago.exe dist/GobanStudio | Select-Object -First 1).FullName
+              (Get-ChildItem -Recurse -Filter katago.exe dist/GobanStudio | Select-Object -First 1).FullName,
+              (Get-ChildItem -Recurse -Filter katago-avx2.exe dist/GobanStudio | Select-Object -First 1).FullName
             )
             foreach ($f in $files) { if (-not $f -or -not (Test-Path $f)) { throw "missing file to sign: $f" } }
             # SHA-256 file digest, RFC 3161 timestamp (SHA-256), so the
@@ -224,8 +245,8 @@ jobs:
           path: windows-app.png
           if-no-files-found: ignore
       - name: self-test the packaged app
-        # v5: includes the optional downloads end to end (pinned KataGo
-        # release assets, 99 MB + 48 MB, into a temporary folder; see
+        # v5: includes the optional downloads end to end (the pinned
+        # KataGo files, 99 MB + 98 MB, into a temporary folder; see
         # scripts/selftest-app.mjs). GOBAN_SELFTEST_MODELS=0 skips them.
         timeout-minutes: 10
         env:
@@ -291,6 +312,8 @@ jobs:
           assert names, "empty archive"
           assert all("\\" not in n for n in names), "backslash in ZIP entry"
           assert any(n.endswith("bin/goban-studio.exe") for n in names), "missing exe"
+          assert any(n.endswith("engine/windows/katago.exe") for n in names), "missing KataGo"
+          assert any(n.endswith("engine/windows/katago-avx2.exe") for n in names), "missing KataGo (AVX2)"
           assert any(n.endswith("engine/windows/msvcp140.dll") for n in names), "missing MSVC runtime"
           assert any(n.endswith("engine/windows/libcrypto-3-x64.dll") for n in names), "missing OpenSSL runtime"
           assert any(n.endswith("licenses/Goban-Studio-MIT.txt") for n in names), "missing app licence"

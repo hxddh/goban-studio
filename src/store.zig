@@ -1,7 +1,7 @@
 //! v9 file storage (docs/v9.md, "Storage"): the page's data as JSON files
 //! under `<app data>/data`, read and written through four bridge commands
 //! (`studio.storeRead`, `studio.storeWrite`, `studio.storeList`,
-//! `studio.storeRemove`; see main.zig).
+//! `studio.storeRemove`; see bridge_files.zig).
 //!
 //! Keys are relative paths of `[a-z0-9_-]+` segments separated by `/`,
 //! ending in `.json` (`profile.json`, `games/g-1730000000000.json`). Nothing

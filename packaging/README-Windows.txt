@@ -15,7 +15,9 @@ The app works offline and needs no account. It makes no network request
 unless you choose Check for updates, or turn on the weekly update check in
 Settings (off by default), or download an optional KataGo network; the
 first two ask GitHub for the latest version and send nothing about you or
-your games. These requests use your Windows proxy setting (Settings >
+your games. The networks come from KataGo's GitHub releases (the human
+model) and from katagotraining.org, KataGo's own network site (the
+stronger network). These requests use your Windows proxy setting (Settings >
 Network & Internet > Proxy, manual setup) or the HTTPS_PROXY environment
 variable, if you have one.
 
@@ -81,5 +83,7 @@ prompt). To remove it, delete these current-user registry keys:
 Licences
 --------
 See resources\frontend\dist\licenses\. Goban Studio is MIT licensed;
-KataGo, Moka and @sabaki/go-board are also MIT; Inter is under the SIL Open
-Font License 1.1.
+KataGo, Moka and @sabaki/go-board are also MIT; the built-in KataGo network
+is CC0, and the optional networks downloaded in Settings are under the
+KataGo Neural Network License (KataGo-networks.txt); Inter is under the SIL
+Open Font License 1.1.
