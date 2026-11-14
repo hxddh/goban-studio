@@ -42,31 +42,54 @@ import { BLACK, LETTERS, coordLabel, positionBase, rulesetById } from "./rules.j
 const OFFLINE = Object.freeze({ available: false, engine: "Local", version: "", async: false, stream: false });
 
 let probe = null;
+let misses = 0;
 // Whether a running search can be stopped. Every host that can search
 // can; the flag stays for the scheduler's sake.
 let cancellable = true;
+
+/** The first wait before an "unavailable" status is asked again; it doubles up to STATUS_RETRY_MAX_MS. */
+export const STATUS_RETRY_MS = 2000;
+export const STATUS_RETRY_MAX_MS = 5 * 60 * 1000;
 
 /** False once status() has found a host that cannot cancel a search. */
 export function canCancel() {
   return cancellable;
 }
 
-/** { available, engine, version, async, stream, ... } — cached per session. */
+/**
+ * { available, engine, version, async, stream, ... }. An available engine
+ * is cached for the session; "unavailable" (or a status call that failed)
+ * only until the next retry, STATUS_RETRY_MS after the first miss and twice
+ * as long after each further one, so a KataGo that was slow to start is
+ * found later.
+ */
 export async function status() {
   if (!hasNative()) return OFFLINE;
-  if (probe) return probe;
-  probe = (async () => {
+  if (probe && Date.now() < probe.until) return probe.value;
+  const entry = { until: Infinity, value: null };
+  probe = entry;
+  entry.value = (async () => {
+    let st = OFFLINE;
     try {
       const value = await nativeInvoke("studio.katagoStatus");
-      if (!value || typeof value !== "object") return OFFLINE;
-      const st = { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
-      cancellable = st.async;
-      return st;
+      if (value && typeof value === "object") st = { ...value, available: !!value.available, async: !!value.async, stream: !!value.stream, models: !!value.models };
     } catch (_) {
-      return OFFLINE;
+      st = OFFLINE;
     }
+    if (st.available) {
+      misses = 0;
+      cancellable = st.async;
+    } else {
+      entry.until = Date.now() + Math.min(STATUS_RETRY_MAX_MS, STATUS_RETRY_MS * 2 ** misses++);
+    }
+    return st;
   })();
-  return probe;
+  return entry.value;
+}
+
+/** When an "unavailable" status will be asked again (ms since the epoch), or null when none is due. */
+export function statusRetryAt() {
+  return probe && Number.isFinite(probe.until) ? probe.until : null;
 }
 
 function maxTimeFor(visits) {

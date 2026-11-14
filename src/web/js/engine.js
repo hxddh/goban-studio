@@ -145,14 +145,13 @@ async function analysisR(game, opts = {}) {
 }
 const analysisQ = (game, opts = {}) => analysisR(game, opts).then((r) => r.analysis);
 
-let cached = null;
+/**
+ * What answers: KataGo or the offline engine. "Offline" is asked again
+ * later (katago.js status); `retryAt` says when (null: not again).
+ */
 export async function info() {
-  if (cached) return cached;
   const st = await KataGo.status();
-  cached = st?.available
-    ? { kind: "katago", name: st.version || "KataGo", available: true }
-    : { kind: "offline", name: "", available: false };
-  return cached;
+  return st?.available ? { kind: "katago", name: st.version || "KataGo", available: true } : { kind: "offline", name: "", available: false, retryAt: KataGo.statusRetryAt() };
 }
 
 /* ------------------------------------------------- optional networks */
