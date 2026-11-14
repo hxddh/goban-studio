@@ -1029,8 +1029,8 @@ export class Game {
     }
     if (ab.length) head += "AB[" + ab.join("][") + "]";
     if (aw.length) head += "AW[" + aw.join("][") + "]";
-    // Who moves first from a set-up position (handicap or problem).
-    if (ab.length || aw.length) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
+    // Who moves first from a set-up position (handicap or problem), or White first on an empty board.
+    if (ab.length || aw.length || root.turn === WHITE) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
     head += marksText(root.marks, sgfCoord, esc) + extraText(root.extra, esc);
     head += "\n";
     const points = (list) => (list || []).map((p) => sgfCoord(p.x, p.y));
