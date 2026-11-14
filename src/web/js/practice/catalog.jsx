@@ -8,7 +8,7 @@ import { useState } from "preact/hooks";
 import { t } from "../i18n.js";
 import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
-import { Icon } from "../app/parts.jsx";
+import { DiagramThumb, Icon } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
@@ -24,6 +24,22 @@ export function CatalogView() {
         <CatalogSections />
       </div>
     </>
+  );
+}
+
+/** A unit's face: the first position its lessons show (nothing until the course's part has arrived). */
+function UnitThumb({ unit }) {
+  const step = unit.lessons.flatMap((l) => l.steps || []).find((s) => Array.isArray(s.board?.diagram));
+  return step ? <DiagramThumb diagram={step.board.diagram} size={36} /> : <span class="unit-thumb-wait" aria-hidden="true" />;
+}
+
+/** A row's progress as a short bar beside its count (the count says it for screen readers). */
+function Meter({ part, of }) {
+  const share = of > 0 ? Math.min(1, part / of) : 0;
+  return (
+    <span class={`meter ${share >= 1 ? "full" : ""}`} aria-hidden="true">
+      <i style={{ width: `${Math.round(share * 100)}%` }} />
+    </span>
   );
 }
 
@@ -50,6 +66,7 @@ export function CatalogSections({ first = true } = {}) {
                   <span class="gr-text">
                     <strong>{t("topic." + topic)}</strong>
                   </span>
+                  <Meter part={solvedOf(list)} of={list.length} />
                   <span class="row-count">{t("practice.ofN", [solvedOf(list), list.length])}</span>
                   <Icon name="next" size={14} />
                 </button>
@@ -108,9 +125,11 @@ function CourseMap() {
             <li class={`unit ${state_} ${expanded ? "open" : ""}`}>
               <button type="button" class="unit-head" aria-expanded={expanded} onClick={() => setOpen(expanded ? -1 : ui)}>
                 <span class="unit-no">{all ? <Icon name="check" size={13} /> : ui + 1}</span>
+                <UnitThumb unit={unit} />
                 <span class="unit-text">
                   <h3>{C.tx(unit.title)}</h3>
                 </span>
+                <Meter part={done} of={unit.lessons.length} />
                 <span class="row-count">{t("practice.ofN", [done, unit.lessons.length])}</span>
                 <Icon name={expanded ? "down" : "next"} size={14} />
               </button>

@@ -17,7 +17,7 @@
 import { Component } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { t } from "../i18n.js";
-import { clearTaskErrors, dismissTask, dismissToast, pauseToasts, resumeToasts, runToastAction, state, toast, update } from "./store.js";
+import { clearTaskErrors, dismissTask, dismissToast, pauseToasts, resumeToasts, runToastAction, state, toast, update, useSlice } from "./store.js";
 import { ErrorCard, Icon, Spinner } from "./parts.jsx";
 import * as C from "./controller.js";
 
@@ -63,6 +63,7 @@ function Toast({ x }) {
  * rather than the element under it.
  */
 export function Toasts() {
+  useSlice("toasts");
   const ref = useRef(null);
   const any = state.toasts.length > 0;
   useEffect(() => {
@@ -89,7 +90,7 @@ export function Toasts() {
       role="region"
       aria-label={t("toast.region")}
       onFocusIn={pauseToasts}
-      onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget) && resumeToasts()}
+      onFocusOut={(e) => !e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget)) && resumeToasts()}
     >
       {state.toasts.map((x) => (
         <Toast x={x} key={x.id} />
@@ -102,8 +103,10 @@ export function Toasts() {
 
 /** Tasks that are slow or failed (store.js runTask), at the top of the page. */
 export function TaskNotice() {
+  useSlice("tasks");
   // Somewhere else now: what failed back there is no longer the question.
-  useEffect(() => clearTaskErrors, [state.space]);
+  const space = state.space;
+  useEffect(() => clearTaskErrors, [space]);
   const shown = state.tasks.filter((x) => x.status === "loading" || x.status === "error");
   if (!shown.length) return null;
   return (

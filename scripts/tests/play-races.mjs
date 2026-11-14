@@ -225,6 +225,28 @@ export default async function ({ test, assert, root }) {
     }
   });
 
+  await test("play races: KataGo kept superseded on the computer's turn: no weaker offline move, Retry asks KataGo again", async () => {
+    const saved = { ...Play.moveSources };
+    try {
+      const g = liveGame(1, { opponent: "ai", humanColor: BLACK });
+      let offline = 0;
+      Play.moveSources.decide = async () => ({ move: null, analysis: null, mode: "standard", impl: "L:1k", cancelled: true, superseded: true });
+      Play.moveSources.offline = async () => (offline++, { x: 6, y: 6 });
+      await Play.maybeComputerMove();
+      assert.equal(offline, 0, "the offline engine was not asked");
+      assert.equal(g.game.moveNumber, 1);
+      assert.equal(g.thinking, false);
+      assert.equal(g.engineFailed, true, "Retry is offered");
+      Play.moveSources.decide = async () => ({ move: { x: 6, y: 2 }, analysis: null, mode: "standard", impl: "L:1k" });
+      Play.retryComputerMove();
+      await until(() => g.game.moveNumber === 2, 3000, "the move after Retry");
+      assert.equal(g.opponentMode, "standard");
+    } finally {
+      Object.assign(Play.moveSources, saved);
+      await settle();
+    }
+  });
+
   await test("play races: opening another review closes the one before: back to the live game, no accidental branch", async () => {
     state.engine = { kind: "offline", available: false };
     const g = liveGame(4);

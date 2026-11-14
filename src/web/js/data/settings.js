@@ -17,6 +17,8 @@ export const DEFAULT_SETTINGS = {
   lang: null,
   appearance: "auto", // auto | light | dark
   coords: true,
+  tallBoard: false, // a traditional board: rows a little further apart than columns (board-surface.js TALL_RATIO)
+  coordsAround: false, // coordinates on all four sides of the board, not only below and on the left
   volume: "normal", // off | quiet | normal | loud (audio.js VOLUME_LEVELS)
   numbers: false,
   lastMoveMark: true, // the mark on the last stone played
@@ -30,7 +32,7 @@ export const DEFAULT_SETTINGS = {
   teaching: null, // null = decide from the estimate (on for newer players)
   confirmMove: false, // two-click placement
   confirmProblemMove: false, // Two-click placement in problems
-  showEval: false, // win-rate bar while playing
+  showEval: true, // the balance while playing, and the verdict on each move (play/verdict.js); new players see it from the start
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the estimate when suggesting an opponent
@@ -54,8 +56,10 @@ const PLAYER_RANKS = [-8, 30];
 /** Capture Go games won: a count, kept to a sane size. */
 const MAX_COUNT = 1e6;
 
+/** @type {(v: number, range: number[]) => number} */
 const clampInt = (v, [lo, hi]) => Math.max(lo, Math.min(hi, Math.round(v)));
 
+/** @type {Record<string, any[]>} */
 const ONE_OF = {
   appearance: ["auto", "light", "dark"],
   boardSize: [9, 13, 19],
@@ -94,7 +98,7 @@ export function normalizeSettings(raw) {
   // (older still) played Japanese rules. Only a new profile has none.
   if (s.defaultRules === undefined && s.onboarded === true) out.defaultRules = "japanese";
   for (const [k, allowed] of Object.entries(ONE_OF)) if (!allowed.includes(out[k])) out[k] = DEFAULT_SETTINGS[k];
-  for (const k of ["coords", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
+  for (const k of ["coords", "coordsAround", "tallBoard", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
     if (typeof out[k] !== "boolean") out[k] = DEFAULT_SETTINGS[k];
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;

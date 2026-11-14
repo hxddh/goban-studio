@@ -11,6 +11,7 @@ import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
+import { verdictOf } from "../play/verdict.js";
 import { Board, Button, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
 import { ScoreCard } from "./score-card.jsx";
 import { NarrowFold, Toolbar } from "./chrome.jsx";
@@ -52,7 +53,7 @@ export function PlayView() {
     deadStones: scoring ? scoring.dead : [],
     variation: null,
     moveNumbers: moveNumbers(game),
-    showCoords: s.settings.coords,
+    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround, tall: s.settings.tallBoard,
     view: null,
     ghost: g.ghost ? { ...g.ghost, color: game.turn } : null,
     hoverColor: scoring ? null : game.turn,
@@ -171,7 +172,7 @@ function FocusTools() {
 function PassAsk({ float = false }) {
   const ref = useRef(null);
   useEffect(() => {
-    const prev = document.activeElement;
+    const prev = /** @type {HTMLElement | null} */ (document.activeElement);
     ref.current?.querySelector(".btn.primary")?.focus({ preventScroll: true });
     return () => {
       if (prev?.isConnected) prev.focus?.({ preventScroll: true });
@@ -259,12 +260,34 @@ function EvalBar() {
   const b = Math.round(e.winrate * 100);
   const lead = e.scoreLead;
   return (
-    <div class="eval-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={b} aria-label={t("play.evalLabel")}>
+    <div class="eval-bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={b} aria-label={t("play.evalLabel")}>
       <div class="eval-track">
         <i style={{ width: `${b}%` }} />
       </div>
       <span class="fine">{t("play.evalText", [lead >= 0 ? t("common.black") : t("common.white"), formatPoints(Math.round(Math.abs(lead) * 2) / 2)])}</span>
     </div>
+  );
+}
+
+/** The verdict on the player's last move (play/verdict.js), when the balance is shown or the game teaches. */
+function verdictShown(g) {
+  return g.opponent === "ai" && !!g.verdicts && (state.settings.showEval || C.teachingOn());
+}
+
+function LastVerdict() {
+  const g = state.game;
+  if (!verdictShown(g) || g.pending) return null;
+  const line = g.game.mainLine();
+  const node = [...line].reverse().find((n) => n.move && !n.move.pass && n.move.color === g.humanColor);
+  const loss = node ? g.verdicts[node.id] : null;
+  const v = verdictOf(loss, state.settings.playerRank);
+  if (!v) return null;
+  const pts = formatPoints(Math.round(loss * 2) / 2);
+  return (
+    <p class={`verdict v-${v}`} aria-live="polite">
+      <i aria-hidden="true" />
+      {t(`play.verdict.${v}`, [pts])}
+    </p>
   );
 }
 
@@ -303,12 +326,15 @@ function MoveStrip() {
           {line.map((n, k) => {
             const i = k + 1;
             const m = n.move;
+            const v = verdictShown(g) ? verdictOf(g.verdicts[n.id], state.settings.playerRank) : null;
+            const marked = v === "slack" || v === "mistake";
             return (
-              <li class={i === line.length ? "last" : ""}>
-                <button type="button" onClick={() => peek(i)} title={t("play.peek")}>
+              <li class={`${i === line.length ? "last" : ""} ${marked ? `v-${v}` : ""}`}>
+                <button type="button" onClick={() => peek(i)} title={marked ? `${t("play.peek")} · ${t(`play.verdict.${v}Short`)}` : t("play.peek")}>
                   <span class="mn">{i}</span>
                   <Stone color={m.color} size={8} />
                   <span>{m.pass ? t("common.pass") : coordLabel(m.x, m.y, game.size)}</span>
+                  {marked && <i class="v-dot" aria-label={t(`play.verdict.${v}Short`)} />}
                 </button>
               </li>
             );
@@ -358,6 +384,7 @@ function PlayPanel() {
         <PlayerRow color={WHITE} />
       </section>
       <EvalBar />
+      <LastVerdict />
       <div class="panel-state" key={g.scoring ? "scoring" : over ? "over" : g.pending ? "pending" : "play"}>
         {!g.scoring && !over && (
           <p class="status-line" aria-live="off">
@@ -428,6 +455,27 @@ function ScoringCard() {
  * A finished game on the board without its review (rare: the review opens
  * by itself when a game ends): the result and the way into the review.
  */
+/**
+ * The game in one line under the result: its length, and how your moves
+ * went (play/verdict.js) when they were judged.
+ */
+function GameTally() {
+  const g = state.game;
+  const moves = g.game.mainLine().length - 1;
+  const counts = { good: 0, slack: 0, mistake: 0 };
+  for (const loss of Object.values(g.verdicts || {})) {
+    const v = verdictOf(loss, state.settings.playerRank);
+    if (v) counts[v]++;
+  }
+  const judged = counts.good + counts.slack + counts.mistake > 0;
+  return (
+    <div class="game-tally">
+      <span>{tn("play.moveN", moves)}</span>
+      {judged && <span>{t("play.result.verdicts", [counts.good, counts.slack, counts.mistake])}</span>}
+    </div>
+  );
+}
+
 function ResultCard() {
   const g = state.game;
   const headline = C.resultHeadline(g);
@@ -437,6 +485,7 @@ function ResultCard() {
       <strong class="result-big">{headline}</strong>
       {headline !== C.resultText(g.game.current.result) && <span class="muted">{C.resultText(g.game.current.result)}</span>}
       {C.unratedReason(g) && <span class="fine unrated-note">{C.unratedReason(g)}</span>}
+      <GameTally />
       <div class="actions center">
         <Button kind="primary" icon="chart" onClick={() => C.openPostGame(g, { inPlace: false })}>
           {t("play.reviewGame")}

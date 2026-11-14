@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import { test, assert, fs, path, root } from "./helpers.mjs";
 import * as Sdk from "../native-sdk.mjs";
+import { installSource } from "../shell-source.mjs";
 
 /* ------------------------------------------------------- YAML subset */
 const isBlank = (l) => /^\s*(#.*)?$/.test(l);
@@ -236,7 +237,7 @@ await test("ci: signing secrets reach only the steps that sign", () => {
   }
   const holders = (f) => allSteps(wf[f]).filter((s) => JSON.stringify(s.env || {}).includes("secrets.")).map((s) => s.name);
   assert.deepEqual(holders("build-macos.yml"), ["signing mode", "import Developer ID certificate", "notarize and staple the app", "notarize and staple the dmg"]);
-  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and katago.exe"]);
+  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and the KataGo builds"]);
   assert.deepEqual(holders("release.yml"), ["sign SHA256SUMS"]);
 });
 
@@ -317,9 +318,9 @@ await test("ci: pull requests that touch the shell compile and test it on macOS 
 
 await test("ci: the Native SDK comes from the lockfile: one exact version, hashed, never installed globally", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  assert.equal(pkg.devDependencies["@native-sdk/cli"], "0.11.0", "one exact version, not a range");
+  assert.equal(pkg.devDependencies["@native-sdk/cli"], "0.11.1", "one exact version, not a range");
   const { version, packages } = Sdk.checkLock();
-  assert.equal(version, "0.11.0");
+  assert.equal(version, "0.11.1");
   // The package and the `native` binary of every platform a release is built on.
   for (const name of ["@native-sdk/cli", "@native-sdk/cli-darwin-arm64", "@native-sdk/cli-darwin-x64", "@native-sdk/cli-win32-x64"]) {
     const p = packages.find((x) => x.name === name);
@@ -330,19 +331,19 @@ await test("ci: the Native SDK comes from the lockfile: one exact version, hashe
   const tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "goban-sdk-"));
   try {
     const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
-    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "^0.11.0" } }));
+    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "^0.11.1" } }));
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
     assert.throws(() => Sdk.checkLock(tmp), /one exact version/);
-    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "0.11.0" } }));
-    assert.equal(Sdk.checkLock(tmp).version, "0.11.0");
+    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "0.11.1" } }));
+    assert.equal(Sdk.checkLock(tmp).version, "0.11.1");
     delete lock.packages["node_modules/@native-sdk/cli-win32-x64"].integrity;
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
     assert.throws(() => Sdk.checkLock(tmp), /no integrity hash for @native-sdk\/cli-win32-x64/);
     lock.packages["node_modules/@native-sdk/cli-win32-x64"].integrity = "sha512-AAAA";
     lock.packages["node_modules/@native-sdk/cli"].version = "0.12.0";
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
-    assert.throws(() => Sdk.checkLock(tmp), /0\.12\.0, package\.json pins 0\.11\.0/);
-    assert.throws(() => Sdk.checkInstalled(tmp), /pins 0\.11\.0/);
+    assert.throws(() => Sdk.checkLock(tmp), /0\.12\.0, package\.json pins 0\.11\.1/);
+    assert.throws(() => Sdk.checkInstalled(tmp), /pins 0\.11\.1/);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -371,11 +372,16 @@ await test("ci: pull requests run the static checks before the tests, with exact
   assert.ok(at("npm run lint") > at("npm ci --ignore-scripts") && at("npm run lint") < at("npm test"), `lint runs after the install and before the tests: ${sh.join(" | ")}`);
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   assert.equal(pkg.scripts.lint, "eslint . --max-warnings 0");
-  assert.match(pkg.scripts.verify, /^npm run lint && npm test/, "npm run verify lints first");
-  for (const dep of ["eslint", "eslint-plugin-react-hooks", "globals"]) assert.match(pkg.devDependencies[dep], /^\d+\.\d+\.\d+$/, `${dep} is pinned to one version`);
+  assert.match(pkg.scripts.verify, /^npm run lint && npm run typecheck && npm test/, "npm run verify lints and checks types first");
+  assert.ok(at("npm run typecheck") > at("npm run lint") && at("npm run typecheck") < at("npm test"), "types are checked after the lint, before the tests");
+  assert.equal(pkg.scripts.typecheck, "tsc --noEmit -p jsconfig.json");
+  const jsconfig = JSON.parse(fs.readFileSync(path.join(root, "jsconfig.json"), "utf8"));
+  assert.equal(jsconfig.compilerOptions.checkJs, true, "the JS itself is checked");
+  assert.deepEqual(jsconfig.exclude, ["src/web/js/bundle.js", "src/web/js/content-lazy"], "only generated files are left out");
+  for (const dep of ["eslint", "eslint-plugin-react-hooks", "globals", "typescript"]) assert.match(pkg.devDependencies[dep], /^\d+\.\d+\.\d+$/, `${dep} is pinned to one version`);
   // The config checks what it says (a rule dropped by mistake would pass everything).
   const config = fs.readFileSync(path.join(root, "eslint.config.js"), "utf8");
-  for (const rule of ["no-undef", "no-unused-vars", "no-redeclare", "no-dupe-keys", "no-unreachable", "no-const-assign", "no-import-assign", "no-self-assign", "eqeqeq", "react-hooks/rules-of-hooks"]) assert.ok(config.includes(`"${rule}"`) || config.includes(`${rule}:`), rule);
+  for (const rule of ["no-undef", "no-unused-vars", "no-redeclare", "no-dupe-keys", "no-unreachable", "no-const-assign", "no-import-assign", "no-self-assign", "eqeqeq", "react-hooks/rules-of-hooks", "react-hooks/exhaustive-deps"]) assert.ok(config.includes(`"${rule}"`) || config.includes(`${rule}:`), rule);
   assert.match(config, /reportUnusedDisableDirectives: "error"/);
 });
 
@@ -433,7 +439,7 @@ await test("ci: SHA256SUMS names its release, is signed when the key exists, and
   assert.deepEqual(rel.jobs.sign.needs, ["preflight", "assemble"]);
   const sums = steps(rel.jobs.assemble).find((s) => s.name === "checksums");
   assert.equal(sums.env.TAG, "${{ inputs.tag }}");
-  // The sixth line binds the signed bytes to the tag (src/install.zig sumsBinding).
+  // The sixth line binds the signed bytes to the tag (src/install_verify.zig sumsBinding).
   assert.match(sums.run, /^printf '%s\\n' "\$TAG" > VERSION$/m);
   assert.match(sums.run, /^sha256sum VERSION >> SHA256SUMS$/m);
   assert.match(sums.run, /test "\$\(wc -l < SHA256SUMS\)" -eq 6/);
@@ -454,11 +460,11 @@ await test("ci: SHA256SUMS names its release, is signed when the key exists, and
   const line = (tag) => `${crypto.createHash("sha256").update(tag + "\n").digest("hex")}  VERSION`;
   assert.equal(line("v14.0.0"), "03f8f8d787997ec97ed6273980f539025f918130669d7660b538ed4dbe40a0a2  VERSION");
   assert.notEqual(line("v14.0.0"), line("v14.0.1"));
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  const zig = installSource();
   assert.ok(zig.includes('"03f8f8d787997ec97ed6273980f539025f918130669d7660b538ed4dbe40a0a2  VERSION\\n"'), "the Zig test checks the same line");
   assert.match(zig, /sha\.update\(tag\);\n\s+sha\.update\("\\n"\);/);
-  assert.match(zig, /try checkBinding\(sums_text, job\.tag\(\), job\.public_key != null\);/);
-  assert.match(zig, /if \(!stagedVersionMatches\(io, job\.platform, staged_root, job\.tag\(\)\)\) return error\.VersionMismatch;/);
+  assert.match(zig, /try install_verify\.checkBinding\(sums_text, job\.tag\(\), job\.public_key != null\);/);
+  assert.match(zig, /if \(!install_package\.stagedVersionMatches\(io, job\.platform, staged_root, job\.tag\(\)\)\) return error\.VersionMismatch;/);
 });
 
 await test("ci: every package states the version the updater will ask it for", () => {
@@ -477,7 +483,7 @@ await test("ci: the disk image offers the Applications folder, and the zip keeps
   assert.ok(dmg.indexOf("ln -s /Applications") < dmg.indexOf("hdiutil create"), "before the image is made");
   assert.match(dmg, /ditto dist\/GobanStudio\.app "dist\/dmg\/Goban Studio\.app"/);
   assert.match(dmg, /grep -x 'GobanStudio\.app\/Contents\/MacOS\/goban-studio'/, "the zip's root is GobanStudio.app");
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  const zig = installSource();
   assert.match(zig, /\.macos_arm64, \.macos_x64 => &\.\{ "GobanStudio\.app", "Goban Studio\.app" \}/);
   assert.match(fs.readFileSync(path.join(root, "scripts/package.sh"), "utf8"), /ln -s \/Applications dmg\/Applications/);
 });
@@ -486,14 +492,37 @@ await test("ci: downloaded and built third-party code is pinned", () => {
   const win = wf["build-windows.yml"];
   assert.equal(win.env.KATAGO_URL, "https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigen-windows-x64.zip");
   assert.equal(win.env.KATAGO_SHA256, "074485cf150c38aa3bb14ac9f54f2952ffefbceb44673709bbb8a83650bf95d6");
-  const dl = steps(win.jobs.build).find((s) => s.name === "download KataGo Eigen sidecar").run;
-  assert.ok(dl.indexOf("sha256sum -c") > 0 && dl.indexOf("sha256sum -c") < dl.indexOf("Expand-Archive"), "checked before it is unpacked");
+  assert.equal(win.env.KATAGO_AVX2_URL, "https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-windows-x64.zip");
+  assert.equal(win.env.KATAGO_AVX2_SHA256, "0d62ffa41ee04dd89dd1b80fe45e306c837231cb1e2dccb4f5780d0ca7c313db");
+  const dl = steps(win.jobs.build).find((s) => s.name === "download KataGo Eigen sidecars (plain and AVX2)").run;
+  // Both zips are checked before either is unpacked.
+  assert.ok(dl.indexOf('"$KATAGO_SHA256  katago.zip" | sha256sum -c') > 0, "plain build checked");
+  assert.ok(dl.indexOf('"$KATAGO_AVX2_SHA256  katago-avx2.zip" | sha256sum -c') > 0, "AVX2 build checked");
+  assert.ok(dl.lastIndexOf("sha256sum -c") < dl.indexOf("Expand-Archive"), "checked before it is unpacked");
+  // The AVX2 build sits beside the plain one, with the same DLLs (src/engine_build.zig).
+  assert.match(dl, /cmp "\$dll" "engine\/windows\/\$\(basename "\$dll"\)"/);
+  assert.match(dl, /cp "\$RUNNER_TEMP\/katago-avx2\/katago\.exe" engine\/windows\/katago-avx2\.exe/);
   const mac = wf["build-macos.yml"];
   assert.equal(mac.env.KATAGO_COMMIT, "92ee95c0a4b25fec214da00951ab69e97e207729");
   const kg = steps(mac.jobs.build).find((s) => s.name === "build KataGo Eigen sidecar").run;
   assert.match(kg, /fetch -q --depth 1 https:\/\/github\.com\/lightvector\/KataGo\.git "\$KATAGO_COMMIT"/);
   assert.match(kg, /test "\$\(git -C "\$RUNNER_TEMP\/KataGo" rev-parse HEAD\)" = "\$KATAGO_COMMIT"/);
   assert.doesNotMatch(kg, /--branch/);
+  // v15: both macOS builds target macOS 13, and the Metal build's libraries
+  // are built from pinned commits, statically, and nothing else is linked.
+  assert.equal(mac.env.MACOS_MIN, "13.0");
+  assert.match(kg, /-DCMAKE_OSX_DEPLOYMENT_TARGET="\$MACOS_MIN"/);
+  assert.match(mac.env.ABSEIL_COMMIT, /^[0-9a-f]{40}$/);
+  assert.match(mac.env.PROTOBUF_COMMIT, /^[0-9a-f]{40}$/);
+  const deps = steps(mac.jobs.build).find((s) => s.name === "build Protocol Buffers and Abseil for the Metal sidecar (static, macOS 13)").run;
+  assert.match(deps, /test "\$\(git -C "\$dir" rev-parse HEAD\)" = "\$commit"/);
+  assert.match(deps, /-DBUILD_SHARED_LIBS=OFF/);
+  const metal = steps(mac.jobs.build).find((s) => s.name === "build KataGo Metal sidecar");
+  assert.equal(metal.if, "${{ env.ARCH == 'arm64' }}");
+  assert.match(metal.run, /-DUSE_BACKEND=METAL/);
+  assert.match(metal.run, /export PKG_CONFIG_LIBDIR="\$METAL_DEPS\/lib\/pkgconfig"/);
+  assert.match(metal.run, /grep -vE '\^\(\/usr\/lib\/\|\/System\/Library\/\|@rpath\/libswift\)'/);
+  assert.match(raw["build-macos.yml"], /plutil -replace LSMinimumSystemVersion -string "\$MACOS_MIN"/);
   // Every other KataGo download is checked against its hash.
   for (const f of ["book.yml", "calibrate.yml", "classics-check.yml", "lesson-check.yml"]) {
     assert.match(wf[f].env.KATAGO_SHA256, /^[0-9a-f]{64}$/, f);

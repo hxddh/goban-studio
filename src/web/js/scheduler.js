@@ -17,7 +17,9 @@
  * search is stopped and goes back to the front of its lane, and its caller
  * simply gets the result of the second run (a report keeps the positions it
  * has and carries on). A search is pre-emptible unless it was queued with
- * `preemptible: false` (a host that cannot cancel a search).
+ * `preemptible: false` (a host that cannot cancel a search). A search
+ * queued with `yields: true` (the reading of the player's moves by rank)
+ * gives way the same way to a search queued in any higher lane.
  *
  * Cancellation is one model everywhere: AbortSignal.
  *
@@ -31,7 +33,7 @@
  *                                  search was stopped by its signal, by
  *                                  cancelLanes or by cancelAll.
  *   ownerSignal(owner)             the signal of a named owner ("game:3",
- *                                  "review:2", "reports", …). Everything
+ *                                  from newOwner, or "reports", …). Everything
  *                                  started with it stops on cancelOwner.
  *   startJob({ kind, owner, … })   a tracked piece of background work with
  *                                  progress and a cancel, shown in Settings →
@@ -152,17 +154,22 @@ export function createScheduler() {
     });
   }
 
-  /** Stop a running background search for a move; it runs again later. */
-  function preempt() {
+  /**
+   * Stop the running search for one queued in lane `li`, when it gives way
+   * (a background search to a move, a yielding one to any higher lane); it
+   * runs again later.
+   */
+  function preempt(li) {
     const e = running;
-    if (!e || e.lane !== LANES.length - 1 || !e.preemptible || e.preempted || !e.run) return;
+    if (!e || !e.preemptible || e.preempted || !e.run || e.lane <= li) return;
+    if (!(e.yields || (li === 0 && e.lane === LANES.length - 1))) return;
     e.preempted = true;
     preemptions++;
     e.run.abort("preempted");
   }
 
   /** Queue one search. See the file comment. */
-  function search(fn, { lane = "background", signal = null, preemptible = true, status = null } = {}) {
+  function search(fn, { lane = "background", signal = null, preemptible = true, yields = false, status = null } = {}) {
     const li = laneIndex(lane);
     return new Promise((resolve, reject) => {
       if (signal?.aborted) {
@@ -173,7 +180,7 @@ export function createScheduler() {
       // Whatever stops the entry (the caller's signal, cancelLanes,
       // cancelAll) aborts this controller; a pre-emption does not.
       if (status) ctl.signal.addEventListener("abort", () => (status.cancelled = true), { once: true });
-      const entry = { lane: li, fn, ctl, resolve, reject, state: "queued", unlink: () => {}, preemptible, preempted: false, run: null };
+      const entry = { lane: li, fn, ctl, resolve, reject, state: "queued", unlink: () => {}, preemptible, yields, preempted: false, run: null };
       ctl.signal.addEventListener(
         "abort",
         () => {
@@ -190,7 +197,7 @@ export function createScheduler() {
       entry.unlink = linkSignals(ctl, [signal]);
       if (entry.state !== "queued") return;
       queues[li].push(entry);
-      if (li === 0) preempt();
+      preempt(li);
       pump();
     });
   }
@@ -198,19 +205,26 @@ export function createScheduler() {
   /**
    * A fresh owner name with a prefix ("game" → "game:4"). Unlike a fixed
    * name ("reports"), it stays cancelled: work it starts afterwards (a late
-   * callback of a game that was replaced) never runs.
+   * callback of a game that was replaced) never runs. Its entry is dropped
+   * when it is cancelled; the name's number, below the next one, is what
+   * keeps it cancelled (fixed names do not end in ":<number>").
    */
-  const unique = new Set();
+  const retired = AbortSignal.abort("cancelled");
   function newOwner(prefix = "owner") {
     const name = `${prefix}:${++nextOwner}`;
-    unique.add(name);
+    owners.set(name, new AbortController());
     return name;
   }
+  const madeHere = (owner) => {
+    const m = /:(\d+)$/.exec(owner);
+    return !!m && Number(m[1]) >= 1 && Number(m[1]) <= nextOwner;
+  };
 
   function ownerSignal(owner) {
     if (!owner) return null;
     let ctl = owners.get(owner);
     if (!ctl) {
+      if (madeHere(owner)) return retired;
       ctl = new AbortController();
       owners.set(owner, ctl);
     }
@@ -220,11 +234,6 @@ export function createScheduler() {
   /** Cancel everything `owner` started; a fixed name can be used again afterwards. */
   function cancelOwner(owner, reason = "cancelled") {
     if (!owner) return;
-    if (unique.has(owner)) {
-      const sig = ownerSignal(owner);
-      if (!sig.aborted) owners.get(owner).abort(reason);
-      return;
-    }
     const ctl = owners.get(owner);
     if (!ctl) return;
     owners.delete(owner);
@@ -309,6 +318,7 @@ export function createScheduler() {
       running: running ? LANES[running.lane] : null,
       queued: Object.fromEntries(LANES.map((l, i) => [l, queues[i].length])),
       preemptions,
+      owners: owners.size,
     };
   }
 

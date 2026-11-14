@@ -1029,8 +1029,8 @@ export class Game {
     }
     if (ab.length) head += "AB[" + ab.join("][") + "]";
     if (aw.length) head += "AW[" + aw.join("][") + "]";
-    // Who moves first from a set-up position (handicap or problem).
-    if (ab.length || aw.length) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
+    // Who moves first from a set-up position (handicap or problem), or White first on an empty board.
+    if (ab.length || aw.length || root.turn === WHITE) head += "PL[" + (root.turn === WHITE ? "W" : "B") + "]";
     head += marksText(root.marks, sgfCoord, esc) + extraText(root.extra, esc);
     head += "\n";
     const points = (list) => (list || []).map((p) => sgfCoord(p.x, p.y));
@@ -1056,6 +1056,7 @@ export class Game {
     // Iterative, so a record of any length or depth cannot overflow the
     // stack. A string on the stack is a parenthesis to write.
     const parts = [];
+    /** @type {any[]} the nodes still to write, and the parentheses between them */
     const stack = [root];
     while (stack.length) {
       const item = stack.pop();

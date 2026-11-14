@@ -59,7 +59,7 @@
   --knob: #fff;
 
   /* Elevation (§4): three shadows that lift, and rings that mark */
-  --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.08), 0 2px 4px rgba(60, 40, 12, 0.06), 0 24px 48px -24px rgba(60, 40, 12, 0.35);
+  --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.1), 0 1px 2px rgba(60, 40, 12, 0.12), 0 12px 24px -14px rgba(60, 40, 12, 0.4);
   --shadow-pop: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 24px -6px rgba(0, 0, 0, 0.18);
   --shadow-sheet: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px -16px rgba(0, 0, 0, 0.32);
   --shadow-raised: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.08); /* the selected segment */
@@ -74,7 +74,7 @@
   --t-title: 600 20px/26px var(--font);
   --t-head: 600 15px/22px var(--font);
   --t-body: 400 13px/20px var(--font);
-  --t-read: 400 14px/22px var(--font);
+  --t-read: 400 15px/24px var(--font);
   --t-small: 400 12px/17px var(--font);
   --t-caption: 500 11px/14px var(--font);
   --t-label: 500 13px/18px var(--font); /* a row's or a name's one strong line; the same size with larger text */
@@ -105,6 +105,7 @@
   --inset: var(--titlebar-inset, 0px);
   --tb: max(52px, var(--inset));
   --page: 880px;
+  --page-wide: 1180px;
 
   /* Layers, lowest first */
   --z-raised: 1;
@@ -150,7 +151,7 @@
   --scrim: rgba(0, 0, 0, 0.5);
   --stone-edge-black: inset 0 0 0 0.75px rgba(255, 255, 255, 0.28);
   --eval-black: #4a4843;
-  --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.7);
+  --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 24px -14px rgba(0, 0, 0, 0.75);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px -16px rgba(0, 0, 0, 0.7);
   --shadow-raised: none;
@@ -248,6 +249,7 @@ kbd { font: 500 11px/1 var(--font); padding: 3px var(--s-15); border-radius: var
 .main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .place { flex: 1; display: flex; flex-direction: column; min-height: 0; animation: place-in var(--dur-3) var(--ease-out); }
 @keyframes place-in { from { opacity: 0; } to { opacity: 1; } }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-2); animation-timing-function: var(--ease-out); }
 .toolbar {
   flex: none; height: var(--tb); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4) 0 var(--s-3);
   border-bottom: 1px solid var(--line); background: var(--bg);
@@ -283,6 +285,14 @@ kbd { font: 500 11px/1 var(--font); padding: 3px var(--s-15); border-radius: var
 /* Pages */
 .page { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--s-5) var(--s-8); }
 .page > * { max-width: var(--page); margin-left: auto; margin-right: auto; }
+/* Today and the Library: one column, two on a wide page (the left what to do now, the right the rest) */
+.page:has(> .cols) { container-type: inline-size; }
+.cols { display: flex; flex-direction: column; }
+@container (min-width: 1200px) {
+  .page:has(> .cols) > * { max-width: var(--page-wide); }
+  .cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); gap: var(--s-7); align-items: start; }
+  .col-side > :first-child { margin-top: 0; }
+}
 .page-head { display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-5); }
 .page-head h1 { font: var(--t-display); letter-spacing: -0.01em; }
 .page-head .muted { font: var(--t-read); }
@@ -406,7 +416,7 @@ button.group-row:hover { background: var(--fill); }
 .gr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-05); }
 .gr-text strong { font: var(--t-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-text span { font: var(--t-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.game-row .thumb { width: 44px; height: 44px; border-radius: 3px; flex: none; }
+.game-row .thumb { width: 44px; height: 44px; border-radius: var(--r-0); flex: none; }
 .game-row > .icon { color: var(--text-3); }
 .outcome { font: var(--t-small); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .outcome.good { color: var(--good); }
@@ -414,6 +424,18 @@ button.group-row:hover { background: var(--fill); }
 .game-item { display: flex; align-items: center; padding-right: var(--s-2); }
 .game-item .group-row { flex: 1; }
 .row-count { flex: none; font: var(--t-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* A row's own action ("Start", "Continue", "Try it"): a quiet button inside a row that is itself the button */
+/* Lines that appear in the panel (a verdict, a hint, the tally) ease in instead of popping (@starting-style; reduced motion makes it instant) */
+.verdict, .panel .note, .game-tally, .week-goal { transition: opacity var(--dur-2) var(--ease-out), translate var(--dur-2) var(--ease-out); }
+@starting-style {
+  .verdict, .panel .note, .game-tally, .week-goal { opacity: 0; translate: 0 4px; }
+}
+.game-tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-05); font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.row-action { flex: none; display: inline-flex; align-items: center; height: 26px; padding: 0 var(--s-25); border-radius: var(--r-1); background: var(--fill); color: var(--text); font: var(--t-label); }
+.group-row:hover .row-action, .today-problem-card:hover .row-action { background: var(--fill-2); }
+.meter { flex: none; align-self: center; width: 56px; height: 4px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--text-2); }
+.meter.full i { background: var(--good); }
 
 /* Cards */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
@@ -595,6 +617,12 @@ button.group-row:hover { background: var(--fill); }
 .eval-bar { display: flex; flex-direction: column; gap: var(--s-15); }
 .eval-track { height: 6px; border-radius: var(--r-pill); background: var(--eval-white); box-shadow: var(--ring-track); overflow: hidden; }
 .eval-track i { display: block; height: 100%; background: var(--eval-black); transition: width var(--dur-3) var(--ease-out); }
+/* the verdict on the player's last move: a quiet line, a dot for a slack move or a mistake */
+.verdict { display: flex; align-items: center; gap: var(--s-15); margin: 0; font: var(--t-small); color: var(--text-2); }
+.verdict > i { width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--good); }
+.verdict.v-slack > i { background: var(--text-3); }
+.verdict.v-mistake > i { background: var(--bad); }
+.verdict.v-mistake { color: var(--text); }
 /* move list: fills the panel, newest at the bottom */
 .moves { flex: 1 1 auto !important; min-height: 120px; display: flex; flex-direction: column; }
 .move-grid {
@@ -608,6 +636,8 @@ button.group-row:hover { background: var(--fill); }
 .move-grid button:hover { background: var(--fill); color: var(--text); }
 .move-grid li.last button { color: var(--text); font-weight: 500; }
 .move-grid .mn { min-width: 22px; text-align: right; color: var(--text-3); }
+.move-grid .v-dot { width: 5px; height: 5px; margin-left: auto; border-radius: var(--r-pill); background: var(--text-3); }
+.move-grid li.v-mistake .v-dot { background: var(--bad); }
 .moves-empty { font: var(--t-small); color: var(--text-3); margin: 0; }
 .float-bar {
   position: absolute; left: 50%; bottom: var(--s-6); transform: translateX(-50%); display: flex; align-items: center; gap: var(--s-3);
@@ -781,6 +811,18 @@ button.progress-row:hover { background: var(--fill); }
 .day-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--fill-2); }
 .day-dots i.on { background: var(--text-2); }
 .day-dots i.week { margin-left: 5px; }
+/* Today: this week as seven days, today's goal, a problem for today */
+.week-days { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+.week-days li { display: flex; flex-direction: column; align-items: center; gap: var(--s-1); font: var(--t-caption); color: var(--text-3); }
+.week-days li i { width: 10px; height: 10px; border-radius: var(--r-pill); background: var(--fill-2); }
+.week-days li.on i { background: var(--text-2); }
+.week-days li.today { color: var(--text); }
+.week-days li.today i { outline: 1px solid var(--text-3); outline-offset: 2px; }
+.week-goal { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); font: var(--t-body); }
+.week-goal .meter { width: 96px; }
+.today-problem-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); cursor: pointer; }
+.today-problem-card:hover { background: var(--fill); }
+.today-problem-card .dthumb { border-radius: var(--r-0); }
 /* The charts end where the mastery row's bar ends, left of its chevron. */
 li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .progress-row.milestones { padding-top: var(--s-3); padding-bottom: var(--s-3); }
@@ -816,6 +858,9 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .catalog .units.map .unit + .unit, .catalog .units.map .units-heading + .unit { border-top: 1px solid var(--line); }
 .catalog .units.map .unit-head { border-radius: 0; min-height: 44px; padding: var(--s-2) var(--s-4); }
 .catalog .units.map .unit-text h3 { font: var(--t-label); }
+.units.map .unit-head .dthumb, .unit-thumb-wait { flex: none; width: 36px; height: 36px; border-radius: var(--r-0); }
+.unit-thumb-wait { background: var(--thumb-board); opacity: 0.5; }
+.catalog .units.map .unit-head { align-items: center; }
 .catalog .units-heading { margin: 0; padding: var(--s-3) var(--s-4) var(--s-1); border-top: 1px solid var(--line); }
 .units { display: flex; flex-direction: column; gap: var(--s-3); }
 .unit { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: var(--s-4); }
@@ -872,8 +917,8 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .tile line.edge { stroke-width: 0.08; }
 .tile circle.b { fill: var(--tile-black); }
 .tile circle.w { fill: var(--tile-white); stroke: var(--tile-rim); stroke-width: 0.05; }
-.tile circle.key-b { fill: var(--tile-white); }
-.tile circle.key-w { fill: var(--tile-black); }
+.tile .key-b { fill: var(--tile-white); }
+.tile .key-w { fill: var(--tile-black); }
 .tile-foot { display: flex; align-items: center; gap: var(--s-1); min-height: 18px; padding: 0 var(--s-05); font: var(--t-small); color: var(--text-3); }
 .tile-foot .problem-no { font-variant-numeric: tabular-nums; }
 .tile-foot .problem-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
@@ -921,6 +966,9 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
   cursor: pointer; text-align: left;
 }
 .collection-row:hover { background: var(--fill); }
+.home-classics .collection-row .thumb { width: 44px; height: 44px; border-radius: var(--r-0); flex: none; }
+.thumb-wait { background: var(--thumb-board); opacity: 0.5; }
+.current-game { margin-bottom: var(--s-4); }
 .collection-row .icon { color: var(--good); }
 .collection-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-05); }
 .collection-main strong { font: var(--t-label); }
@@ -1000,6 +1048,12 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .lang-grid button { height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface); cursor: pointer; font-weight: 500; }
 .lang-grid button.on { border-color: var(--text); box-shadow: var(--ring-selected); }
 .lang-grid.big button { height: 44px; font-size: 14px; }
+/* In Settings the language is one choice among the others: the same segmented control as Appearance and Sound */
+.lang-grid:not(.big) { gap: var(--s-05); padding: var(--s-05); border-radius: var(--r-2); background: var(--fill); }
+.lang-grid:not(.big) button { height: 30px; border: 0; border-radius: var(--r-1); background: transparent; color: var(--text-2); }
+.lang-grid:not(.big) button:hover { color: var(--text); }
+.lang-grid:not(.big) button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-raised); }
+:root[data-theme="dark"] .lang-grid:not(.big) button.on { background: var(--fill-2); }
 .about { display: flex; flex-direction: column; gap: var(--s-1); }
 .shortcuts { display: grid; grid-template-columns: 10em 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
 .shortcuts dd { margin: 0; color: var(--text-2); }

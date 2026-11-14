@@ -83,7 +83,7 @@ export function ReviewView() {
     deadStones: rc ? rc.dead : [],
     variation: rc ? null : varMoves,
     moveNumbers: r.variation || tr || rc ? null : moveNumbers(game),
-    showCoords: s.settings.coords,
+    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround, tall: s.settings.tallBoard,
     view: null,
     hoverColor: rc ? null : tr ? tr.color : game.turn,
     interactive: !tr || tr.status === "open",
@@ -125,6 +125,7 @@ function reviewHeading(r) {
  * An icon-only tool of the toolbar. It has a name for assistive technology,
  * and the same name appears under it on hover and on keyboard focus (a
  * `title` alone shows late, and never for the keyboard).
+ * @param {{ icon: string, label: string, onClick: () => any, active?: boolean, disabled?: boolean }} props
  */
 function Tool({ icon, label, onClick, active, disabled }) {
   return (
@@ -924,7 +925,7 @@ function EditSection() {
       <textarea
         class="comment-box"
         aria-label={t("edit.comment")}
-        rows="3"
+        rows={3}
         key={node.id}
         placeholder={t("edit.commentPlaceholder")}
         value={node.comment || ""}

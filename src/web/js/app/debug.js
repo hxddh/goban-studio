@@ -20,3 +20,32 @@ export function testHandles(win = typeof window !== "undefined" ? window : null)
 export function expose(name, value) {
   if (testHandles()) window[name] = value;
 }
+
+/**
+ * Component renders, for the tests: `{ total, by: { Name: n }, batches,
+ * reset() }`. `batches` counts the store's notifications (`subscribe`).
+ * Preact calls its render hook (`options.__r`, the name its own hooks use)
+ * before each component renders.
+ */
+export function renderCounter(options, subscribe) {
+  const counts = {
+    total: 0,
+    by: {},
+    batches: 0,
+    reset() {
+      counts.total = 0;
+      counts.by = {};
+      counts.batches = 0;
+    },
+  };
+  const hooks = /** @type {any} */ (options);
+  const prev = hooks.__r;
+  hooks.__r = (vnode) => {
+    counts.total++;
+    const name = vnode.type?.displayName || vnode.type?.name || "?";
+    counts.by[name] = (counts.by[name] || 0) + 1;
+    if (prev) prev(vnode);
+  };
+  subscribe(() => counts.batches++);
+  return counts;
+}

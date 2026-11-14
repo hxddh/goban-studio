@@ -7,7 +7,7 @@ import { coordLabel } from "../rules.js";
 import * as Engine from "../engine.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { state, update, toast, announce } from "./store.js";
+import { state, update, updateSlice, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
 import { confirmAction, teachingOn } from "./ctl-core.js";
 import { colorName } from "./game-view.js";
@@ -15,6 +15,7 @@ import { countReady, resignStep, thinkTime } from "./feel.js";
 import { moveMade } from "./clock.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 import { gameOver, gameSignal, isComputerTurn, persistCurrent, playReviewing } from "./game-session.js";
+import { moveLoss, verdictOf } from "../play/verdict.js";
 import { finishGame, startScoring, toggleDead } from "./game-end.js";
 
 /* ------------------------------------------------------------ moves */
@@ -40,7 +41,7 @@ export function humanPlay(x, y) {
   // Two-click placement: the first click shows the stone, the second plays it.
   if (state.settings.confirmMove && !(g.ghost && g.ghost.x === x && g.ghost.y === y)) {
     g.ghost = { x, y };
-    update();
+    updateSlice("game");
     return;
   }
   g.ghost = null;
@@ -53,7 +54,7 @@ export function clearGhost() {
   const g = state.game;
   if (g?.ghost) {
     g.ghost = null;
-    update();
+    updateSlice("game");
   }
 }
 
@@ -89,7 +90,7 @@ function afterMove({ human = false } = {}) {
   g.proposal = false;
   if (g.game.phase === "scoring" && !g.scoring) startScoring();
   persistCurrent();
-  update();
+  updateSlice("game");
   if (human && g.opponent === "ai") maybeComputerMove({ afterHuman: true });
   else if (g.opponent === "ai") maybeComputerMove();
   else ponder();
@@ -119,7 +120,7 @@ export async function ponder() {
   g.before = { nodeId: node.id, ...a };
   g.eval = a;
   checkProposal(a);
-  update();
+  updateSlice("game");
 }
 
 /**
@@ -152,7 +153,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const gen = ++g.gen;
   g.thinking = true;
   g.engineFailed = false;
-  update();
+  updateSlice("game");
   const started = performance.now();
   // The position the move is for, fixed now (a queued search would read the board when it runs).
   const node = g.game.current;
@@ -163,6 +164,9 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
     result = { move: null, analysis: null };
   }
   if (state.game !== g || gen !== g.gen) return;
+  // KataGo kept being superseded (engine.js askKataGo) while this game still
+  // wants the move. Not a failure, so no weaker offline move; Retry asks again.
+  if (result.superseded && !result.move) return computerFailed(g);
   if (!result.move && g.game.current === node) result = await offlineFallback(g, gen, result);
   if (!result || state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
@@ -176,23 +180,20 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
     g.rank = Engine.implLabel(result.impl);
   }
 
-  // Teaching: a big drop after the player's move pauses the reply.
-  if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {
-    const best = g.before.moves?.[0];
-    if (best && Number.isFinite(best.scoreLead) && Number.isFinite(a.scoreLead)) {
-      const loss = g.humanColor * (best.scoreLead - a.scoreLead);
-      const threshold = state.settings.playerRank != null && state.settings.playerRank <= 10 ? 6 : 4;
-      if (loss >= threshold) {
-        g.thinking = false;
-        const move = g.game.current.move;
-        // One reason, from the two searches already made (no new search).
-        const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
-        g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
-        announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
-        update();
-        return;
-      }
-    }
+  // How the player's move compares with the best one: said quietly in the
+  // panel and the move list; in a teaching game a big drop pauses the reply.
+  const loss = afterHuman && a && g.before && g.game.current.parent?.id === g.before.nodeId ? moveLoss(g.before, a, g.humanColor) : null;
+  if (loss != null) (g.verdicts ||= {})[g.game.current.id] = loss;
+  if (loss != null && teachingOn() && verdictOf(loss, state.settings.playerRank) === "mistake") {
+    const best = g.before.moves[0];
+    g.thinking = false;
+    const move = g.game.current.move;
+    // One reason, from the two searches already made (no new search).
+    const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
+    g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
+    announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
+    updateSlice("game");
+    return;
   }
   await reply(g, gen, result, started);
 }
@@ -221,7 +222,7 @@ function computerFailed(g) {
   g.thinking = false;
   g.engineFailed = true;
   announce(t("play.engineFailed"));
-  update();
+  updateSlice("game");
 }
 
 /** Retry after the computer could not move (the panel's Retry). */
@@ -262,7 +263,7 @@ async function reply(g, gen, result, started) {
   g.thinking = false;
   const move = result.move;
   if (!isComputerTurn()) {
-    update();
+    updateSlice("game");
     return;
   }
   // No move to play (a kept teaching pause whose search had none): never stuck on the computer's turn.
@@ -279,7 +280,7 @@ async function reply(g, gen, result, started) {
     afterMove();
   } else if (ready && !proposalWaits(g)) {
     g.proposal = true;
-    update();
+    updateSlice("game");
   }
   if (!gameOver(g) && !g.scoring) ponder();
 }
@@ -377,8 +378,8 @@ export function canRedo(g = state.game) {
  * Play the moves of the last undo again: the player's move and the reply
  * the computer made to it (the computer is not asked again; it is when the
  * undo took back the player's move alone). The clocks stay as they are:
- * the time of those moves was already spent. An undo redone leaves no
- * trace: the game counts one undo fewer.
+ * the time of those moves was already spent. The undo still counts: the
+ * game was told it is no longer rated (noteAssisted), and stays so.
  */
 export function redo() {
   const g = state.game;
@@ -392,7 +393,6 @@ export function redo() {
       break;
     }
   }
-  g.undos = Math.max(0, g.undos - 1);
   Audio.stone(false);
   const last = g.game.current.move;
   if (last) announce(moveText({ color: last.color, x: last.x, y: last.y, pass: last.pass, size: g.game.size }));

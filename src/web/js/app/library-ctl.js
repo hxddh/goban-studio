@@ -8,7 +8,7 @@ import * as Games from "../data/games.js";
 import { recordClassic } from "../model/record.js";
 import { t, tn } from "../i18n.js";
 import { hasFileDialogs, hasNative, normalizePaths, openFileDialog, readFileBytes } from "../host.js";
-import { CLASSICS, withContent } from "../content.js";
+import { CLASSICS, loaded, withContent } from "../content.js";
 import { state, update, toast, dismissToastKey, runTask } from "./store.js";
 import { changeProfile, confirmAction, openSheet, setSetting } from "./ctl-core.js";
 import { persistCurrent } from "./game-session.js";
@@ -92,6 +92,20 @@ export function clearUnfinished() {
   });
 }
 
+/** A classic's final position (data/games.js thumbnail), once the classics are here; read once each. */
+const classicThumbs = new Map();
+export function classicThumb(id) {
+  if (classicThumbs.has(id)) return classicThumbs.get(id);
+  if (!loaded("classics")) return null;
+  const c = CLASSICS.find((g) => g.id === id);
+  let thumb = null;
+  try {
+    if (c?.sgf) thumb = Games.thumbnail(loadSGF(c.sgf).game);
+  } catch (_) {}
+  classicThumbs.set(id, thumb);
+  return thumb;
+}
+
 export function openClassic(id) {
   return withContent("classics", () => showClassic(id));
 }
@@ -113,6 +127,8 @@ function showClassic(id) {
  * Delete a game from the Library: it goes at once, and a toast offers Undo
  * for a few seconds (data/games.js trashGame). The file is deleted when the
  * toast goes, when another game is deleted, and before the app quits.
+ * Anything else that writes everything out (a backup, a restore) makes the
+ * delete final too: the Undo then goes, and a toast says so.
  */
 export function deleteRecord(id) {
   if (!Games.trashGame(id)) return;
@@ -132,6 +148,10 @@ export function deleteRecord(id) {
     },
   });
 }
+
+Games.onTrashFlushed(() => {
+  if (dismissToastKey("game-deleted", "final")) toast(t("library.deletedFinal"), "info");
+});
 
 export function renameRecord(id, name) {
   Games.renameGame(id, name);

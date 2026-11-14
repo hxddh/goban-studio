@@ -17,7 +17,7 @@ import { GRADES, PROBLEMS } from "../content.js";
 import { t, textLang, tn } from "../i18n.js";
 import { state } from "./store.js";
 import * as C from "./controller.js";
-import { Icon, Thumb } from "./parts.jsx";
+import { DiagramThumb, Icon, Thumb } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { estimateLabel } from "./estimate-label.js";
 import { ContinueHero, SuggestedHero, gameInProgress } from "../play/home.jsx";
@@ -61,11 +61,18 @@ export function TodayView() {
           <span class="eyebrow">{date}</span>
           <h1>{greeting()}</h1>
         </header>
-        {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
-        <TodayList />
-        <Progress />
-        <Week />
-        <Recent />
+        <div class="cols">
+          <div class="col-main">
+            {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
+            <TodayList />
+          </div>
+          <div class="col-side">
+            {!Games.listGames().length && activeDays(practiceDays(state.profile, Date.now(), 28)) === 0 && <TodayProblem />}
+            <Progress />
+            <Week />
+            <Recent />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -76,7 +83,7 @@ function TodayList() {
   let row;
   if (C.placementOffered()) {
     row = (
-      <button type="button" class="group-row today-row" data-row="placement" onClick={C.startPlacement}>
+      <button type="button" class="group-row today-row" data-row="placement" onClick={() => C.startPlacement()}>
         <span class="gr-icon">
           <Icon name="target" size={18} />
         </span>
@@ -254,11 +261,62 @@ function Progress() {
   );
 }
 
+/**
+ * This week: seven dots, one a day with today last (a day with practice or a
+ * game is filled), today's goal — the day's practice — and the week in one line.
+ */
 function Week() {
+  const now = Date.now();
+  const days = practiceDays(state.profile, now, 7);
+  const lang = localeOf(state.settings.lang);
+  const path = C.pathNow();
+  const done = path.items.filter((it) => path.done.has(it.key)).length;
   return (
     <section class="section today-week">
       <h2 class="section-title">{t("today.week")}</h2>
+      <ol class="week-days" aria-label={t("today.daysLabel")}>
+        {days.map((n, i) => {
+          const day = new Date(now - (days.length - 1 - i) * DAY);
+          const name = day.toLocaleDateString(lang, { weekday: "narrow" });
+          return (
+            <li class={`${n > 0 ? "on" : ""} ${i === days.length - 1 ? "today" : ""}`} title={day.toLocaleDateString(lang, { weekday: "long" })}>
+              <i aria-hidden="true" />
+              <span>{name}</span>
+            </li>
+          );
+        })}
+      </ol>
       <p class="muted">{weekText(weekCounts())}</p>
+      {path.items.length > 0 && (
+        <p class="week-goal">
+          {path.finished ? t("today.goalDone") : done === 0 ? tn("today.goalTodo", path.items.length) : t("today.goal", [t("practice.ofN", [done, path.items.length])])}
+          {done > 0 && !path.finished && (
+            <span class="meter" aria-hidden="true">
+              <i style={{ width: `${Math.round((done / path.items.length) * 100)}%` }} />
+            </span>
+          )}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * A problem for today, while there is no progress or game to show beside
+ * the hero: the first problem of today's path, as a position, one click away.
+ */
+function TodayProblem() {
+  const now = C.pathNow();
+  const rows = pathRows(now.items);
+  const d = rows.flatMap((r) => r.diagrams || []).find((x) => !now.done.has(x.key));
+  if (!d) return null;
+  return (
+    <section class="section today-problem">
+      <h2 class="section-title">{t("today.problem.title")}</h2>
+      <button type="button" class="today-problem-card" onClick={() => C.openPathItem(d.key)}>
+        <DiagramThumb diagram={d.diagram} size={120} label={t("today.problem.title")} />
+        <span class="row-action">{t("today.problem.try")}</span>
+      </button>
     </section>
   );
 }

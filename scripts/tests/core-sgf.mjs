@@ -187,4 +187,10 @@ await test("a set-up position records who plays first, and move-less nodes fold 
   const out = game.toSGF();
   assert.match(out, /PL\[W\]/);
   assert.equal(loadSGF(out).game.root.turn, WHITE);
+  // White first on an empty board (no AB / AW) keeps its PL too.
+  const bare = loadSGF("(;SZ[9]PL[W])").game;
+  assert.equal(bare.root.turn, WHITE);
+  assert.match(bare.toSGF(), /PL\[W\]/);
+  assert.equal(loadSGF(bare.toSGF()).game.root.turn, WHITE);
+  assert.doesNotMatch(loadSGF("(;SZ[9])").game.toSGF(), /PL\[/, "Black first needs no PL");
 });

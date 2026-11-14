@@ -422,6 +422,13 @@ function chain(c, board, i) {
   return { stones, libs };
 }
 
+/**
+ * A position in the search: the board, who moves, the ko point, passes in
+ * a row and the Zobrist hash halves; `last` and `captured` after a move,
+ * `closed` and `taken` in the counting mode.
+ * @typedef {{ board: Int8Array, toMove: number, ko: number, passes: number, h1: number, h2: number, last?: number, captured?: number, hist?: any[], closed?: any[], taken?: number }} SolverState
+ */
+/** @returns {SolverState} */
 export function initialState(pz) {
   const c = context(pz.size);
   const board = new Int8Array(c.n);
@@ -441,6 +448,11 @@ export function initialState(pz) {
 /**
  * Play at index i (or PASS). Returns a new state or null when illegal.
  * `ignoreKo` lets the ko master retake a ko at once (search only).
+ * @param {any} pz
+ * @param {SolverState} st
+ * @param {number} i
+ * @param {boolean} [ignoreKo]
+ * @returns {SolverState | null}
  */
 export function play(pz, st, i, ignoreKo = false) {
   const c = context(pz.size);
@@ -1013,6 +1025,9 @@ export function solveFirstMoves(pz, budget = 600000, { deadline = Infinity } = {
  * could prove one of them (a guess is never reported as a result).
  * Independent of the problem's `ko` option. `budget` is the node limit of
  * each search (the default when omitted).
+ * @param {any} pz
+ * @param {SolverState} st
+ * @param {{ budget?: number }} [opts]
  */
 export function outcome(pz, st, { budget } = {}) {
   if (pz.counting) return countStatus(pz, st) === "lost" ? "loss" : "win";
@@ -1242,14 +1257,20 @@ export { PASS };
  * an empty list with `exact` false means "not known", not "no winning
  * move". `budget` is the node limit of each search (the default when
  * omitted).
+ * @param {any} pz
+ * @param {SolverState} st
+ * @param {{ budget?: number }} [opts]
+ * @returns {any[] & { exact?: boolean }}
  */
 export function winningMoves(pz, st, { budget } = {}) {
   if (pz.counting) {
+    /** @type {any[] & { exact?: boolean }} */
     const moves = countWinningMoves(pz, st);
     moves.exact = true;
     return moves;
   }
   const keyIdx = keyIndices(pz);
+  /** @type {any[] & { exact?: boolean }} */
   const out = [];
   out.exact = true;
   for (const m of candidates(pz, st, keyIdx)) {
@@ -1957,6 +1978,8 @@ function countExact(pz, st) {
 /**
  * Every choice from `st`: the moves the model allows and the pass, each
  * with the score it leads to (Black's, the move's own prisoners included).
+ * @typedef {{ i: number, x?: number, y?: number, pass?: boolean, next: any, value: number }} CountMove
+ * @returns {{ moves: CountMove[], exact: boolean, nodes: number }}
  */
 export function countMoves(pz, st, { prove = false } = {}) {
   const out = [];

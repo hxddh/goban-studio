@@ -6,7 +6,7 @@
 import { test, assert, fs, path, root } from "./helpers.mjs";
 import { BOARD_PALETTES, BOARD_STYLES, boardPalette, contrast, luminance } from "../../src/web/js/theme.js";
 import { GRID_MIN, RIM_MIN, STAR_MIN, drawThumb, fromDiagram, fromString, thumbPlan } from "../../src/web/js/thumb.js";
-import { gridStrokesOf, lastMarkOf, starRadiusOf } from "../../src/web/js/board-surface.js";
+import { TALL_RATIO, frameAspect, gridRatioOf, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "../../src/web/js/board-surface.js";
 
 await test("board palettes: the dark board is the same wood under a lamp — dimmer, as warm — and stones part from it in every palette", () => {
   assert.deepEqual(BOARD_STYLES, ["standard", "contrast"]);
@@ -94,6 +94,29 @@ await test("last move: a light ring 0.44 of a cell across, never thinner than a 
   assert.equal(small.width, 1.25, "the line never goes under 1.25 px");
   assert.ok(small.radius >= small.width * 1.6 && small.radius <= 14 * 0.25, "still a ring, still inside the stone");
   for (const cell of [10, 20, 30, 45, 80]) assert.ok(lastMarkOf(cell).radius + lastMarkOf(cell).width / 2 < cell * 0.475, `inside the stone at ${cell}`);
+});
+
+await test("a traditional board: rows 7 % further apart on a whole board only, and its frame follows", () => {
+  assert.equal(gridRatioOf({ size: 19 }), 1);
+  assert.equal(gridRatioOf({ size: 19, tall: true }), TALL_RATIO);
+  assert.equal(gridRatioOf({ size: 19, tall: true, view: { x0: 0, y0: 0, x1: 8, y1: 8 } }), 1, "a problem window stays square");
+  assert.equal(frameAspect({ size: 19, showCoords: true }), 1, "a square board's frame is square");
+  const a = frameAspect({ size: 19, showCoords: true, tall: true });
+  assert.ok(a < 1 && a > 1 / TALL_RATIO, `taller than wide, by a little less than the grid (${a})`);
+});
+
+await test("a stone lands: it starts in the air, comes down fast, settles, and never goes below the board", () => {
+  assert.equal(liftOf(0), 1);
+  assert.equal(liftOf(1), 0);
+  assert.equal(liftOf(2), 0, "after the landing it stays down");
+  assert.equal(liftOf(-1), 1);
+  let prev = 1;
+  for (let t = 0.1; t <= 1; t += 0.1) {
+    const l = liftOf(t);
+    assert.ok(l <= prev && l >= 0, `monotone at ${t.toFixed(1)}`);
+    prev = l;
+  }
+  assert.ok(liftOf(0.5) < 0.2, "most of the way down by half time");
 });
 
 await test("grid: whole device pixels, at least one css pixel and at most one and a half; the edge twice the line; star points from 2.5 to 5 px", () => {

@@ -9,7 +9,7 @@
  *
  * Import checks the document first (what it is, its version, every key
  * and the size of every file), brings every file to the current format
- * (data/migrate.js: v9 to v12 backups were `v: 9`), and only then
+ * (data/migrate.js: a backup without a version is format 9), and only then
  * replaces the store with it. Before replacing, the store as it was is
  * copied to `backups/pre-restore-<time>/…` (one file per key, so no copy
  * outgrows the store's limit per file); undoRestore puts it back — after
@@ -75,7 +75,7 @@ export function checkBackup(doc) {
     if (!validKey(key) || !isObject(value)) return { ok: false, error: "damaged", key };
     // The store could not write it back (data/store.js MAX_BYTES).
     if (bytesOf(value) > MAX_BYTES) return { ok: false, error: "tooLarge", key };
-    // Files of an older backup carry no version (v9 to v12); a v13 file carries its own.
+    // Files of an older backup carry no version (format 9, LEGACY_V); a newer file carries its own.
     try {
       data[key] = migrateFile(key, value).value;
     } catch (e) {
@@ -138,6 +138,7 @@ async function writeSnapshot(store, now = Date.now()) {
  * also `snapshot` (its prefix) and `written` (false when a write failed:
  * the store's onError has said which). `{ ok: false, error: "snapshot" }`
  * when the snapshot could not be written (nothing was replaced).
+ * @returns {Promise<{ ok: boolean, error?: string, key?: string, summary?: any, snapshot?: string, written?: boolean }>}
  */
 export async function importBackup(store, doc, { now = Date.now() } = {}) {
   const c = checkBackup(doc);

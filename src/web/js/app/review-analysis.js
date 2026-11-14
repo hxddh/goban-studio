@@ -7,7 +7,7 @@ import * as Engine from "../engine.js";
 import * as Games from "../data/games.js";
 import { store } from "../data/store.js";
 import { t } from "../i18n.js";
-import { state, update } from "./store.js";
+import { state, update, updateSlice } from "./store.js";
 import { persistLive } from "./ctl-core.js";
 import { buildReview, keyMovesOf as keyMistakes, reviewFits } from "../play/review-model.js";
 import { analyzeLine, storeAnalysis, visitsFor } from "../play/analysis.js";
@@ -117,7 +117,7 @@ export async function analyzeReview(review, { existing = null } = {}) {
           if (k % 4 === 0 || k === n) {
             review.keyMoves = keyMovesOf(review);
             if (k % 16 === 0 || k === n) refreshModel(review);
-            update();
+            updateSlice("review");
           }
         },
       }),

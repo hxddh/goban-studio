@@ -26,7 +26,7 @@ allows fails there even if it works on your machine.
 ## Set up: the native shell (Zig + Native SDK)
 
 The shell needs **Zig 0.16.0** exactly (the SDK pins it) and
-**`@native-sdk/cli` 0.11.0**. The SDK is a devDependency at that exact
+**`@native-sdk/cli` 0.11.1**. The SDK is a devDependency at that exact
 version, so `npm ci` installs it — and the `native` binary for your
 platform — with the hashes in `package-lock.json`; do not install it
 globally. It is patched by `scripts/patch-sdk.mjs` (it keeps the system
@@ -86,7 +86,8 @@ run.
 
 | What | Command | Notes |
 | --- | --- | --- |
-| Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code. No warnings are allowed; fix the code rather than disabling a rule |
+| Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code, hook dependencies. No warnings are allowed; fix the code rather than disabling a rule |
+| Types | `npm run typecheck` | TypeScript over the page's JS (`jsconfig.json`, `checkJs`): JSDoc types where inference is not enough |
 | Unit and data tests | `npm test` | Node only, about a minute. `node scripts/test.mjs play-,practice-` runs only files whose names contain those |
 | Content gate | `npm run release-check` | counts, four languages, pins and versions |
 | Interface tests | `npm run build && npm run sync && npm run ui-test` | Chromium via Playwright (`npx playwright install chromium` once). `UI_ONLY=<text>` runs matching checks |
@@ -127,7 +128,7 @@ that search source text. `docs/QA.md` lists what each gate covers.
   until a strong player (for Go content) or a native speaker (for text)
   has reviewed them. Say in the pull request who reviewed what.
 - **No telemetry, no new network access.** The app is offline; the only
-  downloads are the pinned ones in `src/install.zig` and `src/models.zig`.
+  downloads are the pinned ones in `src/install_verify.zig` and `src/models.zig`.
 
 ## Changes and versions
 

@@ -19,6 +19,7 @@ function lines(text) {
   return text.split(" · ").map((x) => <i>{x}</i>);
 }
 
+/** @param {{ sc: any, komi: number, title?: any, confirm?: any, cancel?: any, onConfirm?: () => any, onCancel?: () => any, children?: any }} props */
 export function ScoreCard({ sc, komi, title, confirm, cancel, onConfirm, onCancel, children }) {
   const s = sc.score;
   const pending = sc.source === "pending";

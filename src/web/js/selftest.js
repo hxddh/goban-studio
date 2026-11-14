@@ -120,6 +120,7 @@ async function waitModel(kind, done, ms) {
 
 /** The optional downloads, end to end against the pinned URLs. */
 async function modelChecks(checks, report, cfg = {}) {
+  /** @type {Record<string, any>} */
   const out = (report.models = {});
   // Breadcrumbs: if the app stalls, the runner prints how far it got.
   const mark = (step) => (cfg.path ? writeTextFile(cfg.path + ".progress", JSON.stringify({ step, at: Math.round(now()), models: out }, null, 2)) : null);
@@ -174,6 +175,7 @@ async function modelChecks(checks, report, cfg = {}) {
   checks.modelsRemove = !!(removedHuman.ok && removedStrong.ok && after.human.status === "absent" && after.strong.status === "absent" && refused === null && validAnalysis(fallback, 19));
 }
 
+/** @param {{ state?: any }} [opts] */
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
   const cfg = await selftestConfig();
@@ -181,7 +183,7 @@ export async function runSelfTest({ state } = {}) {
   if (!cfg?.enabled || !cfg.path) return;
   const checks = {
     webview: true,
-    bridge: typeof window.zero?.invoke === "function",
+    bridge: typeof (/** @type {any} */ (window).zero?.invoke) === "function",
     ui: !!(document.querySelector(".app") || document.getElementById("root")?.childElementCount),
   };
   const report = { version: APP_VERSION, language: state?.settings?.lang ?? null, checks, timings: {} };
@@ -266,8 +268,11 @@ export async function runSelfTest({ state } = {}) {
       second.sync && second.sync.reset === false && second.sync.undo === 0 && second.sync.play === 1 &&
       third.sync && third.sync.reset === false && third.sync.undo === 1 && third.sync.play === 0 &&
       // The sync counts prove the position was extended, not replayed; the
-      // timing only guards against a pathological slowdown.
-      secondMs <= firstMs * 1.5
+      // timing only guards against a pathological slowdown (a replay of the
+      // whole game each time). A GPU backend on a virtual machine (Metal on
+      // a CI runner) varies by a second or two between searches, and the
+      // first one may reuse an earlier search's cache: 1.5× or 3 s more.
+      secondMs <= Math.max(firstMs * 1.5, firstMs + 3000)
     );
 
     // --- cancel: a long search stops promptly when asked

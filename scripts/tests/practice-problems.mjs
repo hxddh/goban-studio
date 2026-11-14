@@ -4,7 +4,7 @@
 import { test, PROBLEMS, assert, bundle, sleepMs } from "./helpers.mjs";
 
 await test("practice problems: a tight problem window widens towards the open side", async () => {
-  const { windowOf } = await import("../../src/web/js/board.js");
+  const { windowOf } = await import("../../src/web/js/board-surface.js");
   // A bottom-right corner problem on 19×19: grows up and left only.
   assert.deepEqual(windowOf({ x0: 13, y0: 13, x1: 18, y1: 18 }, 19), { x0: 10, y0: 10, x1: 18, y1: 18 });
   // A centred window grows on both sides.

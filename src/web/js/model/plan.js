@@ -48,10 +48,11 @@ export function dailySet(profile, problems, grades, limit = 5, now = 0) {
  * The problems and drills of Practice's path (`limit` items, a day's size):
  *   1. due reviews first, the most forgotten first: up to MAX_DRILLS
  *      drills from your games, then problems. Reviews come before anything
- *      new, so they cannot pile up: with a small backlog (at most
- *      SMALL_BACKLOG due) they leave at least one place for a new problem
- *      (at most limit − 1 reviews); with more due they may take every
- *      place until the backlog is small again. Never more than
+ *      new, but they leave one place for a new problem (at most limit − 1
+ *      reviews) while one is open, unless more than BACKLOG_PER_PLACE times
+ *      the day's size is due: then they take every place until the backlog
+ *      is back under it (a new place every day lets the backlog of a
+ *      three-item day grow without end). Never more than
  *      MEMORY.REVIEW_CAP reviews a day, counting those already done today
  *      (reviewsToday), so a second session on the same day stays within it;
  *   2. with a focus: problems from the focus themes around the solving
@@ -88,9 +89,11 @@ export function planProblems({ profile, model, pool, bank = null, grades = {}, n
   const soonest = byRetrievability(now);
   const allDrills = (profile.mistakes || []).filter((m) => !m.retired && (m.due || 0) <= now).sort(soonest);
   const dueProblems = pool.filter((d) => isDue(entry(d), now)).sort((a, b) => soonest(entry(a), entry(b)));
-  const backlog = allDrills.length + dueProblems.length;
   const room = Math.max(0, MEMORY.REVIEW_CAP - reviewsToday(profile, now));
-  const maxReviews = Math.min(room, backlog <= RULES.SMALL_BACKLOG ? limit - 1 : limit);
+  // A problem that could take the kept place: not due, not solved.
+  const fresh = pool.some((d) => !isDue(entry(d), now) && !entry(d)?.solved);
+  const keep = fresh && limit > 1 && allDrills.length + dueProblems.length <= RULES.BACKLOG_PER_PLACE * limit;
+  const maxReviews = Math.min(room, keep ? limit - 1 : limit);
   for (const m of allDrills.slice(0, RULES.MAX_DRILLS)) {
     if (items.length >= maxReviews) break;
     add({ kind: "mistake", id: m.id, role: "review", ...(focusKeys.includes(focusKey(m.theme)) ? { why: focusKey(m.theme) } : {}) });
@@ -170,6 +173,9 @@ export function lessonList(content) {
  * stronger goes on to the advanced course once the intermediate course is
  * finished, or straight away if they never started it.
  * `rating`: GoR from rated games, or null.
+ * @param {any[]} all
+ * @param {(id: string) => boolean} isDone
+ * @param {{ experience?: string, playerRank?: number, rating?: number }} [player]
  */
 export function nextLesson(all, isDone, { experience, playerRank, rating } = {}) {
   const open = ({ lesson }) => !isDone(lesson.id);

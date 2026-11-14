@@ -63,6 +63,8 @@ function gradesText(ids) {
  *   { key, kind, role, items, icon | stone, title, why, more, diagrams, focus }
  * A row of problems is named after their theme with how many there are;
  * a problem's own name stays out of it (it would give the answer away).
+ * @typedef {{ key: any, kind: any, role: any, items: any[], icon?: string, stone?: any, title: any, why: any, more: any, diagrams?: { key: string, diagram: string[] }[], focus: any }} PathRow
+ * @returns {PathRow[]}
  */
 export function pathRows(items, wf = null) {
   const themeOf = (it) => PROBLEMS.find((x) => x.id === it.id)?.theme;
@@ -143,7 +145,7 @@ function PlacementOffer() {
         <p class="muted">{t("placement.leadRange", [PLACEMENT.MIN, PLACEMENT.MAX])}</p>
       </div>
       <div class="hero-actions">
-        <Button kind="primary" onClick={C.startPlacement}>
+        <Button kind="primary" onClick={() => C.startPlacement()}>
           {t("placement.start")}
         </Button>
         <button type="button" class="link" onClick={C.skipPlacement}>

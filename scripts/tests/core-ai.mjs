@@ -29,6 +29,29 @@ await test("offline AI: on a settled board it passes at once after the opponent'
   for (const level of [1, 3, 5]) assert.deepEqual(await chooseMove(settled(BLACK), { level }), { pass: true }, `black, level ${level}`);
 });
 
+await test("offline AI: at the end it does not invade the opponent's large sealed area, even with a stone already lost there", async () => {
+  // Black seals 27 points on the left, White its own on the right; Black keeps passing.
+  const wall = Array(9).fill("...XO....");
+  const withLost = wall.map((r, y) => (y === 2 ? "..OXO...." : r));
+  const withDame = wall.map((r, y) => (y === 3 ? "...X.O..." : r));
+  for (const [name, rows, expected] of [["settled", wall, 0], ["a stone of its own already lost inside", withLost, 0], ["one dame left", withDame, 1]]) {
+    for (const level of [1, 3, 5]) {
+      const g = fromRows(rows);
+      g.pass();
+      const played = [];
+      for (let n = 0; n < 30; n++) {
+        const m = await chooseMove(g, { level });
+        if (m.pass) break;
+        assert.ok(g.play(m.x, m.y).ok);
+        played.push([m.x, m.y]);
+        g.pass();
+      }
+      assert.equal(played.length, expected, `${name}, level ${level}: ${JSON.stringify(played)}`);
+      if (expected) assert.deepEqual(played[0], [4, 3], "the dame, then a pass");
+    }
+  }
+});
+
 await test("offline AI: it never plays inside its own one-point eye or its own territory", async () => {
   // White has one dame left (E5 here, between the walls) besides its eyes
   // and territory: that is the move, at every level, every time.

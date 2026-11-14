@@ -15,7 +15,7 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { PracticeHome, whyText } from "../practice/path.jsx";
 import { CatalogView } from "../practice/catalog.jsx";
-import { PositionTile } from "../practice/tile.jsx";
+import { PositionTile, gridFrame } from "../practice/tile.jsx";
 import { cleanFirst, comesBackIn, problemStatus } from "../practice/progress.js";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
@@ -118,7 +118,7 @@ function ProblemGrid({ items, numberOf }) {
         const label = [name ? t("common.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
         return (
           <button type="button" class={`problem-card ${status}`} data-status={status} tabIndex={i === at ? 0 : -1} aria-label={label} title={name || undefined} onFocus={() => setAt(i)} onClick={() => C.openProblem(x.id)}>
-            <PositionTile def={x} />
+            <PositionTile def={x} frame={gridFrame(items)} />
             <span class="tile-foot">
               {toMove != null && <Stone color={toMove} size={10} />}
               <span class="problem-no">{n}</span>
@@ -203,7 +203,7 @@ function MistakeView() {
     board,
     lastMove: D.status === "right" ? D.last : node.move,
     marks,
-    showCoords: state.settings.coords,
+    showCoords: state.settings.coords, coordsAround: state.settings.coordsAround, tall: state.settings.tallBoard,
     view: null,
     hoverColor: m.color,
     interactive: D.status !== "right" && D.status !== "revealed",
@@ -282,7 +282,7 @@ function puzzleModel(P, extra = {}) {
   };
 }
 
-function ProblemFeedback({ P, success }) {
+function ProblemFeedback({ P, success = null }) {
   const counting = P.pz.counting;
   if (P.feedback === "solved" && counting) return <p class="feedback good">{t(C.feedbackKey(P), C.endgameArgs(P))}</p>;
   if (P.answer) return <p class="feedback info">{counting && P.pz.ask === "value" ? t(P.pz.value === 1 ? "practice.endgame.valueAnswerOne" : "practice.endgame.valueAnswer", C.endgameArgs(P)) : t("practice.answerShown")}</p>;
@@ -316,7 +316,7 @@ function ValueChoices({ P }) {
   );
 }
 
-function ProblemControls({ P, onNext, nextLabel }) {
+function ProblemControls({ P, onNext = null, nextLabel = null }) {
   const value = P.pz.counting && P.pz.ask === "value";
   if (value) {
     const done = P.status === "won" || !!P.answer;
@@ -528,7 +528,7 @@ function LessonStep({ L }) {
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
           <h1>{C.tx(L.lesson.title)}</h1>
         </div>
-        <div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax={steps.length} aria-valuenow={L.index + 1} aria-label={t("practice.stepOf", [L.index + 1, steps.length])}>
+        <div class="steps" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={L.index + 1} aria-label={t("practice.stepOf", [L.index + 1, steps.length])}>
           {steps.map((_, i) => (
             <i class={i < L.index ? "done" : i === L.index ? "on" : ""} />
           ))}

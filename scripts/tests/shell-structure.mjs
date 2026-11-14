@@ -115,6 +115,18 @@ await test("shell structure: the controller only lists names, by area, and lists
   assert.deepEqual(unused, [], "names the controller lists that nothing reaches as X.name");
 });
 
+await test("shell structure: a test file that builds today's practice path pins the date", () => {
+  // Without a date of its own, a path is drawn from today: such a file must pin it (helpers.mjs pinDate).
+  const today = /\b(?:pathNow|practicePath|todaysSession)\(\)|\b(?:startPath|continuePath)\(/;
+  const unpinned = [];
+  for (const n of fs.readdirSync(path.join(root, "scripts/tests"))) {
+    if (!n.endsWith(".mjs") || n === "helpers.mjs") continue;
+    const src = fs.readFileSync(path.join(root, "scripts/tests", n), "utf8");
+    if (today.test(src) && !/^pinDate\(\);$/m.test(src)) unpinned.push(n);
+  }
+  assert.deepEqual(unpinned, []);
+});
+
 await test("shell structure: no module is longer than 600 lines, but for content, the rules and solver, and five that may not grow", () => {
   // What is over the line today, with the reason; each may shrink, none may grow.
   const CEILING = {
@@ -134,4 +146,19 @@ await test("shell structure: no module is longer than 600 lines, but for content
   }
   assert.deepEqual(over, []);
   for (const f of Object.keys(CEILING)) assert.ok(f in MODULES && MODULES[f].trimEnd().split("\n").length > 600, `${f} is no longer over 600 lines: take it off the list`);
+});
+
+await test("shell structure: comments say what the code does, not which version brought it", () => {
+  // A comment may name a release tag as an example of its format (update.js,
+  // host.js) or a document by its file name (docs/v9.md); stored formats are
+  // named by their number ("format 9"), not as versions.
+  const ALLOWED = [/docs\/v\d+\.md/g, /docs\/review-v\d+-\w+\.md/g, /"v\d+\.\d+\.\d+"/g];
+  const found = [];
+  for (const [f, src] of Object.entries(MODULES)) {
+    for (const c of src.match(/\/\*[\s\S]*?\*\/|(?<![:"'`\\])\/\/.*$/gm) || []) {
+      const m = ALLOWED.reduce((s, re) => s.replace(re, ""), c).match(/\bv\d+(\.\d+)*\b/);
+      if (m) found.push(`${f}: ${m[0]} in ${c.trim().slice(0, 80)}`);
+    }
+  }
+  assert.deepEqual(found, []);
 });

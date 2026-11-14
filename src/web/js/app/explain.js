@@ -62,6 +62,10 @@ export function summaryOf(attribution, best, size) {
  *   a, b      whole-game analysis before and after the move
  *   refined   optional deeper analysis of the position after the move
  *   line      the game's main line (for the as-played fallback)
+ * @param {any} m
+ * @param {any} a
+ * @param {any} b
+ * @param {{ refined?: any, line?: any[], size?: number }} [opts]
  */
 export function explainMistake(m, a, b, { refined = null, line = null, size } = {}) {
   const signMap = m.before.board.signMap;

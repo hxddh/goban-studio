@@ -102,9 +102,11 @@ export function withContent(part, fn) {
  * Load every part on idle, one after the other (started once at boot).
  * `onArrive(part)` runs after each part is merged, so a view that showed
  * the index alone (Practice's path reads problem titles) can draw again.
+ * @param {(part: string) => void} [onArrive]
  */
 export function preload(onArrive = () => {}) {
   if (have.size === PARTS.length || typeof window === "undefined") return;
+  /** @type {(f: () => void, opts?: IdleRequestOptions) => any} */
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1200));
   const next = (i) => {
     if (i >= PARTS.length) return;

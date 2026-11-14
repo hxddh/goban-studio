@@ -179,9 +179,11 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     await page.waitForFunction(() => window.__state.game.game.moveNumber === 4);
     assert((await line()) === before, `redo played other moves: ${await line()} — was ${before}`);
     assert(await page.evaluate(() => window.__state.game.thinking === false && window.__state.game.game.turn === window.__state.game.humanColor), "it is the player's turn, nobody thinking");
-    // Undone for good this time, then resigned: the result line says why it is not rated.
+    // The redone undo still counts: the game was told it is not rated.
+    assert(await page.evaluate(() => window.__state.game.undos === 1), "a redone undo still counts");
+    // Undone again, then resigned: the result line says why it is not rated.
     await page.click(".panel .actions .btn >> nth=1");
-    await page.waitForFunction(() => window.__state.game.game.moveNumber === 2 && window.__state.game.undos === 1);
+    await page.waitForFunction(() => window.__state.game.game.moveNumber === 2 && window.__state.game.undos === 2);
     assert(await page.evaluate(() => window.__state.toasts.filter((x) => x.message.startsWith("This game will not be rated")).length <= 1), "said once per game");
     await page.click(".panel .menu-wrap .icon-btn");
     await page.click(".menu [role=menuitem] >> nth=-1");

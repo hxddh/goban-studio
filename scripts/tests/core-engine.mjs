@@ -310,17 +310,22 @@ await test("async KataGo hosts get a structured position, stream partial reports
     const cancelReq = sent.filter((s) => s.command === "studio.katagoCancel").at(-1).payload;
     assert.equal(cancelReq.id, sent.filter((s) => s.command === "studio.katagoAnalyzeAsync").at(-1).payload.id);
 
-    // cancel(): everything in flight resolves null; a superseded reply is null.
-    const third = K.analyze(game, { visits: 20 });
-    await new Promise((r) => setTimeout(r, 0));
-    K.cancel();
-    assert.equal(await third, null);
-    assert.deepEqual(sent.at(-1), { command: "studio.katagoCancel", payload: {} });
-    const fourth = K.analyze(game, { visits: 20 });
+    // A superseded reply is null, and says so (it is not a failure).
+    const out = {};
+    const fourth = K.analyze(game, { visits: 20, status: out });
     await new Promise((r) => setTimeout(r, 0));
     const id4 = sent.filter((s) => s.command === "studio.katagoAnalyzeAsync").at(-1).payload.id;
     replies.get(id4)({ ok: false, id: id4, cancelled: true });
     assert.equal(await fourth, null);
+    assert.equal(out.superseded, true);
+    // A plain failure is not marked superseded.
+    const failed = {};
+    const fifth = K.analyze(game, { visits: 20, status: failed });
+    await new Promise((r) => setTimeout(r, 0));
+    const id5 = sent.filter((s) => s.command === "studio.katagoAnalyzeAsync").at(-1).payload.id;
+    replies.get(id5)({ ok: false, id: id5, error: "Timeout" });
+    assert.equal(await fifth, null);
+    assert.equal(failed.superseded, undefined);
   } finally {
     delete globalThis.zero;
   }

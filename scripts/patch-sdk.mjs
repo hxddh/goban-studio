@@ -2,9 +2,10 @@
  * Patch the installed Native SDK's macOS host so app menus keep the system
  * menus.
  *
- * Why: in @native-sdk/cli 0.11.0, `-[NativeSdkAppKitHost setMenusWithTitles:…]`
- * (src/platform/macos/appkit_host.m) builds a brand-new menu bar holding the
- * application menu plus the app's own menus only. The default bar from
+ * Why: in @native-sdk/cli 0.11.0, and still in 0.11.1,
+ * `-[NativeSdkAppKitHost setMenusWithTitles:…]`
+ * (src/platform/macos/appkit_host.m) builds a brand-new menu bar holding
+ * the application menu plus the app's own menus only. The default bar from
  * `-buildMenuBar` disappears with it: File → Close Window, Edit → Undo/Redo/
  * Cut/Copy/Paste/Select All (responder-chain actions that text fields in the
  * web view rely on), View → Enter Full Screen and Window → Minimize/Zoom.
@@ -20,9 +21,9 @@
  * flag is honoured (every item targets the host, which would otherwise
  * always enable it).
  *
- * How: plain text surgery on exact anchors from SDK 0.11.0. The script is
- * idempotent (a marker comment records that the file is patched) and fails
- * loudly — non-zero exit, naming the missing anchor — if the SDK source
+ * How: plain text surgery on exact anchors from SDK 0.11.0 (unchanged in
+ * 0.11.1). The script is idempotent (a marker comment records that the
+ * file is patched) and fails loudly — non-zero exit, naming the missing anchor — if the SDK source
  * does not look the way this patch expects, so an SDK upgrade cannot
  * silently drop the system menus again.
  *

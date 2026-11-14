@@ -1,12 +1,13 @@
 /**
  * Data: the store (src/web/js/data/store.js), backups (data/backup.js)
- * and the host's file commands (src/store.zig, src/main.zig). The host is a
+ * and the host's file commands (src/store.zig, src/bridge_files.zig). The host is a
  * fake with the same rules as store.zig: strict keys, chunks of at most
  * CHUNK_BYTES that must arrive in order, a rename on the last one, and the
  * SDK's 1 MB bridge message.
  */
 import fs from "node:fs";
 import path from "node:path";
+import { shellSource } from "../shell-source.mjs";
 
 const BRIDGE_MAX = 1024 * 1024;
 
@@ -147,11 +148,11 @@ export default async function ({ test, assert, root }) {
   });
 
   await test("data store: the host registers the four file commands, with Zig tests", () => {
-    const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+    const main = shellSource();
     // One command table; the registry and the policies are built from
     // it (and a Zig test checks every name is unique).
     for (const [name, fn] of [["studio.storeRead", "storeRead"], ["studio.storeWrite", "storeWrite"], ["studio.storeList", "storeList"], ["studio.storeRemove", "storeRemove"]]) {
-      assert.ok(main.includes(`.{ .name = "${name}", .invoke = ${fn} },`), name);
+      assert.ok(main.includes(`.{ .name = "${name}", .invoke = bridge_files.${fn} },`), name);
     }
     assert.match(main, /test "every bridge command is registered once, with the same origins"/);
     // The data root: beside models/, with a test override (src/paths.zig).
@@ -164,8 +165,10 @@ export default async function ({ test, assert, root }) {
     assert.match(zig, /test "store keys are validated strictly"/);
     assert.match(zig, /test "store writes atomically, reads in chunks, lists and removes in a temp dir"/);
     // Atomic: a temporary file in the same directory, renamed over the
-    // target (retried briefly on Windows, where a scanner may hold it).
-    assert.match(zig, /try renameRetrying\(self\.io, dir, tmp, sub\)/);
+    // target (retried briefly on Windows, where a scanner may hold it),
+    // flushed to the disk first and the rename made durable after.
+    assert.match(zig, /if \(done\) durable\.syncFile\(self\.io, file\) catch return error\.Disk;/);
+    assert.match(zig, /try renameRetrying\(self\.io, dir, self\.root\(\), tmp, sub\)/);
     // No huge stack buffers in the handlers: the chunk is allocated.
     assert.match(main, /self\.allocator\.alloc\(u8, store_mod\.chunk_bytes\)/);
   });

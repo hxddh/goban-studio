@@ -121,6 +121,15 @@ await test("SGF charsets: UTF-8, a named charset and Western text are never gues
   const named = loadSGF(bytes("(;SZ[9]CA[gb2312]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])"));
   assert.equal(named.game.playerBlack, "聂卫平");
   assert.deepEqual(named.codes, []);
+  // CA[…] written inside a property value (a comment) is text, not the record's charset.
+  const quoted = bytes("(;SZ[9]C[saved as CA[UTF-8] by mistake]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])");
+  assert.equal(loadSGF(quoted).game.playerBlack, "聂卫平");
+  assert.equal(decodeSgf(quoted, { lang: "zh" }).charset, "gb18030");
+  const quotedNamed = bytes("(;SZ[9]C[not CA[UTF-8]]CA[gb2312]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])");
+  assert.deepEqual([decodeSgf(quotedNamed).charset, decodeSgf(quotedNamed).guessed], ["gb18030", false]);
+  // A Shift_JIS name whose trail byte is a backslash, before CA, does not hide CA.
+  const sjisNamed = decodeSgf(bytes("(;SZ[9]PB[", [0x83, 0x5c], "]CA[Shift_JIS];B[aa])"));
+  assert.deepEqual([sjisNamed.text, sjisNamed.guessed], ["(;SZ[9]PB[ソ]CA[Shift_JIS];B[aa])", false]);
   // Latin-1 names stay Latin-1 (the FF[4] default): an accented letter next
   // to "]" or another letter must not be taken for half a CJK character.
   for (const lang of ["zh", "en", "ko", "ja"]) {
@@ -215,4 +224,13 @@ await test("SGF: moves that cannot be read stand as passes but never end the gam
   const over = loadSGF("(;SZ[9];B[cc];W[];B[])").game;
   assert.equal(over.phase, "scoring");
   assert.deepEqual(over.mainLine().map((n) => n.passes), [0, 0, 1, 2]);
+  // Two real passes in the middle, then more moves: not the end. A review that stops there can
+  // play a variation from that position, and the record's own end is still a count.
+  const mid = loadSGF("(;SZ[9];B[cc];W[];B[];W[dd];B[ee];W[];B[])").game;
+  assert.deepEqual(mid.mainLine().map((n) => n.phase), ["playing", "playing", "playing", "playing", "playing", "playing", "playing", "scoring"]);
+  mid.current = mid.mainLine()[3];
+  assert.deepEqual(mid.canPlay(6, 6), { ok: true });
+  assert.ok(mid.play(6, 6).ok, "a variation from the position after the two passes");
+  assert.equal(mid.current.parent.children.length, 2);
+  assert.equal(loadSGF(mid.toSGF()).game.mainLine()[3].phase, "playing");
 });

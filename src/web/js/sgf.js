@@ -68,8 +68,8 @@ let nodeSeq = 1;
 
 /* ------------------------------------------------------------ charsets */
 
-// CA values seen in the wild, by the TextDecoder label that reads them.
-// GB2312 and GBK are subsets of GB18030, so all three use the superset.
+// CA values seen in the wild, by the TextDecoder label that reads them (GB2312 and GBK use their superset, GB18030).
+/** @type {[RegExp, string][]} */
 const CHARSETS = [
   [/^utf-?8$/, "utf-8"],
   [/^(gb2312|gbk|gb18030|cp936|ms936|windows-936|euc-cn|x-gbk|gb-2312|csgb2312|chinese)$/, "gb18030"],
@@ -270,9 +270,10 @@ export function decodeSgf(input, { lang = currentLang() } = {}) {
     // Not UTF-8: the record's own charset.
   }
   const head = decodeWith("windows-1252", bytes.subarray(0, 65536), false);
-  const ca = /(?:^|[^A-Za-z])CA\s*\[([^\]]*)\]/.exec(head);
+  // CA outside property values (a comment that mentions CA[…] is text; escapes are not followed:
+  // a Shift_JIS trail byte is a backslash). A record that says UTF-8 but is not keeps what can be read.
+  const ca = [...head.matchAll(/\[[^\]]*\]|(?<![A-Za-z])CA\s*\[([^\]]*)\]/g)].find((m) => m[1] !== undefined);
   const named = ca && sgfCharset(ca[1]);
-  // A record that says UTF-8 but is not keeps what can be read of it.
   if (named) return as(named, bytes);
   const guess = guessCharset(bytes, lang);
   return guess ? as(guess, bytes, true) : as("windows-1252", bytes);
@@ -419,7 +420,7 @@ function parseSize(raw) {
   const w = /^\d+$/.test(a) ? Number(a) : NaN;
   const h = b === undefined ? w : /^\d+$/.test(b) ? Number(b) : NaN;
   if (w === h && SGF_SIZES.includes(w)) return w;
-  const error = new Error(`Unsupported board size in SGF: ${text}`);
+  const error = /** @type {Error & Record<string, any>} */ (new Error(`Unsupported board size in SGF: ${text}`));
   error.code = "unsupported-size";
   error.size = text.slice(0, 12);
   throw error;
@@ -638,7 +639,7 @@ export function loadSGF(input, { index = null } = {}) {
   if (!roots.length) throw new Error("SGF has no root node");
   const which = index === null || index === undefined ? 0 : Number(index);
   if (!Number.isInteger(which) || which < 0 || which >= roots.length) {
-    const error = new Error(`SGF has no game ${which}`);
+    const error = /** @type {Error & Record<string, any>} */ (new Error(`SGF has no game ${which}`));
     error.code = "no-such-game";
     error.games = roots.length;
     throw error;
@@ -663,7 +664,7 @@ export function loadSGF(input, { index = null } = {}) {
   const rulesRaw = first(data, "RU").trim();
   const rules = rulesFromSgf(rulesRaw);
   if (!rules) {
-    const error = new Error(`Unsupported rules in SGF: ${rulesRaw}`);
+    const error = /** @type {Error & Record<string, any>} */ (new Error(`Unsupported rules in SGF: ${rulesRaw}`));
     error.code = "unsupported-rules";
     error.rules = rulesRaw;
     throw error;
@@ -728,6 +729,7 @@ export function loadSGF(input, { index = null } = {}) {
   // A missing KM takes the ruleset's komi; The komi of
   // a handicap game (0.5) when there are handicap stones.
   const fallbackKomi = defaultKomi(rules, handicap);
+  /** @type {number} */
   let komi = fallbackKomi;
   if (komiRaw.trim() !== "") {
     const stated = parseKomi(komiRaw);
@@ -810,6 +812,8 @@ export function loadSGF(input, { index = null } = {}) {
     const raw = first(d, key);
     const v = moveVertex(raw, size);
     game.current = into;
+    // Two passes followed by more moves did not end the game: that node is not a count.
+    if (into.phase === "scoring") into.phase = "playing";
     let res;
     if (!v) {
       warn("sgf.warn.badMove", [depth + 1, String(raw).slice(0, 12)]);

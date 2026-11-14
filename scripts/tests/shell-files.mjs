@@ -8,6 +8,7 @@ import { test, assert, fs, path, root } from "./helpers.mjs";
 import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, revealDataDir, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
 import { INSTALL_ERRORS, installFallsBack, installMessageKey, interpretInstallStatus } from "../../src/web/js/update.js";
 import * as Sign from "../signing-notes.mjs";
+import { ENGINE_FILES, INSTALL_FILES, SHELL_FILES, shellSource } from "../shell-source.mjs";
 
 function fakeHost() {
   const files = new Map();
@@ -218,8 +219,8 @@ await test("shell files: the data folder is shown by the host; the page names no
   assert.equal(broken.error, "Failed");
   // The browser preview has no folder.
   assert.deepEqual(await revealDataDir(), { ok: false, path: "", error: "unavailable" });
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8");
-  assert.ok(main.includes('.{ .name = "studio.revealDataDir", .invoke = revealDataDir },'));
+  const main = shellSource();
+  assert.ok(main.includes('.{ .name = "studio.revealDataDir", .invoke = bridge_files.revealDataDir },'));
   // The handler never reads a path from the page.
   const handler = main.slice(main.indexOf("fn revealDataDir("), main.indexOf("fn spawnFolder("));
   assert.match(handler, /_ = invocation;/);
@@ -237,7 +238,7 @@ await test("shell files: every text that says where the data is names the folder
   assert.ok(paths.includes('"/Users/a/Library/Application Support/dev.hxddh.gobanstudio"'));
   assert.ok(paths.includes('"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\dev.hxddh.gobanstudio\\\\Data"'));
   // The id is spelled once in the shell (tests aside).
-  for (const f of ["src/main.zig", "src/install.zig", "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
+  for (const f of [...SHELL_FILES, ...INSTALL_FILES, ...ENGINE_FILES, "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
     const code = read(f).split("// ------------------------------------------------------------ tests")[0].split("// ------------------------------------------------------------------ tests")[0];
     assert.doesNotMatch(code, /"dev\.hxddh\.gobanstudio"/, `${f} takes the id from paths.zig`);
   }
@@ -307,9 +308,31 @@ await test("shell files: one instance per data folder is documented where the lo
   assert.ok(storage.includes("`<app data>/data/inbox/`"));
   // Neither is a store key, so the page never sees them listed.
   const main = read("src/main.zig");
-  assert.match(main, /if \(!claimInstance\(&app_state, init, data_dir\)\) return;/);
-  assert.ok(main.indexOf("if (!claimInstance(&app_state, init, data_dir)) return;") < main.indexOf("app_state.store.init(init.io, data_dir);"), "before the store is opened");
-  assert.match(main, /if \(!by_helper and install_mod\.ownUpdateInProgress\(io\)\)/, "a launch during an update stays out of the helper's way");
+  assert.match(main, /if \(!lifecycle\.claimInstance\(&app_state, init, data_dir\)\) return;/);
+  assert.ok(main.indexOf("if (!lifecycle.claimInstance(&app_state, init, data_dir)) return;") < main.indexOf("app_state.store.init(init.io, data_dir);"), "before the store is opened");
+  assert.match(read("src/lifecycle.zig"), /if \(!by_helper and install_apply\.ownUpdateInProgress\(io\)\)/, "a launch during an update stays out of the helper's way");
   for (const text of [read("packaging/README-macOS.txt"), read("packaging/README-Windows.txt")]) assert.doesNotMatch(text, /instance\.lock/, "an implementation detail, not in the user's README");
   assert.match(read("packaging/README-Windows.txt"), /Only one copy runs at a time/);
+});
+
+await test("shell files: every file the shell commits by rename goes through durable.zig, so it survives a power cut", () => {
+  const zigFiles = fs.readdirSync(path.join(root, "src")).filter((f) => f.endsWith(".zig"));
+  for (const f of zigFiles) {
+    if (f === "durable.zig") continue;
+    const code = read(`src/${f}`).split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    const renames = code.match(/\brenameAbsolute\(|\.rename\(/g) || [];
+    // The second launch's inbox request is read and deleted by the running
+    // app within moments; it holds nothing worth flushing to the disk.
+    const allowed = f === "instance.zig" ? 1 : 0;
+    const durable = (code.match(/durable\.renameAbsolute\(/g) || []).length;
+    assert.equal(renames.length - durable, allowed, `${f}: a rename outside durable.zig`);
+    assert.doesNotMatch(code, /\bfile\.sync\(/, `${f}: a commit flushes with durable.syncFile`);
+  }
+  const durable = read("src/durable.zig");
+  assert.match(durable, /std\.c\.F\.FULLFSYNC/, "macOS flushes the drive's cache");
+  assert.match(durable, /MOVEFILE_WRITE_THROUGH/, "Windows moves write-through");
+  assert.match(durable, /\.iterate = true/, "a directory is opened with a descriptor fsync accepts");
+  const store = read("src/store.zig");
+  assert.equal((store.match(/durable\.syncFile\(/g) || []).length, 2, "both store writes flush the file");
+  assert.equal((store.match(/durable\.renameIn\(/g) || []).length, 1, "and rename through the one retrying helper");
 });

@@ -37,6 +37,8 @@ jobs:
       # Static checks first (eslint.config.js): an undefined name or an
       # unused variable fails here, before anything runs.
       - run: npm run lint
+      # Types (jsconfig.json): TypeScript reads the page's JS and its JSDoc.
+      - run: npm run typecheck
       - run: npm test
       - run: npm run release-check
       - run: npm run build
@@ -105,7 +107,7 @@ jobs:
 
   # The shell compiled and unit-tested against the real macOS and Windows
   # hosts (src/macos_open.m, src/win_close.zig, the platform halves of
-  # install.zig, models.zig and net.zig, and the SDK's own host sources),
+  # install*.zig, models.zig and net.zig, and the SDK's own host sources),
   # which the Linux job above cannot compile. Only for pull requests that
   # touch the shell, the build files or the workflows; no KataGo, no
   # packaging, no signing, nothing written anywhere.

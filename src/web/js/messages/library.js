@@ -31,6 +31,7 @@ export const LIBRARY = {
   "library.importError": m("无法读取这个 SGF 文件。", "This SGF file could not be read.", "이 SGF 파일을 읽을 수 없습니다.", "このSGFファイルを読み込めません。"),
   "library.onlySgf": m("只能打开 .sgf 棋谱文件。", "Only .sgf game records can be opened.", ".sgf 기보 파일만 열 수 있습니다.", ".sgf の棋譜ファイルのみ開けます。"),
   "library.deleted": m("对局已删除", "Game deleted", "대국을 삭제했습니다", "対局を削除しました"),
+  "library.deletedFinal": m("对局已彻底删除，无法再撤销", "Game deleted for good: it can no longer be undone", "대국을 완전히 삭제했습니다. 더 이상 되돌릴 수 없습니다", "対局を完全に削除しました。元に戻せません"),
   // Library: the rows, the unfinished games, the order.
   "library.today": m("今天", "Today", "오늘", "今日"),
   "library.yesterday": m("昨天", "Yesterday", "어제", "昨日"),

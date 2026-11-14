@@ -174,7 +174,7 @@ export function normalise(x, targetLufs, peakDb = -1) {
 // ------------------------------------------------------------- sounds ----
 
 /** Board modes for a thick block of wood, scaled by `pitch`. */
-function boardModes(r, { pitch = 1, top = 5200, bright = 1, damp = 1 }) {
+function boardModes(r, { pitch = 1, top = 6800, bright = 1, damp = 1, centre = 1700 }) {
   // Ratios loosely follow a thick plate: dense, inharmonic, more modes up high.
   const base = [1, 1.52, 2.05, 2.71, 3.38, 4.12, 4.9, 5.83, 6.85, 8.1, 9.4, 11.2, 13.1, 15.6, 18.3, 21.7, 25.6];
   const f0 = 196 * pitch;
@@ -182,8 +182,8 @@ function boardModes(r, { pitch = 1, top = 5200, bright = 1, damp = 1 }) {
   for (const k of base) {
     const f = f0 * k * (1 + (r() - 0.5) * 0.06);
     if (f > top) break;
-    // Emphasis around 0.9 to 3 kHz: the bright "pachi" of kaya.
-    const emph = Math.exp(-Math.pow(Math.log(f / 1700) / 1.1, 2));
+    // Emphasis around `centre` (by default 0.9 to 3 kHz): the bright "pachi" of kaya.
+    const emph = Math.exp(-Math.pow(Math.log(f / centre) / 1.1, 2));
     const a = (0.25 + emph * bright) * (0.6 + r() * 0.8);
     const t60 = (0.34 / Math.pow(f / 200, 0.55)) * damp * (0.85 + r() * 0.3);
     modes.push({ f, t60, a });
@@ -202,12 +202,16 @@ export function placeWood(seed, { pitch, hard }) {
   const r = rng(seed);
   const exc = buffer(0.42);
   const t0 = 0.002;
-  pulse(exc, t0, 0.22 + (1 - hard) * 0.25, 1);
+  pulse(exc, t0, 0.1 + (1 - hard) * 0.2, 1);
   burst(exc, t0, 0.35, 0.22 * hard, r);
-  const body = modal(exc, boardModes(r, { pitch, bright: 1.25 * hard }));
+  // Measured against a real stone on kaya (energy mostly 2–5 kHz, a click
+  // above 6 kHz), the first version was dull: centroid 1.3 kHz, nothing
+  // above 6 kHz. The emphasis sits higher and the stone's own modes and the
+  // contact click are louder (docs/review-v14-zh.md, G13).
+  const body = modal(exc, boardModes(r, { pitch, bright: 1.25 * hard, centre: 2600 }));
   const stone = modal(exc, stoneModes(r));
   const click = highpass(exc, 2500);
-  const out = add(add(body, stone, 0.55 * hard), click, 0.12 * hard);
+  const out = add(add(body, stone, 1.1 * hard), click, 0.22 * hard);
   return finish(room(out, r));
 }
 

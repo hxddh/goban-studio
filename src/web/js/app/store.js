@@ -1,17 +1,41 @@
 /**
- * App state: one plain object, one way to change it.
+ * App state: one plain object, two ways to say it changed.
  *
  * Game trees and solver states are mutable objects held inside the state;
  * `update()` is how any change (mutating or not) announces itself, and the
- * view re-renders from the whole state. Preact's diff keeps that cheap and
+ * whole view re-renders from the state. Preact's diff keeps that cheap and
  * keeps focus, scroll and transitions intact.
+ *
+ * A change that concerns one area only says which: `updateSlice("game")`.
+ * Then only the components that subscribed to that slice re-render
+ * (`useSlice("game")`), with everything below them; the shell around them
+ * (the sidebar, the toolbar's history, the sheets layer) stays as it is.
+ * The slices:
+ *
+ *   game      the game on the board: a move, the computer thinking, an evaluation
+ *   review    a review's analysis filling in
+ *   practice  a problem, a lesson step or a drill being answered
+ *   batch     the quiet analysis pass over older games
+ *   toasts, tasks, announce   the shell's own messages
+ *
+ * A slice update may only change what the components of that slice read.
+ * Anything that moves the player somewhere, opens or closes something, or
+ * changes what the shell shows (the space, the page, a sheet, settings) is
+ * an `update()`. Updates in the same moment are notified together; one
+ * `update()` among them notifies everyone.
  */
 import { useEffect, useState } from "preact/hooks";
 import { initialModels } from "../models.js";
 import { t } from "../i18n.js";
 
-const listeners = new Set();
+/** The slices of the area on screen: the page and the sheets layer follow all of them. */
+export const AREA_SLICES = ["game", "review", "practice", "batch"];
+
+/** listener → the slices it follows (null: every notification). */
+const listeners = new Map();
 let scheduled = false;
+/** @type {Set<string> | true} What changed since the last notification: true (everything) or the slices. */
+let changed = new Set();
 
 export const state = {
   ready: false,
@@ -42,27 +66,100 @@ export const state = {
   storeProblem: null, // The safe state, boot.js storeProblemOf (+ continued)
 };
 
-export function update(fn) {
-  if (typeof fn === "function") fn(state);
-  else if (fn && typeof fn === "object") Object.assign(state, fn);
+function notify() {
   if (scheduled) return;
   scheduled = true;
   queueMicrotask(() => {
     scheduled = false;
-    for (const l of listeners) l();
+    const now = changed;
+    changed = new Set();
+    const run = () => {
+      for (const [l, slices] of listeners) if (!slices || now === true || slices.some((s) => now.has(s))) l();
+    };
+    const place = placeKey();
+    const moved = place !== shownPlace;
+    shownPlace = place;
+    if (moved && transitions()) {
+      // A new place or view cross-fades (View Transitions) where the
+      // system has it and motion is not reduced. Preact renders in a
+      // microtask, so the new page is in the DOM after the next task (not
+      // the next frame: frames are paused while the update runs). A
+      // transition that is skipped or interrupted is not an error.
+      const vt = document.startViewTransition(() => {
+        run();
+        return new Promise((r) => setTimeout(r, 0));
+      });
+      for (const p of [vt.ready, vt.finished, vt.updateCallbackDone]) p?.catch?.(() => {});
+      return;
+    }
+    run();
   });
 }
 
-/** Call `l` after each batch of updates; returns the function that stops it. */
+/** Which page is on screen: the place and its view (a lesson, a topic, the review…). */
+let shownPlace = "";
+function placeKey() {
+  return `${state.space}/${state[state.space]?.view || ""}`;
+}
+function transitions() {
+  return typeof document !== "undefined" && typeof document.startViewTransition === "function" && document.documentElement?.dataset?.motion === "full";
+}
+function apply(fn) {
+  if (typeof fn === "function") fn(state);
+  else if (fn && typeof fn === "object") Object.assign(state, fn);
+}
+
+/** Change the state (a function of it, or fields to assign) and re-render everything. */
+export function update(fn) {
+  apply(fn);
+  changed = true;
+  notify();
+}
+
+/**
+ * Change the state and re-render only what follows `slices` (a name or a
+ * list of names; see the top of this file).
+ * @param {string | string[]} slices
+ * @param {((s: typeof state) => any) | Partial<typeof state>} [fn]
+ */
+export function updateSlice(slices, fn) {
+  apply(fn);
+  if (changed !== true) for (const s of [].concat(slices)) changed.add(s);
+  notify();
+}
+
+/** Call `l` after each batch of updates, whatever changed; returns the function that stops it. */
 export function subscribe(l) {
-  listeners.add(l);
+  listeners.set(l, null);
   return () => listeners.delete(l);
 }
 
-export function useAppState() {
+/**
+ * Call `l` after every `update()` and after updates of `slices` (none: only
+ * after `update()`); returns the function that stops it.
+ * @param {string[]} slices
+ * @param {() => void} l
+ */
+export function follow(slices, l) {
+  listeners.set(l, slices.slice());
+  return () => listeners.delete(l);
+}
+
+/**
+ * Re-render the component after every `update()` and after updates of
+ * `slices`; returns the state. With no slices, only after `update()`.
+ * @param {...string} slices
+ */
+export function useSlice(...slices) {
   const [, force] = useState(0);
-  useEffect(() => subscribe(() => force((n) => n + 1)), []);
+  const key = slices.join(" ");
+  useEffect(() => follow(key ? key.split(" ") : [], () => force((n) => n + 1)), [key]);
   return state;
+}
+
+/** The shell's own subscription: every `update()`, no slice. */
+export function useAppState() {
+  return useSlice();
 }
 
 /*
@@ -141,7 +238,7 @@ function closeToast(id, reason) {
   if (life) clearTimeout(life.timer);
   toastLife.delete(id);
   if (!state.toasts.some((x) => x.id === id)) return false;
-  update((s) => {
+  updateSlice("toasts", (s) => {
     s.toasts = s.toasts.filter((x) => x.id !== id);
   });
   try {
@@ -152,11 +249,25 @@ function closeToast(id, reason) {
   return true;
 }
 
+/**
+ * @typedef {object} ToastOptions
+ * @property {string} [key]
+ * @property {boolean} [replace]
+ * @property {{ label: string, run: () => any }} [action]
+ * @property {(reason: string) => void} [onClose]
+ */
+/**
+ * @param {any} message
+ * @param {string} [tone]
+ * @param {number | ToastOptions} [ms]
+ * @param {ToastOptions} [opts]
+ */
 export function toast(message, tone = "info", ms = 0, opts = {}) {
   if (ms && typeof ms === "object") {
     opts = ms;
     ms = 0;
   }
+  const wait = typeof ms === "number" ? ms : 0;
   const { key = null, replace = false, action = null, onClose = null } = opts || {};
   const kind = tone === "warn" ? "warning" : TOAST_TONES.includes(tone) ? tone : "info";
   if (key) {
@@ -166,8 +277,8 @@ export function toast(message, tone = "info", ms = 0, opts = {}) {
   }
   const id = ++toastId;
   const act = action && typeof action.run === "function" && action.label ? { label: String(action.label), run: action.run } : null;
-  toastLife.set(id, { timer: 0, left: toastDuration(message, { tone: kind, action: act, ms }), since: 0, onClose });
-  update((s) => {
+  toastLife.set(id, { timer: 0, left: toastDuration(message, { tone: kind, action: act, ms: wait }), since: 0, onClose });
+  updateSlice("toasts", (s) => {
     s.toasts = [...s.toasts, { id, message, tone: kind, key, action: act }];
   });
   while (state.toasts.length > TOAST_MAX) closeToast(state.toasts[0].id, "replaced");
@@ -237,7 +348,7 @@ export function taskOf(key) {
 }
 
 function setTask(key, entry) {
-  update((s) => {
+  updateSlice("tasks", (s) => {
     const rest = s.tasks.filter((x) => x.key !== key);
     s.tasks = entry ? [...rest, { key, ...entry }] : rest;
   });
@@ -249,7 +360,7 @@ export function dismissTask(key) {
 
 /** Tasks that failed are forgotten when the player moves on. */
 export function clearTaskErrors() {
-  if (state.tasks.some((x) => x.status === "error")) update((s) => (s.tasks = s.tasks.filter((x) => x.status !== "error")));
+  if (state.tasks.some((x) => x.status === "error")) updateSlice("tasks", (s) => (s.tasks = s.tasks.filter((x) => x.status !== "error")));
 }
 
 const taskRuns = new Map();
@@ -299,13 +410,13 @@ export function announce(text, { first = false } = {}) {
   if (first) pending.unshift(text);
   else pending.push(text);
   if (flushing) return;
-  update((s) => {
+  updateSlice("announce", (s) => {
     s.announce = "";
   });
   flushing = setTimeout(() => {
     flushing = 0;
     const words = pending.join(t("a11y.sentence"));
     pending = [];
-    update({ announce: words });
+    updateSlice("announce", { announce: words });
   }, 30);
 }

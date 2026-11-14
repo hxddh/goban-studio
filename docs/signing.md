@@ -60,7 +60,8 @@ the job.
 **Windows** (`build-windows.yml`)
 
 `signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256`
-on `bin\goban-studio.exe` and `…\engine\windows\katago.exe`, then
+on `bin\goban-studio.exe`, `…\engine\windows\katago.exe` and
+`…\engine\windows\katago-avx2.exe` (the AVX2 build, v15), then
 `signtool verify /pa /v` and `Get-AuthenticodeSignature` (status must be
 `Valid`, with a timestamp). The `.pfx` is written to `$RUNNER_TEMP` and
 deleted in a `finally` block. `WebView2Loader.dll` and the MSVC runtime
@@ -194,7 +195,7 @@ expected and is what its release notes describe.
 
 ```powershell
 Get-AuthenticodeSignature .\GobanStudio\bin\goban-studio.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
-Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago.exe .\GobanStudio).FullName | Format-List Status
+Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago*.exe .\GobanStudio).FullName | Format-List Path, Status
 # Status : Valid, with a TimeStamperCertificate
 ```
 
@@ -341,7 +342,7 @@ newer one. So `SHA256SUMS` has a sixth line:
 `sha256sum -c SHA256SUMS` still works for people who check by hand
 (`--ignore-missing` if you did not download every file). The app does not
 download it: it computes the hash of the tag it is installing and compares
-(`src/install.zig` `sumsBinding`). A build with an update key refuses sums
+(`src/install_verify.zig` `sumsBinding`). A build with an update key refuses sums
 without the line (`NoVersion`) or with another version's
 (`VersionMismatch`). After unpacking, the package must also say itself
 that it is that version — `build-info.json` in both packages and
@@ -349,7 +350,7 @@ that it is that version — `build-info.json` in both packages and
 package fail too. Apps older than this check skip the unknown line, as
 they skip the `.dmg` lines, and keep updating.
 
-**What the app does** (`src/install.zig`). Built with a key, it downloads
+**What the app does** (`src/install.zig`, `src/install_verify.zig`). Built with a key, it downloads
 `SHA256SUMS`, then `SHA256SUMS.sig` (one line: the base64 of the 64-byte
 detached signature over the exact bytes of `SHA256SUMS`), and verifies it
 with `std.crypto.sign.Ed25519` **before** it reads any checksum or starts

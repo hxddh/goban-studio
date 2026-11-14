@@ -127,6 +127,7 @@ await test("every key in the string table is used by the interface", () => {
     "models.strong.",
     "newGame.", // new-game-sheet.jsx PRESETS: "newGame." + quick | medium | full
     "phase.", // summary.js PHASES
+    "play.verdict.", // play.jsx: `play.verdict.${verdict}` and its "Short" form (play/verdict.js)
     "phaseIn.",
     "practice.status.", // practice.jsx: a tile's status (new, tried, solved, due, mastered)
     "problem.endgame.", // content/problems.js: `problem.endgame.${k}.title` / `.hint`

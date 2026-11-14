@@ -33,8 +33,9 @@
  *   size. feedback.jsx wraps pages and sheets in an <ErrorBoundary> that
  *   shows it, so a view does not need its own try/catch around rendering.
  */
-import { useEffect, useRef, useState } from "preact/hooks";
-import { BoardView, frameAspect } from "../board.js";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { BoardView } from "../board.js";
+import { frameAspect } from "../board-surface.js";
 import { currentPalette, onBoardTheme } from "../theme.js";
 import { fromDiagram as thumbFromDiagram, fromString as thumbFromString, paintThumb } from "../thumb.js";
 import { t } from "../i18n.js";
@@ -50,6 +51,7 @@ export function Icon({ name, size = 18 }) {
   );
 }
 
+/** @param {{ kind?: string, icon?: string, children?: any, onClick?: (e: MouseEvent) => any, disabled?: boolean, title?: string, size?: string, class?: string, [attr: string]: any }} props */
 export function Button({ kind = "secondary", icon, children, onClick, disabled, title, size, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`btn ${kind} ${size || ""} ${cls}`} onClick={onClick} disabled={disabled} title={title} aria-label={title || undefined} {...rest}>
@@ -59,6 +61,7 @@ export function Button({ kind = "secondary", icon, children, onClick, disabled, 
   );
 }
 
+/** @param {{ icon: string, label: string, onClick?: (e: MouseEvent) => any, disabled?: boolean, active?: boolean, size?: number, class?: string, [attr: string]: any }} props */
 export function IconButton({ icon, label, onClick, disabled, active, size = 18, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`icon-btn ${active ? "on" : ""} ${cls}`} onClick={onClick} disabled={disabled} title={label} aria-label={label} aria-pressed={active === undefined ? undefined : !!active} {...rest}>
@@ -138,6 +141,7 @@ export function Loading({ label }) {
  * The one error surface: what happened in a sentence, and what to do.
  * `actions`: [{ label, onClick, primary }]. `compact`: the inline size (a
  * section that could not load), without the icon and the card's padding.
+ * @param {{ title?: any, body?: any, actions?: { label: any, onClick: () => any, primary?: boolean }[], compact?: boolean, [attr: string]: any }} props
  */
 export function ErrorCard({ title, body, actions = [], compact = false, ...rest }) {
   return (
@@ -192,6 +196,10 @@ export function useAsync(fn, deps = []) {
       live = false;
       clearTimeout(timer);
     };
+    // The caller's deps decide when fn runs again (the rule checks them at
+    // each useAsync call: eslint.config.js additionalHooks); fn itself is a
+    // new closure on every render and is read from the render that changed them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, turn]);
   return { ...s, retry: () => setTurn((n) => n + 1) };
 }
@@ -209,6 +217,7 @@ export function Async({ state: s, label, error, children }) {
  * `text`, a quiet button that says the choice in force (an order). An item
  * with `checked` (true or false) is one of a set of choices and shows a
  * check when it is the one.
+ * @param {{ id: string, items: any[], label?: string, icon?: string, text?: any }} props
  */
 export function MoreMenu({ id, items, label, icon = "more", text = null }) {
   const open = state.menu === id;
@@ -296,13 +305,18 @@ export const SHIFT = isMac ? "⇧" : "Shift+";
 /**
  * The board. `model` is a BoardView model patch; the canvas is created once
  * and updated in place.
+ * @param {{ model: any, onPlay?: (x: number, y: number) => any, onHover?: (v: any) => any, label?: string }} props
  */
 export function Board({ model, onPlay, onHover, label }) {
   const canvas = useRef(null);
   const view = useRef(null);
   const handlers = useRef({ onPlay, onHover });
   handlers.current = { onPlay, onHover };
-  useEffect(() => {
+  // Layout effects, not effects: the board must know what it may do (take
+  // a move, show this position) in the same commit as the page, not at the
+  // next frame. A click in between (the player's turn has come, the board
+  // still says it is the computer's) was dropped.
+  useLayoutEffect(() => {
     view.current = new BoardView(canvas.current, {
       onPlay: (x, y) => handlers.current.onPlay?.(x, y),
       onHover: (v) => {
@@ -312,7 +326,7 @@ export function Board({ model, onPlay, onHover, label }) {
     });
     return () => view.current?.destroy();
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // The last-move mark is a setting of the board, whatever the page.
     view.current?.setModel({ ...model, lastMark: state.settings?.lastMoveMark !== false });
     expose("__board", view.current);
@@ -416,13 +430,14 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
  * Practice's path that share a title look different. Nothing before the
  * problem's part has arrived (content.js), the caller shows its icon.
  */
-export function DiagramThumb({ diagram, label = "" }) {
+export function DiagramThumb({ diagram, label = "", size = 32 }) {
   const ref = useRef(null);
   const key = Array.isArray(diagram) ? diagram.join("|") : "";
   const palette = usePaletteKey();
+  // Keyed by the rows, not the array: a caller may build a new array with the same rows on every render.
   useEffect(() => {
     if (!key) return;
-    paintThumb(ref.current, thumbFromDiagram(diagram), 32);
-  }, [key, palette]);
-  return <canvas ref={ref} class="dthumb" width="32" height="32" role="img" aria-label={label} />;
+    paintThumb(ref.current, thumbFromDiagram(key.split("|")), size);
+  }, [key, palette, size]);
+  return <canvas ref={ref} class="dthumb" width={size} height={size} style={{ width: `${size}px`, height: `${size}px` }} role="img" aria-label={label} />;
 }

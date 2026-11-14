@@ -33,8 +33,8 @@
  * Real-board rules: a captured point can be played again (the solver's
  * `replay`, on for every problem), and the key stones of a life or kill
  * problem must be sealed in, so they can never breathe through a ','
- * point nobody may fill. docs/problems-audit.md records the v4 audit that
- * fixed or removed the problems that relied on either.
+ * point nobody may fill. docs/problems-audit.md ("real-board rules")
+ * records the audit that fixed or removed the problems that relied on either.
  *
  * `shape` (optional) names the classic textbook shape a problem is built
  * on, from SHAPES; the app can list them as a collection.
@@ -488,8 +488,8 @@ export const SHAPES = [
  * Score thresholds for grades 2, 3, 4 and 5, applied by
  * scripts/grade-problems.mjs to each problem's human difficulty score (the
  * theme's base difficulty, branching reading, plausible wrong first
- * moves, alternatives; see the script and docs/problems-audit.md, "v13
- * grading"). (Quintiles of the solver's search effort would put
+ * moves, alternatives; see the script and docs/problems-audit.md,
+ * "difficulty for a person, not for the solver"). (Quintiles of the solver's search effort would put
  * plain ladders at grade 5.) The cuts are fixed values near this
  * set's quintiles (543 problems), so grades stay roughly balanced without
  * being forced; the spot checks in the audit decide them. The check script
@@ -4903,7 +4903,7 @@ export const PROBLEMS = [
     at: [6, 0],
   },
   // ------------------------------------------------------- generated shapes
-  // See docs/problems-audit.md, "v5". Positions were built by
+  // See docs/problems-audit.md, "509 problems". Positions were built by
   // shape generators (a sealed eye space with a solid defender wall and an
   // attacker wall outside it; races along the edge; small tesuji positions on
   // an open edge or corner), proved by the solver like every other problem,

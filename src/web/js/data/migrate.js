@@ -3,9 +3,9 @@
  * (docs/storage.md, "Versions and migrations").
  *
  * Every file the data layer owns carries its format version as `v`:
- * settings.json, current.json, games-index.json and games/<id>.json. v9 to
- * Wrote them without one and in the same format, so a file without `v`
- * is a v9 file. A file is brought to STORE_V one step at a time
+ * settings.json, current.json, games-index.json and games/<id>.json. The
+ * first format wrote them without one, so a file without `v` is format 9
+ * (LEGACY_V). A file is brought to STORE_V one step at a time
  * (MIGRATIONS[n] turns version n into n + 1) when it is read: when the
  * store opens or loads it (data/store.js `migrate`), and for every file of
  * a backup being restored (data/backup.js). A file of a newer version than
@@ -23,7 +23,7 @@ import { PROFILE_V } from "../model/rating.js";
 
 /** The format this version writes. */
 export const STORE_V = 13;
-/** A file without `v`: v9 to v12 wrote that format. */
+/** A file without `v`: the first stored format. */
 export const LEGACY_V = 9;
 
 export const PROFILE_KEY = "profile.json";
@@ -45,11 +45,11 @@ const same = (key, value) => value;
  * pure and returns the value itself when it changes nothing.
  */
 export const MIGRATIONS = {
-  // v9 → v10, v10 → v11, v11 → v12: the stored format did not change.
+  // 9 → 10, 10 → 11, 11 → 12: the stored format did not change.
   9: same,
   10: same,
   11: same,
-  // v12 → v13: a game's analysis keeps one settled share per position and
+  // 12 → 13: a game's analysis keeps one settled share per position and
   // ownership maps only around the key moments (data/pack.js).
   12: (key, value) => {
     if (key.startsWith(GAMES_PREFIX) && Array.isArray(value.analysis)) return { ...value, analysis: packAnalysis(value.analysis) };

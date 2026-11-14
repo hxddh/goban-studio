@@ -1,8 +1,9 @@
 Goban Studio for macOS
 ======================
 
-1. Install it. There are two downloads: GobanStudio-macOS-arm64 for Apple
-   Silicon Macs (M1 and later) and GobanStudio-macOS-x64 for Intel Macs.
+1. Install it. It needs macOS 13 (Ventura) or later. There are two
+   downloads: GobanStudio-macOS-arm64 for Apple Silicon Macs (M1 and
+   later) and GobanStudio-macOS-x64 for Intel Macs.
    From the .dmg: drag "Goban Studio" onto the Applications folder beside
    it, then open it from Applications (not from the disk image: a copy
    that runs from the image cannot update itself). From the .zip: unzip
@@ -27,7 +28,9 @@ Goban Studio for macOS
    request unless you choose Check for updates, or turn on the weekly
    update check in Settings (off by default), or download an optional
    KataGo network; the first two ask GitHub for the latest version and
-   send nothing about you or your games. These requests use the proxy in
+   send nothing about you or your games. The networks come from KataGo's
+   GitHub releases (the human model) and from katagotraining.org, KataGo's
+   own network site (the stronger network). These requests use the proxy in
    System Settings > Network (Web proxy, HTTPS) or the HTTPS_PROXY
    environment variable, if you have one.
 
@@ -75,7 +78,9 @@ Licences
 --------
 Open the app's Contents/Resources/frontend/dist/licenses/ folder
 (right-click the app > Show Package Contents). Goban Studio is MIT
-licensed; KataGo, Moka and @sabaki/go-board are also MIT; Inter is under
-the SIL Open Font License 1.1.
+licensed; KataGo, Moka and @sabaki/go-board are also MIT; the built-in
+KataGo network is CC0, and the optional networks downloaded in Settings are
+under the KataGo Neural Network License (KataGo-networks.txt); Inter is
+under the SIL Open Font License 1.1.
 
 The SHA256SUMS file in the GitHub release lets you verify the download.

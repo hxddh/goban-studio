@@ -1,5 +1,5 @@
 /**
- * Shell: what the app says back (app/store.js toasts and tasks,
+ * Shell: what the app says back (app/store.js slices, toasts and tasks,
  * app/feedback.jsx, app/shortcuts.js, app/debug.js) — toasts with four
  * tones, a duration that follows the text, one action and a reason for
  * closing; tasks that show only when slow and offer Retry when they fail;
@@ -60,6 +60,35 @@ try {
   await C.boot();
   A.setLang("en");
   state.sheet = null;
+
+  /* ------------------------------------------------------------ slices */
+
+  await test("store: a slice update reaches that slice's followers and the plain subscribers; update() reaches everyone", async () => {
+    await settle();
+    const seen = [];
+    const offs = [Store.follow(["game"], () => seen.push("game")), Store.follow(["review", "practice"], () => seen.push("review+practice")), Store.follow([], () => seen.push("shell")), Store.subscribe(() => seen.push("any"))];
+    try {
+      Store.updateSlice("game", (s) => (s.ui = { ...s.ui }));
+      Store.updateSlice("game");
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "game"], "one notification for the moment, to the game's followers");
+      seen.length = 0;
+      Store.updateSlice(["practice", "batch"]);
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "review+practice"]);
+      seen.length = 0;
+      Store.updateSlice("game");
+      Store.update();
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "game", "review+practice", "shell"], "an update() in the same moment notifies everyone");
+      seen.length = 0;
+      Store.updateSlice("toasts");
+      await settle();
+      assert.deepEqual(seen, ["any"]);
+    } finally {
+      for (const off of offs) off();
+    }
+  });
 
   /* ------------------------------------------------------------ toasts */
 
@@ -431,6 +460,16 @@ try {
     Store.runToastAction(state.toasts[0].id);
     assert.deepEqual(names(), ["third"]);
     assert.equal(store.has(Games.gameKey(c.id)), true);
+
+    // Something writes everything out (a backup, a restore) while Undo is offered: the delete is
+    // final, so the Undo goes and a toast says so; an Undo that would do nothing is never shown.
+    C.deleteRecord(c.id);
+    assert.equal(state.toasts[0].message, t("library.deleted"));
+    await store.flush();
+    assert.equal(store.has(Games.gameKey(c.id)), false, "the flush deleted the file");
+    assert.deepEqual(state.toasts.map((x) => [x.message, !!x.action]), [[t("library.deletedFinal"), false]]);
+    assert.deepEqual(names(), []);
+    state.toasts = [];
 
     // A game that is not there: nothing happens.
     C.deleteRecord("missing");

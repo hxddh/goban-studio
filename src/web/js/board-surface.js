@@ -1,7 +1,7 @@
 /**
  * The board's surface and grid, by the cell size (docs/review-v14-zh.md
  * §3.3): the grid's strokes, the star points, the last-move ring, the hover
- * preview's edge and the wood. Pure functions
+ * preview's edge, the wood, a stone's landing and its finish at small sizes. Pure functions
  * of their arguments, so board.js stays the renderer and these numbers can
  * be tested and tuned in one place.
  */
@@ -37,6 +37,62 @@ export function drawPreviewEdge(ctx, cx, cy, cell, black) {
   ctx.stroke();
 }
 
+/**
+ * The part of the board a problem window shows. A tight window is widened
+ * towards the open side to at least MIN_SPAN lines apart, so a corner problem
+ * keeps its surroundings and stones stay a natural size instead of filling
+ * the frame.
+ */
+const MIN_SPAN = 8;
+export function windowOf(view, size) {
+  if (!view) return { x0: 0, y0: 0, x1: size - 1, y1: size - 1 };
+  const want = Math.min(size - 1, MIN_SPAN);
+  const grow = (a, b) => {
+    a = Math.max(0, a);
+    b = Math.min(size - 1, b);
+    let need = want - (b - a);
+    while (need > 0) {
+      // Grow evenly, but never past an edge: what one side cannot take goes
+      // to the other.
+      if (a > 0 && (b >= size - 1 || (need & 1) === 0)) a--;
+      else if (b < size - 1) b++;
+      else break;
+      need--;
+    }
+    return [a, b];
+  };
+  const [x0, x1] = grow(view.x0, view.x1);
+  const [y0, y1] = grow(view.y0, view.y1);
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * A traditional board (Settings → Board): its lines are about 22 mm apart
+ * across and 23.7 mm down, so that seen from the player's seat its squares
+ * look square. Only a whole board; a problem window stays square.
+ */
+export const TALL_RATIO = 1.07;
+export function gridRatioOf(model) {
+  return model?.tall && !model.view ? TALL_RATIO : 1;
+}
+
+/**
+ * Width / height of the board frame for a model: 1 for a whole board (a
+ * little less for a traditional one), the window's own proportion
+ * (clamped) for a problem window.
+ */
+export function frameAspect(model) {
+  const v0 = model?.view;
+  if (!v0) {
+    const n = (model?.size || 19) - 1;
+    const m = model?.showCoords ? 2.5 : 1.6;
+    return (n + m) / (n * gridRatioOf(model) + m);
+  }
+  const v = windowOf(v0, model.size || 19);
+  const m = model.showCoords ? 2.5 : 1.6;
+  const r = (v.x1 - v.x0 + m) / (v.y1 - v.y0 + m);
+  return Math.max(0.6, Math.min(1.7, r));
+}
 /**
  * Grid strokes for a cell size (css px) and device pixel ratio, in whole
  * device pixels: the inner line is 2.2 % of a cell, at least 1 css px and
@@ -108,4 +164,59 @@ export function drawWood(g, w, h, theme) {
     }
     g.stroke();
   }
+}
+
+/**
+ * How high a stone being placed still is, from the share `t` of the landing
+ * time that has passed: 1 in the air, 0 on the board, easing out (it comes
+ * down fast and settles), never below the board.
+ */
+export function liftOf(t) {
+  const u = Math.min(1, Math.max(0, t));
+  return Math.pow(1 - u, 3);
+}
+
+/**
+ * A stone's finish for its size on screen (`device` = its diameter in
+ * device pixels). The sprites are drawn at 256 px; shrunk to a 19×19 cell
+ * the white stone's shell lines turn into noise and the black stone's broad
+ * highlight disappears. Below about 80 device pixels a soft glaze calms the
+ * white face (its rim shading stays), and black gets back a faint highlight
+ * towards the light (top left). Nothing is added at large sizes.
+ */
+export function finishStone(ctx, cx, cy, r, black, device) {
+  const k = Math.min(1, Math.max(0, (80 - device) / 40));
+  if (k <= 0) return;
+  const g = black
+    ? ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.42, 0, cx - r * 0.35, cy - r * 0.42, r * 0.7)
+    : ctx.createRadialGradient(cx - r * 0.1, cy - r * 0.12, 0, cx, cy, r * 0.86);
+  if (black) {
+    g.addColorStop(0, `rgba(150, 150, 146, ${(0.2 * k).toFixed(3)})`);
+    g.addColorStop(1, "rgba(150, 150, 146, 0)");
+  } else {
+    g.addColorStop(0, `rgba(250, 249, 245, ${(0.55 * k).toFixed(3)})`);
+    g.addColorStop(0.7, `rgba(246, 244, 238, ${(0.35 * k).toFixed(3)})`);
+    g.addColorStop(1, "rgba(246, 244, 238, 0)");
+  }
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * The board's edge, so it reads as a block of wood rather than a card: a
+ * light line where the top and left faces catch the light, a slightly
+ * darker band along the bottom and right. Only on a whole board (a problem
+ * window shows part of one and has no edge of its own).
+ */
+export function drawBoardEdge(g, w, h, theme) {
+  const light = theme.dark ? "rgba(255, 236, 200, 0.12)" : "rgba(255, 252, 240, 0.55)";
+  const shade = theme.dark ? "rgba(0, 0, 0, 0.28)" : "rgba(90, 56, 18, 0.16)";
+  g.fillStyle = light;
+  g.fillRect(0, 0, w, 1);
+  g.fillRect(0, 0, 1, h);
+  g.fillStyle = shade;
+  g.fillRect(0, h - 2, w, 2);
+  g.fillRect(w - 2, 0, 2, h);
 }

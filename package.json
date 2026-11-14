@@ -1,6 +1,6 @@
 {
   "name": "goban-studio",
-  "version": "14.0.0",
+  "version": "15.0.0",
   "private": true,
   "type": "module",
   "description": "Goban Studio — learn, play and review Go (围棋 · 바둑 · 囲碁) on macOS and Windows.",
@@ -9,9 +9,10 @@
     "build": "node scripts/bundle.mjs",
     "sync": "node scripts/sync-dist.mjs",
     "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
     "test": "node scripts/test.mjs",
     "test:native": "zig build test -Dnative-sdk-path=node_modules/@native-sdk/cli -Dplatform=null --summary all",
-    "verify": "npm run lint && npm test && npm run build && npm run sync",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build && npm run sync",
     "package:macos": "bash scripts/package.sh",
     "release-check": "node scripts/release-check.mjs",
     "ui-test": "node scripts/ui-test.mjs",
@@ -19,17 +20,18 @@
   },
   "dependencies": {
     "@sabaki/go-board": "1.4.3",
-    "preact": "^10.29.8"
+    "preact": "^11.2.0"
   },
   "devDependencies": {
-    "@native-sdk/cli": "0.11.0",
+    "@native-sdk/cli": "0.11.1",
     "esbuild": "0.28.2",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.63.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=24"

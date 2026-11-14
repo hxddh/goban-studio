@@ -6,7 +6,7 @@
 import { DAY, finite, num, obj, round } from "./util.js";
 
 /**
- * The v9–v12 spaced-review ladder (1, 3, 7, 21 days after consecutive clean
+ * The older spaced-review ladder (1, 3, 7, 21 days after consecutive clean
  * solves). Scheduling uses the memory model below; the ladder is kept
  * only to read records written with it (migrateProblemRecord).
  */
@@ -16,7 +16,7 @@ export const LADDER = [1, 3, 7, 21];
 
 /*
  * Spaced review after FSRS (the free spaced-repetition scheduler's
- * memory model, v4.5 formulas, its published default weights rounded).
+ * memory model, the FSRS-4.5 formulas, its published default weights rounded).
  * Every reviewed item (a problem, a drill from your games) keeps
  *
  *   s  stability: days until the chance of still solving it falls to 90 %
@@ -116,8 +116,8 @@ export function scheduled(mem, now) {
 }
 
 /**
- * The memory fields of a stored item, whichever version wrote it: v13
- * records have them; a v9–v12 record (the 1-3-7-21 ladder: tries, streak,
+ * The memory fields of a stored item, whichever format it is in: a
+ * current record has them; a format 9 record (the 1-3-7-21 ladder: tries, streak,
  * due, last) gets a stability from where it stood on the ladder and keeps
  * its due date, so no review moves on upgrade.
  */
@@ -147,7 +147,7 @@ export function migrateReview(e) {
 }
 
 /**
- * A stored problem record, v9–v13 shape → the v13 shape (null when
+ * A stored problem record, in any format since 9 → the current shape (null when
  * unusable). Pure; normalizeProfile applies it to every record, and the
  * data layer's migration framework can call it directly.
  *   { tries, solved, clean, last, due, streak, solvedAt?,
@@ -164,6 +164,7 @@ export function migrateReview(e) {
  */
 export function migrateProblemRecord(e) {
   if (!obj(e)) return null;
+  /** @type {Record<string, any>} */
   const out = { ...migrateReview(e), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0) };
   if (Number.isFinite(e.solvedAt)) out.solvedAt = e.solvedAt;
   if (e.first === "clean" || e.first === "miss") out.first = e.first;

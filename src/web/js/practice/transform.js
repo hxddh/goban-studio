@@ -19,6 +19,7 @@
  */
 
 export const SYMMETRIES = 8;
+/** @type {Readonly<{ sym: number, swap: boolean }>} */
 export const IDENTITY = Object.freeze({ sym: 0, swap: false });
 
 /** Board point (x, y) under symmetry `sym` on a `size` board. */

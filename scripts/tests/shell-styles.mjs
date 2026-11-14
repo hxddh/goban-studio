@@ -83,7 +83,7 @@ await test("shell styles: the token tables of docs/design.md are the tokens of :
     }
   }
   // What the tables leave to prose: the layout widths of §3, the font stack of §2 and the alias of --ease-out.
-  const PROSE = ["--sb", "--panel", "--inset", "--tb", "--page", "--font", "--ease"];
+  const PROSE = ["--sb", "--panel", "--inset", "--tb", "--page", "--page-wide", "--font", "--ease"];
   for (const p of PROSE) assert.ok(doc.includes("`" + p + "`") || p === "--inset" || p === "--font", `${p} is named in the doc`);
   const missing = Object.keys(LIGHT).filter((k) => !seen.has(k) && !PROSE.includes(k));
   assert.deepEqual(missing, [], "tokens of :root that no table of docs/design.md lists");
@@ -151,7 +151,7 @@ await test("shell styles: every class the stylesheet names is written somewhere 
   walk(path.join(root, "src/web/js"));
   const words = new Set(sources.join("\n").match(/[A-Za-z_][\w-]*/g));
   // Classes whose name is put together at run time, by the prefix the code writes.
-  const BUILT = { "tag-mistake": "tag-" }; // explorer.jsx: `tag-${verdict.tag}`
+  const BUILT = { "tag-mistake": "tag-", "v-good": "v-", "v-slack": "v-", "v-mistake": "v-" }; // explorer.jsx: `tag-${verdict.tag}`; play.jsx: `v-${verdict}`
   const classes = new Set();
   for (const { selector } of DECLS) for (const m of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) classes.add(m[1]);
   assert.ok(classes.size > 300, `${classes.size} classes`);

@@ -29,7 +29,12 @@ native package --target macos --signing adhoc --assets frontend/dist --output di
 
 echo "==> install KataGo sidecar"
 node scripts/install-engine.mjs dist/GobanStudio.app macos
+# The SDK writes LSMinimumSystemVersion 11.0; the app needs macOS 13.
+plutil -replace LSMinimumSystemVersion -string 13.0 dist/GobanStudio.app/Contents/Info.plist
 codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago"
+if [ -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago-metal" ]; then
+  codesign --force --sign - "dist/GobanStudio.app/Contents/Resources/frontend/dist/engine/macos/katago-metal"
+fi
 codesign --force --deep --sign - dist/GobanStudio.app
 test -f "dist/GobanStudio.app/Contents/Resources/frontend/dist/licenses/Goban-Studio-MIT.txt"
 

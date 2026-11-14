@@ -183,7 +183,7 @@ jobs:
           # The sums name the release they are for: VERSION holds the tag
           # and a newline, and its line here is covered by the signature.
           # An app refuses sums whose VERSION is not the tag it asked for
-          # (src/install.zig sumsBinding), so one release's signed files
+          # (src/install_verify.zig sumsBinding), so one release's signed files
           # cannot be offered as another's. Older apps skip the line.
           printf '%s\n' "$TAG" > VERSION
           sha256sum VERSION >> SHA256SUMS

@@ -8,7 +8,7 @@ const manifest_menus = if (@hasField(@TypeOf(app_manifest), "menus")) app_manife
 const manifest_windows = if (@hasField(@TypeOf(app_manifest), "windows")) app_manifest.windows else .{};
 
 /// The app's version from app.zon (kept equal to package.json and
-/// version.js by release-check). The updater compares against it (v13).
+/// version.js by release-check). The updater compares against it.
 pub const app_version: []const u8 = if (@hasField(@TypeOf(app_manifest), "version")) app_manifest.version else "0.0.0";
 
 pub const StdoutTraceSink = struct {
@@ -46,6 +46,11 @@ pub const RunOptions = struct {
             .window_title = self.window_title,
             .bundle_id = self.bundle_id,
             .icon_path = self.icon_path,
+            // SDK 0.11.1: Web Inspector on macOS's WKWebView only in Debug
+            // builds, so a release build cannot be inspected or have script
+            // run in it from Safari's Develop menu (0.11.0 made every WebView
+            // inspectable). WebView2 on Windows is not covered by this flag.
+            .webview_inspection = @import("builtin").mode == .Debug,
         };
         const windows = manifestWindowOptions(buffers);
         if (windows.len > 0) {
@@ -222,7 +227,7 @@ fn windowTitlebar(comptime window: anytype) native_sdk.WindowTitlebarStyle {
 
 /// SDK 0.10 起,窗口初始位置由 `initial_placement` 决定,默认 `.default` = 居中到主屏;
 /// 读回了上次的窗口位置就必须标成 `.restored`,否则只恢复了大小,位置每次都回到正中
-/// (v1.65 / v1.66 就是这样:它们都是用 0.10.1 打的包)。
+/// (SDK 0.10.1 上不标 `.restored` 时就是这样)。
 fn markRestored(window: *native_sdk.WindowOptions) void {
     if (comptime @hasField(native_sdk.WindowOptions, "initial_placement")) window.initial_placement = .restored;
 }
@@ -329,11 +334,10 @@ pub fn runWithOptions(app: native_sdk.App, options: RunOptions, init: std.proces
     }
 }
 
-// v13: the four backends used to have four copies of the same start-up
-// (window state, logging, menus, the Runtime); only how the platform
-// object is made differs, so that is all each one does now. `runOn` is
-// generic over the platform object, and only the backend chosen at compile
-// time is ever analysed, exactly as before.
+// The four backends share one start-up (window state, logging, menus, the
+// Runtime); only how the platform object is made differs, so that is all
+// each one does. `runOn` is generic over the platform object, and only the
+// backend chosen at compile time is ever analysed.
 
 fn runNull(app: native_sdk.App, options: RunOptions, init: std.process.Init) !void {
     var buffers: StateBuffers = undefined;

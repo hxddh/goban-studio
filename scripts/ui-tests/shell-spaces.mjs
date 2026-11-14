@@ -7,7 +7,28 @@
  * baselines; receives its helpers (check, assert, fresh, onboard,
  * clickPoint, pointOf, origin, browser, audit).
  */
-export default async function ({ check, assert, fresh, onboard, clickPoint }) {
+export default async function ({ check, assert, fresh, onboard, clickPoint, browser }) {
+  await check("shell spaces: with motion on, places cross-fade and switching between them raises no error", async () => {
+    // The other checks run with reduced motion (no transitions); this one does not.
+    const ctx = await browser.newContext({ viewport: { width: 1200, height: 860 }, locale: "en-US", reducedMotion: "no-preference" });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    await onboard(page, 1);
+    assert(await page.evaluate(() => document.documentElement.dataset.motion === "full"), "motion is on");
+    for (const [key, space] of [["1", "today"], ["3", "practice"], ["4", "library"], ["2", "play"], ["1", "today"]]) {
+      await page.keyboard.press("Control+" + key);
+      await page.waitForFunction((sp) => window.__state.space === sp, space);
+      await page.waitForTimeout(400);
+    }
+    // A transition whose update outlives the browser's limit is aborted with an error after 4 s.
+    await page.waitForTimeout(4500);
+    assert((await page.locator(".toast.error").count()) === 0, "no error toast");
+    assert(errors.length === 0, errors.join("; "));
+    await ctx.close();
+  });
+
   await check("shell spaces: four spaces in the sidebar; Today leads with one hero, Play is the board, Practice has the path and the catalog, the Library the games", async () => {
     const page = await fresh();
     await onboard(page, 1);

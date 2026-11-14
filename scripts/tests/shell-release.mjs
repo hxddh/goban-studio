@@ -2,6 +2,7 @@
  * Shell: release — the static page, updates, signing notes, screenshots, the tour, the updater and the optional networks.
  */
 import { test, APP_VERSION, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, fs, normalizeSettings, path, root, t } from "./helpers.mjs";
+import { engineSource, installSource, shellSource } from "../shell-source.mjs";
 
 await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
@@ -47,10 +48,10 @@ await test("removing a network retries while the engine is busy, without blockin
   const r = await M.remove("human", { invoke, hasHost: true, sleep: async () => {} });
   assert.equal(r.ok, true);
   assert.equal(calls, 3);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
-  const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
-  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
+  const engine = engineSource();
+  assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: engine_mod\.Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
 });
 
 await test("static page inputs and build script are present", () => {
@@ -153,7 +154,7 @@ await test("checkNow / autoCheckIfDue ask only when allowed and remember success
 });
 
 await test("the native update commands are fixed to this repository", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /"studio\.checkUpdate"/);
   assert.match(main, /"studio\.openReleasePage"/);
@@ -286,7 +287,7 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
   // One look at the configuration; the tour module loads only when it asks for it.
   assert.match(app, /if \(c\?\.tour\)[^\n]*import\("\.\.\/tour\.js"\)/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /GOBAN_TOUR_OUT/);
   for (const wf of ["build-macos.yml", "build-windows.yml"]) {
     const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8").replace(/\r\n/g, "\n");
@@ -458,8 +459,8 @@ await test("the interface goes available → downloading → ready → installin
 });
 
 await test("the native install commands are fixed to this repository's release downloads", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
+  const zig = installSource();
   for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
   assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
   // The page's payload carries a tag and nothing else; no URL is ever read from it.
@@ -513,7 +514,7 @@ await test("model status replies normalize; the browser preview is unavailable",
   const raw = {
     available: true,
     human: { status: "downloading", bytes: 49_533_115, total: 99_066_230, idleMs: 31_000, needed: 0, name: "b18c384nbt-humanv0", error: "" },
-    strong: { status: "failed", bytes: 0, total: 48_038_914, idleMs: 0, needed: 112_000_000, name: "g170e", error: "DiskFull" },
+    strong: { status: "failed", bytes: 0, total: 97_898_094, idleMs: 0, needed: 112_000_000, name: "kata1-b18c384nbt", error: "DiskFull" },
   };
   const st = M.normalizeStatus(raw);
   assert.equal(st.available, true);
@@ -571,25 +572,31 @@ await test("model actions name a kind only, and report what changed", async () =
   assert.equal(M.megabytes(9_500_000), "9.5");
 });
 
-await test("the downloader fetches only pinned KataGo release files, verified before use", () => {
+await test("the downloader fetches only pinned KataGo files, verified before use", () => {
   const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8").replace(/\r\n/g, "\n");
   const urls = [...zig.matchAll(/\.url = "([^"]+)"/g)].map((m) => m[1]);
   // No other address is ever built: every http(s) literal outside the specs is a test value.
   assert.equal([...zig.slice(0, zig.indexOf("// ------------------------------------------------------------------ tests")).matchAll(/"https?:\/\//g)].length, 2);
   assert.deepEqual(urls, [
     "https://github.com/lightvector/KataGo/releases/download/v1.15.0/b18c384nbt-humanv0.bin.gz",
-    "https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz",
+    "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
   ]);
   assert.match(zig, /\.sha256 = "637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5"/);
-  assert.match(zig, /\.sha256 = "09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967"/);
+  assert.match(zig, /\.sha256 = "9d7a6afed8ff5b74894727e156f04f0cd36060a24824892008fbb6e0cba51f1d"/);
   assert.match(zig, /\.size = 99_066_230/);
-  assert.match(zig, /\.size = 48_038_914/);
+  assert.match(zig, /\.size = 97_898_094/);
   assert.equal(M.MODELS.human.bytes, 99_066_230);
-  assert.equal(M.MODELS.strong.bytes, 48_038_914);
+  assert.equal(M.MODELS.strong.bytes, 97_898_094);
+  // Two hosts: GitHub for the human model, KataGo's network server for the
+  // strong one; a redirect may reach nothing else, and an update never
+  // reaches KataGo's server (net.zig github_hosts).
+  assert.match(zig, /pub const download_hosts = net\.github_hosts \+\+ \[_\]\[\]const u8\{katago_network_host\};/);
+  assert.match(zig, /const katago_network_host = "media\.katagotraining\.org";/);
+  assert.match(zig, /\.redirect_hosts = &download_hosts,/);
   // Only the verified file is renamed into place, inside the models folder.
   assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
-  assert.match(zig, /renameAbsolute\(part, final/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  assert.match(zig, /durable\.renameAbsolute\(self\.io, part, final\)/);
+  const main = shellSource();
   for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
   // The page names a kind; the payload has no URL or path field.
   assert.match(main, /const ModelPayload = struct \{\n    kind: \[\]const u8 = "",\n\};/);
@@ -599,7 +606,7 @@ await test("the downloader fetches only pinned KataGo release files, verified be
     assert.ok(cfg.includes(line), line);
   }
   assert.doesNotMatch(cfg, /humanSLProfile\s*=/, "the profile is set per request");
-  const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
+  const engineZig = engineSource();
   assert.match(engineZig, /"-human-model", extra, "-config", resolved\.human_config/);
 });
 
@@ -610,7 +617,43 @@ await test("the packaged self-test checks the downloads only when the workflow a
   const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);
   assert.match(app, /fs\.rmSync\(modelsDir/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /GOBAN_SELFTEST_MODELS/);
   assert.match(main, /GOBAN_MODELS_DIR/);
+});
+
+/**
+ * The comment part of one line of Zig: from the first `//` that is not in a
+ * string or character literal, or "" (a multiline string line `\\…` is data).
+ */
+function zigComment(line) {
+  if (/^\s*\\\\/.test(line)) return "";
+  let quote = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "/" && line[i + 1] === "/") return line.slice(i);
+  }
+  return "";
+}
+
+await test("the shell's comments say what the code does, not which version added it", () => {
+  const files = [...fs.readdirSync(path.join(root, "src")).filter((f) => f.endsWith(".zig")).map((f) => `src/${f}`), "build.zig"];
+  assert.ok(files.length > 20);
+  const found = [];
+  for (const f of files) {
+    fs.readFileSync(path.join(root, f), "utf8").split(/\r?\n/).forEach((line, i) => {
+      // Quoted text in a comment is an example of data ("v14.0.0"), and a
+      // file name is a file name (docs/v9.md).
+      const comment = zigComment(line).replace(/"[^"]*"|`[^`]*`/g, "").replace(/[\w/-]*v\d+\.md\b/g, "");
+      if (/(?<![\w.-])v\d+(\.\d+)*\b/.test(comment)) found.push(`${f}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(found, [], "no `v13:` or `(since v5)` in a comment");
+  // The check sees through strings: data keeps its versions.
+  assert.equal(zigComment('const url = "https://x/v1.15.0/y"; // fetched once'), "// fetched once");
+  assert.equal(zigComment("    \\\\{\"tag_name\":\"v4.0.0\"} // not a comment"), "");
 });

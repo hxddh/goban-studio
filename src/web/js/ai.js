@@ -12,9 +12,11 @@
  * Knowing when to stop. The engine never plays a move that only costs it
  * points (see `pointless`): into its own eye or its own sealed territory,
  * into self-atari, or a lone stone into a small sealed area of the
- * opponent's. When nothing else is left it passes, so a finished game ends
- * as soon as the opponent passes instead of after the engine has filled in
- * its own territory.
+ * opponent's — or into any sealed area of the opponent's once the board is
+ * settled (its own stones already lost in there do not count as a way in).
+ * When nothing else is left it passes, so a finished game ends as soon as
+ * the opponent passes instead of after the engine has filled in its own
+ * territory or invaded the opponent's, stone after hopeless stone.
  *
  * The search is time-sliced with setTimeout, so the board keeps painting while
  * the computer thinks. There is no worker: zero:// only loads the one classic
@@ -55,15 +57,45 @@ function isEye(board, x, y, color) {
 
 const AROUND = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
+/** Small chains of `color` that sit in an area the other colour alone seals: invaders with no way to live. */
+const LOST_CHAIN = 4;
+function lostChains(board, color, size) {
+  const seen = new Set();
+  const small = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (board.get([x, y]) !== color || seen.has(y * size + x)) continue;
+      const chain = board.getChain([x, y]);
+      for (const [cx, cy] of chain) seen.add(cy * size + cx);
+      if (chain.length <= LOST_CHAIN) small.push(chain);
+    }
+  }
+  if (!small.length) return [];
+  const without = board.clone();
+  for (const chain of small) for (const p of chain) without.set(p, EMPTY);
+  const owners = territoryMap(without);
+  return small.filter((chain) => chain.every(([cx, cy]) => owners[cy][cx] === -color));
+}
+
 /**
  * The empty regions of the board: for every empty point, the region it
  * belongs to as { owner, size }. `owner` is the colour whose stones alone
  * seal the region (rules.js territoryMap, so the open board around a few
- * stones belongs to nobody), 0 for a region both colours touch.
+ * stones belongs to nobody), 0 for a region both colours touch. Read for
+ * `color` to move: its lost chains (lostChains) count as empty points of
+ * the opponent's area. `settled` is true when no region bigger than two
+ * points (a dame) is open to both colours.
  */
-function emptyRegions(board, size) {
+function emptyRegions(board, size, color) {
+  const lost = lostChains(board, color, size);
+  if (lost.length) {
+    board = board.clone();
+    for (const chain of lost) for (const p of chain) board.set(p, EMPTY);
+  }
   const owners = territoryMap(board);
+  /** @type {any[][] & { settled?: boolean }} */
   const out = Array.from({ length: size }, () => Array(size).fill(null));
+  out.settled = true;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board.get([x, y]) !== EMPTY || out[y][x]) continue;
@@ -82,6 +114,7 @@ function emptyRegions(board, size) {
           stack.push([nx, ny]);
         }
       }
+      if (!region.owner && region.size > 2) out.settled = false;
     }
   }
   return out;
@@ -98,7 +131,8 @@ const NO_ROOM = 6;
  *     joins, is left with one liberty);
  *   - its own sealed territory, unless the stone rescues a neighbouring
  *     group of its own that is in atari;
- *   - a sealed area of the opponent's of at most NO_ROOM points.
+ *   - a sealed area of the opponent's of at most NO_ROOM points, or of
+ *     any size once the board is settled (regions.settled).
  *
  * A move that captures is never pointless. `regions` is emptyRegions() of
  * the same board.
@@ -115,7 +149,7 @@ function pointless(board, color, x, y, regions) {
   if (next.getLiberties([x, y]).length <= 1) return true;
   const region = regions[y][x];
   if (!region || !region.owner) return false;
-  if (region.owner !== color) return region.size <= NO_ROOM;
+  if (region.owner !== color) return region.size <= NO_ROOM || regions.settled;
   for (const [dx, dy] of AROUND) {
     const p = [x + dx, y + dy];
     if (board.has(p) && board.get(p) === color && board.getLiberties(p).length === 1) return false;
@@ -205,7 +239,7 @@ function moveHeuristic(board, color, x, y, size, lastMove) {
 
 function candidates(board, color, size, lastMove, limit, legal = null) {
   const list = [];
-  const regions = emptyRegions(board, size);
+  const regions = emptyRegions(board, size, color);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board.get([x, y]) !== EMPTY) continue;
@@ -305,7 +339,7 @@ export async function chooseMove(game, { level = 3, color = game.turn } = {}) {
   // Nor does it get to throw points away: a pointless pick goes to the
   // heuristics too, which pass when there is nothing worth playing.
   const board = game.board.clone();
-  if (neural && (neural.pass || ((!legal || legal(neural.x, neural.y)) && !pointless(board, color, neural.x, neural.y, emptyRegions(board, size))))) return neural;
+  if (neural && (neural.pass || ((!legal || legal(neural.x, neural.y)) && !pointless(board, color, neural.x, neural.y, emptyRegions(board, size, color))))) return neural;
   const lastMove = game.lastMove;
   const cfg = LEVELS.find((l) => l.id === level) || LEVELS[2];
   const started = performance.now();

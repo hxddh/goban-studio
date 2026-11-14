@@ -82,7 +82,7 @@ jobs:
           done < nets.txt
           echo "KATAGO=$RUNNER_TEMP/kg/squashfs-root/AppRun" >> "$GITHUB_ENV"
           echo "KATAGO_HUMAN_MODEL=$RUNNER_TEMP/kg/b18c384nbt-humanv0.bin.gz" >> "$GITHUB_ENV"
-          echo "KATAGO_STRONG_MODEL=$RUNNER_TEMP/kg/g170e-b15c192-s1672170752-d466197061.txt.gz" >> "$GITHUB_ENV"
+          echo "KATAGO_STRONG_MODEL=$RUNNER_TEMP/kg/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz" >> "$GITHUB_ENV"
           "$RUNNER_TEMP/kg/squashfs-root/AppRun" version
           nproc
       - name: play ${{ matrix.run }} shard ${{ matrix.shard }}

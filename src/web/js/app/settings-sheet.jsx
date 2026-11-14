@@ -151,6 +151,8 @@ function BoardPane() {
         </Row>
         <p class="fine">{t("settings.boardStyleHelp")}</p>
         <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
+        {s.coords && <Switch label={t("settings.coordsAround")} checked={!!s.coordsAround} onChange={(v) => set("coordsAround", v)} />}
+        <Switch label={t("settings.tallBoard")} checked={!!s.tallBoard} onChange={(v) => set("tallBoard", v)} />
         <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
         <Switch label={t("settings.lastMove")} checked={s.lastMoveMark !== false} onChange={(v) => set("lastMoveMark", v)} />
       </section>
@@ -265,7 +267,7 @@ function AboutPane() {
         <p class="about">
           <strong>Goban Studio {APP_VERSION}</strong>
           <span class="fine">{t("settings.offline")}</span>
-          <span class="fine">{t("common.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
+          <span class="fine">{t("common.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · KataGo networks (CC0; downloads: KataGo Neural Network License) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
         </p>
       </section>
       <section class="settings-group">
@@ -381,7 +383,7 @@ function ModelRow({ kind, one }) {
         <span class="fine">{t(`models.${kind}.desc`, [mb])}</span>
         {line && <span class={`model-status ${st}`} aria-live="polite">{line}</span>}
         {busy && (
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Models.percent(one)}>
+          <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Models.percent(one)}>
             <i style={{ width: `${Models.percent(one)}%` }} />
           </div>
         )}
@@ -445,7 +447,7 @@ function UpdateRow() {
       </div>
       {st === "downloading" && (
         <div class="update-progress">
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round((u.progress || 0) * 100)}>
+          <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((u.progress || 0) * 100)}>
             <i style={{ width: `${Math.round((u.progress || 0) * 100)}%` }} />
           </div>
           {u.total > 0 && <span class="fine">{t("update.progress", [U.formatBytes(u.received || 0), U.formatBytes(u.total)])}</span>}
