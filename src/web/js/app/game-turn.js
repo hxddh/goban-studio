@@ -380,8 +380,8 @@ export function canRedo(g = state.game) {
  * Play the moves of the last undo again: the player's move and the reply
  * the computer made to it (the computer is not asked again; it is when the
  * undo took back the player's move alone). The clocks stay as they are:
- * the time of those moves was already spent. An undo redone leaves no
- * trace: the game counts one undo fewer.
+ * the time of those moves was already spent. The undo still counts: the
+ * game was told it is no longer rated (noteAssisted), and stays so.
  */
 export function redo() {
   const g = state.game;
@@ -395,7 +395,6 @@ export function redo() {
       break;
     }
   }
-  g.undos = Math.max(0, g.undos - 1);
   Audio.stone(false);
   const last = g.game.current.move;
   if (last) announce(moveText({ color: last.color, x: last.x, y: last.y, pass: last.pass, size: g.game.size }));
