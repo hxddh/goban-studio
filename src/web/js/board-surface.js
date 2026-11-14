@@ -78,8 +78,9 @@ export function drawWood(g, w, h, theme) {
   const rnd = seeded(0x60ba);
   const ink = theme.dark ? "28, 16, 4" : "112, 70, 24";
   const light = theme.dark ? "255, 236, 200" : "255, 246, 226";
-  // The dim board carries the same wood more quietly.
-  const k = theme.dark ? 0.5 : 1;
+  // A quiet grain: felt more than seen. The lamp-lit dark board carries a
+  // little more of it, so the wood still reads at its lower luminance.
+  const k = theme.dark ? 0.5 : 0.55;
   // Broad bands, a few board-widths of variation.
   for (let x = 0; x < w; ) {
     const bw = 18 + rnd() * 70;

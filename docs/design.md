@@ -174,13 +174,17 @@ force; the table gives the light standard palette.
 
 ## 5. The board
 
-* **Surface.** One board: a flat warm honey (#E4CB9A) with a faint
-  centre-to-edge falloff. No grain, no alternative materials. In the dark
-  theme it is the same board, dimmer — lower luminance and saturation
-  (#927D58, about a third of the light board's luminance), white stones
-  toned down about 14 % so they do not glare, black stones with a faint
-  light rim so they still part from the surface, signals on the board as
-  light tints. Black stones stand at ≥ 3:1 and white at ≥ 2:1 against it.
+* **Surface.** One board: a warm honey (#E4CB9A) in straight-grained
+  wood (fine grain and broad bands within a few per cent of the base,
+  drawn once per size by `src/web/js/board-surface.js`) with a faint
+  centre-to-edge falloff. No alternative materials. In the dark theme it is
+  the same wood under a lamp in a dark room: lower luminance but its warmth
+  and saturation kept (#9E7E4E), the light falling off towards the edges,
+  white stones toned down only about 6 %, black stones parting from the
+  wood by contrast alone (no rim on the board; thumbnails keep one),
+  signals on the board as light tints. Black stones stand at ≥ 3:1 and
+  white at ≥ 2:1 against it. The grid, star points, last-move ring and
+  hover preview take their sizes from the cell (`board-surface.js`).
   All board colours live in one place, `src/web/js/theme.js`; the board,
   thumbnails, the New game size cards, a hero's empty board and the app's
   mark in the sidebar read it, and follow the theme live (also when

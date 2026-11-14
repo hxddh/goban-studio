@@ -6,10 +6,11 @@
  *
  * There is one board in two styles, each in a light and a dark version:
  *
- *   standard   the honey board; in the dark theme the same board, dimmer
- *              (lower luminance and saturation, white stones toned down so
- *              they do not glare, black stones with a faint rim so they
- *              still part from the surface)
+ *   standard   the honey board; in the dark theme the same wood under a
+ *              lamp in a dark room: lower luminance but its warmth and
+ *              saturation kept, the light falling off towards the edges,
+ *              white stones barely toned down, black stones parting from
+ *              the wood by contrast alone (no rim)
  *   contrast   a plain, very legible board: near-white (light) or
  *              near-black (dark), strong lines, flat stones with clear
  *              rims. Chosen in Settings → Board, and used by itself when
@@ -58,18 +59,19 @@ const STANDARD_DARK = {
   ...STANDARD_LIGHT,
   key: "standard-dark",
   dark: true,
-  base: "#927D58",
-  vignette: "rgba(10, 6, 0, 0.1)",
-  line: "rgba(22, 15, 6, 0.74)",
-  edge: "rgba(22, 15, 6, 0.86)",
-  star: "rgba(22, 15, 6, 0.86)",
-  text: "rgba(18, 12, 4, 0.72)",
-  shadow: "rgba(8, 5, 0, 0.42)",
-  whiteDim: 0.14,
-  blackRim: "rgba(255, 244, 222, 0.16)",
+  base: "#9E7E4E",
+  vignette: "rgba(12, 7, 0, 0.2)",
+  line: "rgba(24, 15, 4, 0.76)",
+  edge: "rgba(24, 15, 4, 0.88)",
+  star: "rgba(24, 15, 4, 0.88)",
+  text: "rgba(24, 15, 4, 0.7)",
+  shadow: "rgba(10, 6, 0, 0.45)",
+  whiteDim: 0.06,
+  blackRim: null,
   stone: {
+    // The thumbnails keep a faint rim on black: at two pixels a stone the contrast alone is not enough.
     black: { fill: "#131312", rim: "rgba(255, 244, 222, 0.22)", rimWidth: 0.03 },
-    white: { fill: "#D6D1C4", rim: "rgba(14, 10, 4, 0.55)", rimWidth: 0.035 },
+    white: { fill: "#E0DBCF", rim: "rgba(14, 10, 4, 0.55)", rimWidth: 0.035 },
   },
   onBlack: "#E9E3D6",
   onWhite: "#241F18",
