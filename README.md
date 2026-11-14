@@ -173,7 +173,9 @@ is verified and what is not.
 ## Engine
 
 The packaged app ships KataGo 1.18.1 (the Eigen CPU build) with the b6c96
-network, on every board size. The opponent's strength comes from the
+network, on every board size. On Windows it also ships KataGo's AVX2 build
+and starts that one when the processor has AVX2, falling back to the plain
+build if it does not start. The opponent's strength comes from the
 search budget, from choosing among KataGo's candidates within a loss
 window and, for the weaker ranks, from a share of deliberate beginner's
 moves.

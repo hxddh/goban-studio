@@ -41,6 +41,7 @@
 //! and the page falls back to its local opponent.
 const std = @import("std");
 const builtin = @import("builtin");
+const engine_build = @import("engine_build.zig");
 
 /// Development builds also look for the engine relative to the current
 /// directory (the checkout); a released app never runs whatever binary
@@ -63,6 +64,18 @@ pub const Slot = enum(u2) {
     }
 };
 pub const slot_count = 3;
+
+/// Which executable the slots start, shared by them (engine_build.zig):
+/// whether this machine can run the faster build, and whether it already
+/// failed to start this session (then every slot uses the plain one).
+pub const BuildState = struct {
+    capable: bool = false,
+    failed: std.atomic.Value(bool) = .init(false),
+
+    pub fn detect() BuildState {
+        return .{ .capable = engine_build.hostCapable() };
+    }
+};
 
 /// How the human SL model picks its move (see engine/model/human.cfg):
 /// `raw` follows the human policy of the profile at one network
@@ -115,6 +128,14 @@ pub const Engine = struct {
     extra_model_len: usize = 0,
     env_map: *std.process.Environ.Map = undefined,
     child: ?std.process.Child = null,
+    /// Shared with the other slots (Worker.build); null: plain build only.
+    build: ?*BuildState = null,
+    /// The faster build's file name beside the plain one (a test sets its own).
+    preferred_name: ?[]const u8 = engine_build.preferred_name,
+    /// The process running now is the faster build (engine_build.zig).
+    running_preferred: bool = false,
+    /// The watchdog killed the current process (under `write_lock`).
+    killed: bool = false,
     /// The running process, for the watchdog's kill from the UI thread.
     /// Set and cleared under `write_lock`, and cleared before the child is
     /// reaped, so the handle (pid / process HANDLE) is still valid
@@ -133,6 +154,7 @@ pub const Engine = struct {
     read_buf: [256 * 1024]u8 = undefined,
     exe_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     bin_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
+    preferred_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     model_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     config_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
     version_path: [std.Io.Dir.max_path_bytes]u8 = undefined,
@@ -182,6 +204,7 @@ pub const Engine = struct {
     /// sees the end of the stream and reaps it.
     fn killUnlocked(self: *@This()) void {
         const id = self.kill_id orelse return;
+        self.killed = true;
         switch (builtin.os.tag) {
             .windows => _ = std.os.windows.ntdll.NtTerminateProcess(id, @enumFromInt(1)),
             .wasi => {},
@@ -201,6 +224,8 @@ pub const Engine = struct {
 
     const Paths = struct {
         binary: []const u8,
+        /// The faster build beside it, when the package has one.
+        preferred: ?[]const u8 = null,
         model: []const u8,
         config: []const u8,
         version: []const u8,
@@ -247,6 +272,7 @@ pub const Engine = struct {
     pub fn paths(self: *@This()) ?Paths {
         var root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var bin_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        var preferred_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var model_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var cfg_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var version_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
@@ -298,12 +324,22 @@ pub const Engine = struct {
             if (!exists(self.io, model)) continue;
             if (!exists(self.io, config)) continue;
             @memcpy(self.bin_path[0..bin.len], bin);
+            var preferred: ?[]const u8 = null;
+            if (self.preferred_name) |name| {
+                if (join(&preferred_buf, &.{ abs_root, platform, name })) |fast| {
+                    if (exists(self.io, fast)) {
+                        @memcpy(self.preferred_path[0..fast.len], fast);
+                        preferred = self.preferred_path[0..fast.len];
+                    }
+                }
+            }
             @memcpy(self.model_path[0..model.len], model);
             @memcpy(self.config_path[0..config.len], config);
             @memcpy(self.version_path[0..version.len], version);
             @memcpy(self.human_config_path[0..human_config.len], human_config);
             return .{
                 .binary = self.bin_path[0..bin.len],
+                .preferred = preferred,
                 .model = self.model_path[0..model.len],
                 .config = self.config_path[0..config.len],
                 .version = if (exists(self.io, version)) self.version_path[0..version.len] else "KataGo",
@@ -338,9 +374,50 @@ pub const Engine = struct {
         const extra = self.extraModel();
         if (self.slot != .standard and (extra.len == 0 or !exists(self.io, extra))) return error.ModelMissing;
         if (self.slot == .human and !exists(self.io, resolved.human_config)) return error.EngineMissing;
-        const standard_argv = [_][]const u8{ resolved.binary, "gtp", "-model", resolved.model, "-config", resolved.config, "-override-config", override };
-        const strong_argv = [_][]const u8{ resolved.binary, "gtp", "-model", extra, "-config", resolved.config, "-override-config", override };
-        const human_argv = [_][]const u8{ resolved.binary, "gtp", "-model", resolved.model, "-human-model", extra, "-config", resolved.human_config, "-override-config", override };
+
+        // v15: the faster build first, when this machine can run it
+        // (engine_build.zig). It must answer one GTP command, which it does
+        // only once its backend is up and the network loaded; if it does
+        // not, every slot uses the plain build from now on.
+        if (self.build) |build| {
+            const choice = engine_build.choose(resolved.preferred != null, build.capable, build.failed.load(.acquire));
+            if (choice == .preferred) {
+                if (self.spawn(resolved.preferred.?, &resolved, extra, override)) |_| {
+                    if (self.command("name")) |_| {
+                        self.running_preferred = true;
+                        return;
+                    } else |err| {
+                        try self.preferredFailed(err);
+                    }
+                } else |err| {
+                    try self.preferredFailed(err);
+                }
+            }
+        }
+        try self.spawn(resolved.binary, &resolved, extra, override);
+        self.running_preferred = false;
+    }
+
+    /// The faster build did not start: remember it for every slot, and go
+    /// on with the plain build, unless the watchdog killed it (the request
+    /// has used up its time; it is answered Timeout, and the next one
+    /// starts the plain build).
+    fn preferredFailed(self: *@This(), err: anyerror) !void {
+        var killed = false;
+        if (self.write_lock) |lock| {
+            lock.lockUncancelable(self.io);
+            killed = self.killed;
+            lock.unlock(self.io);
+        } else killed = self.killed;
+        self.deinit(self.io);
+        if (self.build) |build| build.failed.store(true, .release);
+        if (killed) return err;
+    }
+
+    fn spawn(self: *@This(), binary: []const u8, resolved: *const Paths, extra: []const u8, override: []const u8) !void {
+        const standard_argv = [_][]const u8{ binary, "gtp", "-model", resolved.model, "-config", resolved.config, "-override-config", override };
+        const strong_argv = [_][]const u8{ binary, "gtp", "-model", extra, "-config", resolved.config, "-override-config", override };
+        const human_argv = [_][]const u8{ binary, "gtp", "-model", resolved.model, "-human-model", extra, "-config", resolved.human_config, "-override-config", override };
         var child = try std.process.spawn(self.io, .{
             .argv = switch (self.slot) {
                 .standard => &standard_argv,
@@ -356,6 +433,11 @@ pub const Engine = struct {
         const stdin = child.stdin orelse return error.EngineProtocol;
         const stdout = child.stdout orelse return error.EngineProtocol;
         self.child = child;
+        if (self.write_lock) |lock| {
+            lock.lockUncancelable(self.io);
+            self.killed = false;
+            lock.unlock(self.io);
+        } else self.killed = false;
         self.setKillId(child.id);
         self.setStdin(stdin);
         self.stdout = stdout;
@@ -842,6 +924,8 @@ const SlotState = struct {
 
 pub const Worker = struct {
     engines: [slot_count]Engine = [_]Engine{.{}} ** slot_count,
+    /// Faster build or plain one, for every slot (engine_build.zig).
+    build: BuildState = .{},
     io: std.Io = undefined,
 
     lock: std.Io.Mutex = .init,
@@ -889,9 +973,11 @@ pub const Worker = struct {
     pub fn init(self: *Worker, io: std.Io, env_map: *std.process.Environ.Map, strong_model: []const u8, human_model: []const u8) void {
         self.* = .{};
         self.io = io;
+        self.build = BuildState.detect();
         for (&self.engines, 0..) |*engine, i| {
             engine.init(io, env_map);
             engine.write_lock = &self.lock;
+            engine.build = &self.build;
             const slot: Slot = @enumFromInt(i);
             engine.setSlot(slot, switch (slot) {
                 .standard => "",
@@ -1522,6 +1608,66 @@ test "the watchdog kills a process that stops answering" {
     _ = &child;
     try std.testing.expect(engine.child == null);
     try std.testing.expect(engine.kill_id == null);
+}
+
+test "the faster build is tried first; when it does not start, every slot uses the plain one" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir_len = try tmp.dir.realPath(io, &dir_buf);
+    const root = dir_buf[0..dir_len];
+    const platform = @tagName(builtin.os.tag);
+    try tmp.dir.createDirPath(io, "model");
+    try tmp.dir.createDirPath(io, platform);
+    try tmp.dir.writeFile(io, .{ .sub_path = "model/model.txt.gz", .data = "x" });
+    try tmp.dir.writeFile(io, .{ .sub_path = "model/gtp.cfg", .data = "x" });
+    // Stand-ins: the plain build answers `name`; the faster one that cannot
+    // run exits at once (as an illegal instruction or a missing GPU would),
+    // and one that can answers too.
+    const answers = "#!/bin/sh\nwhile read -r line; do echo \"= KataGo\"; echo; done\n";
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    try tmp.dir.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path_buf, "{s}/katago", .{platform}), .data = answers, .flags = .{ .permissions = .executable_file } });
+    try tmp.dir.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path_buf, "{s}/katago-broken", .{platform}), .data = "#!/bin/sh\nexit 132\n", .flags = .{ .permissions = .executable_file } });
+    try tmp.dir.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path_buf, "{s}/katago-fast", .{platform}), .data = answers, .flags = .{ .permissions = .executable_file } });
+
+    var env = std.process.Environ.Map.init(std.testing.allocator);
+    defer env.deinit();
+    try env.put("GOBAN_KATAGO_DIR", root);
+    try env.put("TMPDIR", root);
+
+    // A machine that can run it, and a faster build that does not start.
+    var build: BuildState = .{ .capable = true };
+    var engine: Engine = .{};
+    engine.init(io, &env);
+    engine.build = &build;
+    engine.preferred_name = "katago-broken";
+    try engine.start();
+    try std.testing.expect(!engine.running_preferred);
+    try std.testing.expect(build.failed.load(.acquire));
+    try std.testing.expectEqualStrings("KataGo", try engine.command("name"));
+    engine.deinit(io);
+    // Remembered: the next start (of any slot sharing `build`) goes straight
+    // to the plain build, even with a faster build that would work.
+    engine.preferred_name = "katago-fast";
+    try engine.start();
+    try std.testing.expect(!engine.running_preferred);
+    engine.deinit(io);
+
+    // A faster build that starts is the one used.
+    build = .{ .capable = true };
+    try engine.start();
+    try std.testing.expect(engine.running_preferred);
+    try std.testing.expectEqualStrings("KataGo", try engine.command("name"));
+    engine.deinit(io);
+
+    // A machine that cannot run it never tries.
+    build = .{ .capable = false };
+    try engine.start();
+    try std.testing.expect(!engine.running_preferred);
+    try std.testing.expect(!build.failed.load(.acquire));
+    engine.deinit(io);
 }
 
 test "the played move's probability is read from a kata-raw-human-nn report" {

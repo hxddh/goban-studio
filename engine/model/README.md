@@ -4,6 +4,14 @@
 The engine is KataGo v1.18.1, MIT licensed by David J Wu and contributors:
 <https://github.com/lightvector/KataGo>.
 
+v15: a faster build may sit beside it, and the host starts it instead when
+the machine can run it (`src/engine_build.zig`), falling back to the plain
+build for the rest of the session if it does not answer its first command:
+
+| Platform | Plain build (always) | Faster build | Used when |
+| --- | --- | --- | --- |
+| Windows x64 | `katago.exe` (official `eigen` zip) | `katago-avx2.exe` (official `eigenavx2` zip; same DLLs) | the CPU has AVX2 and FMA and the OS saves the AVX state |
+
 `model.txt.gz` is the public b6c96 network (KataGo model version 8). It is
 one of the networks of KataGo's "g170" run, which are under CC0 (effectively
 public domain), not under KataGo's MIT licence and not under the KataGo

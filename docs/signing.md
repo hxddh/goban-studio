@@ -60,7 +60,8 @@ the job.
 **Windows** (`build-windows.yml`)
 
 `signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256`
-on `bin\goban-studio.exe` and `…\engine\windows\katago.exe`, then
+on `bin\goban-studio.exe`, `…\engine\windows\katago.exe` and
+`…\engine\windows\katago-avx2.exe` (the AVX2 build, v15), then
 `signtool verify /pa /v` and `Get-AuthenticodeSignature` (status must be
 `Valid`, with a timestamp). The `.pfx` is written to `$RUNNER_TEMP` and
 deleted in a `finally` block. `WebView2Loader.dll` and the MSVC runtime
@@ -194,7 +195,7 @@ expected and is what its release notes describe.
 
 ```powershell
 Get-AuthenticodeSignature .\GobanStudio\bin\goban-studio.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
-Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago.exe .\GobanStudio).FullName | Format-List Status
+Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago*.exe .\GobanStudio).FullName | Format-List Path, Status
 # Status : Valid, with a TimeStamperCertificate
 ```
 

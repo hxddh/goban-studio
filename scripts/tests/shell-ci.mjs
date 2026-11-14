@@ -236,7 +236,7 @@ await test("ci: signing secrets reach only the steps that sign", () => {
   }
   const holders = (f) => allSteps(wf[f]).filter((s) => JSON.stringify(s.env || {}).includes("secrets.")).map((s) => s.name);
   assert.deepEqual(holders("build-macos.yml"), ["signing mode", "import Developer ID certificate", "notarize and staple the app", "notarize and staple the dmg"]);
-  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and katago.exe"]);
+  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and the KataGo builds"]);
   assert.deepEqual(holders("release.yml"), ["sign SHA256SUMS"]);
 });
 
@@ -486,8 +486,16 @@ await test("ci: downloaded and built third-party code is pinned", () => {
   const win = wf["build-windows.yml"];
   assert.equal(win.env.KATAGO_URL, "https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigen-windows-x64.zip");
   assert.equal(win.env.KATAGO_SHA256, "074485cf150c38aa3bb14ac9f54f2952ffefbceb44673709bbb8a83650bf95d6");
-  const dl = steps(win.jobs.build).find((s) => s.name === "download KataGo Eigen sidecar").run;
-  assert.ok(dl.indexOf("sha256sum -c") > 0 && dl.indexOf("sha256sum -c") < dl.indexOf("Expand-Archive"), "checked before it is unpacked");
+  assert.equal(win.env.KATAGO_AVX2_URL, "https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-windows-x64.zip");
+  assert.equal(win.env.KATAGO_AVX2_SHA256, "0d62ffa41ee04dd89dd1b80fe45e306c837231cb1e2dccb4f5780d0ca7c313db");
+  const dl = steps(win.jobs.build).find((s) => s.name === "download KataGo Eigen sidecars (plain and AVX2)").run;
+  // Both zips are checked before either is unpacked.
+  assert.ok(dl.indexOf('"$KATAGO_SHA256  katago.zip" | sha256sum -c') > 0, "plain build checked");
+  assert.ok(dl.indexOf('"$KATAGO_AVX2_SHA256  katago-avx2.zip" | sha256sum -c') > 0, "AVX2 build checked");
+  assert.ok(dl.lastIndexOf("sha256sum -c") < dl.indexOf("Expand-Archive"), "checked before it is unpacked");
+  // The AVX2 build sits beside the plain one, with the same DLLs (src/engine_build.zig).
+  assert.match(dl, /cmp "\$dll" "engine\/windows\/\$\(basename "\$dll"\)"/);
+  assert.match(dl, /cp "\$RUNNER_TEMP\/katago-avx2\/katago\.exe" engine\/windows\/katago-avx2\.exe/);
   const mac = wf["build-macos.yml"];
   assert.equal(mac.env.KATAGO_COMMIT, "92ee95c0a4b25fec214da00951ab69e97e207729");
   const kg = steps(mac.jobs.build).find((s) => s.name === "build KataGo Eigen sidecar").run;

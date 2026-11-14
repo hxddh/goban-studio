@@ -2303,6 +2303,7 @@ pub fn main(init: std.process.Init) !void {
 
 test {
     std.testing.refAllDecls(engine_mod);
+    std.testing.refAllDecls(@import("engine_build.zig"));
     std.testing.refAllDecls(update_mod);
     std.testing.refAllDecls(install_mod);
     std.testing.refAllDecls(models_mod);
