@@ -16,7 +16,7 @@
  *   incremental           a position extended by one move is synced with a
  *                         single `play` (no reset) and searched no slower;
  *                         stepping back is a single `undo`
- *   cancel                a long search stops < 1 s after studio.katagoCancel
+ *   cancel                a long search stops < 1 s after studio.katagoCancel (3 s on Metal)
  *                         and the engine answers normally afterwards
  *
  * When the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
@@ -43,6 +43,10 @@ import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, updateCancel, 
 const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
 const MAX_FRAME_GAP_MS = 250;
 const MAX_CANCEL_MS = 1000;
+// The Metal build on a CI runner's virtual GPU can take seconds to finish
+// the batch it is evaluating when the cancel arrives; a real cancel is
+// still told apart from none by the reply and the 5 s wait.
+const MAX_CANCEL_MS_GPU = 3000;
 
 const now = () => performance.now();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -298,7 +302,10 @@ export async function runSelfTest({ state } = {}) {
       report.menusError = String(e?.message || e);
       checks.menus = false;
     }
-    checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < MAX_CANCEL_MS && validAnalysis(after, 9));
+    const build = (await nativeInvoke("studio.katagoStatus").catch(() => null))?.build ?? null;
+    report.engineBuild = build;
+    const cancelLimit = build === "metal" ? MAX_CANCEL_MS_GPU : MAX_CANCEL_MS;
+    checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < cancelLimit && validAnalysis(after, 9));
 
     if (cfg.models) await modelChecks(checks, report, cfg);
   } catch (error) {
