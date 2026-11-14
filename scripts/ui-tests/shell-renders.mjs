@@ -5,7 +5,8 @@
  * The page counts component renders (window.__renders, app/debug.js) and
  * the store's notifications. A change that concerns one area (app/store.js
  * updateSlice) re-renders the components that read it, not the shell: a
- * move in Play, a tick of the review's analysis, a problem attempt. The
+ * move in Play, a tick of the review's analysis (only the chart, the
+ * progress line, the evaluation and the key moments), a problem attempt. The
  * shell itself (Shell: the sidebar, the sheets layer, the messages) does
  * not render for them at all. The totals have about twice the headroom of
  * what is measured; with the whole tree re-rendered on each notification
@@ -15,7 +16,7 @@
  */
 export const RENDERS = {
   move: 130, // a move and the computer's reply, every render it causes (63 measured)
-  analysisTick: 90, // renders per notification while a review is analysed (47)
+  analysisTick: 24, // renders per notification while a review is analysed: only what shows the analysis (10; 47 with the whole review)
   attempt: 150, // a wrong answer to a problem and its reset (77)
 };
 
@@ -25,7 +26,7 @@ const TOP = process.env.RENDER_REPORT === "all" ? Infinity : 6;
 const read = (page) => page.evaluate((top) => {
   const c = window.__renders;
   const names = Object.entries(c.by).sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, n]) => `${k} ${n}`).join(", ");
-  return { total: c.total, batches: c.batches, shell: c.by.Shell || 0, top: names };
+  return { total: c.total, batches: c.batches, shell: c.by.Shell || 0, review: (c.by.ReviewView || 0) + (c.by.ReviewPanel || 0), top: names };
 }, TOP);
 
 export default async function ({ check, assert, fresh, onboard, clickPoint }) {
@@ -109,6 +110,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint }) {
     assert(move.shell === 0 && attempt.shell === 0, `the shell re-rendered: ${report}`);
     // The analysis starts and ends with an update() of everything (the review's state changes).
     assert(tick.shell <= 2, `the shell re-rendered during the analysis: ${report}`);
+    // Nor the review around what shows it (store.js "analysis"): its board and panel render with those two updates, not per tick.
+    assert(tick.review <= 4, `the review re-rendered during the analysis (${tick.review}): ${report}`);
     assert(move.total < RENDERS.move, `a move: ${report}`);
     assert(perTick < RENDERS.analysisTick, `analysis: ${report}`);
     assert(attempt.total < RENDERS.attempt, `attempt: ${report}`);

@@ -13,6 +13,9 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 
+/** A problem as its tile shows it: Black or White to play, as its first showing will be. */
+export { firstShown } from "./transform.js";
+
 /**
  * The square window of the board a diagram is shown in:
  *   { n, stones: [{ x, y, black, key }], edge: { l, t, r, b } }

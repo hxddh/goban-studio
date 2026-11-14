@@ -37,8 +37,11 @@ saved refers to them any more.
 v15 replaces the optional stronger network (g170e-b15c192, 2020) with
 kata1-b18c384nbt-s9996604416. The top opponent setting that uses it
 (`LS:2d`) and the analysis budget (`STRONG_VISIT_SCALE`) were measured with
-the old network and **have not been measured again yet** ("v15: a new
-stronger network, not yet measured" below).
+the old network. v16 measured `LS:2d` again on 13×13 with the new network:
+it won all 48 games against the standard and human-style 2 dan and the
+400-visit bridge, as the old network did, so its ≈7 dan label stands as a
+lower bound ("v16: the new network on 13×13" below). The analysis budget
+is still b15c192's.
 
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -1325,7 +1328,7 @@ the request by its id. `humanPolicy` is reported only while the human
 model is installed; until then nothing is shown and the estimate is
 unchanged.
 
-## v15: a new stronger network, not yet measured
+## v15: a new stronger network
 
 The optional "stronger analysis" download is now
 `kata1-b18c384nbt-s9996604416-d4316597426` (98 MB, from
@@ -1358,6 +1361,50 @@ the networks pinned in `src/models.zig` and now points
 2. KataGo `benchmark` with the new network on the runner, to set
    `STRONG_VISIT_SCALE` so that a full-game review takes no longer than it
    did with b15c192.
+
+## v16: the new network on 13×13
+
+Run `v16-13strong` (calibrate workflow run 43578216734,
+`docs/calibration/results/v16-13strong.jsonl`): 13×13, komi 6.5, 16 games
+per pair, four games at a time per runner with one search thread each,
+`LS:2d` with kata1-b18c384nbt-s9996604416 at 64 visits.
+
+| Pair | Games | Result | Seconds per ply |
+| --- | ---: | --- | ---: |
+| L:2d vs LS:2d | 16 | 0–16 | 4.4 |
+| HL:2d vs LS:2d | 16 | 0–16 | 6.6 |
+| C:v400 vs LS:2d | 16 | 0–16 | 5.0 |
+| L:2d vs C:v400 | 16 | 2–14 | 1.4 |
+
+53 games were adjudicated, 11 ended by passes; the median margin of
+`LS:2d`'s wins was 69 points. In 3 of its 48 games one move fell back to
+the plain search.
+
+**What it says.**
+
+- *Strength.* Exactly what v8 found with b15c192 on 13×13 (16–0 against
+  `L:2d` and `C:v400`): the stronger-network level is far above
+  everything else on the ladder, and the bridge still sits above `L:2d`
+  (14–2, as 13–3 in `v8-13b`). A sweep only bounds a level from below, so
+  `MEASURED.strong` keeps b15c192's θ and the ≈7 dan label, now as a
+  floor: the new network at the same 64 visits is not weaker. Placing it
+  more exactly would need a stronger bridge (more visits on the new
+  network), which no level of the app uses.
+- *Cost.* Games with `LS:2d` took 4.4–6.6 s per ply against 1.4 s for
+  `L:2d` against the bridge on the same runners. Taking the other side's
+  moves out, one `LS:2d` move cost about 8 s, roughly 8 visits/s for one
+  search thread on a shared runner core (v5 measured b15c192 at 25
+  visits/s on the test VM). The app searches with four threads and caps a
+  move at 3–6 s, so on a CPU of that class the top opponent takes 2–3 s a
+  move and still finishes its 64 visits; on a slower one the clock ends
+  the search a little early. The Metal and AVX2 builds should be several
+  times faster; Settings → Engines → Measure speed now shows the figure on
+  a real machine.
+
+**Not changed.** The labels, `MEASURED`, the opponent settings and
+`STRONG_VISIT_SCALE` (0.5). Whether review and hints with the new network
+are fast enough on an Eigen-only laptop is for the real-machine checks
+(`docs/review-v15-zh.md`, V1 and V5), with Measure speed.
 
 ## Limitations
 

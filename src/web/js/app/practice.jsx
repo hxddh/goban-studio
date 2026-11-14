@@ -15,7 +15,7 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { PracticeHome, whyText } from "../practice/path.jsx";
 import { CatalogView } from "../practice/catalog.jsx";
-import { PositionTile, gridFrame } from "../practice/tile.jsx";
+import { PositionTile, firstShown, gridFrame } from "../practice/tile.jsx";
 import { cleanFirst, comesBackIn, problemStatus } from "../practice/progress.js";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
@@ -109,7 +109,7 @@ function ProblemGrid({ items, numberOf }) {
   };
   return (
     <div class="problem-grid" role="group" onKeyDown={onKeyDown}>
-      {items.map((x, i) => {
+      {items.map((def) => firstShown(def, p.seed)).map((x, i) => {
         const rec = p.problems[x.id];
         const status = problemStatus(rec, now);
         const n = numberOf(x);

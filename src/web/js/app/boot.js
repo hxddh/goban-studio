@@ -9,7 +9,7 @@ import { store } from "../data/store.js";
 import { SETTINGS_KEY, loadSettings } from "../data/settings.js";
 import { CURRENT_KEY, GAMES_PREFIX, migrateFile } from "../data/migrate.js";
 import { BACKUPS_PREFIX, expireSnapshots } from "../data/backup.js";
-import { normalizeProfile, setPriorRank } from "../model/profile.js";
+import { newSeed, normalizeProfile, setPriorRank } from "../model/profile.js";
 import { detectLang, loadLang, preloadLangs, setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { hasNative, isPackaged } from "../host.js";
@@ -107,6 +107,8 @@ export async function boot() {
   if (!settings.onboarded && (problem || (!store.has(SETTINGS_KEY) && (store.has(PROFILE_KEY) || Games.listGames().length > 0)))) settings.onboarded = true;
   state.settings = settings;
   state.profile = normalizeProfile(store.get(PROFILE_KEY));
+  // The player's own draws (a problem's first colour): kept with the profile's next write, not written now.
+  if (!state.profile.seed) state.profile = { ...state.profile, seed: newSeed() };
   state.storeProblem = problem ? { ...problem, continued: false } : null;
   await stringsFor(settings.lang);
   setLang(settings.lang);

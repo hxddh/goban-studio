@@ -5,7 +5,7 @@
 //! the weekly check, which is off by default). A short-lived thread makes
 //! one HTTPS GET to GitHub's "latest release" API for this repository and
 //! nothing else: no identifiers, no version, no cookies. It goes through
-//! the proxy the environment or the system names (net.zig), else directly. The result is
+//! the proxy the environment or the system names (net_proxy.zig), else directly. The result is
 //! handed to the UI thread the same way KataGo results are (a locked slot
 //! plus the platform's thread-safe `wake`), and the UI thread answers the
 //! waiting `studio.checkUpdate` call. Nothing here touches the webview.
@@ -22,6 +22,7 @@
 const std = @import("std");
 const json = @import("json.zig");
 const net = @import("net.zig");
+const net_tunnel = @import("net_tunnel.zig");
 
 pub const releases_api_url = "https://api.github.com/repos/hxddh/goban-studio/releases/latest";
 /// The one page `studio.openReleasePage` opens.
@@ -46,7 +47,7 @@ pub const WakeFn = *const fn (context: ?*anyopaque) anyerror!void;
 pub const Checker = struct {
     io: std.Io = undefined,
     lock: std.Io.Mutex = .init,
-    /// Where the proxy settings are read from (net.zig); set once by
+    /// Where the proxy settings are read from (net_proxy.zig); set once by
     /// `main`. Null: always connect directly.
     env: ?*const std.process.Environ.Map = null,
 
@@ -169,14 +170,14 @@ pub fn check(
     reply_buf: []u8,
 ) []const u8 {
     // Through the proxy the environment or the system names, if any.
-    var session: net.Session = undefined;
+    var session: net_tunnel.Session = undefined;
     session.init(allocator, io, env, "api.github.com");
     defer session.deinit();
     return checkWith(&session, allocator, response_buf, reply_buf);
 }
 
 /// `check` with a caller-made session.
-pub fn checkWith(session: *net.Session, allocator: std.mem.Allocator, response_buf: []u8, reply_buf: []u8) []const u8 {
+pub fn checkWith(session: *net_tunnel.Session, allocator: std.mem.Allocator, response_buf: []u8, reply_buf: []u8) []const u8 {
     const result = net.get(session, releases_api_url, user_agent, &.{
         .{ .name = "accept", .value = "application/vnd.github+json" },
         .{ .name = "x-github-api-version", .value = "2022-11-28" },

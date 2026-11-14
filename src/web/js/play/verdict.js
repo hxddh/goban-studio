@@ -30,6 +30,21 @@ export function moveLoss(before, after, color) {
   return color * (best.scoreLead - after.scoreLead);
 }
 
+/**
+ * How many of the moves on `line` (the game's main line, its nodes) were
+ * good, slack or mistakes, from `verdicts` (node id → points lost). A move
+ * taken back keeps its entry in `verdicts` but is not on the line, so it is
+ * not counted.
+ */
+export function tallyVerdicts(line, verdicts, playerRank) {
+  const counts = { good: 0, slack: 0, mistake: 0 };
+  for (const node of line) {
+    const v = verdictOf(verdicts?.[node.id], playerRank);
+    if (v) counts[v]++;
+  }
+  return counts;
+}
+
 /** "good" | "slack" | "mistake" for a loss in points (null: nothing to say). */
 export function verdictOf(loss, playerRank) {
   if (loss == null || !Number.isFinite(loss)) return null;

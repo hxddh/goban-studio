@@ -109,9 +109,45 @@ await test("practice transform: 60 problems across the bank are still proved aft
   assert.ok(performance.now() - t0 < 60000, "within a minute");
 });
 
+await test("practice transform: a problem's first showing is as written, White to play for about half the problems, the same each time on a profile", () => {
+  const swappable = PROBLEMS.filter(T.canSwap);
+  const seeds = ["0", "1f3a9c2e", "deadbeef", "7", "a0b1c2d3", "zz"];
+  const shares = [];
+  for (const seed of seeds) {
+    let white = 0;
+    for (const def of swappable) {
+      const t = T.firstTransform(def, seed);
+      assert.equal(t.sym, 0, `${def.id}: the first showing is never turned`);
+      assert.deepEqual(T.firstTransform(def, seed), t, "the same on the same profile");
+      if (t.swap) white++;
+    }
+    shares.push(white / swappable.length);
+  }
+  for (const [i, share] of shares.entries()) assert.ok(share > 0.44 && share < 0.56, `seed ${seeds[i]}: ${(share * 100).toFixed(1)}% White to play`);
+  // Another profile gets another half: two seeds agree on about half the problems, not all.
+  const agree = swappable.filter((d) => T.firstTransform(d, seeds[1]).swap === T.firstTransform(d, seeds[2]).swap).length / swappable.length;
+  assert.ok(agree > 0.4 && agree < 0.6, `two profiles agree on ${(agree * 100).toFixed(1)}%`);
+  // Endgame problems count with Black first: never recoloured.
+  for (const def of PROBLEMS.filter((p) => p.goal === "endgame")) for (const seed of seeds) assert.deepEqual(T.firstTransform(def, seed), T.IDENTITY);
+  // The tile's definition is the board's: the same colours, kept for the grid.
+  const def = swappable.find((d) => T.firstTransform(d, seeds[1]).swap);
+  const tile = T.firstShown(def, seeds[1]);
+  assert.equal(T.firstShown(def, seeds[1]), tile, "kept");
+  assert.deepEqual(tile.shown, { sym: 0, swap: true });
+  assert.equal(S.createPuzzle(tile).userColor, -S.createPuzzle(def).userColor);
+  assert.equal(T.firstShown({ id: def.id, topic: def.topic }, seeds[1]).diagram, undefined, "before the body arrives: as it is");
+});
+
 await test("practice transform: a review's transform is reproducible, never the written problem, within the allowed symmetries", () => {
   const def = PROBLEMS.find((p) => p.goal === "kill");
-  assert.deepEqual(T.reviewTransform(def, 0), T.IDENTITY, "first showing: as written");
+  assert.deepEqual(T.reviewTransform(def, 0), T.firstTransform(def), "first showing: its first transform");
+  for (const seed of ["a", "b", "c", "d"]) {
+    const first = T.firstTransform(def, seed);
+    for (let tries = 1; tries <= 20; tries++) {
+      const t = T.reviewTransform(def, tries, seed);
+      assert.ok(t.sym !== 0 || t.swap !== first.swap, `${seed} ${tries}: a review never looks like the first showing`);
+    }
+  }
   const seen = new Set();
   for (let tries = 1; tries <= 40; tries++) {
     const t = T.reviewTransform(def, tries);
@@ -143,13 +179,16 @@ await test("practice transform: in the app, a problem tried before comes back tr
   state.space = "practice";
   state.practice = { view: "home", topic: null, lesson: null, problem: null, daily: null, placement: null };
   const id = "capture-basic-02";
+  state.profile.seed = "1";
+  assert.equal(T.firstTransform(PROBLEMS.find((p) => p.id === id), "1").swap, false);
   C.openProblem(id);
-  assert.equal(state.practice.problem.def.shown, undefined, "the first time: as written");
+  assert.equal(state.practice.problem.def.shown, undefined, "the first time, in Black on this profile: as written");
   C.showAnswer();
   assert.equal(state.profile.problems[id].tries, 1);
+  assert.equal(state.profile.seed, "1", "the seed is kept with the profile");
   C.openProblem(id);
   const P = state.practice.problem;
-  const t = T.reviewTransform(PROBLEMS.find((p) => p.id === id), 1);
+  const t = T.reviewTransform(PROBLEMS.find((p) => p.id === id), 1, "1");
   assert.deepEqual(P.def.shown, t);
   assert.equal(P.def.id, id);
   if (t.swap) assert.equal(P.pz.userColor, -1, "White to play");
@@ -165,6 +204,43 @@ await test("practice transform: in the app, a problem tried before comes back tr
   assert.equal(P.status, "won");
   assert.equal(state.profile.problems[id].tries, 2);
   assert.equal(state.profile.problems[id].solved, true);
+});
+
+await test("practice transform: in the app, a problem first shown in White says White to play, takes White's answer and is recorded under its own id", async () => {
+  const { C, state, PM } = A;
+  A.setLang("en");
+  const seed = "1f3a9c2e";
+  state.profile = { ...PM.newProfile({ rank: 10 }), seed };
+  const written = PROBLEMS.find((p) => p.goal === "live" && T.firstTransform(p, seed).swap && S.createPuzzle(p).userColor === 1);
+  const id = written.id;
+  C.openProblem(id);
+  const P = state.practice.problem;
+  assert.deepEqual(P.def.shown, { sym: 0, swap: true });
+  assert.equal(P.def.id, id);
+  assert.equal(P.pz.userColor, -1, "White to play");
+  assert.equal(C.goalText(P.pz), "White to play: live");
+  assert.equal(C.defGoalText(T.firstShown(written, seed)), "White to play: live", "the tile says the same");
+  assert.equal(C.defToMove(T.firstShown(written, seed)), -1);
+  // The hint points at one of White's right moves.
+  C.problemHint();
+  assert.ok(P.hintAt && A.S.solveFirstMoves(P.pz).correct.some((m) => m.x === P.hintAt.x && m.y === P.hintAt.y));
+  for (let guard = 0; guard < 10 && P.status !== "won"; guard++) {
+    while (P.busy) await sleep(20);
+    if (P.status === "won") break;
+    const mv = A.S.winningMoves(P.pz, P.st)[0];
+    C.practicePlay(mv.x, mv.y);
+    await sleep(0);
+  }
+  while (P.busy) await sleep(20);
+  assert.equal(P.status, "won");
+  assert.equal(state.profile.problems[id].tries, 1);
+  assert.equal(state.profile.problems[id].solved, true);
+  assert.equal(state.profile.seed, seed);
+  // The answer, shown on a new profile with the same seed, starts with White's move.
+  state.profile = { ...PM.newProfile({ rank: 10 }), seed };
+  C.openProblem(id);
+  C.showAnswer();
+  assert.equal(state.practice.problem.answer[0].c, -1);
 });
 
 await test("practice transform: Confirm moves in problems — the first click shows the stone, the same point again plays it, Esc cancels", async () => {

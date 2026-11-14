@@ -31,11 +31,17 @@ env:
   KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
   KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
   SHARDS: 20
+  # To search again only some games (one that ran out of time), list their
+  # ids here, comma-separated; the report keeps the others when the network
+  # and visits are the same.
+  CLASSICS_ONLY: ""
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # The stronger network (v15) needs more than two hours for a long game on
+    # a hosted runner's four cores; six is GitHub's limit for a job.
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +76,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          node scripts/check-classics-katago.mjs run --shard "${{ matrix.shard }}/$SHARDS" --threads "$(nproc)" --out "out/shard-${{ matrix.shard }}.json"
+          only=(); if [ -n "$CLASSICS_ONLY" ]; then only=(--only "$CLASSICS_ONLY"); fi
+          node scripts/check-classics-katago.mjs run --shard "${{ matrix.shard }}/$SHARDS" --threads "$(nproc)" "${only[@]}" --out "out/shard-${{ matrix.shard }}.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: classics-${{ matrix.shard }}

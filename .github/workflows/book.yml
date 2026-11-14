@@ -29,14 +29,14 @@ env:
   KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
   KATAGO_VERSION: "1.18.1"
   # The strong network pinned in src/models.zig.
-  NET_URL: https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz
-  NET_SHA256: 09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967
-  NET_NAME: g170e-b15c192-s1672170752-d466197061
+  NET_URL: https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz
+  NET_SHA256: 9d7a6afed8ff5b74894727e156f04f0cd36060a24824892008fbb6e0cba51f1d
+  NET_NAME: kata1-b18c384nbt-s9996604416-d4316597426
   # Visits per position, the size of each tree and how freely KataGo's own
   # choices are expanded. Positions the committed book already holds (same
   # network and visits) are reused, not searched again.
   BOOK_ARGS: >-
-    --visits 2000 --max-whole 2200 --max-corner 3200 --share 0.03 --auto-loss 3
+    --visits 1000 --max-whole 2200 --max-corner 3200 --share 0.03 --auto-loss 3
     --seed-depth-whole 3 --seed-depth-corner 4 --threads 4 --search-threads 2
     --reuse src/web/js/content/book.json
   SHARDS: "16"
@@ -63,8 +63,8 @@ jobs:
           cd "$RUNNER_TEMP/kg"
           for i in 1 2 3; do curl -fsSL -o katago.zip "$KATAGO_URL" && break || sleep 10; done
           echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -
-          for i in 1 2 3; do curl -fsSL -o net.txt.gz "$NET_URL" && break || sleep 10; done
-          echo "$NET_SHA256  net.txt.gz" | sha256sum -c -
+          for i in 1 2 3; do curl -fsSL -o net.bin.gz "$NET_URL" && break || sleep 10; done
+          echo "$NET_SHA256  net.bin.gz" | sha256sum -c -
           unzip -q katago.zip
           chmod +x katago
           # The release is a self-extracting image; without FUSE it unpacks itself.
@@ -74,7 +74,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: >
           node scripts/make-book.mjs --phase seed --tree ${{ matrix.tree }}
-          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
+          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.bin.gz"
           --network-name "$NET_NAME" $BOOK_ARGS --parts book-parts --deadline-min 150
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -104,8 +104,8 @@ jobs:
           cd "$RUNNER_TEMP/kg"
           for i in 1 2 3; do curl -fsSL -o katago.zip "$KATAGO_URL" && break || sleep 10; done
           echo "$KATAGO_SHA256  katago.zip" | sha256sum -c -
-          for i in 1 2 3; do curl -fsSL -o net.txt.gz "$NET_URL" && break || sleep 10; done
-          echo "$NET_SHA256  net.txt.gz" | sha256sum -c -
+          for i in 1 2 3; do curl -fsSL -o net.bin.gz "$NET_URL" && break || sleep 10; done
+          echo "$NET_SHA256  net.bin.gz" | sha256sum -c -
           unzip -q katago.zip
           chmod +x katago
           # The release is a self-extracting image; without FUSE it unpacks itself.
@@ -122,7 +122,7 @@ jobs:
         run: >
           node scripts/make-book.mjs --phase shard --shard ${{ matrix.shard }} --shards $SHARDS
           --seed-dir seeds --parts book-parts
-          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.txt.gz"
+          --katago "$RUNNER_TEMP/kg/katago" --model "$RUNNER_TEMP/kg/net.bin.gz"
           --network-name "$NET_NAME" $BOOK_ARGS --deadline-min 300
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

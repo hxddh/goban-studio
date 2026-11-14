@@ -26,6 +26,44 @@ const PANES = ["general", "board", "playing", "you", "engines", "data", "about"]
 /** Panes allowed to scroll (none: a pane that grows past the sheet is split or trimmed instead). */
 const MAY_SCROLL = [];
 
+/**
+ * KataGo for the Engines pane, on top of shell-sheets' fake host (which an
+ * earlier init script installs): `window.__katago` is the status,
+ * `window.__katagoAnswer` answers a search (after `window.__katagoDelay`
+ * ms) or a cancel, and `window.__searches` lists the searches asked for.
+ */
+function fakeKataGo() {
+  window.__katago = {
+    available: true,
+    engine: "KataGo",
+    version: "KataGo 1.18.1",
+    async: true,
+    stream: true,
+    models: true,
+    build: "eigen",
+    fallback: null,
+    networks: { standard: "g170-b6c96-s175395328-d26788732", strong: "kata1-b18c384nbt-s9996604416-d4316597426" },
+  };
+  window.__katagoDelay = 0;
+  window.__searches = [];
+  const open = new Map();
+  window.__katagoAnswer = (command, p) => {
+    if (command === "studio.katagoCancel") {
+      open.get(p.id)?.({ ok: false, cancelled: true });
+      open.delete(p.id);
+      return { ok: true };
+    }
+    window.__searches.push({ engine: p.engine || "standard", visits: p.visits });
+    return new Promise((resolve) => {
+      open.set(p.id, resolve);
+      setTimeout(() => {
+        open.delete(p.id);
+        resolve({ ok: true, id: p.id, play: "D4", info: `info move D4 visits ${p.visits} winrate 0.5 scoreLead 0 order 0 pv D4` });
+      }, window.__katagoDelay);
+    });
+  };
+}
+
 export default async function ({ check, assert, fresh, firstLanding, origin }) {
   /** Someone who has used the app (browser preview), with these settings, at Today. */
   async function seededPage(settings = {}, { locale = "en-US", viewport = { width: 1200, height: 800 }, files = {} } = {}) {
@@ -66,9 +104,13 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
               return { available: true, human: { status: "downloading", bytes: 40_000_000, total: 99_066_230, idleMs: 60_000, name: "h" }, strong: { status: "failed", bytes: 0, total: 48_038_914, error: "Network", name: "s" } };
             }
             if (command === "studio.revealDataDir") return { ok: true, path: "/data" };
+            // KataGo fell back from its faster build; both networks are measured.
+            if (command === "studio.katagoStatus") return { ...window.__katago, fallback: "timed-out" };
+            if (command === "studio.katagoAnalyzeAsync" || command === "studio.katagoCancel") return window.__katagoAnswer(command, p);
             return invoke(command, p);
           };
         });
+        await page.addInitScript(fakeKataGo);
         await page.goto(origin + "/");
         await page.waitForSelector(".today");
         assert((await page.evaluate(() => document.documentElement.dataset.text)) === (large ? "large" : "normal"), "text size");
@@ -78,20 +120,27 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
         assert(JSON.stringify(tabs) === JSON.stringify(PANES), `panes: ${tabs}`);
         for (const id of PANES) {
           await openPane(page, id);
-          if (id === "engines") await page.waitForSelector(".model-row .progress");
+          if (id === "engines") {
+            await page.waitForSelector(".model-row .progress");
+            await page.click("[data-measure-speed]");
+            await page.waitForFunction(() => /\d/.test(document.querySelector("[data-engine-speed]")?.textContent || ""));
+            await page.waitForSelector("[data-engine-fallback]");
+          }
           if (id === "data") await page.waitForSelector("[data-undo-restore]");
           await page.waitForTimeout(40);
           const m = await page.evaluate(() => {
             const pane = document.querySelector(".settings-pane");
             const sheet = document.querySelector(".settings-sheet").getBoundingClientRect();
             const nav = document.querySelector(".settings-nav");
-            return { content: pane.scrollHeight, room: pane.clientHeight, wide: pane.scrollWidth > pane.clientWidth + 1, sheetFits: sheet.top >= 0 && sheet.bottom <= innerHeight, navFits: nav.scrollHeight <= nav.clientHeight + 1 };
+            // The content's own height (scrollHeight never reports less than the room), so the summary shows the margin left.
+            const natural = Math.ceil(pane.lastElementChild.getBoundingClientRect().bottom - pane.getBoundingClientRect().top + pane.scrollTop + parseFloat(getComputedStyle(pane).paddingBottom));
+            return { content: pane.scrollHeight, natural, room: pane.clientHeight, wide: pane.scrollWidth > pane.clientWidth + 1, sheetFits: sheet.top >= 0 && sheet.bottom <= innerHeight, navFits: nav.scrollHeight <= nav.clientHeight + 1 };
           });
           assert(m.sheetFits, `${locale} ${id}: the sheet does not fit the window`);
           assert(m.navFits, `${locale} ${id}: the list of panes scrolls`);
           assert(!m.wide, `${locale} ${id}: the pane scrolls sideways`);
           if (!MAY_SCROLL.includes(id)) assert(m.content <= m.room, `${locale} ${id}${large ? " (larger text)" : ""}: ${m.content} px of content in ${m.room} px`);
-          seen.push(m.content);
+          if (!MAY_SCROLL.includes(id)) seen.push({ px: m.natural, room: m.room, where: `${locale} ${id}` });
         }
         // The fullest states were really on screen.
         await openPane(page, "engines");
@@ -101,9 +150,65 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
         assert(page.errors.length === 0, `${locale}: ${page.errors.join("; ")}`);
         await page.close();
       }
-      return `tallest pane ${Math.max(...seen)} px`;
+      const top = seen.reduce((a, b) => (b.px > a.px ? b : a));
+      const engines = seen.filter((x) => x.where.endsWith(" engines")).reduce((a, b) => (b.px > a.px ? b : a));
+      return `tallest content ${top.px} px in ${top.room} px, ${top.where}; Engines ${engines.px} px, ${engines.where}`;
     });
   }
+
+  await check("shell settings: Engines names the KataGo build in plain words and why it fell back; Measure speed times each network in the background; Stop stops it", async () => {
+    const page = await fresh("en-US", { width: 1200, height: 800 });
+    await page.addInitScript(fakeHost, { "settings.json": JSON.stringify({ v: 13, lang: "en", onboarded: true, experience: "player", playerRank: 12 }) });
+    await page.addInitScript(() => {
+      const invoke = window.zero.invoke;
+      window.zero.invoke = async (command, p) => {
+        if (command === "studio.katagoStatus") return window.__katago;
+        if (command === "studio.katagoAnalyzeAsync" || command === "studio.katagoCancel") return window.__katagoAnswer(command, p);
+        return invoke(command, p);
+      };
+    });
+    await page.addInitScript(fakeKataGo);
+    await page.addInitScript(() => (window.__katago.build = "metal"));
+    await page.goto(origin + "/");
+    await page.waitForSelector(".today");
+    await openPane(page, "engines");
+    const line = () => page.locator("[data-engine-build]").textContent();
+    await page.waitForSelector("[data-engine-build=metal]");
+    assert((await line()) === "Engine: KataGo 1.18.1 · Metal (graphics card)", await line());
+    assert((await page.locator("[data-engine-fallback]").count()) === 0, "no fallback line while the faster build runs");
+
+    // The faster build is given up while the pane is closed: opened again, it says so.
+    await page.evaluate(() => Object.assign(window.__katago, { build: "eigen", fallback: "no-answer" }));
+    await openPane(page, "general");
+    await openPane(page, "engines");
+    await page.waitForSelector("[data-engine-build=eigen]");
+    assert((await line()) === "Engine: KataGo 1.18.1 · standard (CPU)", await line());
+    const why = await page.locator("[data-engine-fallback]").textContent();
+    assert(why.includes("did not answer") && why.includes("standard one"), why);
+
+    // Measure speed: a warm-up and a timed search per network, in that order.
+    await page.evaluate(() => (window.__katagoDelay = 20));
+    await page.click("[data-measure-speed]");
+    await page.waitForFunction(() => /visits\/s.*visits\/s/.test(document.querySelector("[data-engine-speed]")?.textContent || ""));
+    const speed = await page.locator("[data-engine-speed]").textContent();
+    assert(/^Built-in: [\d,]+ visits\/s · Stronger: [\d,]+ visits\/s$/.test(speed), speed);
+    const asked = await page.evaluate(() => window.__searches.map((s) => `${s.engine}:${s.visits}`).join(" "));
+    assert(asked === "standard:1 standard:300 strong:1 strong:300", asked);
+
+    // Stop: the search in the host is cancelled and nothing is reported.
+    await page.evaluate(() => {
+      window.__katagoDelay = 30000;
+      window.__searches = [];
+    });
+    await page.click("[data-measure-speed]");
+    await page.waitForFunction(() => window.__searches.length > 0);
+    assert((await page.locator("[data-engine-speed]").textContent()) === "Measuring…", "says it is measuring");
+    await page.click(".engine-row .btn");
+    await page.waitForSelector("[data-measure-speed]");
+    assert((await page.locator("[data-engine-speed]").count()) === 0, "a stopped measurement reports nothing");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
 
   await check("shell settings: the volume has four levels; a change is kept and heard once at the new level; Off is silent; the old sound switch migrates", async () => {
     // A settings file from before the volume: the sound switched off.
