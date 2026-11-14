@@ -33,7 +33,7 @@
  *   size. feedback.jsx wraps pages and sheets in an <ErrorBoundary> that
  *   shows it, so a view does not need its own try/catch around rendering.
  */
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BoardView, frameAspect } from "../board.js";
 import { currentPalette, onBoardTheme } from "../theme.js";
 import { fromDiagram as thumbFromDiagram, fromString as thumbFromString, paintThumb } from "../thumb.js";
@@ -302,7 +302,11 @@ export function Board({ model, onPlay, onHover, label }) {
   const view = useRef(null);
   const handlers = useRef({ onPlay, onHover });
   handlers.current = { onPlay, onHover };
-  useEffect(() => {
+  // Layout effects, not effects: the board must know what it may do (take
+  // a move, show this position) in the same commit as the page, not at the
+  // next frame. A click in between (the player's turn has come, the board
+  // still says it is the computer's) was dropped.
+  useLayoutEffect(() => {
     view.current = new BoardView(canvas.current, {
       onPlay: (x, y) => handlers.current.onPlay?.(x, y),
       onHover: (v) => {
@@ -312,7 +316,7 @@ export function Board({ model, onPlay, onHover, label }) {
     });
     return () => view.current?.destroy();
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // The last-move mark is a setting of the board, whatever the page.
     view.current?.setModel({ ...model, lastMark: state.settings?.lastMoveMark !== false });
     expose("__board", view.current);

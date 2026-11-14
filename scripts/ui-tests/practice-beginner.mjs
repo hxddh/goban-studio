@@ -297,7 +297,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
             for (let x = 0; x < 9; x++) r += { 1: "X", "-1": "O", 0: "." }[G.board.get([x, y])];
             rows.push(r);
           }
-          return { rows: rows.join("/"), can: G.canPlay(pt.x, pt.y), human: s.humanColor, ghost: window.__board?.model?.ghost ?? null, moves: s.game.moveNumber, turn: s.game.turn, thinking: s.thinking, pending: !!s.pending, proposal: !!s.proposal, phase: s.game.phase, result: s.game.current.result || null, sheet: window.__state.sheet?.kind || null, toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent) };
+          return { rows: rows.join("/"), can: G.canPlay(pt.x, pt.y), human: s.humanColor, interactive: window.__board?.model?.interactive, ghost: window.__board?.model?.ghost ?? null, moves: s.game.moveNumber, turn: s.game.turn, thinking: s.thinking, pending: !!s.pending, proposal: !!s.proposal, phase: s.game.phase, result: s.game.current.result || null, sheet: window.__state.sheet?.kind || null, toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent) };
         }, pt);
         throw new Error(`${e.message} — after clicking ${pt.x},${pt.y} at move ${n}: ${JSON.stringify(at)}`);
       });
@@ -319,6 +319,57 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     await page.waitForSelector(".score-card");
     await page.waitForTimeout(100);
     assert((await page.locator(".score-card .first-count").count()) === 0, "the note came back");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
+  await check("practice beginner: a click the moment the computer has replied plays (the board takes moves as soon as it is the player's turn)", async () => {
+    const page = await fresh();
+    await page.goto(ORIGIN + "/");
+    await page.waitForSelector(".ob-card");
+    await page.click(".ob-card .btn.primary");
+    await page.click(".choice >> nth=1");
+    await page.click(".today .hero .btn.primary");
+    await page.waitForFunction(() => window.__state.game && window.__board?.model.size === 9 && window.__board.geom?.cell > 20 && !window.__state.game.thinking);
+    for (let i = 0; i < 4; i++) {
+      // Play a move, then click the next point in the first task after the reply lands: before
+      // the next frame. A board that learns it may take moves only at the next paint drops it.
+      const out = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const s = window.__state.game;
+            const G = s.game;
+            const free = [];
+            for (let y = 1; y < 8; y++) for (let x = 1; x < 8; x++) if (G.canPlay(x, y).ok) free.push({ x, y });
+            const [a] = free;
+            const n = G.moveNumber;
+            const click = (p) => {
+              const b = window.__board;
+              const r = b.canvas.getBoundingClientRect();
+              const at = { clientX: r.left + b.geom.ox + p.x * b.geom.cell, clientY: r.top + b.geom.oy + p.y * b.geom.cell, button: 0, bubbles: true, pointerId: 1, isPrimary: true };
+              b.canvas.dispatchEvent(new PointerEvent("pointerdown", at));
+            };
+            click(a);
+            const started = performance.now();
+            const poll = () => {
+              const g = window.__state.game;
+              if (g.pending) document.querySelector(".teach .btn.ghost")?.click();
+              if (g.game.moveNumber >= n + 2 && !g.thinking) {
+                const next = free.find((p) => g.game.canPlay(p.x, p.y).ok);
+                const before = g.game.moveNumber;
+                click(next);
+                return resolve({ played: g.game.moveNumber === before + 1, before, after: g.game.moveNumber, interactive: window.__board.model.interactive });
+              }
+              if (performance.now() - started > 15000) return resolve({ timeout: true, moves: g.game.moveNumber });
+              setTimeout(poll, 0);
+            };
+            setTimeout(poll, 0);
+          }),
+      );
+      assert(out.played, JSON.stringify(out));
+      // Let the reply to that move land before the next round.
+      await page.waitForFunction(() => !window.__state.game.thinking && !window.__state.game.pending && window.__state.game.game.turn === window.__state.game.humanColor, null, { timeout: 15000 });
+    }
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();
   });
