@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
   teaching: null, // null = decide from the estimate (on for newer players)
   confirmMove: false, // two-click placement
   confirmProblemMove: false, // Two-click placement in problems
-  showEval: false, // win-rate bar while playing
+  showEval: true, // the balance while playing, and the verdict on each move (play/verdict.js); new players see it from the start
   timeControl: "none", // none | move30 | byoyomi
   liveAnalysis: true, // candidate overlay in review
   autoStrength: true, // follow the estimate when suggesting an opponent

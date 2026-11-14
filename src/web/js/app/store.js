@@ -54,12 +54,15 @@ export function update(fn) {
     shownPlace = place;
     if (moved && transitions()) {
       // A new place or view cross-fades (View Transitions) where the
-      // system has it and motion is not reduced; Preact renders in a
-      // microtask, so the new page is in the DOM a frame later.
-      document.startViewTransition(() => {
+      // system has it and motion is not reduced. Preact renders in a
+      // microtask, so the new page is in the DOM after the next task (not
+      // the next frame: frames are paused while the update runs). A
+      // transition that is skipped or interrupted is not an error.
+      const vt = document.startViewTransition(() => {
         for (const l of listeners) l();
-        return new Promise((r) => requestAnimationFrame(() => r()));
+        return new Promise((r) => setTimeout(r, 0));
       });
+      for (const p of [vt.ready, vt.finished, vt.updateCallbackDone]) p?.catch?.(() => {});
       return;
     }
     for (const l of listeners) l();

@@ -420,13 +420,13 @@ export function CountUp({ value, start = 0, format = (v) => v }) {
  * Practice's path that share a title look different. Nothing before the
  * problem's part has arrived (content.js), the caller shows its icon.
  */
-export function DiagramThumb({ diagram, label = "" }) {
+export function DiagramThumb({ diagram, label = "", size = 32 }) {
   const ref = useRef(null);
   const key = Array.isArray(diagram) ? diagram.join("|") : "";
   const palette = usePaletteKey();
   useEffect(() => {
     if (!key) return;
-    paintThumb(ref.current, thumbFromDiagram(diagram), 32);
-  }, [key, palette]);
-  return <canvas ref={ref} class="dthumb" width="32" height="32" role="img" aria-label={label} />;
+    paintThumb(ref.current, thumbFromDiagram(diagram), size);
+  }, [key, palette, size]);
+  return <canvas ref={ref} class="dthumb" width={size} height={size} style={{ width: `${size}px`, height: `${size}px` }} role="img" aria-label={label} />;
 }

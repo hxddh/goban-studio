@@ -802,6 +802,18 @@ button.progress-row:hover { background: var(--fill); }
 .day-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--fill-2); }
 .day-dots i.on { background: var(--text-2); }
 .day-dots i.week { margin-left: 5px; }
+/* Today: this week as seven days, today's goal, a problem for today */
+.week-days { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+.week-days li { display: flex; flex-direction: column; align-items: center; gap: var(--s-1); font: var(--t-caption); color: var(--text-3); }
+.week-days li i { width: 10px; height: 10px; border-radius: var(--r-pill); background: var(--fill-2); }
+.week-days li.on i { background: var(--text-2); }
+.week-days li.today { color: var(--text); }
+.week-days li.today i { outline: 1px solid var(--text-3); outline-offset: 2px; }
+.week-goal { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); font: var(--t-body); }
+.week-goal .meter { width: 96px; }
+.problem-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); cursor: pointer; }
+.problem-card:hover { background: var(--fill); }
+.problem-card .dthumb { border-radius: var(--r-0); }
 /* The charts end where the mastery row's bar ends, left of its chevron. */
 li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .progress-row.milestones { padding-top: var(--s-3); padding-bottom: var(--s-3); }
