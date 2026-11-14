@@ -1,5 +1,5 @@
 {
-  "note": "v8: the shipped ladder on 13x13, never measured before (docs/strength.md, v8). v8-13a: the standard levels, adjacent and two apart. v8-13b: every human-style level against the standard levels of the same ID and its neighbours, the stronger network, and a 400-visit bridge above the top. v8-13c: bridges for the two sweeps of v8-13a (docs/calibration/v8-candidates.json). v11 (docs/strength.md, v11): v11-13h, 13x13 handicap games, 1 to 4 stones for the weaker standard level against the next level up and two up, at five ladder points, with the app's handicap points and komi; v11-19anchor, KataGo's human SL model as a 10-kyu player (H:rank_10k, the 19x19 anchor) against the current ladder around 10 kyu (the standard levels and the v4 bridges of docs/calibration/v11-candidates.json). A run whose games are all in results/<run>.jsonl gets no jobs, so pushing this plan unchanged plays nothing new. Push to a calibrate/** branch to run it (.github/workflows/calibrate.yml).",
+  "note": "v8: the shipped ladder on 13x13, never measured before (docs/strength.md, v8). v8-13a: the standard levels, adjacent and two apart. v8-13b: every human-style level against the standard levels of the same ID and its neighbours, the stronger network, and a 400-visit bridge above the top. v8-13c: bridges for the two sweeps of v8-13a (docs/calibration/v8-candidates.json). v11 (docs/strength.md, v11): v11-13h, 13x13 handicap games, 1 to 4 stones for the weaker standard level against the next level up and two up, at five ladder points, with the app's handicap points and komi; v11-19anchor, KataGo's human SL model as a 10-kyu player (H:rank_10k, the 19x19 anchor) against the current ladder around 10 kyu (the standard levels and the v4 bridges of docs/calibration/v11-candidates.json). A run whose games are all in results/<run>.jsonl gets no jobs, so pushing this plan unchanged plays nothing new. Push to a calibrate/** branch to run it (.github/workflows/calibrate.yml). v16 (docs/review-v15-zh.md, V5): v16-13strong, the stronger-network level (LS:2d) with the kata1-b18c384nbt network that replaced g170e-b15c192, against the standard 2 dan, the human-style 2 dan and the 400-visit bridge above the top, and the bridge against the standard 2 dan to anchor it.",
   "runs": [
     {
       "id": "v8-13a",
@@ -53,6 +53,17 @@
       "scoreVisits": 200,
       "candidates": "docs/calibration/v11-candidates.json",
       "tag": "v11"
+    },
+    {
+      "id": "v16-13strong",
+      "size": 13,
+      "games": 16,
+      "pairs": "LS:2d-L:2d,LS:2d-HL:2d,LS:2d-C:v400,C:v400-L:2d",
+      "shards": 6,
+      "workers": 4,
+      "scoreVisits": 400,
+      "candidates": "docs/calibration/v7-candidates.json",
+      "tag": "v16"
     }
   ]
 }
