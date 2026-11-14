@@ -17,7 +17,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(root, "src/web/js/content/classics.js");
@@ -160,7 +160,7 @@ async function main() {
   const min = Number(argv[argv.indexOf("--min") + 1]) || 3;
   const text = fs.readFileSync(SRC, "utf8");
   const head = text.slice(0, text.indexOf("export const CLASSICS = "));
-  const { CLASSICS } = await import(`${SRC}?t=${Date.now()}`);
+  const { CLASSICS } = await import(`${pathToFileURL(SRC).href}?t=${Date.now()}`); // a file URL: a Windows path is not one
   const report = JSON.parse(fs.readFileSync(DATA, "utf8"));
   const next = withMoments(CLASSICS, report, min);
   const out = `${head}export const CLASSICS = ${JSON.stringify(next, null, 2)};\n`;
