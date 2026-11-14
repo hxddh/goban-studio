@@ -134,20 +134,34 @@ async function pointOf(page, x, y) {
 }
 async function clickPoint(page, x, y) {
   // The board on screen must be the one the page registered (a new view
-  // registers after its first paint), and its geometry must be of the
-  // canvas as laid out now: the ResizeObserver reports a new size only at
-  // the next frame, and a point read in between is off (the likely cause
-  // of the explorer check's rare timeout: its panel fills in late).
+  // registers after its first paint), its geometry must be of the canvas
+  // as laid out now (the ResizeObserver reports a new size only at the
+  // next frame), and the layout must have settled: the same place, size
+  // and geometry over two frames, so the point read is where the click lands.
+  await page.evaluate(() => (window.__clickLayout = null));
   await page.waitForFunction(() => {
     const c = document.querySelector("canvas.board");
     const b = window.__board;
     if (!(c && b && b.canvas === c && b.geom)) return false;
     const r = c.getBoundingClientRect();
-    return Math.round(r.width) === b.cssW && Math.round(r.height) === b.cssH;
+    if (Math.round(r.width) !== b.cssW || Math.round(r.height) !== b.cssH) return false;
+    const key = [r.left, r.top, r.width, r.height, b.geom.ox, b.geom.oy, b.geom.cell, b.model.size].join();
+    const settled = window.__clickLayout === key;
+    window.__clickLayout = key;
+    return settled;
   });
   const p = await pointOf(page, x, y);
   assert(p, "board geometry not exposed");
+  // The point the board itself reads from the click, as it reads it (board.js eventPoint).
+  await page.evaluate(() => {
+    const b = window.__board;
+    window.__clicked = null;
+    b.canvas.addEventListener("pointerdown", (e) => (window.__clicked = b.pointToVertex(...Object.values(b.eventPoint(e))) || "none"), { capture: true, once: true });
+  });
   await page.mouse.click(p.x, p.y);
+  // A click the board read as another point (or none) fails here, saying so, not later as a wait that times out.
+  const got = await page.evaluate(() => window.__clicked);
+  assert(got && got.x === x && got.y === y, `the click for ${x},${y} reached the board as ${JSON.stringify(got)}`);
 }
 
 /**
