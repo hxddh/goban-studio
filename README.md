@@ -306,10 +306,13 @@ src/web/js/model/        the player model: rating, spaced review, focus, the pat
 src/web/js/content/      course, problems and their levels, classics, opening book
 src/web/js/messages/     every interface string in four languages, by area
 
-src/main.zig             the shell: window, the bridge's commands, menus
+src/main.zig, shell.zig  the shell: start-up and its state
+src/commands.zig         the bridge's command table; events.zig: platform events
+src/bridge_*.zig         the commands: files, window and menus, KataGo, updates, networks
+src/lifecycle.zig        one running copy, and the save before a quit
 src/store.zig, files.zig, paths.zig      the data folder, file dialogs, paths
 src/instance.zig         one running copy; a second launch hands over its file
-src/engine.zig           the KataGo child process
+src/engine.zig, engine_build.zig         the KataGo child process; which build starts
 src/net.zig              one HTTPS client: proxy, redirects, resume
 src/update.zig, install.zig, updater/    update check, download and checks, the swap helpers
 src/models.zig           the optional network downloads

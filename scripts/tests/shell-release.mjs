@@ -2,6 +2,7 @@
  * Shell: release — the static page, updates, signing notes, screenshots, the tour, the updater and the optional networks.
  */
 import { test, APP_VERSION, DEFAULT_SETTINGS, Host, M, MESSAGES, PNG, Shots, Sign, U, assert, fs, normalizeSettings, path, root, t } from "./helpers.mjs";
+import { shellSource } from "../shell-source.mjs";
 
 await test("Moka 9x9 assets are present and attributed", () => {
   for (const file of ["host.js", "index.js", "worker.js", "go-model.json", "go-model.bin", "LICENSE", "THIRD_PARTY_NOTICES.md"]) {
@@ -47,7 +48,7 @@ await test("removing a network retries while the engine is busy, without blockin
   const r = await M.remove("human", { invoke, hasHost: true, sleep: async () => {} });
   assert.equal(r.ok, true);
   assert.equal(calls, 3);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /if \(!self\.katago\.stopSlot\(modelSlot\(kind\)\)\) return modelReply\(self, output, false, "Busy"\);/);
   const engine = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(engine, /pub fn stopSlot\(self: \*Worker, slot: Slot\) bool \{\n\s+\/\/ Never wait on the worker/);
@@ -153,7 +154,7 @@ await test("checkNow / autoCheckIfDue ask only when allowed and remember success
 });
 
 await test("the native update commands are fixed to this repository", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   const zig = fs.readFileSync(path.join(root, "src/update.zig"), "utf8").replace(/\r\n/g, "\n");
   assert.match(main, /"studio\.checkUpdate"/);
   assert.match(main, /"studio\.openReleasePage"/);
@@ -286,7 +287,7 @@ await test("the screenshot tour visits five screens and starts only with GOBAN_T
   const app = fs.readFileSync(path.join(root, "src/web/js/app/app.jsx"), "utf8").replace(/\r\n/g, "\n");
   // One look at the configuration; the tour module loads only when it asks for it.
   assert.match(app, /if \(c\?\.tour\)[^\n]*import\("\.\.\/tour\.js"\)/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /GOBAN_TOUR_OUT/);
   for (const wf of ["build-macos.yml", "build-windows.yml"]) {
     const y = fs.readFileSync(path.join(root, ".github/workflows", wf), "utf8").replace(/\r\n/g, "\n");
@@ -458,7 +459,7 @@ await test("the interface goes available → downloading → ready → installin
 });
 
 await test("the native install commands are fixed to this repository's release downloads", () => {
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8").replace(/\r\n/g, "\n");
   for (const cmd of ["studio.updateStatus", "studio.updateCancel", "studio.updateDownload", "studio.updateApply"]) assert.match(main, new RegExp(`"${cmd.replace(".", "\\.")}"`), cmd);
   assert.match(zig, /download_prefix = "https:\/\/github\.com\/hxddh\/goban-studio\/releases\/download\/"/);
@@ -595,7 +596,7 @@ await test("the downloader fetches only pinned KataGo files, verified before use
   // Only the verified file is renamed into place, inside the models folder.
   assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
   assert.match(zig, /renameAbsolute\(part, final/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
   // The page names a kind; the payload has no URL or path field.
   assert.match(main, /const ModelPayload = struct \{\n    kind: \[\]const u8 = "",\n\};/);
@@ -616,7 +617,7 @@ await test("the packaged self-test checks the downloads only when the workflow a
   const app = fs.readFileSync(path.join(root, "scripts/selftest-app.mjs"), "utf8").replace(/\r\n/g, "\n");
   assert.match(app, /GOBAN_MODELS_DIR: modelsDir/);
   assert.match(app, /fs\.rmSync\(modelsDir/);
-  const main = fs.readFileSync(path.join(root, "src/main.zig"), "utf8").replace(/\r\n/g, "\n");
+  const main = shellSource();
   assert.match(main, /GOBAN_SELFTEST_MODELS/);
   assert.match(main, /GOBAN_MODELS_DIR/);
 });

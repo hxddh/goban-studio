@@ -13,9 +13,9 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 585 checks in 69 files |
+| Unit and data tests | `npm test` | 586 checks in 69 files |
 | Interface tests | `npm run ui-test` | 141 checks, 18 visual baselines |
-| Zig tests | `npm run test:native` | 72 pass on Linux, 3 more are skipped there |
+| Zig tests | `npm run test:native` | 79 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
 <!-- /counts -->
 

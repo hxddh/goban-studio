@@ -3,10 +3,10 @@
 //! The Native SDK's Windows host destroys the window on WM_CLOSE (close
 //! button, Alt+F4, the taskbar's "Close window") and the app quits with it;
 //! it offers no hook in between. So, once the page has announced its flush
-//! hook (main.zig `studio.flushHook`), the host window is subclassed: a
+//! hook (lifecycle.zig `studio.flushHook`), the host window is subclassed: a
 //! WM_CLOSE from the user is held back, the page is asked to flush, and
 //! `proceed` re-posts the close when it answered or its time ran out
-//! (main.zig's quit gate never waits longer than `flush_timeout_ms`).
+//! (lifecycle.zig's quit gate never waits longer than `flush_timeout_ms`).
 //!
 //! Only the first top-level window of the SDK's own window class on the UI
 //! thread is subclassed (the app has one window). Everything except that

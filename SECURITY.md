@@ -45,8 +45,9 @@ Only the latest release is supported. There are no older branches.
 ## Trust boundaries
 
 1. **The page is not fully trusted by the shell.** It renders SGF files
-   and comments from anywhere, so the native bridge (`src/main.zig`) accepts
-   a fixed list of commands with typed payloads, the store's file names are
+   and comments from anywhere, so the native bridge (the table in
+   `src/commands.zig`, the handlers in `src/bridge_*.zig`) accepts a fixed
+   list of commands with typed payloads, the store's file names are
    checked against an allow-list on both sides, and KataGo receives only a
    narrow GTP vocabulary. A cross-site-scripting bug in the page should not
    become arbitrary file access or code execution; if you find a path where
