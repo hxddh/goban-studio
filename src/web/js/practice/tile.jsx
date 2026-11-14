@@ -3,7 +3,9 @@
  * side of the board the problem is on, drawn in SVG so it is sharp at any
  * size. Board edges are drawn where the position touches them and the
  * lines run off the tile where the board goes on; the stones the goal is
- * about carry a small dot.
+ * about carry a small triangle (the usual mark for "these stones" in a
+ * diagram). The tiles of one grid share one framing, so a stone is the
+ * same size on each.
  *
  * A grid can hold a hundred tiles, so a tile draws its position only once
  * it is near the screen (one shared IntersectionObserver); until then it
@@ -78,11 +80,23 @@ function whenNear(el, show) {
   };
 }
 
-export function PositionTile({ def }) {
+/** How many lines a diagram spans (its larger side): the framing a grid of tiles shares (gridFrame). */
+export function extentOf(def) {
+  const rows = def?.diagram;
+  if (!Array.isArray(rows) || !rows.length) return 0;
+  return Math.max(rows.length, ...rows.map((r) => r.replace(/\s+/g, "").length));
+}
+
+/** One framing for a grid: the largest diagram's extent, from 6 lines to at most 13. */
+export function gridFrame(defs) {
+  return Math.min(13, Math.max(6, ...defs.map(extentOf)));
+}
+
+export function PositionTile({ def, frame = 6 }) {
   const ref = useRef(null);
   const [near, setNear] = useState(false);
   useEffect(() => (near ? undefined : whenNear(ref.current, () => setNear(true))), [near]);
-  const win = near ? tileWindow(def) : null;
+  const win = near ? tileWindow(def, frame) : null;
   if (!win) return <span ref={ref} class="tile" aria-hidden="true" />;
   const { n, stones, edge } = win;
   const lines = [];
@@ -100,7 +114,7 @@ export function PositionTile({ def }) {
         {stones.map((s) => (
           <>
             <circle class={s.black ? "b" : "w"} cx={s.x + 0.5} cy={s.y + 0.5} r="0.46" />
-            {s.key && <circle class={s.black ? "key-b" : "key-w"} cx={s.x + 0.5} cy={s.y + 0.5} r="0.13" />}
+            {s.key && <polygon class={s.black ? "key-b" : "key-w"} points={`${s.x + 0.5},${s.y + 0.27} ${s.x + 0.7},${s.y + 0.62} ${s.x + 0.3},${s.y + 0.62}`} />}
           </>
         ))}
       </svg>

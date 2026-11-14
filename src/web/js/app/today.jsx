@@ -313,7 +313,7 @@ function TodayProblem() {
   return (
     <section class="section today-problem">
       <h2 class="section-title">{t("today.problem.title")}</h2>
-      <button type="button" class="problem-card" onClick={() => C.openPathItem(d.key)}>
+      <button type="button" class="today-problem-card" onClick={() => C.openPathItem(d.key)}>
         <DiagramThumb diagram={d.diagram} size={120} label={t("today.problem.title")} />
         <span class="row-action">{t("today.problem.try")}</span>
       </button>

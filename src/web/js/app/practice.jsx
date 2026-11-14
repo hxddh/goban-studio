@@ -15,7 +15,7 @@ import { Board, Button, GradeDots, Icon, Stone } from "./parts.jsx";
 import { Toolbar } from "./chrome.jsx";
 import { PracticeHome, whyText } from "../practice/path.jsx";
 import { CatalogView } from "../practice/catalog.jsx";
-import { PositionTile } from "../practice/tile.jsx";
+import { PositionTile, gridFrame } from "../practice/tile.jsx";
 import { cleanFirst, comesBackIn, problemStatus } from "../practice/progress.js";
 import { CaptureView, LessonDone } from "./beginner.jsx";
 
@@ -118,7 +118,7 @@ function ProblemGrid({ items, numberOf }) {
         const label = [name ? t("common.labelValue", [t("practice.problemN", [n]), name]) : t("practice.problemN", [n]), C.defGoalText(x), statusText(status, rec)].filter(Boolean).join(t("a11y.sentence"));
         return (
           <button type="button" class={`problem-card ${status}`} data-status={status} tabIndex={i === at ? 0 : -1} aria-label={label} title={name || undefined} onFocus={() => setAt(i)} onClick={() => C.openProblem(x.id)}>
-            <PositionTile def={x} />
+            <PositionTile def={x} frame={gridFrame(items)} />
             <span class="tile-foot">
               {toMove != null && <Stone color={toMove} size={10} />}
               <span class="problem-no">{n}</span>

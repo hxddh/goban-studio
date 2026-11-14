@@ -432,7 +432,7 @@ button.group-row:hover { background: var(--fill); }
 }
 .game-tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-05); font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .row-action { flex: none; display: inline-flex; align-items: center; height: 26px; padding: 0 var(--s-25); border-radius: var(--r-1); background: var(--fill); color: var(--text); font: var(--t-label); }
-.group-row:hover .row-action, .problem-card:hover .row-action { background: var(--fill-2); }
+.group-row:hover .row-action, .today-problem-card:hover .row-action { background: var(--fill-2); }
 .meter { flex: none; align-self: center; width: 56px; height: 4px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--text-2); }
 .meter.full i { background: var(--good); }
@@ -820,9 +820,9 @@ button.progress-row:hover { background: var(--fill); }
 .week-days li.today i { outline: 1px solid var(--text-3); outline-offset: 2px; }
 .week-goal { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); font: var(--t-body); }
 .week-goal .meter { width: 96px; }
-.problem-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); cursor: pointer; }
-.problem-card:hover { background: var(--fill); }
-.problem-card .dthumb { border-radius: var(--r-0); }
+.today-problem-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); cursor: pointer; }
+.today-problem-card:hover { background: var(--fill); }
+.today-problem-card .dthumb { border-radius: var(--r-0); }
 /* The charts end where the mastery row's bar ends, left of its chevron. */
 li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .progress-row.milestones { padding-top: var(--s-3); padding-bottom: var(--s-3); }
@@ -917,8 +917,8 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .tile line.edge { stroke-width: 0.08; }
 .tile circle.b { fill: var(--tile-black); }
 .tile circle.w { fill: var(--tile-white); stroke: var(--tile-rim); stroke-width: 0.05; }
-.tile circle.key-b { fill: var(--tile-white); }
-.tile circle.key-w { fill: var(--tile-black); }
+.tile .key-b { fill: var(--tile-white); }
+.tile .key-w { fill: var(--tile-black); }
 .tile-foot { display: flex; align-items: center; gap: var(--s-1); min-height: 18px; padding: 0 var(--s-05); font: var(--t-small); color: var(--text-3); }
 .tile-foot .problem-no { font-variant-numeric: tabular-nums; }
 .tile-foot .problem-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
