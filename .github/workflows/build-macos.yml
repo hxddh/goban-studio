@@ -180,12 +180,15 @@ jobs:
           set -euo pipefail
           # pkg-config sees only the libraries built above, never Homebrew's.
           export PKG_CONFIG_LIBDIR="$METAL_DEPS/lib/pkgconfig"
-          # The Swift driver links this one; it reads the deployment target
-          # from the environment as well as from CMake's setting.
+          # The Swift driver links this one, and KataGo sets the deployment
+          # target only after its project() call, so Swift would target the
+          # runner's own macOS (it did: minos 15.0). The Swift target is given
+          # explicitly, and the environment carries the same minimum.
           export MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build-metal" \
             -G Ninja -DUSE_BACKEND=METAL -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN" \
+            -DCMAKE_Swift_COMPILER_TARGET="arm64-apple-macos$MACOS_MIN" \
             -DCMAKE_PREFIX_PATH="$METAL_DEPS" \
             -DProtobuf_PROTOC_EXECUTABLE="$METAL_DEPS/bin/protoc" \
             -DProtobuf_INCLUDE_DIR="$METAL_DEPS/include" \
