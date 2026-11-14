@@ -37,7 +37,7 @@ falls back to a Chinese face.
 | `--t-title` | 20 / 26 | 600 | panel titles, sheet titles, hero headline |
 | `--t-head` | 15 / 22 | 600 | section headings, card titles |
 | `--t-body` | 13 / 20 | 400 | everything by default |
-| `--t-read` | 14 / 22 | 400 | lesson text and explanations (reading) |
+| `--t-read` | 15 / 24 | 400 | lesson text and explanations (reading): a size up from the interface, for reading |
 | `--t-small` | 12 / 17 | 400 | secondary text, metadata |
 | `--t-caption` | 11 / 14 | 500 | eyebrows, chart axes, badges |
 | `--t-label` | 13 / 18 | 500 | the one strong line of a row or a name |
@@ -78,8 +78,11 @@ The window has three columns:
 | Panel (board places) | 320 px (352 px from 1600 px) | fixed slots, see §7 |
 
 List pages (Play's home, Practice's path and catalog) centre a 880 px column
-(`--page`); `--sb`, `--panel` and `--tb` are the sidebar, the panel and the
-toolbar of the table above.
+(`--page`). Today and the Library have two columns when the page is at
+least 1200 px wide — what to do now on the left, progress and collections
+on the right — and centre 1180 px instead (`--page-wide`). `--sb`,
+`--panel` and `--tb` are the sidebar, the panel and the toolbar of the
+table above.
 
 | Token | Value | Use |
 | --- | --- | --- |

@@ -49,8 +49,30 @@ export function update(fn) {
   scheduled = true;
   queueMicrotask(() => {
     scheduled = false;
+    const place = placeKey();
+    const moved = place !== shownPlace;
+    shownPlace = place;
+    if (moved && transitions()) {
+      // A new place or view cross-fades (View Transitions) where the
+      // system has it and motion is not reduced; Preact renders in a
+      // microtask, so the new page is in the DOM a frame later.
+      document.startViewTransition(() => {
+        for (const l of listeners) l();
+        return new Promise((r) => requestAnimationFrame(() => r()));
+      });
+      return;
+    }
     for (const l of listeners) l();
   });
+}
+
+/** Which page is on screen: the place and its view (a lesson, a topic, the review…). */
+let shownPlace = "";
+function placeKey() {
+  return `${state.space}/${state[state.space]?.view || ""}`;
+}
+function transitions() {
+  return typeof document !== "undefined" && typeof document.startViewTransition === "function" && document.documentElement?.dataset?.motion === "full";
 }
 
 /** Call `l` after each batch of updates; returns the function that stops it. */

@@ -15,6 +15,7 @@ import { formatPoints } from "../rules.js";
 import { playersOf, relativeDay } from "./import.js";
 import { Toolbar } from "../app/chrome.jsx";
 import { useJobs } from "../app/background.jsx";
+import { gameInProgress } from "./home.jsx";
 
 /** The list shows this many games at first ("Show all" for the rest). */
 const LIST_COMPACT = 8;
@@ -47,9 +48,15 @@ export function LibraryHome() {
         <header class="page-head">
           <h1>{t("nav.library")}</h1>
         </header>
-        <MyGames />
-        <Explorer />
-        <Classics />
+        <div class="cols">
+          <div class="col-main">
+            <MyGames />
+            <Explorer />
+          </div>
+          <div class="col-side">
+            <Classics />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -162,6 +169,27 @@ function GameRow({ g, unfinished = false }) {
 }
 
 /** The games left unfinished: a short group of their own, each row continuing its game. */
+/** The game on the board now, before it is saved: one row that continues it (Today's hero says the same). */
+function CurrentGame() {
+  const g = state.game;
+  // A game already kept as a record has its own row (unfinished, or with its result).
+  if (!gameInProgress() || (g.recordId && Games.listGames().some((r) => r.id === g.recordId))) return null;
+  return (
+    <ul class="group games current-game">
+      <li class="game-item">
+        <button type="button" class="group-row game-row" onClick={C.continueCurrent}>
+          <Thumb thumb={Games.thumbnail(g.game)} size={g.game.size} />
+          <span class="gr-text">
+            <strong>{t("library.inProgress")}</strong>
+            <span>{t("library.continueTitle", [g.game.size, g.game.moveNumber])}</span>
+          </span>
+          <span class="row-action">{t("library.continue")}</span>
+        </button>
+      </li>
+    </ul>
+  );
+}
+
 function Unfinished({ games }) {
   if (!games.length) return null;
   const shown = state.ui.allUnfinished ? games : games.slice(0, UNFINISHED_SHOWN);
@@ -210,7 +238,8 @@ function MyGames() {
   return (
     <section class="home-section home-games">
       <h2 class="section-title">{t("library.mine")}</h2>
-      {!all.length && !unfinished.length && <p class="muted">{t("library.emptyHelp")}</p>}
+      {!all.length && !unfinished.length && !gameInProgress() && <p class="muted">{t("library.emptyHelp")}</p>}
+      <CurrentGame />
       <Unfinished games={unfinished} />
       {all.length > 0 && (
         <div class="games-group">
@@ -274,6 +303,7 @@ function Classics() {
         {list.map((g) => (
           <li>
             <button type="button" class={`collection-row ${done[g.id]?.done ? "done" : ""}`} onClick={() => C.openClassic(g.id)}>
+              {C.classicThumb(g.id) ? <Thumb thumb={C.classicThumb(g.id)} size={19} /> : <span class="thumb thumb-wait" aria-hidden="true" />}
               <span class="collection-main">
                 <strong>{C.tx(g.title)}</strong>
                 <span class="muted">

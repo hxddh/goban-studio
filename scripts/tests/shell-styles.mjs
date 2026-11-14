@@ -83,7 +83,7 @@ await test("shell styles: the token tables of docs/design.md are the tokens of :
     }
   }
   // What the tables leave to prose: the layout widths of §3, the font stack of §2 and the alias of --ease-out.
-  const PROSE = ["--sb", "--panel", "--inset", "--tb", "--page", "--font", "--ease"];
+  const PROSE = ["--sb", "--panel", "--inset", "--tb", "--page", "--page-wide", "--font", "--ease"];
   for (const p of PROSE) assert.ok(doc.includes("`" + p + "`") || p === "--inset" || p === "--font", `${p} is named in the doc`);
   const missing = Object.keys(LIGHT).filter((k) => !seen.has(k) && !PROSE.includes(k));
   assert.deepEqual(missing, [], "tokens of :root that no table of docs/design.md lists");

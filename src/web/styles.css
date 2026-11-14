@@ -74,7 +74,7 @@
   --t-title: 600 20px/26px var(--font);
   --t-head: 600 15px/22px var(--font);
   --t-body: 400 13px/20px var(--font);
-  --t-read: 400 14px/22px var(--font);
+  --t-read: 400 15px/24px var(--font);
   --t-small: 400 12px/17px var(--font);
   --t-caption: 500 11px/14px var(--font);
   --t-label: 500 13px/18px var(--font); /* a row's or a name's one strong line; the same size with larger text */
@@ -105,6 +105,7 @@
   --inset: var(--titlebar-inset, 0px);
   --tb: max(52px, var(--inset));
   --page: 880px;
+  --page-wide: 1180px;
 
   /* Layers, lowest first */
   --z-raised: 1;
@@ -248,6 +249,7 @@ kbd { font: 500 11px/1 var(--font); padding: 3px var(--s-15); border-radius: var
 .main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .place { flex: 1; display: flex; flex-direction: column; min-height: 0; animation: place-in var(--dur-3) var(--ease-out); }
 @keyframes place-in { from { opacity: 0; } to { opacity: 1; } }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-2); animation-timing-function: var(--ease-out); }
 .toolbar {
   flex: none; height: var(--tb); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4) 0 var(--s-3);
   border-bottom: 1px solid var(--line); background: var(--bg);
@@ -283,6 +285,14 @@ kbd { font: 500 11px/1 var(--font); padding: 3px var(--s-15); border-radius: var
 /* Pages */
 .page { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--s-5) var(--s-8); }
 .page > * { max-width: var(--page); margin-left: auto; margin-right: auto; }
+/* Today and the Library: one column, two on a wide page (the left what to do now, the right the rest) */
+.page:has(> .cols) { container-type: inline-size; }
+.cols { display: flex; flex-direction: column; }
+@container (min-width: 1200px) {
+  .page:has(> .cols) > * { max-width: var(--page-wide); }
+  .cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); gap: var(--s-7); align-items: start; }
+  .col-side > :first-child { margin-top: 0; }
+}
 .page-head { display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-5); }
 .page-head h1 { font: var(--t-display); letter-spacing: -0.01em; }
 .page-head .muted { font: var(--t-read); }
@@ -406,7 +416,7 @@ button.group-row:hover { background: var(--fill); }
 .gr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-05); }
 .gr-text strong { font: var(--t-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-text span { font: var(--t-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.game-row .thumb { width: 44px; height: 44px; border-radius: 3px; flex: none; }
+.game-row .thumb { width: 44px; height: 44px; border-radius: var(--r-0); flex: none; }
 .game-row > .icon { color: var(--text-3); }
 .outcome { font: var(--t-small); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .outcome.good { color: var(--good); }
@@ -929,6 +939,9 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
   cursor: pointer; text-align: left;
 }
 .collection-row:hover { background: var(--fill); }
+.home-classics .collection-row .thumb { width: 44px; height: 44px; border-radius: var(--r-0); flex: none; }
+.thumb-wait { background: var(--thumb-board); opacity: 0.5; }
+.current-game { margin-bottom: var(--s-4); }
 .collection-row .icon { color: var(--good); }
 .collection-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-05); }
 .collection-main strong { font: var(--t-label); }
@@ -1008,6 +1021,12 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .lang-grid button { height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface); cursor: pointer; font-weight: 500; }
 .lang-grid button.on { border-color: var(--text); box-shadow: var(--ring-selected); }
 .lang-grid.big button { height: 44px; font-size: 14px; }
+/* In Settings the language is one choice among the others: the same segmented control as Appearance and Sound */
+.lang-grid:not(.big) { gap: var(--s-05); padding: var(--s-05); border-radius: var(--r-2); background: var(--fill); }
+.lang-grid:not(.big) button { height: 30px; border: 0; border-radius: var(--r-1); background: transparent; color: var(--text-2); }
+.lang-grid:not(.big) button:hover { color: var(--text); }
+.lang-grid:not(.big) button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-raised); }
+:root[data-theme="dark"] .lang-grid:not(.big) button.on { background: var(--fill-2); }
 .about { display: flex; flex-direction: column; gap: var(--s-1); }
 .shortcuts { display: grid; grid-template-columns: 10em 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
 .shortcuts dd { margin: 0; color: var(--text-2); }

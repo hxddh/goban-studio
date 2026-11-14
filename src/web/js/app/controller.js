@@ -9,7 +9,7 @@
 // The app itself: starting up, the four spaces, the Library's games, the player's data
 export { boot, finishOnboarding, startFirstRun, setPlayerRank } from "./boot.js";
 export { SPACES, playHome, playBoard, goSpace, toggleFocus, restore } from "./spaces.js";
-export { openRecord, lookAtRecord, reviewUnfinished, clearUnfinished, openClassic, deleteRecord, renameRecord, exportRecord, undoImport, importSGFText, importFromCollection, importAllFromCollection, importSources, importFiles, importPaths, pickImport, pasteSGF } from "./library-ctl.js";
+export { openRecord, lookAtRecord, reviewUnfinished, clearUnfinished, openClassic, classicThumb, deleteRecord, renameRecord, exportRecord, undoImport, importSGFText, importFromCollection, importAllFromCollection, importSources, importFiles, importPaths, pickImport, pasteSGF } from "./library-ctl.js";
 export { setReloader, retryStore, continueReadOnly, resetDamaged, exportBackup, importBackup, restoreSnapshot, revealDataFolder, undoRestore, clearData, clearDataNow } from "./data-ctl.js";
 
 // The shell: settings, sheets, history, menus

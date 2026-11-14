@@ -61,11 +61,17 @@ export function TodayView() {
           <span class="eyebrow">{date}</span>
           <h1>{greeting()}</h1>
         </header>
-        {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
-        <TodayList />
-        <Progress />
-        <Week />
-        <Recent />
+        <div class="cols">
+          <div class="col-main">
+            {gameInProgress() ? <ContinueHero /> : C.firstRunOffer() === "lesson" ? <FirstLessonHero /> : <SuggestedHero />}
+            <TodayList />
+          </div>
+          <div class="col-side">
+            <Progress />
+            <Week />
+            <Recent />
+          </div>
+        </div>
       </div>
     </>
   );
