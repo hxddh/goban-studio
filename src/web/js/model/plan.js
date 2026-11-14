@@ -170,6 +170,9 @@ export function lessonList(content) {
  * stronger goes on to the advanced course once the intermediate course is
  * finished, or straight away if they never started it.
  * `rating`: GoR from rated games, or null.
+ * @param {any[]} all
+ * @param {(id: string) => boolean} isDone
+ * @param {{ experience?: string, playerRank?: number, rating?: number }} [player]
  */
 export function nextLesson(all, isDone, { experience, playerRank, rating } = {}) {
   const open = ({ lesson }) => !isDone(lesson.id);

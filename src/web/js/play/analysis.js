@@ -43,6 +43,8 @@ export const visitsFor = (size) => (size === 19 ? 40 : size === 13 ? 56 : 80);
  * scheduler's lane (background by default), so the computer's move and
  * what the player looks at always go first; `signal` cancels the pass, and
  * a search still queued then never runs. `existing` positions are kept.
+ * @param {any} game
+ * @param {{ visits?: number, signal?: AbortSignal, lane?: string, onProgress?: (done: number, total: number) => void, onPoint?: (i: number, point: any) => void, existing?: any[] }} [opts]
  */
 export async function analyzeLine(game, { visits = 40, signal = null, lane = "background", onProgress, onPoint, existing = null } = {}) {
   const line = game.mainLine();
@@ -340,6 +342,7 @@ export function analyseAll({ ids = null } = {}) {
   return batch;
 }
 
+/** @type {(signal: AbortSignal) => Promise<void>} */
 const aborted = (signal) => new Promise((resolve) => (signal.aborted ? resolve() : signal.addEventListener("abort", () => resolve(), { once: true })));
 
 async function runBatch(me, b) {

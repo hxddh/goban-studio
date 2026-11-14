@@ -152,11 +152,25 @@ function closeToast(id, reason) {
   return true;
 }
 
+/**
+ * @typedef {object} ToastOptions
+ * @property {string} [key]
+ * @property {boolean} [replace]
+ * @property {{ label: string, run: () => any }} [action]
+ * @property {(reason: string) => void} [onClose]
+ */
+/**
+ * @param {any} message
+ * @param {string} [tone]
+ * @param {number | ToastOptions} [ms]
+ * @param {ToastOptions} [opts]
+ */
 export function toast(message, tone = "info", ms = 0, opts = {}) {
   if (ms && typeof ms === "object") {
     opts = ms;
     ms = 0;
   }
+  const wait = typeof ms === "number" ? ms : 0;
   const { key = null, replace = false, action = null, onClose = null } = opts || {};
   const kind = tone === "warn" ? "warning" : TOAST_TONES.includes(tone) ? tone : "info";
   if (key) {
@@ -166,7 +180,7 @@ export function toast(message, tone = "info", ms = 0, opts = {}) {
   }
   const id = ++toastId;
   const act = action && typeof action.run === "function" && action.label ? { label: String(action.label), run: action.run } : null;
-  toastLife.set(id, { timer: 0, left: toastDuration(message, { tone: kind, action: act, ms }), since: 0, onClose });
+  toastLife.set(id, { timer: 0, left: toastDuration(message, { tone: kind, action: act, ms: wait }), since: 0, onClose });
   update((s) => {
     s.toasts = [...s.toasts, { id, message, tone: kind, key, action: act }];
   });

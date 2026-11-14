@@ -185,6 +185,8 @@ function opponentFor(profile, size, modeOf) {
  * `rank` is the opponent's measured rank (its label); `quick` is the same
  * on 9×9, offered beside the standard board. `modeOf(level)` says which
  * mode each level is played in on this machine (standard by default).
+ * @param {any} profile
+ * @param {{ size?: number, modeOf?: (level: any) => string }} [opts]
  */
 export function suggestedGame(profile, { size = 19, modeOf = () => "standard" } = {}) {
   const p = normalizeProfile(profile);

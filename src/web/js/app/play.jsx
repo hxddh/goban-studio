@@ -171,7 +171,7 @@ function FocusTools() {
 function PassAsk({ float = false }) {
   const ref = useRef(null);
   useEffect(() => {
-    const prev = document.activeElement;
+    const prev = /** @type {HTMLElement | null} */ (document.activeElement);
     ref.current?.querySelector(".btn.primary")?.focus({ preventScroll: true });
     return () => {
       if (prev?.isConnected) prev.focus?.({ preventScroll: true });
@@ -259,7 +259,7 @@ function EvalBar() {
   const b = Math.round(e.winrate * 100);
   const lead = e.scoreLead;
   return (
-    <div class="eval-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={b} aria-label={t("play.evalLabel")}>
+    <div class="eval-bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={b} aria-label={t("play.evalLabel")}>
       <div class="eval-track">
         <i style={{ width: `${b}%` }} />
       </div>

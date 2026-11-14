@@ -69,6 +69,15 @@ export function suggestHandicap(playerRank, opponentRank, size) {
  */
 export { LANES } from "./scheduler.js";
 export const sched = scheduler;
+
+/**
+ * @typedef {object} SearchOptions
+ * @property {AbortSignal} [signal] aborted when the result is no longer wanted
+ * @property {string} [lane] the scheduler lane (scheduler.js LANES)
+ * @property {any} [node] the position searched (default: the game's current node)
+ * @property {number} [visits] the search budget
+ * @property {(info: any) => void} [onInfo] partial results of a live search
+ */
 /**
  * One queued search as { analysis, cancelled }. `cancelled` is true when
  * the search was stopped (its signal, cancel(), quitting) rather than
@@ -140,6 +149,7 @@ function strongAnswered() {
   strongFailures = 0;
 }
 
+/** @param {{ strong?: boolean, human?: boolean }} [installed] */
 export function setModels({ strong, human } = {}) {
   if (strong !== undefined) {
     if (strong && !models.strong) strongFailures = 0;
@@ -186,6 +196,8 @@ export function opponentFor(rank) {
  * The implementation that plays an opponent `{ rank, impl }` (or a bare
  * rank) with `inst`: its own implementation while that can play, else
  * what plays its rank.
+ * @param {any} opp
+ * @param {{ human?: boolean, strong?: boolean }} [inst]
  */
 export function resolveOpponent(opp, inst = installed()) {
   const o = opp && typeof opp === "object" ? opp : { rank: opp };
@@ -373,6 +385,9 @@ export function humanRequest(human) {
  * the move back, started another game) ends the decision there: the result
  * has no move and `cancelled: true`. Nothing else is searched and the
  * offline engine is not asked, because the position is no longer wanted.
+ * @param {any} game
+ * @param {any} opponent
+ * @param {SearchOptions} [opts]
  */
 export async function decide(game, opponent, { signal, lane = "move", node = game.current } = {}) {
   const inst = installed();
@@ -416,12 +431,21 @@ export async function offlineMove(game, opponent) {
   return chooseLocal(game, { level: std?.level?.local ?? 3, color: game.turn });
 }
 
-/** A quick look at the position (for teaching mode and the eval bar): pondering. */
+/**
+ * A quick look at the position (for teaching mode and the eval bar): pondering.
+ * @param {any} game
+ * @param {SearchOptions} [opts]
+ */
 export async function evaluate(game, { node = game.current, visits = 48, signal, lane = "live" } = {}) {
   return analysisQ(game, { node, visits, signal, lane });
 }
 
-/** Live analysis of the position on screen (review, explorer), with partial results. */
+/**
+ * Live analysis of the position on screen (review, explorer), with partial results.
+ * @param {any} game
+ * @param {any} node
+ * @param {SearchOptions} [opts]
+ */
 export async function live(game, node, { visits = 240, onInfo, signal, lane = "interactive" } = {}) {
   return analysisQ(game, { node, visits, onInfo, signal, lane });
 }
@@ -445,7 +469,11 @@ export async function chooseMove(game, opponent, opts = {}) {
   return chooseLocal(game, { level: std.level.local, color: game.turn });
 }
 
-/** The engine's suggestion for the side to move, with a short line (the player waits on it). */
+/**
+ * The engine's suggestion for the side to move, with a short line (the player waits on it).
+ * @param {any} game
+ * @param {SearchOptions} [opts]
+ */
 export async function hint(game, { signal, lane = "move", node = game.current } = {}) {
   // The position asked about, fixed now (a queued search would otherwise read the board when it runs).
   const { analysis, cancelled } = await analysisR(game, { node, visits: 200, signal, lane });
@@ -462,6 +490,10 @@ export async function hint(game, { signal, lane = "move", node = game.current } 
 /**
  * Review data for one position: Black-POV win rate and score lead, and the
  * best move with its line. `visits` trades accuracy for speed.
+ * @param {any} game
+ * @param {any} node
+ * @param {number} [visits]
+ * @param {SearchOptions} [opts]
  */
 export async function analyzeNode(game, node, visits = 48, { signal, lane = "background" } = {}) {
   const a = await analysisQ(game, { node, visits, signal, lane });
@@ -494,6 +526,8 @@ export function estimateNode(game, node) {
  * Dead stones at the end of the game, from KataGo's ownership. A stone is
  * dead when the area under it clearly belongs to the other colour. Returns
  * [] when the engine is unavailable; the player marks stones by hand then.
+ * @param {any} game
+ * @param {SearchOptions} [opts]
  */
 export async function deadStones(game, { signal, lane = "interactive", node = game.current } = {}) {
   const a = await analysisQ(game, { node, visits: 160, signal, lane });

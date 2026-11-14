@@ -138,6 +138,7 @@ async function writeSnapshot(store, now = Date.now()) {
  * also `snapshot` (its prefix) and `written` (false when a write failed:
  * the store's onError has said which). `{ ok: false, error: "snapshot" }`
  * when the snapshot could not be written (nothing was replaced).
+ * @returns {Promise<{ ok: boolean, error?: string, key?: string, summary?: any, snapshot?: string, written?: boolean }>}
  */
 export async function importBackup(store, doc, { now = Date.now() } = {}) {
   const c = checkBackup(doc);

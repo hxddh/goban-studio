@@ -282,7 +282,7 @@ function puzzleModel(P, extra = {}) {
   };
 }
 
-function ProblemFeedback({ P, success }) {
+function ProblemFeedback({ P, success = null }) {
   const counting = P.pz.counting;
   if (P.feedback === "solved" && counting) return <p class="feedback good">{t(C.feedbackKey(P), C.endgameArgs(P))}</p>;
   if (P.answer) return <p class="feedback info">{counting && P.pz.ask === "value" ? t(P.pz.value === 1 ? "practice.endgame.valueAnswerOne" : "practice.endgame.valueAnswer", C.endgameArgs(P)) : t("practice.answerShown")}</p>;
@@ -316,7 +316,7 @@ function ValueChoices({ P }) {
   );
 }
 
-function ProblemControls({ P, onNext, nextLabel }) {
+function ProblemControls({ P, onNext = null, nextLabel = null }) {
   const value = P.pz.counting && P.pz.ask === "value";
   if (value) {
     const done = P.status === "won" || !!P.answer;
@@ -528,7 +528,7 @@ function LessonStep({ L }) {
           <span class="eyebrow">{C.tx(L.unit.title)}</span>
           <h1>{C.tx(L.lesson.title)}</h1>
         </div>
-        <div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax={steps.length} aria-valuenow={L.index + 1} aria-label={t("practice.stepOf", [L.index + 1, steps.length])}>
+        <div class="steps" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={L.index + 1} aria-label={t("practice.stepOf", [L.index + 1, steps.length])}>
           {steps.map((_, i) => (
             <i class={i < L.index ? "done" : i === L.index ? "on" : ""} />
           ))}

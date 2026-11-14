@@ -320,6 +320,8 @@ export async function loadGame(id) {
  * the rest of the options go to its meta. `keepPlace` keeps an edited game
  * where it is in the history instead of moving it to the top. `finishedAt`
  * is set the first time a game is saved with a result.
+ * @param {any} game
+ * @param {{ id?: string, name?: string, source?: string, keepPlace?: boolean, [meta: string]: any }} [opts]
  */
 export function saveGame(game, { id = null, name = "", source = "game", keepPlace = false, ...meta } = {}) {
   const now = Date.now();

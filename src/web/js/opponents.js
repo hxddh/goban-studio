@@ -141,6 +141,7 @@ const level = (id) => {
  * `HL:`, `CH:` and `LS:`, which does not). `level` is what engine.js plays: a standard level's fields,
  * plus `human` or `strong` for those kinds.
  */
+/** @type {{ id: string, kind: string, level: any, theta: Record<number, number>, gor: number[] }[]} */
 export const IMPLS = [
   // standard levels and the bridges between them (`C:bNN` is the
   // 8-visit base level with blunder 0.NN; C:b40 was also measured on 13×13)

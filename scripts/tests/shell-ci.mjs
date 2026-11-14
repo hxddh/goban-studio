@@ -371,11 +371,16 @@ await test("ci: pull requests run the static checks before the tests, with exact
   assert.ok(at("npm run lint") > at("npm ci --ignore-scripts") && at("npm run lint") < at("npm test"), `lint runs after the install and before the tests: ${sh.join(" | ")}`);
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   assert.equal(pkg.scripts.lint, "eslint . --max-warnings 0");
-  assert.match(pkg.scripts.verify, /^npm run lint && npm test/, "npm run verify lints first");
-  for (const dep of ["eslint", "eslint-plugin-react-hooks", "globals"]) assert.match(pkg.devDependencies[dep], /^\d+\.\d+\.\d+$/, `${dep} is pinned to one version`);
+  assert.match(pkg.scripts.verify, /^npm run lint && npm run typecheck && npm test/, "npm run verify lints and checks types first");
+  assert.ok(at("npm run typecheck") > at("npm run lint") && at("npm run typecheck") < at("npm test"), "types are checked after the lint, before the tests");
+  assert.equal(pkg.scripts.typecheck, "tsc --noEmit -p jsconfig.json");
+  const jsconfig = JSON.parse(fs.readFileSync(path.join(root, "jsconfig.json"), "utf8"));
+  assert.equal(jsconfig.compilerOptions.checkJs, true, "the JS itself is checked");
+  assert.deepEqual(jsconfig.exclude, ["src/web/js/bundle.js", "src/web/js/content-lazy"], "only generated files are left out");
+  for (const dep of ["eslint", "eslint-plugin-react-hooks", "globals", "typescript"]) assert.match(pkg.devDependencies[dep], /^\d+\.\d+\.\d+$/, `${dep} is pinned to one version`);
   // The config checks what it says (a rule dropped by mistake would pass everything).
   const config = fs.readFileSync(path.join(root, "eslint.config.js"), "utf8");
-  for (const rule of ["no-undef", "no-unused-vars", "no-redeclare", "no-dupe-keys", "no-unreachable", "no-const-assign", "no-import-assign", "no-self-assign", "eqeqeq", "react-hooks/rules-of-hooks"]) assert.ok(config.includes(`"${rule}"`) || config.includes(`${rule}:`), rule);
+  for (const rule of ["no-undef", "no-unused-vars", "no-redeclare", "no-dupe-keys", "no-unreachable", "no-const-assign", "no-import-assign", "no-self-assign", "eqeqeq", "react-hooks/rules-of-hooks", "react-hooks/exhaustive-deps"]) assert.ok(config.includes(`"${rule}"`) || config.includes(`${rule}:`), rule);
   assert.match(config, /reportUnusedDisableDirectives: "error"/);
 });
 

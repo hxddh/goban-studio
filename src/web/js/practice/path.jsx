@@ -143,7 +143,7 @@ function PlacementOffer() {
         <p class="muted">{t("placement.leadRange", [PLACEMENT.MIN, PLACEMENT.MAX])}</p>
       </div>
       <div class="hero-actions">
-        <Button kind="primary" onClick={C.startPlacement}>
+        <Button kind="primary" onClick={() => C.startPlacement()}>
           {t("placement.start")}
         </Button>
         <button type="button" class="link" onClick={C.skipPlacement}>

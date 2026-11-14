@@ -26,6 +26,7 @@ function fileName(key) {
   return key;
 }
 
+/** @param {{ title: any, children?: any, actions?: any }} props */
 function Screen({ title, children, actions }) {
   const ref = useRef(null);
   useEffect(() => {

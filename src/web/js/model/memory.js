@@ -164,6 +164,7 @@ export function migrateReview(e) {
  */
 export function migrateProblemRecord(e) {
   if (!obj(e)) return null;
+  /** @type {Record<string, any>} */
   const out = { ...migrateReview(e), solved: e.solved === true, clean: e.clean === true, last: num(e.last, 0) };
   if (Number.isFinite(e.solvedAt)) out.solvedAt = e.solvedAt;
   if (e.first === "clean" || e.first === "miss") out.first = e.first;

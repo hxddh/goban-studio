@@ -50,6 +50,7 @@ export function Icon({ name, size = 18 }) {
   );
 }
 
+/** @param {{ kind?: string, icon?: string, children?: any, onClick?: (e: MouseEvent) => any, disabled?: boolean, title?: string, size?: string, class?: string, [attr: string]: any }} props */
 export function Button({ kind = "secondary", icon, children, onClick, disabled, title, size, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`btn ${kind} ${size || ""} ${cls}`} onClick={onClick} disabled={disabled} title={title} aria-label={title || undefined} {...rest}>
@@ -59,6 +60,7 @@ export function Button({ kind = "secondary", icon, children, onClick, disabled, 
   );
 }
 
+/** @param {{ icon: string, label: string, onClick?: (e: MouseEvent) => any, disabled?: boolean, active?: boolean, size?: number, class?: string, [attr: string]: any }} props */
 export function IconButton({ icon, label, onClick, disabled, active, size = 18, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`icon-btn ${active ? "on" : ""} ${cls}`} onClick={onClick} disabled={disabled} title={label} aria-label={label} aria-pressed={active === undefined ? undefined : !!active} {...rest}>
@@ -138,6 +140,7 @@ export function Loading({ label }) {
  * The one error surface: what happened in a sentence, and what to do.
  * `actions`: [{ label, onClick, primary }]. `compact`: the inline size (a
  * section that could not load), without the icon and the card's padding.
+ * @param {{ title?: any, body?: any, actions?: { label: any, onClick: () => any, primary?: boolean }[], compact?: boolean, [attr: string]: any }} props
  */
 export function ErrorCard({ title, body, actions = [], compact = false, ...rest }) {
   return (
@@ -213,6 +216,7 @@ export function Async({ state: s, label, error, children }) {
  * `text`, a quiet button that says the choice in force (an order). An item
  * with `checked` (true or false) is one of a set of choices and shows a
  * check when it is the one.
+ * @param {{ id: string, items: any[], label?: string, icon?: string, text?: any }} props
  */
 export function MoreMenu({ id, items, label, icon = "more", text = null }) {
   const open = state.menu === id;
@@ -300,6 +304,7 @@ export const SHIFT = isMac ? "⇧" : "Shift+";
 /**
  * The board. `model` is a BoardView model patch; the canvas is created once
  * and updated in place.
+ * @param {{ model: any, onPlay?: (x: number, y: number) => any, onHover?: (v: any) => any, label?: string }} props
  */
 export function Board({ model, onPlay, onHover, label }) {
   const canvas = useRef(null);

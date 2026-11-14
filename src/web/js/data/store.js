@@ -110,7 +110,11 @@ async function pool(items, n, fn) {
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
 }
 
-/** The key a damaged file's copy goes to: `bad/<key without .json>-<time>.json`. */
+/**
+ * The key a damaged file's copy goes to: `bad/<key without .json>-<time>.json`.
+ * @param {string} key
+ * @param {number | string} [now]
+ */
 export function badKey(key, now = Date.now()) {
   const base = key.slice(0, -5);
   const out = `${BAD_PREFIX}${base}-${now}.json`;

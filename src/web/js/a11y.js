@@ -90,6 +90,7 @@ export function moveText({ color, x = null, y = null, pass = false, captured = 0
 /**
  * Stepping through a game in review: "Move 12, Black D4, loses about 3.5
  * points". `loss` (points, from the analysis) is left out when unknown.
+ * @param {{ number: number, move?: any, size?: number, captured?: number, loss?: number }} step
  */
 export function reviewMoveText({ number, move, size, captured = 0, loss = null }) {
   if (!number || !move) return t("a11y.start");

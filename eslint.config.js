@@ -44,8 +44,7 @@ export default [
       ecmaVersion: "latest",
       sourceType: "module",
       parserOptions: { ecmaFeatures: { jsx: true } },
-      // webkitAudioContext: Safari's older name for AudioContext (audio.js checks for it).
-      globals: { ...globals.browser, webkitAudioContext: "readonly" },
+      globals: globals.browser,
     },
     plugins: { "react-hooks": reactHooks },
     // Hooks: called in order, and every effect lists what it reads, so it

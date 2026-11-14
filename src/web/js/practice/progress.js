@@ -41,6 +41,8 @@ export const cleanFirst = (e) => !!e && e.solved === true && e.first === "clean"
  * plays the items, not the rows.
  *   → [{ kind, role, why, theme, items: [item…] }]
  * `themeOf(item)` names a problem's theme (null: never merged).
+ * @param {any[]} [items]
+ * @param {(item: any) => any} [themeOf]
  */
 export function groupPath(items = [], themeOf = () => null) {
   const rows = [];

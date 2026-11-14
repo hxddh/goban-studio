@@ -11,11 +11,12 @@ import { IconButton } from "./parts.jsx";
  * The frame of a sheet. `onClose` is what its close button and a click
  * outside do; `onEscape` (a sheet opened from another sheet) is what Esc
  * does instead of closing every sheet.
+ * @param {{ title?: any, children?: any, footer?: any, wide?: boolean, onClose?: () => any, onEscape?: () => any, labelledBy?: string, class?: string }} props
  */
 export function Modal({ title, children, footer, wide, onClose = C.closeSheet, onEscape, labelledBy, class: cls = "" }) {
   const ref = useRef(null);
   useEffect(() => {
-    const prev = document.activeElement;
+    const prev = /** @type {HTMLElement | null} */ (document.activeElement);
     // Focus the intended control, or the sheet itself (no stray focus ring
     // on the close button when nothing is primary).
     const first = ref.current?.querySelector("[data-autofocus]") || ref.current?.querySelector("button.primary") || ref.current;

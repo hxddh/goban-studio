@@ -7,6 +7,7 @@
  * not import the modules that open them. Without a listener a call does
  * nothing: a problem opened on its own is just a problem.
  */
+/** @type {(...args: any[]) => void} */
 const nothing = () => {};
 
 export const flow = {

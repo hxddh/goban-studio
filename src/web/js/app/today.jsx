@@ -76,7 +76,7 @@ function TodayList() {
   let row;
   if (C.placementOffered()) {
     row = (
-      <button type="button" class="group-row today-row" data-row="placement" onClick={C.startPlacement}>
+      <button type="button" class="group-row today-row" data-row="placement" onClick={() => C.startPlacement()}>
         <span class="gr-icon">
           <Icon name="target" size={18} />
         </span>

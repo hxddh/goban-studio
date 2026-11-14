@@ -54,8 +54,10 @@ const PLAYER_RANKS = [-8, 30];
 /** Capture Go games won: a count, kept to a sane size. */
 const MAX_COUNT = 1e6;
 
+/** @type {(v: number, range: number[]) => number} */
 const clampInt = (v, [lo, hi]) => Math.max(lo, Math.min(hi, Math.round(v)));
 
+/** @type {Record<string, any[]>} */
 const ONE_OF = {
   appearance: ["auto", "light", "dark"],
   boardSize: [9, 13, 19],

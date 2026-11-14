@@ -113,6 +113,7 @@ export function Sidebar() {
  * The toolbar. `crumbs` are links back up the hierarchy; `title` is the
  * current place (list pages leave it out and show a large title instead);
  * children are the actions, right-aligned — at most one primary.
+ * @param {{ crumbs?: { label: any, onClick?: () => any }[], title?: any, titleLang?: string, sub?: any, children?: any, class?: string }} props
  */
 export function Toolbar({ crumbs = [], title, titleLang = null, sub, children, class: cls = "" }) {
   return (

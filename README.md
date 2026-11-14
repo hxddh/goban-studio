@@ -216,6 +216,7 @@ offline engine.
 
 ```bash
 npm run lint           # ESLint, no warnings allowed
+npm run typecheck      # TypeScript over the JS (jsconfig.json)
 npm test               # unit and data tests, Node only
 npm run release-check  # content counts, four languages, pins, one version
 npm run build && npm run sync && npm run ui-test   # real Chromium

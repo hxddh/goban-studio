@@ -89,7 +89,7 @@ export function Toasts() {
       role="region"
       aria-label={t("toast.region")}
       onFocusIn={pauseToasts}
-      onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget) && resumeToasts()}
+      onFocusOut={(e) => !e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget)) && resumeToasts()}
     >
       {state.toasts.map((x) => (
         <Toast x={x} key={x.id} />

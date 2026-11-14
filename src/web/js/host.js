@@ -515,8 +515,9 @@ export async function setupChrome() {
   // buttons keep their clicks.
   document.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    if (!e.target.closest?.("[data-drag]")) return;
-    if (e.target.closest("button, a, input, select, textarea, canvas")) return;
+    const target = /** @type {Element} */ (e.target);
+    if (!target.closest?.("[data-drag]")) return;
+    if (target.closest("button, a, input, select, textarea, canvas")) return;
     windowDrag();
   });
 }

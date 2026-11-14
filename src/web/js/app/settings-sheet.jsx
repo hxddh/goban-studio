@@ -381,7 +381,7 @@ function ModelRow({ kind, one }) {
         <span class="fine">{t(`models.${kind}.desc`, [mb])}</span>
         {line && <span class={`model-status ${st}`} aria-live="polite">{line}</span>}
         {busy && (
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Models.percent(one)}>
+          <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Models.percent(one)}>
             <i style={{ width: `${Models.percent(one)}%` }} />
           </div>
         )}
@@ -445,7 +445,7 @@ function UpdateRow() {
       </div>
       {st === "downloading" && (
         <div class="update-progress">
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round((u.progress || 0) * 100)}>
+          <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((u.progress || 0) * 100)}>
             <i style={{ width: `${Math.round((u.progress || 0) * 100)}%` }} />
           </div>
           {u.total > 0 && <span class="fine">{t("update.progress", [U.formatBytes(u.received || 0), U.formatBytes(u.total)])}</span>}
