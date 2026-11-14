@@ -33,7 +33,7 @@
  *                                  search was stopped by its signal, by
  *                                  cancelLanes or by cancelAll.
  *   ownerSignal(owner)             the signal of a named owner ("game:3",
- *                                  "review:2", "reports", …). Everything
+ *                                  from newOwner, or "reports", …). Everything
  *                                  started with it stops on cancelOwner.
  *   startJob({ kind, owner, … })   a tracked piece of background work with
  *                                  progress and a cancel, shown in Settings →
@@ -205,19 +205,26 @@ export function createScheduler() {
   /**
    * A fresh owner name with a prefix ("game" → "game:4"). Unlike a fixed
    * name ("reports"), it stays cancelled: work it starts afterwards (a late
-   * callback of a game that was replaced) never runs.
+   * callback of a game that was replaced) never runs. Its entry is dropped
+   * when it is cancelled; the name's number, below the next one, is what
+   * keeps it cancelled (fixed names do not end in ":<number>").
    */
-  const unique = new Set();
+  const retired = AbortSignal.abort("cancelled");
   function newOwner(prefix = "owner") {
     const name = `${prefix}:${++nextOwner}`;
-    unique.add(name);
+    owners.set(name, new AbortController());
     return name;
   }
+  const madeHere = (owner) => {
+    const m = /:(\d+)$/.exec(owner);
+    return !!m && Number(m[1]) >= 1 && Number(m[1]) <= nextOwner;
+  };
 
   function ownerSignal(owner) {
     if (!owner) return null;
     let ctl = owners.get(owner);
     if (!ctl) {
+      if (madeHere(owner)) return retired;
       ctl = new AbortController();
       owners.set(owner, ctl);
     }
@@ -227,11 +234,6 @@ export function createScheduler() {
   /** Cancel everything `owner` started; a fixed name can be used again afterwards. */
   function cancelOwner(owner, reason = "cancelled") {
     if (!owner) return;
-    if (unique.has(owner)) {
-      const sig = ownerSignal(owner);
-      if (!sig.aborted) owners.get(owner).abort(reason);
-      return;
-    }
     const ctl = owners.get(owner);
     if (!ctl) return;
     owners.delete(owner);
@@ -316,6 +318,7 @@ export function createScheduler() {
       running: running ? LANES[running.lane] : null,
       queued: Object.fromEntries(LANES.map((l, i) => [l, queues[i].length])),
       preemptions,
+      owners: owners.size,
     };
   }
 
