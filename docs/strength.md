@@ -34,6 +34,12 @@ opponent axis" below). The IDs below remain the names of calibrated
 settings (`L:<id>`, `HL:<id>`, `LS:<id>` in the calibration); nothing
 saved refers to them any more.
 
+v15 replaces the optional stronger network (g170e-b15c192, 2020) with
+kata1-b18c384nbt-s9996604416. The top opponent setting that uses it
+(`LS:2d`) and the analysis budget (`STRONG_VISIT_SCALE`) were measured with
+the old network and **have not been measured again yet** ("v15: a new
+stronger network, not yet measured" below).
+
 | ID | Label shown | visits | temp | maxLoss | slip | blunder | θ (nats, 95% CI) | EGF GoR (95% CI) | Measured rank (95% CI) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `30k` | ≈30 kyu | 8 | 2 | 40 | 0.3 | 1 | 0 (reference) | −1272 (−2154 to −933) | 34k (43k–30k) |
@@ -1318,6 +1324,40 @@ evaluation extends the watchdog's deadline by 20 s, and an abort cancels
 the request by its id. `humanPolicy` is reported only while the human
 model is installed; until then nothing is shown and the estimate is
 unchanged.
+
+## v15: a new stronger network, not yet measured
+
+The optional "stronger analysis" download is now
+`kata1-b18c384nbt-s9996604416-d4316597426` (98 MB, from
+`media.katagotraining.org`, `src/models.zig`) instead of
+`g170e-b15c192-s1672170752-d466197061` (48 MB). It is used for:
+
+- the top opponent setting, `LS:2d` (`opponents.js`): the `2d` level's
+  search on the stronger network (64 visits) instead of 160 visits on
+  b6c96;
+- analysis, review, hints and counting, at `STRONG_VISIT_SCALE` (0.5) of
+  the visits asked of b6c96.
+
+Nothing here has been measured with the new network. `LS:2d`'s θ and label
+in `MEASURED.strong` are b15c192's; with a much stronger network at the
+same visits the label is, if anything, a lower bound, the same reading v5
+gave the old network. The cost per visit is the open question: the new
+network is about five times b15c192's size (18 blocks × 384 channels against
+15 × 192), so on a CPU each visit costs several times more, and v5 rejected
+b20c256 at 4.9 visits/s on the test VM as too slow for a laptop. It is
+expected to be much faster with the Metal build on Apple Silicon and the
+AVX2 build on Windows (v15), but that too is unmeasured.
+
+To do before the labels or the budget are trusted again, with the
+calibration workflow (`.github/workflows/calibrate.yml`, which downloads
+the networks pinned in `src/models.zig` and now points
+`KATAGO_STRONG_MODEL` at the new file):
+
+1. `calibrate-strength.mjs` with `LS:2d` against `L:2d` and the anchor,
+   19×19 and 9×9, to place `LS:2d` again (and consider fewer visits);
+2. KataGo `benchmark` with the new network on the runner, to set
+   `STRONG_VISIT_SCALE` so that a full-game review takes no longer than it
+   did with b15c192.
 
 ## Limitations
 

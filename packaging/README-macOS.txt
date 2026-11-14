@@ -75,7 +75,9 @@ Licences
 --------
 Open the app's Contents/Resources/frontend/dist/licenses/ folder
 (right-click the app > Show Package Contents). Goban Studio is MIT
-licensed; KataGo, Moka and @sabaki/go-board are also MIT; Inter is under
-the SIL Open Font License 1.1.
+licensed; KataGo, Moka and @sabaki/go-board are also MIT; the built-in
+KataGo network is CC0, and the optional networks downloaded in Settings are
+under the KataGo Neural Network License (KataGo-networks.txt); Inter is
+under the SIL Open Font License 1.1.
 
 The SHA256SUMS file in the GitHub release lets you verify the download.

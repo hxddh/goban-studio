@@ -224,8 +224,8 @@ jobs:
           path: windows-app.png
           if-no-files-found: ignore
       - name: self-test the packaged app
-        # v5: includes the optional downloads end to end (pinned KataGo
-        # release assets, 99 MB + 48 MB, into a temporary folder; see
+        # v5: includes the optional downloads end to end (the pinned
+        # KataGo files, 99 MB + 98 MB, into a temporary folder; see
         # scripts/selftest-app.mjs). GOBAN_SELFTEST_MODELS=0 skips them.
         timeout-minutes: 10
         env:

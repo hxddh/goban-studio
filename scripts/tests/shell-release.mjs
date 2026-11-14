@@ -513,7 +513,7 @@ await test("model status replies normalize; the browser preview is unavailable",
   const raw = {
     available: true,
     human: { status: "downloading", bytes: 49_533_115, total: 99_066_230, idleMs: 31_000, needed: 0, name: "b18c384nbt-humanv0", error: "" },
-    strong: { status: "failed", bytes: 0, total: 48_038_914, idleMs: 0, needed: 112_000_000, name: "g170e", error: "DiskFull" },
+    strong: { status: "failed", bytes: 0, total: 97_898_094, idleMs: 0, needed: 112_000_000, name: "kata1-b18c384nbt", error: "DiskFull" },
   };
   const st = M.normalizeStatus(raw);
   assert.equal(st.available, true);
@@ -571,21 +571,27 @@ await test("model actions name a kind only, and report what changed", async () =
   assert.equal(M.megabytes(9_500_000), "9.5");
 });
 
-await test("the downloader fetches only pinned KataGo release files, verified before use", () => {
+await test("the downloader fetches only pinned KataGo files, verified before use", () => {
   const zig = fs.readFileSync(path.join(root, "src/models.zig"), "utf8").replace(/\r\n/g, "\n");
   const urls = [...zig.matchAll(/\.url = "([^"]+)"/g)].map((m) => m[1]);
   // No other address is ever built: every http(s) literal outside the specs is a test value.
   assert.equal([...zig.slice(0, zig.indexOf("// ------------------------------------------------------------------ tests")).matchAll(/"https?:\/\//g)].length, 2);
   assert.deepEqual(urls, [
     "https://github.com/lightvector/KataGo/releases/download/v1.15.0/b18c384nbt-humanv0.bin.gz",
-    "https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz",
+    "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
   ]);
   assert.match(zig, /\.sha256 = "637746e44f0efe00ad1245a50aa9bbf0716efe364c43965ead97bd6835d84ab5"/);
-  assert.match(zig, /\.sha256 = "09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967"/);
+  assert.match(zig, /\.sha256 = "9d7a6afed8ff5b74894727e156f04f0cd36060a24824892008fbb6e0cba51f1d"/);
   assert.match(zig, /\.size = 99_066_230/);
-  assert.match(zig, /\.size = 48_038_914/);
+  assert.match(zig, /\.size = 97_898_094/);
   assert.equal(M.MODELS.human.bytes, 99_066_230);
-  assert.equal(M.MODELS.strong.bytes, 48_038_914);
+  assert.equal(M.MODELS.strong.bytes, 97_898_094);
+  // Two hosts: GitHub for the human model, KataGo's network server for the
+  // strong one; a redirect may reach nothing else, and an update never
+  // reaches KataGo's server (net.zig github_hosts).
+  assert.match(zig, /pub const download_hosts = net\.github_hosts \+\+ \[_\]\[\]const u8\{katago_network_host\};/);
+  assert.match(zig, /const katago_network_host = "media\.katagotraining\.org";/);
+  assert.match(zig, /\.redirect_hosts = &download_hosts,/);
   // Only the verified file is renamed into place, inside the models folder.
   assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
   assert.match(zig, /renameAbsolute\(part, final/);

@@ -21,15 +21,21 @@ Only the latest release is supported. There are no older branches.
 - **Nothing, by default.** Games, lessons, problems, analysis and the
   opponent all run on your computer. There is no account, telemetry or
   analytics.
-- **GitHub releases, when you ask.** *Check for updates*, *Download and
-  install*, and the optional KataGo networks fetch files from
-  `github.com` release downloads only. The addresses are fixed in the native
-  code (`src/install.zig`, `src/models.zig`): the page passes a release tag
-  or a network kind, never a URL, and redirects are followed only to
-  GitHub's own download hosts over HTTPS. If your system (or the
-  `HTTPS_PROXY` environment variable) names an HTTP proxy, these requests
-  go through it as a CONNECT tunnel: the proxy learns the host name, and
-  TLS is still verified end to end with GitHub (`src/net.zig`). Only
+- **GitHub releases and KataGo's network server, when you ask.** *Check
+  for updates* and *Download and install* fetch files from `github.com`
+  (the releases API and release downloads) only. Of the optional KataGo
+  networks, the human model comes from KataGo's GitHub releases and the
+  stronger network (kata1-b18c384nbt) from `media.katagotraining.org`,
+  KataGo's official network server; it is not published on GitHub. The
+  addresses are fixed in the native code (`src/install.zig`,
+  `src/models.zig`): the page passes a release tag or a network kind, never
+  a URL. Redirects are followed only over HTTPS, and only to GitHub's own
+  download hosts (updates) or to those and `media.katagotraining.org`
+  (networks); an update request can never be sent to KataGo's server. If
+  your system (or the `HTTPS_PROXY` environment variable) names an HTTP
+  proxy, these requests go through it as a CONNECT tunnel: the proxy learns
+  the host name, and TLS is still verified end to end with the server
+  (`src/net.zig`). Only
   plain HTTP proxies are used; SOCKS proxies and auto-config (PAC) scripts
   are not, and when no tunnel can be set up the request goes out directly.
 - **Files you choose.** SGF files and backups are read and written where

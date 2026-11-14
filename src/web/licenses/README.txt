@@ -8,7 +8,13 @@ components; their licence texts sit beside this file.
   @sabaki/go-board 1.4.3 — MIT — sabaki-go-board-MIT.txt
   Preact 10.29.8 — MIT — Preact-MIT.txt
   Moka v2.1 9×9 network and player — MIT — Moka-MIT.txt
-  KataGo 1.18.1 and the b6c96 network — MIT — KataGo-MIT.txt
+  KataGo 1.18.1 (the engine) — MIT — KataGo-MIT.txt
+  The built-in b6c96 network (KataGo's g170 run) — CC0 — KataGo-networks.txt
+
+The optional networks the app can download on request are not part of the
+package: KataGo's human model (b18c384nbt-humanv0) and the stronger network
+(kata1-b18c384nbt) are under the KataGo Neural Network License, whose
+copyright notice and text are in KataGo-networks.txt.
 
 The SGF opening positions are from the public-domain Go game collection at
 https://homepages.cwi.nl/~aeb/go/games/ and the historical records are

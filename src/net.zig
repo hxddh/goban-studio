@@ -15,8 +15,10 @@
 //!     tunnel can be set up (the proxy is not there, refuses, or the TLS
 //!     handshake through it fails) the request goes out directly, as every
 //!     request did before the app read proxy settings.
-//!   * One GET. `fetch` follows redirects by hand, only to GitHub's own
-//!     download hosts and only over HTTPS, and can continue a file that is
+//!   * One GET. `fetch` follows redirects by hand, only over HTTPS and only
+//!     to the hosts the request names (GitHub's own download hosts unless
+//!     the caller says otherwise: models.zig adds KataGo's network
+//!     server, nothing else does), and can continue a file that is
 //!     partly on disk with an HTTP Range request; when the server ignores
 //!     the range it starts over. The bytes go to a `Sink`, which is also
 //!     how a transfer is cancelled. `get` is the same for a small reply
@@ -36,7 +38,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 /// GitHub answers a release download with a redirect to one of these.
-const redirect_hosts = [_][]const u8{
+pub const github_hosts = [_][]const u8{
     "github.com",
     "objects.githubusercontent.com",
     "release-assets.githubusercontent.com",
@@ -44,22 +46,33 @@ const redirect_hosts = [_][]const u8{
 };
 pub const max_redirects = 5;
 
-/// A redirect target: HTTPS, no user info or port, host exactly one of
-/// GitHub's download hosts, printable ASCII without spaces.
-pub fn allowedRedirect(url: []const u8) bool {
+/// The host of an HTTPS address with a path: no user info or port,
+/// printable ASCII without spaces or backslashes. Null for anything else.
+pub fn httpsHost(url: []const u8) ?[]const u8 {
     const scheme = "https://";
-    if (url.len > 4096 or !std.mem.startsWith(u8, url, scheme)) return false;
+    if (url.len > 4096 or !std.mem.startsWith(u8, url, scheme)) return null;
     for (url) |c| {
-        if (c <= 0x20 or c >= 0x7f or c == '\\') return false;
+        if (c <= 0x20 or c >= 0x7f or c == '\\') return null;
     }
     const rest = url[scheme.len..];
     const end = std.mem.indexOfAny(u8, rest, "/?#") orelse rest.len;
-    const host = rest[0..end];
-    if (end == rest.len or rest[end] != '/') return false;
-    for (redirect_hosts) |allowed| {
+    if (end == rest.len or rest[end] != '/') return null;
+    return rest[0..end];
+}
+
+/// An HTTPS address whose host is exactly one of `hosts`.
+pub fn allowedUrl(url: []const u8, hosts: []const []const u8) bool {
+    const host = httpsHost(url) orelse return false;
+    for (hosts) |allowed| {
         if (std.mem.eql(u8, host, allowed)) return true;
     }
     return false;
+}
+
+/// A redirect target for an update request: HTTPS, host exactly one of
+/// GitHub's download hosts.
+pub fn allowedRedirect(url: []const u8) bool {
+    return allowedUrl(url, &github_hosts);
 }
 
 // ------------------------------------------------------------------ proxy
@@ -589,6 +602,8 @@ pub const Request = struct {
     expected_size: ?u64 = null,
     /// More than this is refused (`TooLarge`).
     max_bytes: u64,
+    /// The hosts a redirect may lead to (always over HTTPS).
+    redirect_hosts: []const []const u8 = &github_hosts,
 };
 
 pub const FetchError = error{
@@ -748,7 +763,7 @@ pub fn fetch(session: *Session, request: Request, sink: Sink, chunk: []u8) anyer
             hops += 1;
             if (hops > max_redirects) return error.BadRedirect;
             const target = exchange.location() orelse return error.BadRedirect;
-            if (!allowedRedirect(target)) return error.BadRedirect;
+            if (!allowedUrl(target, request.redirect_hosts)) return error.BadRedirect;
             const next = &bufs[hops % 2];
             @memcpy(next[0..target.len], target);
             url = next[0..target.len];
@@ -813,7 +828,7 @@ pub fn retryDelayMs(attempt: u32) i64 {
 
 const testing = std.testing;
 
-test "redirects only to GitHub's download hosts over HTTPS" {
+test "redirects only over HTTPS, only to the hosts a request names (GitHub by default)" {
     try testing.expect(allowedRedirect("https://release-assets.githubusercontent.com/github-production-release-asset/1/2?sp=r&sv=2018-11-09&sig=a%2Bb%3D"));
     try testing.expect(allowedRedirect("https://objects.githubusercontent.com/github-production-release-asset-2e65be/1/2?X-Amz-Algorithm=AWS4"));
     try testing.expect(allowedRedirect("https://github.com/hxddh/goban-studio/releases/download/v5.0.0/SHA256SUMS"));
@@ -826,6 +841,17 @@ test "redirects only to GitHub's download hosts over HTTPS" {
     try testing.expect(!allowedRedirect("https://github.com/a b"));
     try testing.expect(!allowedRedirect("/relative/path"));
     try testing.expect(!allowedRedirect("file:///etc/passwd"));
+    // KataGo's network server is not a GitHub host: an update request never
+    // follows a redirect there, a request that names it may.
+    try testing.expect(!allowedRedirect("https://media.katagotraining.org/uploaded/networks/models/kata1/x.bin.gz"));
+    const with_katago = [_][]const u8{ "github.com", "media.katagotraining.org" };
+    try testing.expect(allowedUrl("https://media.katagotraining.org/uploaded/networks/models/kata1/x.bin.gz", &with_katago));
+    try testing.expect(!allowedUrl("http://media.katagotraining.org/x", &with_katago));
+    try testing.expect(!allowedUrl("https://katagotraining.org/x", &with_katago));
+    try testing.expect(!allowedUrl("https://media.katagotraining.org.evil.example/x", &with_katago));
+    try testing.expect(!allowedUrl("https://objects.githubusercontent.com/x", &with_katago));
+    try testing.expectEqualStrings("github.com", httpsHost("https://github.com/x").?);
+    try testing.expect(httpsHost("https://github.com") == null);
 }
 
 test "the environment's proxy: HTTPS first, then ALL, unless NO_PROXY names the host" {
@@ -1148,8 +1174,45 @@ test "live (GOBAN_NET_LIVE=1): a release file arrives through the proxy, whole a
     }, none.sink(), &chunk));
     try testing.expectError(error.TooLarge, fetch(&session, .{ .url = url, .user_agent = agent, .max_bytes = 64 }, none.sink(), &chunk));
 
+    // KataGo's network server (models.zig, the strong network): its last
+    // 100 bytes, resumed from where a nearly finished download stopped.
+    {
+        const net_url = "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz";
+        const net_size: u64 = 97_898_094;
+        const hosts = github_hosts ++ [_][]const u8{"media.katagotraining.org"};
+        var katago: Session = undefined;
+        katago.init(testing.allocator, io, &env, "media.katagotraining.org");
+        defer katago.deinit();
+        // Counts what arrives after the first `base` bytes (already on disk).
+        const Tail = struct {
+            base: u64,
+            stored: u64 = 0,
+            restarts: usize = 0,
+            fn write(context: *anyopaque, bytes: []const u8, at: u64) anyerror!void {
+                const self: *@This() = @ptrCast(@alignCast(context));
+                if (at < self.base) return error.TooLarge;
+                self.stored = at + bytes.len - self.base;
+            }
+            fn restart(context: *anyopaque) anyerror!void {
+                const self: *@This() = @ptrCast(@alignCast(context));
+                self.restarts += 1;
+            }
+            fn progress(context: *anyopaque, received: u64, total: u64) bool {
+                _ = context;
+                _ = received;
+                _ = total;
+                return true;
+            }
+        };
+        var tail: Tail = .{ .base = net_size - 100 };
+        const got = try fetch(&katago, .{ .url = net_url, .user_agent = "GobanStudio-models", .offset = net_size - 100, .expected_size = net_size, .max_bytes = net_size, .redirect_hosts = &hosts }, .{ .context = &tail, .write = Tail.write, .restart = Tail.restart, .progress = Tail.progress }, &chunk);
+        try testing.expectEqual(net_size, got);
+        try testing.expectEqual(@as(u64, 100), tail.stored);
+        try testing.expectEqual(@as(usize, 0), tail.restarts);
+    }
+
     // The update check's document.
-    const big = try testing.allocator.alloc(u8, 512 * 1024);
+    const big =try testing.allocator.alloc(u8, 512 * 1024);
     defer testing.allocator.free(big);
     const reply = try get(&session, "https://api.github.com/repos/hxddh/goban-studio/releases/latest", "GobanStudio-update-check", &.{
         .{ .name = "accept", .value = "application/vnd.github+json" },

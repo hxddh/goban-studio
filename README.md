@@ -96,11 +96,14 @@ No account, no telemetry, and no network request unless you ask for one:
   release. The weekly automatic check is off until you turn it on.
 - **Download and install** fetches that release's package and its
   `SHA256SUMS` from GitHub.
-- **The optional KataGo networks** (Settings → Engines) are fetched from
-  KataGo's GitHub releases when you choose them.
+- **The optional KataGo networks** (Settings → Engines) are fetched when
+  you choose them: the human model from KataGo's GitHub releases, the
+  stronger network from KataGo's own network server,
+  `media.katagotraining.org`.
 
 The addresses are fixed in the native code, and redirects are followed
-only to GitHub's own download hosts over HTTPS. If your system, or the
+only over HTTPS: for updates only to GitHub's own download hosts, for the
+networks to those and `media.katagotraining.org`. If your system, or the
 `HTTPS_PROXY` variable, names an HTTP proxy, these requests go through it
 as a tunnel, with TLS still verified end to end. SOCKS proxies and proxy
 auto-config (PAC) scripts are not used. An interrupted download continues
@@ -184,8 +187,10 @@ is a model, not people. Method, results and limits:
 
 Two optional networks can be added in Settings → Engines, each pinned by
 address, size and SHA-256 and removable again: KataGo's human model
-(99 MB; the opponent then plays in a human style) and a larger network
-(48 MB; used for analysis, hints, counting and the strongest ranks).
+(99 MB; the opponent then plays in a human style) and a current strong
+network, kata1-b18c384nbt (98 MB; used for analysis, hints, counting and
+the strongest ranks; it is much larger than the built-in one, so analysis
+is slower on older computers).
 
 In the browser preview there is no KataGo: a small offline engine plays,
 and the interface says so where it matters.
@@ -317,5 +322,9 @@ Each version's notes are in [`.github/release-notes/`](.github/release-notes/).
 
 ## Licence
 
-MIT. KataGo, Moka and @sabaki/go-board are MIT; Inter is under the SIL
-Open Font License 1.1. The licences ship inside the app.
+MIT. KataGo, Moka and @sabaki/go-board are MIT; the built-in KataGo network
+(g170 b6c96) is CC0, and the optional networks (the human model and
+kata1-b18c384nbt) are under the
+[KataGo Neural Network License](https://katagotraining.org/network_license/)
+(`engine/model/LICENSE-KataGo-networks.txt`); Inter is under the SIL Open
+Font License 1.1. The licences ship inside the app.

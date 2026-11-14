@@ -62,6 +62,7 @@ for (const file of [
   "engine/model/model.txt.gz",
   "engine/model/gtp.cfg",
   "engine/model/LICENSE-KataGo.txt",
+  "engine/model/LICENSE-KataGo-networks.txt",
   "engine/model/version.txt",
   "src/macos_open.m",
   "src/web/licenses/README.txt",

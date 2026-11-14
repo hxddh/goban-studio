@@ -9,7 +9,8 @@
  * actually starts".
  *
  * The optional downloads are exercised too, end to end against the
- * pinned KataGo release URLs (human model 99 MB, stronger network 48 MB:
+ * pinned KataGo URLs (human model 99 MB from GitHub, stronger network 98 MB
+ * from media.katagotraining.org:
  * seconds on a GitHub-hosted runner), into a temporary models folder that
  * is deleted afterwards. GOBAN_SELFTEST_MODELS=0 skips them (offline runs).
  *

@@ -209,7 +209,12 @@ export const SHELL = {
     "이것들 없이도 오프라인으로 모두 쓸 수 있습니다. ‘다운로드’를 누르기 전에는 아무것도 받지 않습니다.",
     "これらがなくてもオフラインですべて使えます。「ダウンロード」を押すまで何も取得しません。",
   ),
-  "models.source": m("文件来自 KataGo 在 GitHub 的官方发布，使用前会核对校验值。", "Files come from KataGo's official GitHub releases and are verified before use.", "파일은 KataGo의 GitHub 공식 릴리스에서 받으며, 사용 전에 검사값을 확인합니다.", "ファイルは GitHub の KataGo 公式リリースから取得し、使う前にチェックサムを確認します。"),
+  "models.source": m(
+    "人类模型来自 KataGo 在 GitHub 的官方发布，更强的网络来自 KataGo 的官方网络站点 katagotraining.org。使用前都会核对校验值。",
+    "The human model comes from KataGo's official GitHub releases, the stronger network from KataGo's official network site, katagotraining.org. Both are verified before use.",
+    "인간 모델은 KataGo의 GitHub 공식 릴리스에서, 더 강한 네트워크는 KataGo 공식 네트워크 사이트 katagotraining.org에서 받습니다. 둘 다 사용 전에 검사값을 확인합니다.",
+    "人間モデルは GitHub の KataGo 公式リリースから、より強いネットワークは KataGo 公式のネットワークサイト katagotraining.org から取得します。どちらも使う前にチェックサムを確認します。",
+  ),
   "models.human.name": m("拟人对手", "Human-style opponent", "사람 같은 상대", "人間らしい相手"),
   "models.human.desc": m(
     "KataGo 的人类棋谱模型（{0} MB）。电脑对手会像同级别的人一样下棋：人的棋形，也有人的失误。",
@@ -219,10 +224,10 @@ export const SHELL = {
   ),
   "models.strong.name": m("更强的分析", "Stronger analysis", "더 강한 분석", "より強い解析"),
   "models.strong.desc": m(
-    "更大的 KataGo 网络（{0} MB），用于复盘、提示、数目和最高一级的对手。较旧的电脑上分析会变慢。",
-    "A larger KataGo network ({0} MB) for review, hints, counting and the strongest opponent level. Analysis is slower on older computers.",
-    "더 큰 KataGo 네트워크({0} MB). 복기, 힌트, 계가, 가장 강한 상대에 씁니다. 오래된 컴퓨터에서는 분석이 느려집니다.",
-    "より大きな KataGo ネットワーク（{0} MB）。検討、ヒント、整地、いちばん強い相手に使います。古いコンピュータでは解析が遅くなります。",
+    "KataGo 当前的强力网络之一（b18c384，{0} MB），用于复盘、提示、数目和最高一级的对手。它比内置网络大得多：较旧的电脑上分析会明显变慢。",
+    "One of KataGo's current strong networks (b18c384, {0} MB) for review, hints, counting and the strongest opponent level. It is much larger than the built-in one: analysis is noticeably slower on older computers.",
+    "KataGo의 현재 강한 네트워크 중 하나(b18c384, {0} MB). 복기, 힌트, 계가, 가장 강한 상대에 씁니다. 내장 네트워크보다 훨씬 커서 오래된 컴퓨터에서는 분석이 눈에 띄게 느려집니다.",
+    "KataGo の現行の強いネットワークの一つ（b18c384、{0} MB）。検討、ヒント、整地、いちばん強い相手に使います。内蔵のものよりずっと大きく、古いコンピュータでは解析がはっきり遅くなります。",
   ),
   "models.download": m("下载（{0} MB）", "Download ({0} MB)", "다운로드 ({0} MB)", "ダウンロード（{0} MB）"),
   "models.resume": m("继续下载", "Resume download", "다운로드 계속", "ダウンロードを再開"),

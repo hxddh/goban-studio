@@ -81,5 +81,7 @@ prompt). To remove it, delete these current-user registry keys:
 Licences
 --------
 See resources\frontend\dist\licenses\. Goban Studio is MIT licensed;
-KataGo, Moka and @sabaki/go-board are also MIT; Inter is under the SIL Open
-Font License 1.1.
+KataGo, Moka and @sabaki/go-board are also MIT; the built-in KataGo network
+is CC0, and the optional networks downloaded in Settings are under the
+KataGo Neural Network License (KataGo-networks.txt); Inter is under the SIL
+Open Font License 1.1.

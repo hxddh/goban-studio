@@ -68,6 +68,7 @@ const licenseSources = [
   [path.join(root, "node_modules", "preact", "LICENSE"), "Preact-MIT.txt"],
   [path.join(src, "moka", "LICENSE"), "Moka-MIT.txt"],
   [path.join(root, "engine", "model", "LICENSE-KataGo.txt"), "KataGo-MIT.txt"],
+  [path.join(root, "engine", "model", "LICENSE-KataGo-networks.txt"), "KataGo-networks.txt"],
   [path.join(src, "licenses", "README.txt"), "README.txt"],
   [path.join(src, "moka", "THIRD_PARTY_NOTICES.md"), "Moka-THIRD_PARTY_NOTICES.md"],
 ];

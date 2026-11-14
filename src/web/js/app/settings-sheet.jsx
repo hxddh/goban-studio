@@ -265,7 +265,7 @@ function AboutPane() {
         <p class="about">
           <strong>Goban Studio {APP_VERSION}</strong>
           <span class="fine">{t("settings.offline")}</span>
-          <span class="fine">{t("common.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
+          <span class="fine">{t("common.labelValue", [t("settings.licenses"), "Goban Studio (MIT) · KataGo (MIT) · KataGo networks (CC0; downloads: KataGo Neural Network License) · Moka (MIT) · @sabaki/go-board (MIT) · Preact (MIT)"])}</span>
         </p>
       </section>
       <section class="settings-group">

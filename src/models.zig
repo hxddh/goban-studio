@@ -5,13 +5,16 @@
 //!
 //!   * `human`   KataGo's human SL model (b18c384nbt-humanv0), which makes
 //!               the opponent play like a human of a given rank;
-//!   * `strong`  a larger standard network (g170e b15c192) for analysis,
-//!               review and the top ladder level.
+//!   * `strong`  a current standard network (kata1 b18c384nbt) for
+//!               analysis, review and the top ladder level.
 //!
 //! Rules this module keeps:
 //!
 //!   * Only the URLs pinned in `specs` are ever fetched. The page names a
 //!     model by kind ("human" / "strong"), never by address.
+//!   * Two hosts only: KataGo's GitHub releases (the human model) and
+//!     KataGo's own network server, media.katagotraining.org (the strong
+//!     network, which is not on GitHub). Both over HTTPS.
 //!   * Files live in the app's data directory (`<data>/models`), never in
 //!     the signed app bundle.
 //!   * A download streams into `<file>.part`, hashing as it goes; the file
@@ -24,7 +27,7 @@
 //!     retried a few times by the same download, continuing where it
 //!     stopped.
 //!   * Requests go through the proxy the environment or the system names
-//!     (net.zig), and follow redirects only to GitHub's download hosts.
+//!     (net.zig), and follow redirects only over HTTPS to `download_hosts`.
 //!   * Free space is checked before the transfer starts (macOS, Windows).
 //!
 //! Threads: one short-lived thread per download. The UI thread reads the
@@ -55,8 +58,14 @@ pub const Spec = struct {
     size: u64,
 };
 
-/// The only two files this module can fetch. Both come from KataGo's
-/// official GitHub releases (MIT; see engine/model/LICENSE-KataGo.txt).
+/// The hosts a model download may reach, first request or redirect:
+/// GitHub's release-download hosts, and KataGo's network server.
+pub const download_hosts = net.github_hosts ++ [_][]const u8{katago_network_host};
+const katago_network_host = "media.katagotraining.org";
+
+/// The only two files this module can fetch. The human model is from
+/// KataGo's GitHub releases; the strong network from katagotraining.org,
+/// under the KataGo Neural Network License (engine/model/LICENSE-KataGo-networks.txt).
 pub const specs = [kind_count]Spec{
     .{
         .kind = .human,
@@ -68,11 +77,11 @@ pub const specs = [kind_count]Spec{
     },
     .{
         .kind = .strong,
-        .file = "g170e-b15c192-s1672170752-d466197061.txt.gz",
-        .name = "g170e-b15c192-s1672170752-d466197061",
-        .url = "https://github.com/lightvector/KataGo/releases/download/v1.3.2/g170e-b15c192-s1672170752-d466197061.txt.gz",
-        .sha256 = "09456899f1b9155217f4ca059cf8a68f79b7eba22cf6b7c00ffb7f17ce067967",
-        .size = 48_038_914,
+        .file = "kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
+        .name = "kata1-b18c384nbt-s9996604416-d4316597426",
+        .url = "https://media.katagotraining.org/uploaded/networks/models/kata1/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
+        .sha256 = "9d7a6afed8ff5b74894727e156f04f0cd36060a24824892008fbb6e0cba51f1d",
+        .size = 97_898_094,
     },
 };
 
@@ -428,7 +437,7 @@ pub const Manager = struct {
         if (offset < s.size) {
             // Through the proxy the environment or the system names, if any.
             var session: net.Session = undefined;
-            session.init(allocator, self.io, self.env, "github.com");
+            session.init(allocator, self.io, self.env, net.httpsHost(s.url) orelse "github.com");
             defer session.deinit();
             var failures: u32 = 0;
             while (true) {
@@ -532,6 +541,7 @@ pub const Manager = struct {
             .offset = offset.*,
             .expected_size = s.size,
             .max_bytes = s.size,
+            .redirect_hosts = &download_hosts,
         }, .{
             .context = &ctx,
             .write = PartSink.sinkWrite,
@@ -681,10 +691,19 @@ test "pinned specs are well formed" {
         try std.testing.expectEqual(@as(usize, i), @intFromEnum(s.kind));
         try std.testing.expectEqual(@as(usize, 64), s.sha256.len);
         for (s.sha256) |c| try std.testing.expect(std.ascii.isDigit(c) or (c >= 'a' and c <= 'f'));
-        try std.testing.expect(std.mem.startsWith(u8, s.url, "https://github.com/lightvector/KataGo/releases/download/"));
+        try std.testing.expect(net.allowedUrl(s.url, &download_hosts));
         try std.testing.expect(std.mem.endsWith(u8, s.url, s.file));
         try std.testing.expect(s.size > 1024 * 1024);
     }
+    // Each from its own place, and nowhere else.
+    try std.testing.expect(std.mem.startsWith(u8, spec(.human).url, "https://github.com/lightvector/KataGo/releases/download/"));
+    try std.testing.expect(std.mem.startsWith(u8, spec(.strong).url, "https://media.katagotraining.org/uploaded/networks/models/kata1/"));
+    // A model redirect may reach GitHub and KataGo's network server, over
+    // HTTPS only; an update request (net.allowedRedirect) still only GitHub.
+    try std.testing.expect(net.allowedUrl("https://release-assets.githubusercontent.com/x", &download_hosts));
+    try std.testing.expect(!net.allowedUrl("http://media.katagotraining.org/x", &download_hosts));
+    try std.testing.expect(!net.allowedUrl("https://katagotraining.org/x", &download_hosts));
+    try std.testing.expect(!net.allowedRedirect(spec(.strong).url));
     try std.testing.expectEqual(Kind.human, parseKind("human").?);
     try std.testing.expectEqual(Kind.strong, parseKind("strong").?);
     try std.testing.expect(parseKind("https://evil.example/x.bin.gz") == null);
