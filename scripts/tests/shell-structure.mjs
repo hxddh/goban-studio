@@ -135,3 +135,18 @@ await test("shell structure: no module is longer than 600 lines, but for content
   assert.deepEqual(over, []);
   for (const f of Object.keys(CEILING)) assert.ok(f in MODULES && MODULES[f].trimEnd().split("\n").length > 600, `${f} is no longer over 600 lines: take it off the list`);
 });
+
+await test("shell structure: comments say what the code does, not which version brought it", () => {
+  // A comment may name a release tag as an example of its format (update.js,
+  // host.js) or a document by its file name (docs/v9.md); stored formats are
+  // named by their number ("format 9"), not as versions.
+  const ALLOWED = [/docs\/v\d+\.md/g, /docs\/review-v\d+-\w+\.md/g, /"v\d+\.\d+\.\d+"/g];
+  const found = [];
+  for (const [f, src] of Object.entries(MODULES)) {
+    for (const c of src.match(/\/\*[\s\S]*?\*\/|(?<![:"'`\\])\/\/.*$/gm) || []) {
+      const m = ALLOWED.reduce((s, re) => s.replace(re, ""), c).match(/\bv\d+(\.\d+)*\b/);
+      if (m) found.push(`${f}: ${m[0]} in ${c.trim().slice(0, 80)}`);
+    }
+  }
+  assert.deepEqual(found, []);
+});

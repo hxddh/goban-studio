@@ -1,6 +1,6 @@
 /**
  * A second reading of the player's strength, from their own moves
- * (docs/strength.md, "v13: your moves").
+ * (docs/strength.md, "your moves, a second channel").
  *
  * KataGo's human SL model gives, for a position and a rank profile, the
  * probability that a player of that rank plays each point. Over one game

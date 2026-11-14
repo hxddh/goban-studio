@@ -167,7 +167,7 @@ export async function initIndex() {
   const games = stored && isObject(stored.games) ? stored.games : null;
   const keys = store.list(GAMES_PREFIX).filter(idOfKey);
   const missing = keys.filter((k) => !store.isLoaded(k) && !validEntry(games?.[idOfKey(k)]));
-  // Side by side, a few at a time (an upgrade from v12 reads every game once).
+  // Side by side, a few at a time (a format migration reads every game once).
   let next = 0;
   const worker = async () => {
     while (next < missing.length) await store.load(missing[next++]).catch(() => {});
