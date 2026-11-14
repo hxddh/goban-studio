@@ -121,6 +121,15 @@ await test("SGF charsets: UTF-8, a named charset and Western text are never gues
   const named = loadSGF(bytes("(;SZ[9]CA[gb2312]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])"));
   assert.equal(named.game.playerBlack, "聂卫平");
   assert.deepEqual(named.codes, []);
+  // CA[…] written inside a property value (a comment) is text, not the record's charset.
+  const quoted = bytes("(;SZ[9]C[saved as CA[UTF-8] by mistake]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])");
+  assert.equal(loadSGF(quoted).game.playerBlack, "聂卫平");
+  assert.equal(decodeSgf(quoted, { lang: "zh" }).charset, "gb18030");
+  const quotedNamed = bytes("(;SZ[9]C[not CA[UTF-8]]CA[gb2312]PB[", [0xc4, 0xf4, 0xce, 0xc0, 0xc6, 0xbd], "];B[aa])");
+  assert.deepEqual([decodeSgf(quotedNamed).charset, decodeSgf(quotedNamed).guessed], ["gb18030", false]);
+  // A Shift_JIS name whose trail byte is a backslash, before CA, does not hide CA.
+  const sjisNamed = decodeSgf(bytes("(;SZ[9]PB[", [0x83, 0x5c], "]CA[Shift_JIS];B[aa])"));
+  assert.deepEqual([sjisNamed.text, sjisNamed.guessed], ["(;SZ[9]PB[ソ]CA[Shift_JIS];B[aa])", false]);
   // Latin-1 names stay Latin-1 (the FF[4] default): an accented letter next
   // to "]" or another letter must not be taken for half a CJK character.
   for (const lang of ["zh", "en", "ko", "ja"]) {
