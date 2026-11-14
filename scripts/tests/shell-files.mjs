@@ -314,3 +314,25 @@ await test("shell files: one instance per data folder is documented where the lo
   for (const text of [read("packaging/README-macOS.txt"), read("packaging/README-Windows.txt")]) assert.doesNotMatch(text, /instance\.lock/, "an implementation detail, not in the user's README");
   assert.match(read("packaging/README-Windows.txt"), /Only one copy runs at a time/);
 });
+
+await test("shell files: every file the shell commits by rename goes through durable.zig, so it survives a power cut", () => {
+  const zigFiles = fs.readdirSync(path.join(root, "src")).filter((f) => f.endsWith(".zig"));
+  for (const f of zigFiles) {
+    if (f === "durable.zig") continue;
+    const code = read(`src/${f}`).split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    const renames = code.match(/\brenameAbsolute\(|\.rename\(/g) || [];
+    // The second launch's inbox request is read and deleted by the running
+    // app within moments; it holds nothing worth flushing to the disk.
+    const allowed = f === "instance.zig" ? 1 : 0;
+    const durable = (code.match(/durable\.renameAbsolute\(/g) || []).length;
+    assert.equal(renames.length - durable, allowed, `${f}: a rename outside durable.zig`);
+    assert.doesNotMatch(code, /\bfile\.sync\(/, `${f}: a commit flushes with durable.syncFile`);
+  }
+  const durable = read("src/durable.zig");
+  assert.match(durable, /std\.c\.F\.FULLFSYNC/, "macOS flushes the drive's cache");
+  assert.match(durable, /MOVEFILE_WRITE_THROUGH/, "Windows moves write-through");
+  assert.match(durable, /\.iterate = true/, "a directory is opened with a descriptor fsync accepts");
+  const store = read("src/store.zig");
+  assert.equal((store.match(/durable\.syncFile\(/g) || []).length, 2, "both store writes flush the file");
+  assert.equal((store.match(/durable\.renameIn\(/g) || []).length, 1, "and rename through the one retrying helper");
+});

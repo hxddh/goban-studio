@@ -165,8 +165,10 @@ export default async function ({ test, assert, root }) {
     assert.match(zig, /test "store keys are validated strictly"/);
     assert.match(zig, /test "store writes atomically, reads in chunks, lists and removes in a temp dir"/);
     // Atomic: a temporary file in the same directory, renamed over the
-    // target (retried briefly on Windows, where a scanner may hold it).
-    assert.match(zig, /try renameRetrying\(self\.io, dir, tmp, sub\)/);
+    // target (retried briefly on Windows, where a scanner may hold it),
+    // flushed to the disk first and the rename made durable after.
+    assert.match(zig, /if \(done\) durable\.syncFile\(self\.io, file\) catch return error\.Disk;/);
+    assert.match(zig, /try renameRetrying\(self\.io, dir, self\.root\(\), tmp, sub\)/);
     // No huge stack buffers in the handlers: the chunk is allocated.
     assert.match(main, /self\.allocator\.alloc\(u8, store_mod\.chunk_bytes\)/);
   });

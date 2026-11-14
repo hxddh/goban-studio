@@ -77,7 +77,11 @@ ending in `.json` (the same rule on both sides: `store.js validKey`,
 `bad/settings-1731000000000.json`, not `settings.json.bad`. A file is at
 most 8 MB and moves over the bridge in chunks of 384 KB; the host writes a
 temporary file and renames it over the target, so a file is never half
-written.
+written. A write is reported done only once it would survive a power cut
+(`durable.zig`): the temporary file is flushed to the disk (on macOS with
+`F_FULLFSYNC`, which also empties the drive's own cache), and after the
+rename so is the folder that holds it; on Windows the rename is a
+write-through move, since a folder cannot be flushed there.
 
 A game file's `source` is `"game"` (played here; with no result it is an
 unfinished game, which its row continues), `"import"` (an SGF opened,

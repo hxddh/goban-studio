@@ -133,6 +133,7 @@ test {
     std.testing.refAllDecls(install_mod);
     std.testing.refAllDecls(models_mod);
     std.testing.refAllDecls(store_mod);
+    std.testing.refAllDecls(@import("durable.zig"));
     std.testing.refAllDecls(files_mod);
     std.testing.refAllDecls(win_close);
     std.testing.refAllDecls(json);

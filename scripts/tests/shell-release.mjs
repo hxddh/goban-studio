@@ -595,7 +595,7 @@ await test("the downloader fetches only pinned KataGo files, verified before use
   assert.match(zig, /\.redirect_hosts = &download_hosts,/);
   // Only the verified file is renamed into place, inside the models folder.
   assert.match(zig, /if \(!std\.mem\.eql\(u8, &hex, s\.sha256\)\)/);
-  assert.match(zig, /renameAbsolute\(part, final/);
+  assert.match(zig, /durable\.renameAbsolute\(self\.io, part, final\)/);
   const main = shellSource();
   for (const name of ["studio.modelStatus", "studio.modelDownload", "studio.modelCancel", "studio.modelRemove"]) assert.ok(main.includes(`"${name}"`), name);
   // The page names a kind; the payload has no URL or path field.
