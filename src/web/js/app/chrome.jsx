@@ -42,10 +42,10 @@ const NARROW_QUERY = "(max-width: 860px)";
 
 /** Whether the window is narrow now; follows resizes. */
 function useNarrow() {
-  const mq = typeof matchMedia === "function" ? matchMedia(NARROW_QUERY) : null;
-  const [narrow, setNarrow] = useState(!!mq?.matches);
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === "function" && matchMedia(NARROW_QUERY).matches);
   useEffect(() => {
-    if (!mq) return;
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia(NARROW_QUERY);
     const on = () => setNarrow(mq.matches);
     mq.addEventListener?.("change", on);
     on();

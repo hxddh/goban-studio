@@ -103,7 +103,8 @@ export function Toasts() {
 /** Tasks that are slow or failed (store.js runTask), at the top of the page. */
 export function TaskNotice() {
   // Somewhere else now: what failed back there is no longer the question.
-  useEffect(() => clearTaskErrors, [state.space]);
+  const space = state.space;
+  useEffect(() => clearTaskErrors, [space]);
   const shown = state.tasks.filter((x) => x.status === "loading" || x.status === "error");
   if (!shown.length) return null;
   return (

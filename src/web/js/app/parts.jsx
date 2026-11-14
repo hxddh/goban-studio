@@ -192,6 +192,10 @@ export function useAsync(fn, deps = []) {
       live = false;
       clearTimeout(timer);
     };
+    // The caller's deps decide when fn runs again (the rule checks them at
+    // each useAsync call: eslint.config.js additionalHooks); fn itself is a
+    // new closure on every render and is read from the render that changed them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, turn]);
   return { ...s, retry: () => setTurn((n) => n + 1) };
 }
@@ -420,9 +424,10 @@ export function DiagramThumb({ diagram, label = "" }) {
   const ref = useRef(null);
   const key = Array.isArray(diagram) ? diagram.join("|") : "";
   const palette = usePaletteKey();
+  // Keyed by the rows, not the array: a caller may build a new array with the same rows on every render.
   useEffect(() => {
     if (!key) return;
-    paintThumb(ref.current, thumbFromDiagram(diagram), 32);
+    paintThumb(ref.current, thumbFromDiagram(key.split("|")), 32);
   }, [key, palette]);
   return <canvas ref={ref} class="dthumb" width="32" height="32" role="img" aria-label={label} />;
 }

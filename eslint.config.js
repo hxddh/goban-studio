@@ -48,7 +48,9 @@ export default [
       globals: { ...globals.browser, webkitAudioContext: "readonly" },
     },
     plugins: { "react-hooks": reactHooks },
-    rules: { ...rules, "react-hooks/rules-of-hooks": "error" },
+    // Hooks: called in order, and every effect lists what it reads, so it
+    // re-runs when that changes. useAsync (app/parts.jsx) takes deps too.
+    rules: { ...rules, "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": ["error", { additionalHooks: "^useAsync$" }] },
   },
   {
     files: ["scripts/**/*.{js,mjs}", "eslint.config.js"],
