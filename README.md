@@ -318,7 +318,8 @@ src/durable.zig          a written file survives a power cut
 src/instance.zig         one running copy; a second launch hands over its file
 src/engine.zig, engine_build.zig         the KataGo child process; which build starts
 src/engine_request.zig, engine_worker.zig  what a search is; the thread that runs it
-src/net.zig              one HTTPS client: proxy, redirects, resume
+src/net.zig              one HTTPS client: redirects, resume
+src/net_proxy.zig, net_tunnel.zig        which proxy; the session and the tunnel through it
 src/update.zig, install.zig, updater/    update check, download and checks, the swap helpers
 src/install_verify.zig, install_package.zig, install_apply.zig
                          signature and sums; the package; the helper and replies

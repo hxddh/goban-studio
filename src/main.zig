@@ -76,7 +76,7 @@ pub fn main(init: std.process.Init) !void {
     const models = try std.heap.page_allocator.create(models_mod.Manager);
     models.init(init.io, paths_mod.modelsDir(init.environ_map, &models_dir_buf));
     // Downloads and the update check use the proxy the environment or the
-    // system names (net.zig).
+    // system names (net_proxy.zig).
     models.env = init.environ_map;
     app_state.models = models;
     // File storage: the page's settings, profile and games (store.zig).
@@ -148,6 +148,8 @@ test {
     std.testing.refAllDecls(paths_mod);
     std.testing.refAllDecls(instance_mod);
     std.testing.refAllDecls(net_mod);
+    std.testing.refAllDecls(@import("net_proxy.zig"));
+    std.testing.refAllDecls(@import("net_tunnel.zig"));
     _ = bridge_files;
     _ = bridge_katago;
     _ = bridge_models;
