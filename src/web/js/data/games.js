@@ -404,6 +404,18 @@ const trash = new WeakMap();
 /** Stores whose flush commits the trash. */
 const hooked = new WeakSet();
 const trashed = (id) => trash.get(store)?.id === id;
+/** Told the id when a flush, not commitTrash, makes a held delete final (onTrashFlushed). */
+const flushedListeners = new Set();
+
+/**
+ * fn(id) when a flush (quitting, a backup, a restore) makes the held
+ * delete final, so whoever offers its Undo can withdraw the offer and say
+ * so. Returns the function that stops listening.
+ */
+export function onTrashFlushed(fn) {
+  flushedListeners.add(fn);
+  return () => flushedListeners.delete(fn);
+}
 
 /** The id of the game held for an undo, or null. */
 export function trashedGame() {
@@ -421,7 +433,10 @@ export function trashGame(id) {
   // Writing everything out (quit, a backup) makes the delete final.
   if (!hooked.has(store) && typeof store.onFlush === "function") {
     const st = store;
-    st.onFlush(() => commitTrashOf(st));
+    st.onFlush(() => {
+      const gone = commitTrashOf(st);
+      if (gone) for (const fn of flushedListeners) fn(gone);
+    });
     hooked.add(st);
   }
   m.delete(id);
