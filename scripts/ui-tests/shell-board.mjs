@@ -100,7 +100,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".sheet", { state: "detached" });
   };
 
-  await check("shell board: in the dark theme the board is the same board dimmer — surface, lines and stones keep their contrast; it follows System live", async () => {
+  await check("shell board: in the dark theme the board is the same wood under a lamp — surface, lines and stones keep their contrast; it follows System live", async () => {
     const page = await seededPage({ appearance: "light" });
     await position(page);
     const light = await sample(page);
@@ -124,8 +124,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     assert(kB >= 3, `black stone on the dark board ${kB.toFixed(2)}:1`);
     assert(kW >= 2, `white stone on the dark board ${kW.toFixed(2)}:1`);
     assert(contrast(hex(dark.black), hex(dark.white)) >= 8, "black against white");
-    // White does not glare: clearly dimmer than in the light theme, still unmistakably white.
-    assert(lum(dark.white) < lum(light.white) - 0.08 && lum(dark.white) > 0.45, `white stone ${lum(dark.white).toFixed(3)} (light theme ${lum(light.white).toFixed(3)})`);
+    // White is barely toned down: a touch dimmer than in the light theme, unmistakably white.
+    assert(lum(dark.white) < lum(light.white) && lum(dark.white) > lum(light.white) - 0.12 && lum(dark.white) > 0.5, `white stone ${lum(dark.white).toFixed(3)} (light theme ${lum(light.white).toFixed(3)})`);
     // In the light theme a white stone is told from the board by its shadow more than its tone; in the dark one by its tone.
     assert(kW > contrast(hex(light.white), hex(light.surface)), "white parts from the dark board better than from the light one");
     // Lines stay readable.

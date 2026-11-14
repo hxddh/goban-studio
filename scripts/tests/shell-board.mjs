@@ -6,9 +6,9 @@
 import { test, assert, fs, path, root } from "./helpers.mjs";
 import { BOARD_PALETTES, BOARD_STYLES, boardPalette, contrast, luminance } from "../../src/web/js/theme.js";
 import { GRID_MIN, RIM_MIN, STAR_MIN, drawThumb, fromDiagram, fromString, thumbPlan } from "../../src/web/js/thumb.js";
-import { lastMarkOf } from "../../src/web/js/board.js";
+import { gridStrokesOf, lastMarkOf, starRadiusOf } from "../../src/web/js/board-surface.js";
 
-await test("board palettes: the dark board is the same board dimmer, and stones part from it in every palette", () => {
+await test("board palettes: the dark board is the same wood under a lamp — dimmer, as warm — and stones part from it in every palette", () => {
   assert.deepEqual(BOARD_STYLES, ["standard", "contrast"]);
   const light = boardPalette({ dark: false });
   const dark = boardPalette({ dark: true });
@@ -17,7 +17,7 @@ await test("board palettes: the dark board is the same board dimmer, and stones 
   // Dimmer: under half the light board's luminance, and well under the page's light surfaces.
   assert.ok(luminance(light.base) > 0.55, `light ${luminance(light.base)}`);
   assert.ok(luminance(dark.base) < 0.3 && luminance(dark.base) > 0.12, `dark ${luminance(dark.base)}`);
-  // The same board: still a warm brown (red over green over blue), only less saturated.
+  // The same wood: a warm brown (red over green over blue) that keeps its saturation, so it does not turn grey.
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const sat = (hex) => {
     const [r, g, b] = rgb(hex);
@@ -25,10 +25,15 @@ await test("board palettes: the dark board is the same board dimmer, and stones 
   };
   const [r, g, b] = rgb(dark.base);
   assert.ok(r > g && g > b, "warm");
-  assert.ok(sat(dark.base) < sat(light.base) + 0.08, "not more saturated than the light board");
-  // Sprites are kept (not another material); white is toned down, black gets a rim.
+  assert.ok(sat(dark.base) >= sat(light.base), "at least as saturated as the light board");
+  // Sprites are kept (not another material); white is barely toned down; black parts by contrast alone.
   assert.equal(dark.sprites, true);
-  assert.ok(dark.whiteDim > 0 && dark.whiteDim <= 0.25 && dark.blackRim);
+  assert.ok(dark.whiteDim > 0 && dark.whiteDim <= 0.08, `whiteDim ${dark.whiteDim}`);
+  assert.equal(dark.blackRim, null);
+  assert.ok(contrast(dark.stone.black.fill, dark.base) >= 4.5, "black reads on the dark board without a rim");
+  // The light falls off towards the edges more than on the light board.
+  const alpha = (rgba) => Number(rgba.match(/[\d.]+\)$/)[0].slice(0, -1));
+  assert.ok(alpha(dark.vignette) > alpha(light.vignette));
   assert.equal(light.whiteDim, 0);
   for (const style of BOARD_STYLES) {
     for (const mode of ["light", "dark"]) {
@@ -81,14 +86,34 @@ await test("board palettes: the stylesheet's defaults are the light standard pal
   assert.ok(!css.toLowerCase().includes(boardPalette({ dark: true }).base.toLowerCase()));
 });
 
-await test("last move: a thin ring 0.4 of a cell across, never thinner than a hairline or smaller than it can show", () => {
+await test("last move: a light ring 0.44 of a cell across, never thinner than a hairline or smaller than it can show", () => {
   const big = lastMarkOf(60);
-  assert.equal(big.radius, 12);
-  assert.equal(big.width, 3);
+  assert.equal(big.radius, 13.2);
+  assert.equal(big.width, 2.1);
   const small = lastMarkOf(14);
   assert.equal(small.width, 1.25, "the line never goes under 1.25 px");
   assert.ok(small.radius >= small.width * 1.6 && small.radius <= 14 * 0.25, "still a ring, still inside the stone");
   for (const cell of [10, 20, 30, 45, 80]) assert.ok(lastMarkOf(cell).radius + lastMarkOf(cell).width / 2 < cell * 0.475, `inside the stone at ${cell}`);
+});
+
+await test("grid: whole device pixels, at least one css pixel and at most one and a half; the edge twice the line; star points from 2.5 to 5 px", () => {
+  // 19×19 at about 39 px a cell: a 1 css px line on Retina (it was half a pixel), one device pixel at 1×.
+  assert.deepEqual(gridStrokesOf(39, 2), { line: 2, edge: 4 });
+  assert.deepEqual(gridStrokesOf(39, 1), { line: 1, edge: 2 });
+  // 9×9 at about 83 px a cell: capped at 1.5 css px, so a large board does not turn heavy.
+  assert.deepEqual(gridStrokesOf(83, 2), { line: 3, edge: 6 });
+  // The high-contrast board's lineScale still thickens it.
+  assert.ok(gridStrokesOf(39, 2, 1.5).line > gridStrokesOf(39, 2).line);
+  for (const cell of [8, 20, 39, 60, 83, 120]) {
+    for (const dpr of [1, 1.5, 2]) {
+      const g = gridStrokesOf(cell, dpr);
+      assert.ok(Number.isInteger(g.line) && g.line >= 1 && g.line / dpr <= 1.5 + 0.5 / dpr, `${cell} at ${dpr}×`);
+      assert.ok(g.edge >= g.line + 1 && g.edge <= g.line * 2);
+    }
+  }
+  assert.equal(starRadiusOf(10), 2.5);
+  assert.equal(starRadiusOf(39), 39 * 0.085);
+  assert.equal(starRadiusOf(83), 5);
 });
 
 await test("thumbnails: what is drawn follows the cell size in device pixels — whole-pixel cells, grid and stars only when legible", () => {

@@ -21,12 +21,13 @@
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
 import { loadMaterials, stoneVariant } from "./materials.js";
 import { currentPalette, onBoardTheme } from "./theme.js";
+import { drawPreviewEdge, drawWood, gridStrokesOf, lastMarkOf, starRadiusOf } from "./board-surface.js";
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
 const DPR_LIMIT = 2;
 const wantCellsFor = (m) => (m.showCoords ? 1.25 : 0.8);
-const bandFor = (m) => (m.showCoords ? 34 : 14);
+const bandFor = (m) => (m.showCoords ? 28 : 14);
 
 /**
  * Width / height of the board frame for a model: 1 for a whole board, the
@@ -79,16 +80,6 @@ const ON_LIGHT = { accent: "#34529A", good: "#2E7D4F", bad: "#B3402C" };
 const ON_DARK = { accent: "#9FB6EE", good: "#7FD0A2", bad: "#F09A84" };
 const PLACE_MS = 140;
 const FADE_MS = 260;
-
-/**
- * The last-move ring for a cell size (css px): 0.4 × cell across, its line
- * 5 % of a cell and never under 1.25 px, so it stays a ring on a small
- * board and a hairline on a large one.
- */
-export function lastMarkOf(cell) {
-  const width = Math.max(1.25, cell * 0.05);
-  return { radius: Math.max(width * 1.6, cell * 0.2), width };
-}
 
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
@@ -368,6 +359,7 @@ export class BoardView {
     g.scale(this.dpr, this.dpr);
     g.fillStyle = theme.base;
     g.fillRect(0, 0, w, h);
+    if (!theme.contrast) drawWood(g, w, h, theme);
     // A barely-there falloff from the centre, so the surface is not dead flat.
     const r = Math.hypot(w, h) / 2;
     const v = g.createRadialGradient(w / 2, h / 2, r * 0.35, w / 2, h / 2, r);
@@ -399,8 +391,7 @@ export class BoardView {
     // 1.6× the inner lines. Lines on an open side of a zoomed window run off
     // by half a cell.
     const dpr = this.dpr;
-    const lineDev = Math.max(1, Math.round(cell * dpr * 0.02 * (theme.lineScale || 1)));
-    const edgeDev = Math.max(lineDev + 1, Math.round(lineDev * 1.6));
+    const { line: lineDev, edge: edgeDev } = gridStrokesOf(cell, dpr, theme.lineScale || 1);
     const snap = (v, wDev) => {
       const off = (wDev % 2) / 2;
       return (Math.round(v * dpr - off) + off) / dpr;
@@ -440,17 +431,18 @@ export class BoardView {
     for (const [x, y] of starPoints(size)) {
       if (x < win.x0 || x > win.x1 || y < win.y0 || y > win.y1) continue;
       ctx.beginPath();
-      ctx.arc(snap(px(x), lineDev), snap(py(y), lineDev), Math.max(1.5, cell * 0.065), 0, Math.PI * 2);
+      ctx.arc(snap(px(x), lineDev), snap(py(y), lineDev), starRadiusOf(cell), 0, Math.PI * 2);
       ctx.fill();
     }
 
     if (m.showCoords) {
       ctx.fillStyle = theme.text;
-      const fs = Math.max(10, Math.min(13, cell * 0.3));
+      const fs = Math.max(10, Math.min(12, cell * 0.3));
       ctx.font = `500 ${fs}px ${this.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const gap = Math.min(cell * 0.8, cell * 0.5 + 18);
+      // Just past the edge stones: half a stone, then a fixed gap.
+      const gap = Math.min(cell * 0.8, cell * 0.475 + 12);
       for (let x = win.x0; x <= win.x1; x++) {
         ctx.fillText(LETTERS[x], px(x), py(win.y1) + gap + ext(win.y1 < size - 1) * 0.6);
       }
@@ -574,7 +566,12 @@ export class BoardView {
     // Hover preview.
     const hv = m.hover;
     if (m.interactive && hv && inWin(hv.x, hv.y) && !m.board?.[hv.y]?.[hv.x] && m.hoverColor) {
-      if (m.hoverValid) this.stone(ctx, hv.x, hv.y, m.hoverColor, theme, { alpha: 0.42, shadow: false, jitter: false });
+      if (m.hoverValid) {
+        // A preview, not a stain: a light stone with a clear edge.
+        const black = m.hoverColor === BLACK;
+        this.stone(ctx, hv.x, hv.y, m.hoverColor, theme, { alpha: black ? 0.38 : 0.6, shadow: false, jitter: false });
+        drawPreviewEdge(ctx, px(hv.x), py(hv.y), cell, black);
+      }
       else {
         ctx.strokeStyle = theme.tones.bad;
         ctx.globalAlpha = 0.75;
