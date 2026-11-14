@@ -11,7 +11,8 @@
  * runs the search; the UI never blocks. The host keeps KataGo's board
  * between requests and only sends the moves that changed. Partial reports
  * stream in as `katago:info` window events, a request can be cancelled,
- * and a new request supersedes the previous. (There is no synchronous
+ * and a new request supersedes the previous (which the host then answers
+ * `{ ok: false, cancelled: true }`: see `status` of analyze()). (There is no synchronous
  * path: it would block the host's UI thread, and the page and the host ship
  * together.) Every request has a deadline in the host: a
  * KataGo that stops answering is killed and the request resolves null,
@@ -207,7 +208,7 @@ export function toAnalysis(info, playText, size) {
 
 /* ---------------------------------------------------------------- async */
 
-/** Requests in flight: id → { size, onInfo, finish }. */
+/** Requests in flight: id → { size, onInfo }. */
 const live = new Map();
 let nextId = 0;
 let listening = false;
@@ -239,13 +240,13 @@ export function enginePayload({ engine = "standard", profile = "", humanStyle = 
   return {};
 }
 
-function analyzeAsync(game, node, visits, onInfo, signal, select) {
+function analyzeAsync(game, node, visits, onInfo, signal, select, out) {
   const id = `k${++nextId}`;
   const stream = typeof onInfo === "function";
   const payload = { id, ...positionPayload(game, node, visits), stream, ...enginePayload(select) };
   if (stream) listen();
   return new Promise((resolve) => {
-    const entry = { size: game.size, onInfo: stream ? onInfo : null, finish: null };
+    const entry = { size: game.size, onInfo: stream ? onInfo : null };
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -259,12 +260,14 @@ function analyzeAsync(game, node, visits, onInfo, signal, select) {
       nativeInvoke("studio.katagoCancel", { id }).catch(() => {});
       finish(null);
     };
-    entry.finish = finish;
     live.set(id, entry);
     if (signal) signal.addEventListener("abort", onAbort, { once: true });
     nativeInvoke("studio.katagoAnalyzeAsync", payload).then(
       (reply) => {
-        if (!reply || typeof reply !== "object" || reply.ok !== true) return finish(null);
+        if (!reply || typeof reply !== "object" || reply.ok !== true) {
+          if (reply?.cancelled === true && out && !signal?.aborted) out.superseded = true;
+          return finish(null);
+        }
         const result = toAnalysis(reply.info, reply.play, game.size);
         if (result && reply.sync && typeof reply.sync === "object") result.sync = reply.sync;
         if (result) result.engine = typeof reply.engine === "string" ? reply.engine : "standard";
@@ -287,12 +290,18 @@ function analyzeAsync(game, node, visits, onInfo, signal, select) {
  *   engine           "standard" | "strong" | "human" (see above)
  *   profile, humanStyle   human engine only
  *
+ *   status           optional object: `superseded` is set to true when the
+ *                    host answered that it cancelled the search although
+ *                    `signal` did not abort (a newer request reached KataGo
+ *                    first). That is not a failure of the engine; the
+ *                    scheduler (engine.js) asks again.
+ *
  * Resolves { moves, ownership, winrate, scoreLead, play, visits, engine }
  * or null when KataGo is not available, the request fails (including an
  * optional network that is not installed), or it was cancelled or
  * superseded by a newer request.
  */
-export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null, engine = "standard", profile = "", humanStyle = "raw" } = {}) {
+export async function analyze(game, { node = game.current, visits = 64, onInfo = null, signal = null, engine = "standard", profile = "", humanStyle = "raw", status: out = null } = {}) {
   if (!hasNative() || signal?.aborted) return null;
   const st = await status();
   if (!st?.available || signal?.aborted) return null;
@@ -300,15 +309,7 @@ export async function analyze(game, { node = game.current, visits = 64, onInfo =
   if (!st.async) return null;
   // Optional networks need a host with `models`.
   if (engine !== "standard" && !st.models) return null;
-  return analyzeAsync(game, node, visits, onInfo, signal, { engine, profile, humanStyle });
-}
-
-/** Cancel whatever is in flight; pending analyze() calls resolve null. */
-export function cancel() {
-  if (!live.size) return;
-  const entries = [...live.values()];
-  if (hasNative()) nativeInvoke("studio.katagoCancel", {}).catch(() => {});
-  for (const entry of entries) entry.finish?.(null);
+  return analyzeAsync(game, node, visits, onInfo, signal, { engine, profile, humanStyle }, out);
 }
 
 /* ------------------------------------------- Human policy of moves */
@@ -329,29 +330,48 @@ export function cancel() {
  *   { ok: true, moves: [{ index, p: { [profile]: probability of the move played } }] }
  * (index: the move's number in the line, 0-based; passes left out).
  *
+ * It reaches the same KataGo as the searches, so it goes through the
+ * scheduler like them (engine.js humanPolicy), never straight to the host:
+ * a request that reached the host while a search ran would cancel it.
+ * `status.superseded` is set as for analyze().
+ *
  * Resolves that list, or null when the host, the human model or the
- * request is not there (the caller then shows nothing).
+ * request is not there (the caller then shows nothing), or when `signal`
+ * aborts (at once; the host answers the cancelled request on its own).
  */
-export async function humanMoveProbabilities(game, color, profiles, { signal = null } = {}) {
+export async function humanMoveProbabilities(game, color, profiles, { signal = null, status: out = null } = {}) {
   if (!hasNative() || signal?.aborted) return null;
   const st = await status();
   if (!st?.available || !st.humanPolicy || signal?.aborted) return null;
   const base = positionPayload(game, game.mainLine ? game.mainLine().at(-1) : game.current, 1);
-  // The host scores every move of `color` and may take a while; an abort
-  // cancels it there too (`studio.katagoCancel` with this id).
   const id = `h${++nextId}`;
-  const onAbort = () => nativeInvoke("studio.katagoCancel", { id }).catch(() => {});
-  signal?.addEventListener("abort", onAbort, { once: true });
-  try {
-    const reply = await nativeInvoke("studio.katagoHumanPolicy", { id, size: base.size, komi: base.komi, rules: base.rules, setup: base.setup, moves: base.moves, color: color === BLACK ? "B" : "W", profiles: profiles.slice() });
-    if (signal?.aborted || !reply || reply.ok !== true || !Array.isArray(reply.moves)) return null;
-    return reply.moves.filter((m) => m && Number.isFinite(m.index) && m.p && typeof m.p === "object");
-  } catch (error) {
-    console.warn("KataGo human policy request failed", error);
-    return null;
-  } finally {
-    signal?.removeEventListener("abort", onAbort);
-  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      resolve(value);
+    };
+    const onAbort = () => {
+      nativeInvoke("studio.katagoCancel", { id }).catch(() => {});
+      finish(null);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    nativeInvoke("studio.katagoHumanPolicy", { id, size: base.size, komi: base.komi, rules: base.rules, setup: base.setup, moves: base.moves, color: color === BLACK ? "B" : "W", profiles: profiles.slice() }).then(
+      (reply) => {
+        if (!reply || reply.ok !== true || !Array.isArray(reply.moves)) {
+          if (reply?.cancelled === true && out && !signal?.aborted) out.superseded = true;
+          return finish(null);
+        }
+        finish(reply.moves.filter((m) => m && Number.isFinite(m.index) && m.p && typeof m.p === "object"));
+      },
+      (error) => {
+        console.warn("KataGo human policy request failed", error);
+        finish(null);
+      },
+    );
+  });
 }
 
 /** Whether this host can answer humanMoveProbabilities (and the human model is installed). */

@@ -163,6 +163,9 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
     result = { move: null, analysis: null };
   }
   if (state.game !== g || gen !== g.gen) return;
+  // KataGo kept being superseded (engine.js askKataGo) while this game still
+  // wants the move. Not a failure, so no weaker offline move; Retry asks again.
+  if (result.superseded && !result.move) return computerFailed(g);
   if (!result.move && g.game.current === node) result = await offlineFallback(g, gen, result);
   if (!result || state.game !== g || gen !== g.gen) return;
   const a = result.analysis;
