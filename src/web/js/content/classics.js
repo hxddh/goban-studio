@@ -38,6 +38,22 @@ export const CLASSICS = [
     },
     "moments": [
       {
+        "index": 60,
+        "source": "katago",
+        "title": {
+          "zh": "全局最大的转折",
+          "en": "The largest swing",
+          "ko": "가장 큰 승부처",
+          "ja": "最大の分岐点"
+        },
+        "note": {
+          "zh": "KataGo 会下下边的 H3；这一手让白棋损失约 6 目。白棋约 6 目的领先没有了，局面回到均势。",
+          "en": "KataGo would play H3 (bottom) instead; this costs White about 6 points. White's lead of about 6 points is gone: the game is about even.",
+          "ko": "KataGo는 하변의 H3에 둡니다. 이 수로 백은 약 6집을 손해 봅니다. 백의 약 6집 우세가 사라져 형세가 비슷해집니다.",
+          "ja": "KataGo は下辺の H3 を選びます。この手で白は約6目損をしています。白の約6目のリードが消え、ほぼ互角になります。"
+        }
+      },
+      {
         "index": 127,
         "title": {
           "zh": "耳赤之妙手",
@@ -50,6 +66,22 @@ export const CLASSICS = [
           "en": "One stone works in every direction at once: it backs Black's strength at the top, presses White's group on the right and helps the fight below. A doctor watching is said to have seen Gennan's ears turn red and known Black would win.",
           "ko": "한 수가 위쪽의 두터움, 오른쪽 백 돌, 아래쪽 싸움을 동시에 돌봅니다. 관전하던 의사가 겐난의 귀가 붉어지는 것을 보고 흑의 승리를 짐작했다고 전해집니다.",
           "ja": "一手で上辺の厚み、右辺の白、下辺の攻防のすべてに働きます。観戦していた医師が幻庵の耳が赤くなるのを見て黒の勝ちを悟ったと伝えられます。"
+        }
+      },
+      {
+        "index": 191,
+        "source": "katago",
+        "title": {
+          "zh": "黑棋代价较大的一手",
+          "en": "A costly Black move",
+          "ko": "흑의 손해가 큰 수",
+          "ja": "黒の損が大きい一手"
+        },
+        "note": {
+          "zh": "KataGo 会下左上的 F14；这一手让黑棋损失约 4 目。原本大致均势，此后白棋领先约 4 目。",
+          "en": "KataGo would play F14 (upper left) instead; this costs Black about 4 points. The game was about even; now White leads by about 4 points.",
+          "ko": "KataGo는 좌상의 F14에 둡니다. 이 수로 흑은 약 4집을 손해 봅니다. 비슷하던 형세에서 이제 백이 약 4집 앞섭니다.",
+          "ja": "KataGo は左上の F14 を選びます。この手で黒は約4目損をしています。ほぼ互角だった形勢が、白の約4目リードになります。"
         }
       }
     ],
@@ -166,7 +198,57 @@ export const CLASSICS = [
       "ko": "1674년 도사쿠 대 야스이 지테쓰. 도사쿠는 바둑 최초의 전반적 이론가였고, 이 대국은 가볍고 전체를 중시하는 스타일을 보여 줍니다.",
       "ja": "1674年、道策対安井知哲。道策は囲碁最初の全局理論家であり、この局は軽く全体を見る棋風を示しています。"
     },
-    "sgf": "(;\nPB[Yasui Chitetsu]\nBR[7p]\nPW[Honinbo Dosaku]\nKM[0]\nRE[W+5]\nDT[1674-08-30]\nJD[Enpō 2-7-29]\nPC[Residence of Lord Kagatsume of Kai]\n\n;B[cp];W[eq];B[hq];W[qo];B[qd];W[oc];B[dc];W[ce];B[mc];W[md]\n;B[ld];W[ed];B[ec];W[fd];B[gc];W[gd];B[hc];W[fc];B[fb];W[gb]\n;B[hb];W[eb];B[ga];W[cc];B[db];W[qg];B[pe];W[nd];B[of];W[lc]\n;B[kc];W[lb];B[kb];W[le];B[kd];W[qb];B[mf];W[qj];B[ph];W[qh]\n;B[mb];W[rc];B[op];W[pq];B[oq];W[pr];B[lq];W[cm];B[do];W[cj]\n;B[fp];W[pi];B[on];W[or];B[nr];W[po];B[oo];W[cr];B[qc];W[rb]\n;B[fq];W[bq];B[cn];W[bm];B[dr];W[bo];B[bp];W[ap];B[di];W[dj]\n;B[fi];W[ej];B[fg];W[oe];B[pc];W[pf];B[ob];W[qe];B[nc];W[od]\n;B[pb];W[rd];B[me];W[og];B[fj];W[fl];B[fk];W[gl];B[cb];W[cg]\n;B[dg];W[bh];B[dd];W[ef];B[ff];W[ee];B[if];W[gh];B[ch];W[cf]\n;B[bi];W[ci];B[dh];W[bj];B[fh];W[ko];B[km];W[kq];B[lp];W[io]\n;B[im];W[iq];B[hp];W[lm];B[ln];W[lr];B[mr];W[jr];B[mm];W[hr]\n;B[gr];W[lo];B[ls];W[hm];B[in];W[ho];B[hn];W[go];B[gn];W[fo]\n;B[er];W[cq];B[hs];W[ir];B[dq];W[eo];B[ep];W[em];B[hk];W[mh]\n;B[qm];W[mn];B[ll];W[mp];B[mq];W[jn];B[nn];W[mo];B[rn];W[ro]\n;B[pp];W[qp];B[rq];W[rr];B[ki];W[nl];B[ol];W[nk];B[nm];W[kh]\n;B[lh];W[lg];B[li];W[mg];B[kg];W[lf];B[bn];W[an];B[dn];W[jm]\n;B[jl];W[gk];B[hj];W[rl];B[ql];W[rk];B[gm];W[fm];B[dm];W[dl]\n;B[ek];W[el];B[dk];W[ck];B[cd];W[jf];B[jg];W[hf];B[ie];W[gf]\n;B[ge];W[he];B[hd];W[fe];B[hg];W[gg];B[hh];W[gi];B[gj];W[rm]\n;B[qn];W[sn];B[bg];W[ai];B[bd];W[ae];B[hi];W[ge];B[ad];W[bf]\n;B[mi];W[ni];B[nj];W[oj];B[mj];W[ok];B[nh];W[ng];B[pd];W[nf]\n;B[pa];W[je];B[jd];W[hl];B[il];W[gp];B[gq];W[kr];B[jp];W[jo]\n;B[kp];W[ip];B[qq];W[qr];B[oi];W[oh];B[ni];W[mk];B[lk];W[kn]\n;B[lm];W[pn];B[om];W[is];B[gs];W[ks];B[os];W[ps];B[be];W[af]\n;B[qa];W[ra];B[cs];W[bs];B[ds];W[ns];B[ms];W[os];B[eg];W[ag]\n;B[ei])"
+    "sgf": "(;\nPB[Yasui Chitetsu]\nBR[7p]\nPW[Honinbo Dosaku]\nKM[0]\nRE[W+5]\nDT[1674-08-30]\nJD[Enpō 2-7-29]\nPC[Residence of Lord Kagatsume of Kai]\n\n;B[cp];W[eq];B[hq];W[qo];B[qd];W[oc];B[dc];W[ce];B[mc];W[md]\n;B[ld];W[ed];B[ec];W[fd];B[gc];W[gd];B[hc];W[fc];B[fb];W[gb]\n;B[hb];W[eb];B[ga];W[cc];B[db];W[qg];B[pe];W[nd];B[of];W[lc]\n;B[kc];W[lb];B[kb];W[le];B[kd];W[qb];B[mf];W[qj];B[ph];W[qh]\n;B[mb];W[rc];B[op];W[pq];B[oq];W[pr];B[lq];W[cm];B[do];W[cj]\n;B[fp];W[pi];B[on];W[or];B[nr];W[po];B[oo];W[cr];B[qc];W[rb]\n;B[fq];W[bq];B[cn];W[bm];B[dr];W[bo];B[bp];W[ap];B[di];W[dj]\n;B[fi];W[ej];B[fg];W[oe];B[pc];W[pf];B[ob];W[qe];B[nc];W[od]\n;B[pb];W[rd];B[me];W[og];B[fj];W[fl];B[fk];W[gl];B[cb];W[cg]\n;B[dg];W[bh];B[dd];W[ef];B[ff];W[ee];B[if];W[gh];B[ch];W[cf]\n;B[bi];W[ci];B[dh];W[bj];B[fh];W[ko];B[km];W[kq];B[lp];W[io]\n;B[im];W[iq];B[hp];W[lm];B[ln];W[lr];B[mr];W[jr];B[mm];W[hr]\n;B[gr];W[lo];B[ls];W[hm];B[in];W[ho];B[hn];W[go];B[gn];W[fo]\n;B[er];W[cq];B[hs];W[ir];B[dq];W[eo];B[ep];W[em];B[hk];W[mh]\n;B[qm];W[mn];B[ll];W[mp];B[mq];W[jn];B[nn];W[mo];B[rn];W[ro]\n;B[pp];W[qp];B[rq];W[rr];B[ki];W[nl];B[ol];W[nk];B[nm];W[kh]\n;B[lh];W[lg];B[li];W[mg];B[kg];W[lf];B[bn];W[an];B[dn];W[jm]\n;B[jl];W[gk];B[hj];W[rl];B[ql];W[rk];B[gm];W[fm];B[dm];W[dl]\n;B[ek];W[el];B[dk];W[ck];B[cd];W[jf];B[jg];W[hf];B[ie];W[gf]\n;B[ge];W[he];B[hd];W[fe];B[hg];W[gg];B[hh];W[gi];B[gj];W[rm]\n;B[qn];W[sn];B[bg];W[ai];B[bd];W[ae];B[hi];W[ge];B[ad];W[bf]\n;B[mi];W[ni];B[nj];W[oj];B[mj];W[ok];B[nh];W[ng];B[pd];W[nf]\n;B[pa];W[je];B[jd];W[hl];B[il];W[gp];B[gq];W[kr];B[jp];W[jo]\n;B[kp];W[ip];B[qq];W[qr];B[oi];W[oh];B[ni];W[mk];B[lk];W[kn]\n;B[lm];W[pn];B[om];W[is];B[gs];W[ks];B[os];W[ps];B[be];W[af]\n;B[qa];W[ra];B[cs];W[bs];B[ds];W[ns];B[ms];W[os];B[eg];W[ag]\n;B[ei])",
+    "moments": [
+      {
+        "index": 74,
+        "source": "katago",
+        "title": {
+          "zh": "白棋代价较大的一手",
+          "en": "A costly White move",
+          "ko": "백의 손해가 큰 수",
+          "ja": "白の損が大きい一手"
+        },
+        "note": {
+          "zh": "KataGo 会下中央的 J12；这一手让白棋损失约 4 目。黑棋的领先由约 5 目变为约 10 目。",
+          "en": "KataGo would play J12 (centre) instead; this costs White about 4 points. Black's lead goes from about 5 to about 10 points.",
+          "ko": "KataGo는 중앙의 J12에 둡니다. 이 수로 백은 약 4집을 손해 봅니다. 흑의 우세가 약 5집에서 약 10집이 됩니다.",
+          "ja": "KataGo は中央の J12 を選びます。この手で白は約4目損をしています。黒のリードが約5目から約10目になります。"
+        }
+      },
+      {
+        "index": 131,
+        "source": "katago",
+        "title": {
+          "zh": "全局最大的转折",
+          "en": "The largest swing",
+          "ko": "가장 큰 승부처",
+          "ja": "最大の分岐点"
+        },
+        "note": {
+          "zh": "KataGo 会下左下的 C3；这一手让黑棋损失约 6 目。原本大致均势，此后白棋领先约 5 目。",
+          "en": "KataGo would play C3 (lower left) instead; this costs Black about 6 points. The game was about even; now White leads by about 5 points.",
+          "ko": "KataGo는 좌하의 C3에 둡니다. 이 수로 흑은 약 6집을 손해 봅니다. 비슷하던 형세에서 이제 백이 약 5집 앞섭니다.",
+          "ja": "KataGo は左下の C3 を選びます。この手で黒は約6目損をしています。ほぼ互角だった形勢が、白の約5目リードになります。"
+        }
+      },
+      {
+        "index": 142,
+        "source": "katago",
+        "title": {
+          "zh": "白棋代价较大的一手",
+          "en": "A costly White move",
+          "ko": "백의 손해가 큰 수",
+          "ja": "白の損が大きい一手"
+        },
+        "note": {
+          "zh": "KataGo 会下右边的 Q7；这一手让白棋损失约 4 目。白棋约 4 目的领先没有了，局面回到均势。",
+          "en": "KataGo would play Q7 (right side) instead; this costs White about 4 points. White's lead of about 4 points is gone: the game is about even.",
+          "ko": "KataGo는 우변의 Q7에 둡니다. 이 수로 백은 약 4집을 손해 봅니다. 백의 약 4집 우세가 사라져 형세가 비슷해집니다.",
+          "ja": "KataGo は右辺の Q7 を選びます。この手で白は約4目損をしています。白の約4目のリードが消え、ほぼ互角になります。"
+        }
+      }
+    ]
   },
   {
     "id": "game-century",
@@ -873,6 +955,38 @@ export const CLASSICS = [
           "en": "Ke Jie invades the 3-3 point under White's star point as early as move 7, a move AlphaGo had made professionals take seriously; here he uses it against AlphaGo itself. AlphaGo won by half a point.",
           "ko": "커제가 7수 만에 백 화점 아래 삼삼에 들어갑니다. 알파고가 프로 기사들에게 다시 보게 만든 수로, 커제는 이를 알파고에게 사용했습니다. 알파고가 반집으로 이겼습니다.",
           "ja": "柯潔は7手目で早くも白の星の下の三々に入ります。AlphaGo がプロに見直させた打ち方で、それを AlphaGo 自身に向けました。AlphaGo が半目勝ちしました。"
+        }
+      },
+      {
+        "index": 55,
+        "source": "katago",
+        "title": {
+          "zh": "全局最大的转折",
+          "en": "The largest swing",
+          "ko": "가장 큰 승부처",
+          "ja": "最大の分岐点"
+        },
+        "note": {
+          "zh": "KataGo 会下左边的 G9；这一手让黑棋损失约 2.2 目。白棋的领先由约 3 目变为约 6 目。",
+          "en": "KataGo would play G9 (left side) instead; this costs Black about 2.2 points. White's lead goes from about 3 to about 6 points.",
+          "ko": "KataGo는 좌변의 G9에 둡니다. 이 수로 흑은 약 2.2집을 손해 봅니다. 백의 우세가 약 3집에서 약 6집이 됩니다.",
+          "ja": "KataGo は左辺の G9 を選びます。この手で黒は約2.2目損をしています。白のリードが約3目から約6目になります。"
+        }
+      },
+      {
+        "index": 190,
+        "source": "katago",
+        "title": {
+          "zh": "白棋代价较大的一手",
+          "en": "A costly White move",
+          "ko": "백의 손해가 큰 수",
+          "ja": "白の損が大きい一手"
+        },
+        "note": {
+          "zh": "KataGo 会下上边的 N18；这一手让白棋损失约 1.4 目。白棋的领先由约 8 目变为约 7 目。",
+          "en": "KataGo would play N18 (top) instead; this costs White about 1.4 points. White's lead goes from about 8 to about 7 points.",
+          "ko": "KataGo는 상변의 N18에 둡니다. 이 수로 백은 약 1.4집을 손해 봅니다. 백의 우세가 약 8집에서 약 7집이 됩니다.",
+          "ja": "KataGo は上辺の N18 を選びます。この手で白は約1.4目損をしています。白のリードが約8目から約7目になります。"
         }
       }
     ],

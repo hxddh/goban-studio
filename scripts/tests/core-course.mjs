@@ -42,7 +42,7 @@ await test("classics: the KataGo moments are what classics-moments.mjs writes fr
   for (const classic of CLASSICS) {
     for (const mo of (classic.moments || []).filter((x) => x.source === "katago")) {
       const move = checked.get(classic.id).moves[mo.index - 1];
-      assert.ok(move.loss >= 1.5, `${classic.id} ${mo.index}: a swing the check measured`);
+      assert.ok(move.loss >= 1, `${classic.id} ${mo.index}: a swing the check measured`);
       for (const lang of LANG_IDS) assert.ok(mo.note[lang].includes(move.best), `${classic.id} ${mo.index} ${lang}: names KataGo's move`);
     }
     // Every checked classic has at least three moments, hand-written or KataGo's.

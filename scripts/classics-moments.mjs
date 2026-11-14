@@ -7,7 +7,7 @@
  *   node scripts/classics-moments.mjs [--min 3] [--check]
  *
  * Every classic gets at least --min moments. The hand-written ones stay;
- * the rest are the game's largest swings while it was still in the
+ * the rest are the game's largest swings (1.5 points or more, else 1) while it was still in the
  * balance, at least 8 moves from another moment, with a note in four
  * languages that says only what the check measured: what KataGo would
  * play instead and where, how much the move cost, and how the lead
@@ -124,11 +124,13 @@ export function pick(game, kept, min) {
   if (want <= 0) return [];
   const taken = kept.map((k) => k.index);
   const chosen = [];
-  // The game in the balance first; a game decided early is allowed a wider margin.
-  for (const margin of [20, 35, Infinity]) {
+  // The game in the balance first; a game decided early is allowed a wider
+  // margin, and a game played this well (AlphaGo's) smaller swings.
+  const tries = [1.5, 1].flatMap((loss) => [20, 35, Infinity].map((margin) => ({ loss, margin })));
+  for (const { loss, margin } of tries) {
     const cands = game.moves
       .map((m) => ({ m }))
-      .filter(({ m }) => m.best && /^[A-HJ-T]\d+$/.test(m.best) && m.loss >= 1.5 && Math.abs(m.lead) <= margin)
+      .filter(({ m }) => m.best && /^[A-HJ-T]\d+$/.test(m.best) && m.loss >= loss && Math.abs(m.lead) <= margin)
       .sort((p, q) => q.m.loss - p.m.loss || p.m.n - q.m.n);
     for (const c of cands) {
       if (chosen.length >= want) break;

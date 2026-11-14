@@ -54,7 +54,7 @@ await test("explorer: the Chinese opening is Q16, Q3 and R9 (high: Q9), and noth
   for (const node of tree.nodes) {
     if (!shape[node.name]) continue;
     const pts = shape[node.name].map(at);
-    const ok = [0, 1, 2, 3, 4, 5, 6, 7].some((s) => pts.every(([x, y]) => { const p = Book.applySym(s, x, y); return node.signMap[p.y][p.x] === BLACK; }));
+    const ok = [0, 1, 2, 3, 4, 5, 6, 7].some((s) => pts.every(([x, y]) => { const [px, py] = Book.applySym(s, x, y); return node.signMap[py][px] === BLACK; }));
     assert.ok(ok, `record ${node.index} is named ${node.name} but is not that opening`);
   }
   // The old line (R4 with R10 or Q10) is still a book position, but it is not called the Chinese opening.
