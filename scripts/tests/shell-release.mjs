@@ -621,3 +621,39 @@ await test("the packaged self-test checks the downloads only when the workflow a
   assert.match(main, /GOBAN_SELFTEST_MODELS/);
   assert.match(main, /GOBAN_MODELS_DIR/);
 });
+
+/**
+ * The comment part of one line of Zig: from the first `//` that is not in a
+ * string or character literal, or "" (a multiline string line `\\…` is data).
+ */
+function zigComment(line) {
+  if (/^\s*\\\\/.test(line)) return "";
+  let quote = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "/" && line[i + 1] === "/") return line.slice(i);
+  }
+  return "";
+}
+
+await test("the shell's comments say what the code does, not which version added it", () => {
+  const files = [...fs.readdirSync(path.join(root, "src")).filter((f) => f.endsWith(".zig")).map((f) => `src/${f}`), "build.zig"];
+  assert.ok(files.length > 20);
+  const found = [];
+  for (const f of files) {
+    fs.readFileSync(path.join(root, f), "utf8").split(/\r?\n/).forEach((line, i) => {
+      // Quoted text in a comment is an example of data ("v14.0.0"), and a
+      // file name is a file name (docs/v9.md).
+      const comment = zigComment(line).replace(/"[^"]*"|`[^`]*`/g, "").replace(/[\w/-]*v\d+\.md\b/g, "");
+      if (/(?<![\w.-])v\d+(\.\d+)*\b/.test(comment)) found.push(`${f}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(found, [], "no `v13:` or `(since v5)` in a comment");
+  // The check sees through strings: data keeps its versions.
+  assert.equal(zigComment('const url = "https://x/v1.15.0/y"; // fetched once'), "// fetched once");
+  assert.equal(zigComment("    \\\\{\"tag_name\":\"v4.0.0\"} // not a comment"), "");
+});

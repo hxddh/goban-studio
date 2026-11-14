@@ -123,7 +123,8 @@ pub fn onEvent(context: *anyopaque, runtime: *native_sdk.Runtime, event: native_
 }
 
 /// Native menu picks reach the page as `menu:command` ({command, windowId});
-/// the v2 `shortcut` event is kept for older listeners.
+/// the same pick also goes out as a `shortcut` event ({id, command, key,
+/// windowId, modifiers}), for listeners that still use that name.
 fn forwardCommand(runtime: *native_sdk.Runtime, name: []const u8, window_id: u64) void {
     const wid: native_sdk.WindowId = if (window_id == 0) 1 else window_id;
     var buf: [512]u8 = undefined;

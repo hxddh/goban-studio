@@ -1,18 +1,17 @@
 //! KataGo sidecar for every board size.
 //!
 //! The web layer owns the game; this module owns the persistent KataGo GTP
-//! processes. One way in, the `Worker` (v3): a dedicated thread owns the
+//! processes. One way in, the `Worker`: a dedicated thread owns the
 //! GTP conversation. The UI thread hands it a structured position
 //! (`Request`), the worker brings KataGo's board there incrementally
 //! (undo/play from the last position it sent), searches with
 //! `kata-search_analyze_cancellable`, and queues partial reports and the
 //! final result for the UI thread to collect after a platform wake.
-//! Nothing here touches the webview or the runtime. (v13 removed the v2
-//! synchronous path, a GTP script from the page run on the UI thread: the
-//! page has used the worker since v3, and the script path could block the
-//! window for a whole search.)
+//! Nothing here touches the webview or the runtime, and nothing runs a
+//! search on the UI thread, where it could block the window for the whole
+//! search.
 //!
-//! v13 watchdog: KataGo is a separate program and can hang (a stuck GPU
+//! The watchdog: KataGo is a separate program and can hang (a stuck GPU
 //! driver, a network that never finishes loading, a pipe that stops). The
 //! worker gives every request a deadline (`deadlineMs`): its own `maxTime`
 //! plus a grace, much longer when the process still has to start and load
@@ -22,7 +21,7 @@
 //! (process discarded, the next request starts a fresh one), and the page
 //! falls back to its offline engine.
 //!
-//! v5: up to three KataGo processes, one per `Slot`, all driven by the same
+//! Up to three KataGo processes, one per `Slot`, all driven by the same
 //! worker thread (the page runs one search at a time anyway):
 //!
 //!   * `standard`  the shipped b6c96 network: the opponent ladder (its
@@ -381,7 +380,7 @@ pub const Engine = struct {
         if (self.slot != .standard and (extra.len == 0 or !exists(self.io, extra))) return error.ModelMissing;
         if (self.slot == .human and !exists(self.io, resolved.human_config)) return error.EngineMissing;
 
-        // v15: the faster build first, when this machine can run it
+        // The faster build first, when this machine can run it
         // (engine_build.zig). It must answer one GTP command, which it does
         // only once its backend is up and the network loaded; if it does
         // not, every slot uses the plain build from now on.

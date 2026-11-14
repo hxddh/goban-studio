@@ -14,7 +14,7 @@
 //! UI side (`timeout_ms`): a check that outlives it is answered with
 //! `Timeout`, and whatever its thread produces later is dropped.
 //!
-//! v13: the checker also remembers the tag its own last successful check
+//! The checker also remembers the tag its own last successful check
 //! returned (`lastTag`). The installer accepts only that tag, and only if
 //! it is newer than the running version (`isNewer`): the page cannot ask
 //! for an older release (a downgrade to a version with a known bug) or for

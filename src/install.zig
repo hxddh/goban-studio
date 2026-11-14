@@ -1,4 +1,4 @@
-//! In-app update install (v5).
+//! In-app update install.
 //!
 //! After an update check found a newer release, the player may choose
 //! "Download and install". Everything here happens only on that request:
@@ -13,21 +13,21 @@
 //!      On its own that catches corruption, truncation and a wrong file,
 //!      but it is not a signature: SHA256SUMS comes from the same release
 //!      over the same TLS connection to GitHub, so whoever can publish a
-//!      release can publish matching sums. v13: a build made with
+//!      release can publish matching sums. So a build made with
 //!      `-Dupdate-pubkey=<base64 Ed25519 public key>` (docs/signing.md)
 //!      also downloads `SHA256SUMS.sig` — the base64 of a 64-byte Ed25519
 //!      signature over the exact bytes of SHA256SUMS — and refuses the
 //!      update without a valid one (`NoSignature`, `BadSignature`). The
 //!      private key never touches GitHub's release storage; it lives in the
-//!      release job's secrets. A build without the option behaves as
-//!      before (checksums only), and says so nowhere it could mislead.
+//!      release job's secrets. A build without the option checks the
+//!      checksums only, and says so nowhere it could mislead.
 //!   3. Unpack into a per-user staging directory under the temp dir
 //!      (macOS: `ditto -x -k`, then `codesign --verify --deep --strict`;
 //!      Windows: std.zip with every entry name checked first), and check
 //!      the layout, the bundle id and the executable's CPU architecture.
 //!   4. Apply — on "Restart to update" the app writes its *embedded* helper
 //!      script (src/updater/) next to the staging directory and starts it
-//!      detached. v13: the helper takes an exclusive lock for the
+//!      detached. The helper takes an exclusive lock for the
 //!      installation (`.<name>.goban-lock` beside it: a second helper for
 //!      the same app refuses) and then creates a "started" marker in the
 //!      staging directory. The app quits only once that marker exists; if

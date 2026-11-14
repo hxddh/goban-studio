@@ -60,7 +60,7 @@ pub fn parseMoves(list: []const u8, size: u8, allow_pass: bool, out: []Move) err
     return n;
 }
 
-/// The rulesets the page can ask for (v5). Each maps to one KataGo
+/// The rulesets the page can ask for. Each maps to one KataGo
 /// `kata-set-rules` preset; anything else is an invalid request.
 pub const Rules = enum {
     japanese,
@@ -114,7 +114,7 @@ pub const Position = struct {
 /// What a request asks of KataGo.
 pub const Kind = enum { analyze, human_policy };
 
-/// Human-policy requests (v13, docs/strength.md "your moves"): at most this
+/// Human-policy requests (docs/strength.md "your moves"): at most this
 /// many positions and profiles, and this many network evaluations, per call.
 pub const max_policy_positions = 200;
 pub const max_policy_profiles = 8;

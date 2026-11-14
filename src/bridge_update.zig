@@ -130,7 +130,7 @@ fn spawnBrowser(io: std.Io, url: []const u8) bool {
 
 // ------------------------------------------------------------ update install
 //
-// v5: after a check found a newer release, the player may download and
+// After a check found a newer release, the player may download and
 // install it (install.zig). The download runs on its own thread; the page
 // polls `studio.updateStatus` for progress and is answered on
 // `studio.updateDownload` when the thread is done (platform wake, or the
@@ -213,7 +213,7 @@ const DownloadPayload = struct {
     tag: []const u8 = "",
 };
 
-/// May `tag` be installed over this version? v13: only the tag this
+/// May `tag` be installed over this version? Only the tag this
 /// app's own last successful check returned, and only when it is newer
 /// than the running version (no downgrades, no tags the page made up).
 /// Returns the refusal's error name, or null.

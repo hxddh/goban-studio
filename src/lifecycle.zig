@@ -1,4 +1,4 @@
-//! One instance per data directory (instance.zig) and the v13 quit gate:
+//! One instance per data directory (instance.zig) and the quit gate:
 //! the page's flush before a quit or window close, and the wait for the
 //! update helper.
 const std = @import("std");
@@ -114,7 +114,7 @@ pub fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const 
 
 // ------------------------------------------------------------ quit gate
 //
-// v13. Two waits that must end before the app goes away, both run by one
+// Two waits that must end before the app goes away, both run by one
 // 100 ms timer on the UI thread:
 //
 //   * the update helper's "started" marker (`studio.updateApply`): the app

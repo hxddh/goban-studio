@@ -22,7 +22,7 @@ pub fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocatio
     if (!json.append(output, &n, if (self.katago_available) "{\"available\":true" else "{\"available\":false")) return error.HandlerFailed;
     if (!json.append(output, &n, ",\"engine\":\"KataGo\",\"analyze\":true,\"async\":true,\"stream\":true,\"cancel\":true,\"incremental\":true,\"models\":true,\"version\":")) return error.HandlerFailed;
     if (!json.appendString(output, &n, self.katago_version)) return error.HandlerFailed;
-    // v13: `studio.katagoHumanPolicy` needs the human SL model.
+    // `studio.katagoHumanPolicy` needs the human SL model.
     const human = self.katago_available and self.models.isReady(.human);
     if (!json.append(output, &n, if (human) ",\"humanPolicy\":true}" else ",\"humanPolicy\":false}")) return error.HandlerFailed;
     return output[0..n];
@@ -41,8 +41,8 @@ const AnalyzePayload = struct {
     id: []const u8 = "",
     size: u32 = 19,
     komi: f64 = 6.5,
-    /// v5: "japanese" | "chinese" | "korean". A page without the field
-    /// (before v5) means Japanese, the only ruleset it knew.
+    /// "japanese" | "chinese" | "korean". Without the field (a page that
+    /// knew only one ruleset), Japanese.
     rules: []const u8 = "japanese",
     setup: []const u8 = "",
     moves: []const u8 = "",
@@ -50,11 +50,11 @@ const AnalyzePayload = struct {
     visits: u32 = 64,
     maxTime: f64 = 6.0,
     stream: bool = false,
-    /// v5: "standard" (default), "strong" or "human".
+    /// "standard" (default), "strong" or "human".
     engine: []const u8 = "standard",
-    /// v5, human engine only: a KataGo human SL profile ("rank_12k").
+    /// Human engine only: a KataGo human SL profile ("rank_12k").
     profile: []const u8 = "",
-    /// v5, human engine only: "raw" or "search".
+    /// Human engine only: "raw" or "search".
     humanStyle: []const u8 = "raw",
 };
 
@@ -308,7 +308,7 @@ fn submitJob(self: *App, job_in: *Job, req: *engine_request.Request, budget_ms: 
 
 // ------------------------------------------------------------ human policy
 //
-// v13 (docs/strength.md "your moves"): how likely a player of each rank
+// docs/strength.md "your moves": how likely a player of each rank
 // would have been to play the moves the player actually played, from the
 // human SL model's raw policy. One async request per finished game.
 
@@ -449,7 +449,7 @@ const CancelPayload = struct {
 
 /// `studio.katagoCancel` {id}: stop that request; `{}` (no id at all)
 /// stops every open one. The cancelled request itself replies
-/// {ok:false, cancelled:true}. v13: an id that is present but not a valid
+/// {ok:false, cancelled:true}. An id that is present but not a valid
 /// request id (empty, too long, odd characters) is an `InvalidRequest`,
 /// never "cancel everything".
 pub fn katagoCancel(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {

@@ -1,4 +1,4 @@
-//! Which KataGo executable to start (v15).
+//! Which KataGo executable to start.
 //!
 //! A package carries the plain build, `katago` / `katago.exe`, which runs on
 //! every machine the app supports, and may carry a faster one beside it:

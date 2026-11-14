@@ -10,7 +10,7 @@ const App = shell.App;
 
 // ------------------------------------------------------------ models
 //
-// Optional networks (v5). The page names a kind, never an address: the
+// Optional networks. The page names a kind, never an address: the
 // URLs, sizes and SHA-256 hashes are pinned in models.zig. Downloads run on
 // their own thread and write only under the app's data directory; the page
 // polls `studio.modelStatus` for progress.

@@ -1,4 +1,4 @@
-//! Windows: let the page flush before the window closes (v13).
+//! Windows: let the page flush before the window closes.
 //!
 //! The Native SDK's Windows host destroys the window on WM_CLOSE (close
 //! button, Alt+F4, the taskbar's "Close window") and the app quits with it;

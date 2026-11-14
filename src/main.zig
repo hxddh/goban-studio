@@ -70,7 +70,7 @@ pub fn main(init: std.process.Init) !void {
     var data_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const data_dir = paths_mod.dataDir(init.environ_map, &data_dir_buf);
     if (!lifecycle.claimInstance(&app_state, init, data_dir)) return;
-    // Optional networks (v5). Not freed at exit: a download thread may
+    // Optional networks (models.zig). Not freed at exit: a download thread may
     // still be running.
     var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const models = try std.heap.page_allocator.create(models_mod.Manager);
@@ -79,7 +79,7 @@ pub fn main(init: std.process.Init) !void {
     // system names (net.zig).
     models.env = init.environ_map;
     app_state.models = models;
-    // v9 file storage: the page's settings, profile and games (store.zig).
+    // File storage: the page's settings, profile and games (store.zig).
     app_state.store.init(init.io, data_dir);
     var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;

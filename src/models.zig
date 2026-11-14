@@ -1,4 +1,4 @@
-//! Optional KataGo networks (v5): downloaded only when the player asks.
+//! Optional KataGo networks: downloaded only when the player asks.
 //!
 //! The app ships the small b6c96 network and is complete without anything
 //! here. In Settings the player may fetch two more:

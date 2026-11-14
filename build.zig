@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     // apply. An explicit -Doptimize (or --release) pins both roles.
     const optimize_request = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size");
     const optimize = optimizeMode(b, optimize_request, .Debug);
-    // v13: packages are ReleaseSafe. The shell parses untrusted input (the
+    // Packages are ReleaseSafe. The shell parses untrusted input (the
     // page's JSON, KataGo's output, zip files) with plenty of slicing and
     // integer casts; in ReleaseFast an out-of-bounds index is silent memory
     // corruption, in ReleaseSafe a clean panic. The cost is negligible
@@ -61,11 +61,11 @@ pub fn build(b: *std.Build) void {
     const cef_auto_install_override = b.option(bool, "cef-auto-install", "Override app.zon CEF auto-install setting");
     const package_target = b.option(PackageTarget, "package-target", "Package target: macos, windows, linux") orelse .macos;
     const native_sdk_path = b.option([]const u8, "native-sdk-path", "Path to the Native SDK framework checkout") orelse default_native_sdk_path;
-    // v13 (docs/signing.md): the Ed25519 public key that must have signed a
+    // docs/signing.md: the Ed25519 public key that must have signed a
     // release's SHA256SUMS before the in-app updater installs it, as base64
-    // of its 32 bytes. Empty (the default): checksums only, as before.
+    // of its 32 bytes. Empty (the default): checksums only.
     const update_pubkey = b.option([]const u8, "update-pubkey", "Base64 Ed25519 public key that signs SHA256SUMS (empty: no signature check)") orelse "";
-    // v13: may the Vite dev server (http://127.0.0.1:5173) call the bridge?
+    // May the Vite dev server (http://127.0.0.1:5173) call the bridge?
     // Default: only in Debug builds of each exe (see appOptionsModule).
     const dev_origin_option = b.option(bool, "dev-origin", "Allow the dev server origin http://127.0.0.1:5173 (default: Debug builds only)");
     const package_optimize_name = @tagName(package_optimize);
@@ -297,17 +297,17 @@ fn nativeSdkPath(b: *std.Build, native_sdk_path: []const u8, sub_path: []const u
 /// Does this SDK checkout actually carry `sub_path`?
 ///
 /// The SDK is deliberately **not** pinned, so the build has to survive the
-/// version it happens to find. v1.45.0's Windows installer did not: SDK 0.7.2
-/// split a Direct2D compositor out into
-/// `src/platform/windows/gpu_surface_renderer.cpp` and made `webview2_host.cpp`
-/// call into it, while this file still compiled only the one host source —
-/// `lld-link: undefined symbol: createWindowsGpuRenderer()`, and the release
-/// shipped with a macOS zip and no Windows package. ≤0.7.1 has no such file,
-/// so adding it unconditionally would just move the breakage to older SDKs.
+/// version it happens to find. SDK 0.7.2 split a Direct2D compositor out
+/// into `src/platform/windows/gpu_surface_renderer.cpp` and made
+/// `webview2_host.cpp` call into it, so compiling only the one host source
+/// fails to link there (`lld-link: undefined symbol:
+/// createWindowsGpuRenderer()`), and the release ships without a Windows
+/// package. ≤0.7.1 has no such file, so adding it unconditionally would just
+/// move the breakage to older SDKs.
 fn nativeSdkHas(b: *std.Build, native_sdk_path: []const u8, sub_path: []const u8) bool {
     const joined = b.pathJoin(&.{ native_sdk_path, sub_path });
     // Zig 0.16 spelling: `std.fs.cwd()` is gone, and Io.Dir.access takes the
-    // build graph's io. (Wrote the 0.15 form first; it does not compile.)
+    // build graph's io. (The 0.15 form does not compile.)
     std.Io.Dir.cwd().access(b.graph.io, joined, .{}) catch return false;
     return true;
 }

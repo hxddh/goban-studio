@@ -1,4 +1,4 @@
-//! v9 file storage (docs/v9.md, "Storage"): the page's data as JSON files
+//! File storage (docs/v9.md, "Storage"): the page's data as JSON files
 //! under `<app data>/data`, read and written through four bridge commands
 //! (`studio.storeRead`, `studio.storeWrite`, `studio.storeList`,
 //! `studio.storeRemove`; see bridge_files.zig).

@@ -410,7 +410,7 @@ pub const Worker = struct {
         if (self.running_deadline_ms != 0) self.running_deadline_ms = @max(self.running_deadline_ms, now + ms);
     }
 
-    /// Human policy (v13): for each move of `req.color` from `policy_from`
+    /// Human policy: for each move of `req.color` from `policy_from`
     /// on, bring the human slot's board to the position before it and read
     /// the raw human SL policy under each profile: `kata-set-param
     /// humanSLProfile <p>` then `kata-raw-human-nn <color> 0` (one

@@ -45,12 +45,12 @@ pub const update_timer_interval_ns: u64 = 250 * std.time.ns_per_ms;
 /// watchdog) while `studio.updateDownload` is open.
 pub const install_timer_id: u64 = 0x696e_7374_616c;
 pub const install_timer_interval_ns: u64 = 500 * std.time.ns_per_ms;
-/// Timer that runs the quit gate (v13): the page's flush before the app
+/// Timer that runs the quit gate (lifecycle.zig): the page's flush before the app
 /// quits or the window closes, and the wait for the update helper's
 /// "started" marker.
 pub const gate_timer_id: u64 = 0x6761_7465;
 pub const gate_timer_interval_ns: u64 = 100 * std.time.ns_per_ms;
-/// How long the page gets to write what is pending before a quit (v13).
+/// How long the page gets to write what is pending before a quit.
 pub const flush_timeout_ms: i64 = 1_500;
 /// Timer that looks for a second launch's request (instance.zig).
 pub const inbox_timer_id: u64 = 0x696e_626f_78;
@@ -77,7 +77,7 @@ pub const Job = struct {
     /// The KataGo process that serves it (echoed as `engine`).
     slot: engine_mod.Slot = .standard,
     kind: engine_request.Kind = .analyze,
-    /// Backstop (v13): past this the page is answered `Timeout` whatever
+    /// Backstop: past this the page is answered `Timeout` whatever
     /// the worker is doing, so no request can hang. The worker's own
     /// watchdog (engine_worker.zig) normally fires long before.
     deadline_ms: i64 = 0,
@@ -147,7 +147,7 @@ pub const App = struct {
     update_responder: native_sdk.bridge.AsyncResponder = undefined,
     update_bridge_id: [native_sdk.bridge.max_id_bytes]u8 = undefined,
     update_bridge_id_len: usize = 0,
-    /// Update install (v5; see install.zig). One open `studio.updateDownload`
+    /// Update install (install.zig). One open `studio.updateDownload`
     /// call at a time; progress is read with `studio.updateStatus`.
     installer: *install_mod.Installer = undefined,
     install_wake_installed: bool = false,
@@ -161,11 +161,11 @@ pub const App = struct {
     install_target: install_apply.Target = .{},
     install_target_known: bool = false,
     staging_root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
-    /// Optional networks (v5, models.zig): the page polls their state.
+    /// Optional networks (models.zig): the page polls their state.
     models: *models_mod.Manager = undefined,
-    /// v9 file storage (store.zig): `<app data>/data`, set up in `main`.
+    /// File storage (store.zig): `<app data>/data`, set up in `main`.
     store: store_mod.Store = undefined,
-    /// v13: the user's files the page may read or write (files.zig).
+    /// The user's files the page may read or write (files.zig).
     grants: files_mod.Grants = undefined,
     /// Held for the life of the process: this is the one instance that
     /// uses the data directory (instance.zig). Null when no lock could be
@@ -175,7 +175,7 @@ pub const App = struct {
     /// A quit or window close has begun: requests of a second launch are
     /// left for it to notice that this process is going away.
     quitting: bool = false,
-    /// v13 quit gate. The page announces its flush hook
+    /// The quit gate (lifecycle.zig). The page announces its flush hook
     /// (`studio.flushHook`); a quit or window close then asks it to write
     /// what is pending (`app:flush` event) and waits for
     /// `studio.flushDone` or `flush_timeout_ms`, whichever comes first.
@@ -186,7 +186,7 @@ pub const App = struct {
     after_flush: AfterFlush = .none,
     gate_timer_running: bool = false,
     win_close_installed: bool = false,
-    /// v13: `studio.updateApply` waits for the helper's "started" marker
+    /// `studio.updateApply` waits for the helper's "started" marker
     /// before it answers and quits.
     apply_active: bool = false,
     apply_deadline_ms: i64 = 0,
