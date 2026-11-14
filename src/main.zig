@@ -93,6 +93,7 @@ pub fn main(init: std.process.Init) !void {
     app_state.request_scratch = try std.heap.page_allocator.create(engine_request.Request);
     app_state.request_scratch.* = .{};
     app_state.katago_available = katago.standard().available();
+    katago.build.present = katago.standard().preferredPresent();
     app_state.katago_version = katago.standard().versionText(&app_state.katago_version_buf);
     // Not freed at exit either: a check thread may still be finishing.
     const updater = try std.heap.page_allocator.create(update_mod.Checker);

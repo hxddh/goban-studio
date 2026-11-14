@@ -39,6 +39,54 @@ pub fn choose(preferred_present: bool, host_capable: bool, preferred_failed: boo
     return if (preferred_present and host_capable and !preferred_failed) .preferred else .plain;
 }
 
+/// The build in use, as the diagnostics name it (`studio.katagoStatus`):
+/// the Metal build, the AVX2 build, or the plain Eigen build.
+pub const Build = enum {
+    metal,
+    avx2,
+    eigen,
+
+    /// What the faster build is for `os`/`arch` (the plain one elsewhere).
+    pub fn faster(os: std.Target.Os.Tag, arch: std.Target.Cpu.Arch) Build {
+        return switch (os) {
+            .windows => if (arch == .x86_64) .avx2 else .eigen,
+            .macos => if (arch == .aarch64) .metal else .eigen,
+            else => .eigen,
+        };
+    }
+};
+
+/// The build `choose` picks, by name.
+pub fn inUse(os: std.Target.Os.Tag, arch: std.Target.Cpu.Arch, preferred_present: bool, host_capable: bool, preferred_failed: bool) Build {
+    return switch (choose(preferred_present, host_capable, preferred_failed)) {
+        .preferred => Build.faster(os, arch),
+        .plain => .eigen,
+    };
+}
+
+/// Why the faster build was given up for the session, if it was.
+pub const Fallback = enum(u8) {
+    none = 0,
+    /// It could not be started at all (not executable, or the system
+    /// refused to load it).
+    start_failed = 1,
+    /// It started but did not answer its first GTP command (it crashed
+    /// or exited: an illegal instruction, a GPU it cannot use).
+    no_answer = 2,
+    /// It was still loading when the request's time ran out.
+    timed_out = 3,
+
+    /// The reason code the page reads; null for `none`.
+    pub fn code(self: Fallback) ?[]const u8 {
+        return switch (self) {
+            .none => null,
+            .start_failed => "start-failed",
+            .no_answer => "no-answer",
+            .timed_out => "timed-out",
+        };
+    }
+};
+
 // ------------------------------------------------------------------ AVX2
 
 /// What CPUID and XGETBV report, as far as AVX2 is concerned.
@@ -157,6 +205,20 @@ test "choose: the faster build only when present, usable, and not failed" {
     try std.testing.expectEqual(Choice.plain, choose(true, false, false));
     try std.testing.expectEqual(Choice.plain, choose(true, true, true));
     try std.testing.expectEqual(Choice.plain, choose(false, false, true));
+}
+
+test "the build in use, by name, and why the faster one was given up" {
+    try std.testing.expectEqual(Build.metal, inUse(.macos, .aarch64, true, true, false));
+    try std.testing.expectEqual(Build.avx2, inUse(.windows, .x86_64, true, true, false));
+    try std.testing.expectEqual(Build.eigen, inUse(.macos, .aarch64, true, true, true));
+    try std.testing.expectEqual(Build.eigen, inUse(.macos, .aarch64, false, true, false));
+    try std.testing.expectEqual(Build.eigen, inUse(.windows, .x86_64, true, false, false));
+    try std.testing.expectEqual(Build.eigen, inUse(.macos, .x86_64, true, true, false));
+    try std.testing.expectEqual(Build.eigen, inUse(.linux, .x86_64, true, true, false));
+    try std.testing.expect(Fallback.none.code() == null);
+    try std.testing.expectEqualStrings("start-failed", Fallback.start_failed.code().?);
+    try std.testing.expectEqualStrings("no-answer", Fallback.no_answer.code().?);
+    try std.testing.expectEqualStrings("timed-out", Fallback.timed_out.code().?);
 }
 
 test "AVX2 needs the CPU bits and the OS saving the AVX state" {

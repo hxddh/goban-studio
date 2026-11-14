@@ -5,6 +5,7 @@ const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
 const engine_request = @import("engine_request.zig");
 const engine_worker = @import("engine_worker.zig");
+const engine_build = @import("engine_build.zig");
 const models_mod = @import("models.zig");
 const json = @import("json.zig");
 const bridge_update = @import("bridge_update.zig");
@@ -24,8 +25,35 @@ pub fn katagoStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocatio
     if (!json.appendString(output, &n, self.katago_version)) return error.HandlerFailed;
     // `studio.katagoHumanPolicy` needs the human SL model.
     const human = self.katago_available and self.models.isReady(.human);
-    if (!json.append(output, &n, if (human) ",\"humanPolicy\":true}" else ",\"humanPolicy\":false}")) return error.HandlerFailed;
+    if (!json.append(output, &n, if (human) ",\"humanPolicy\":true" else ",\"humanPolicy\":false")) return error.HandlerFailed;
+    const build = &self.katago.build;
+    if (!appendDiagnostics(output, &n, build.inUse(), build.fallback(), self.models.isReady(.strong), self.models.isReady(.human))) return error.HandlerFailed;
+    if (!json.append(output, &n, "}")) return error.HandlerFailed;
     return output[0..n];
+}
+
+/// What Settings → Engines shows: the build in use ("metal", "avx2",
+/// "eigen"), why the faster one was given up this session (a reason code,
+/// or null), and the network each slot runs (the optional ones only when
+/// installed).
+pub fn appendDiagnostics(output: []u8, n: *usize, build: engine_build.Build, fallback: engine_build.Fallback, strong: bool, human: bool) bool {
+    if (!json.append(output, n, ",\"build\":")) return false;
+    if (!json.appendString(output, n, @tagName(build))) return false;
+    if (!json.append(output, n, ",\"fallback\":")) return false;
+    if (fallback.code()) |code| {
+        if (!json.appendString(output, n, code)) return false;
+    } else if (!json.append(output, n, "null")) return false;
+    if (!json.append(output, n, ",\"networks\":{\"standard\":")) return false;
+    if (!json.appendString(output, n, engine_mod.standard_network)) return false;
+    if (strong) {
+        if (!json.append(output, n, ",\"strong\":")) return false;
+        if (!json.appendString(output, n, models_mod.spec(.strong).name)) return false;
+    }
+    if (human) {
+        if (!json.append(output, n, ",\"human\":")) return false;
+        if (!json.appendString(output, n, models_mod.spec(.human).name)) return false;
+    }
+    return json.append(output, n, "}");
 }
 
 // ------------------------------------------------------------ async KataGo
@@ -592,4 +620,27 @@ test "human policy replies are JSON the page reads" {
     parsed.deinit();
     var small: [40]u8 = undefined;
     try std.testing.expect(policyReply(&small, "p7", rows) == null);
+}
+
+test "the diagnostics: the build in use, why the faster one was given up, and each slot's network" {
+    var buf: [512]u8 = undefined;
+    var n: usize = 0;
+    try std.testing.expect(appendDiagnostics(&buf, &n, .metal, .none, false, false));
+    try std.testing.expectEqualStrings(",\"build\":\"metal\",\"fallback\":null,\"networks\":{\"standard\":\"g170-b6c96-s175395328-d26788732\"}", buf[0..n]);
+    n = 0;
+    try std.testing.expect(appendDiagnostics(&buf, &n, .eigen, .no_answer, true, true));
+    try std.testing.expectEqualStrings(",\"build\":\"eigen\",\"fallback\":\"no-answer\",\"networks\":{\"standard\":\"g170-b6c96-s175395328-d26788732\",\"strong\":\"kata1-b18c384nbt-s9996604416-d4316597426\",\"human\":\"b18c384nbt-humanv0\"}", buf[0..n]);
+    // The whole status stays JSON.
+    var whole: [600]u8 = undefined;
+    var m: usize = 0;
+    try std.testing.expect(json.append(&whole, &m, "{\"available\":true"));
+    try std.testing.expect(appendDiagnostics(&whole, &m, .avx2, .timed_out, false, true));
+    try std.testing.expect(json.append(&whole, &m, "}"));
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, whole[0..m], .{});
+    defer parsed.deinit();
+    try std.testing.expectEqualStrings("timed-out", parsed.value.object.get("fallback").?.string);
+    // Too small a buffer is refused, never cut.
+    var small: [40]u8 = undefined;
+    n = 0;
+    try std.testing.expect(!appendDiagnostics(&small, &n, .eigen, .none, false, false));
 }
