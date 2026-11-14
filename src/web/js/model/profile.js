@@ -16,9 +16,10 @@
  *     week: { start, focus: [key], areas? } | null,   // this week's focus, kept
  *     days: { [yyyymmdd]: count },                  // games finished and problems tried per local day
  *     marks: { [milestone]: at },                   // one-time milestones, when first reached
+ *     seed?: string,                                // this player's draws: a problem's first colour
  *   }
  *
- * `first`, `seen`, `days`, `marks`, a game's `assisted` and a history
+ * `first`, `seen`, `days`, `marks`, `seed`, a game's `assisted` and a history
  * point's `r`/`sd` are optional additions to the version-13 file: a file
  * without them reads as before (nothing to migrate), and a record whose
  * first-sight result is not known is left out of the solving level.
@@ -217,7 +218,20 @@ export function normalizeProfile(raw) {
   for (const [k, v] of Object.entries(obj(raw.days) || {})) if (/^\d{8}$/.test(k) && num(v, 0) > 0) days[k] = Math.floor(num(v));
   const marks = {};
   for (const [k, v] of Object.entries(obj(raw.marks) || {})) if (finite(v)) marks[k] = v;
-  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week, placement, days: trimDays(days), marks };
+  const seed = isSeed(raw.seed) ? { seed: raw.seed } : {};
+  return { v: PROFILE_V, rating, history, games: normalizeGames(raw.games), problems, mistakes: mistakes.slice(0, MAX_MISTAKES), lessons, classics, week, placement, days: trimDays(days), marks, ...seed };
+}
+
+/** A profile's seed: up to 16 letters and digits (newSeed makes eight). */
+const isSeed = (v) => typeof v === "string" && /^[0-9a-z]{1,16}$/i.test(v);
+
+/**
+ * A new seed for a profile that has none: eight hex digits, drawn once.
+ * The app gives it to the profile it loads (boot.js), so it is written
+ * with the profile's next change.
+ */
+export function newSeed(rand = Math.random) {
+  return Math.floor(rand() * 0x100000000).toString(16).padStart(8, "0");
 }
 
 /* ============================================================ the focus */
