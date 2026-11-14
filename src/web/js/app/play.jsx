@@ -11,7 +11,7 @@ import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
-import { verdictOf } from "../play/verdict.js";
+import { tallyVerdicts, verdictOf } from "../play/verdict.js";
 import { Board, Button, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
 import { ScoreCard } from "./score-card.jsx";
 import { NarrowFold, Toolbar } from "./chrome.jsx";
@@ -462,11 +462,8 @@ function ScoringCard() {
 function GameTally() {
   const g = state.game;
   const moves = g.game.mainLine().length - 1;
-  const counts = { good: 0, slack: 0, mistake: 0 };
-  for (const loss of Object.values(g.verdicts || {})) {
-    const v = verdictOf(loss, state.settings.playerRank);
-    if (v) counts[v]++;
-  }
+  // Only the moves the game kept (a move taken back keeps its verdict in g.verdicts).
+  const counts = tallyVerdicts(g.game.mainLine(), g.verdicts, state.settings.playerRank);
   const judged = counts.good + counts.slack + counts.mistake > 0;
   return (
     <div class="game-tally">
