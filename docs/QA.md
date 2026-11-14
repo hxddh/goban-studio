@@ -39,6 +39,15 @@ the workflows, the SDK scripts or `package.json` / `package-lock.json`
 compiles the shell and runs its unit tests on a macOS and a Windows
 runner. It builds no KataGo, packages nothing and signs nothing.
 
+Since v16 a pull request that touches what the packages are made of
+(the shell sources, `src/web/js/selftest.js`, `engine/`, `packaging/`,
+`build-macos.yml`, `build-windows.yml`, `release.yml`, or the packaging
+scripts) also runs the release's own builds, `package-macos` (Apple
+Silicon, Metal and Eigen KataGo) and `package-windows` (AVX2 and plain),
+each ending in the packaged app's self-test. No secret is passed, so the
+packages are unsigned, and nothing is published. All four faults v15's
+release rehearsals found would have failed here.
+
 ## Static checks (`npm run lint`)
 
 ESLint with `eslint.config.js`: undefined names, unused variables and
@@ -222,7 +231,9 @@ No machine can check these, and none has been done yet:
   built and its `version` checked there, but whether it answers a move on
   the runner's virtual GPU is informational, and neither the speed-up nor
   the fallback on a real Mac or PC has been tried. Nor has the Metal build
-  under the hardened runtime of a Developer ID build.
+  under the hardened runtime of a Developer ID build. Settings → Engines
+  shows the build in use, the fallback reason and the visits per second,
+  which is what such a check should record.
 - **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192;
   the top level and the analysis budget that use it have not been measured
   again (`docs/strength.md`, "v15").

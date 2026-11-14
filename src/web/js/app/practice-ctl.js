@@ -301,14 +301,15 @@ export function openProblem(id, { daily = null, placement = false } = {}) {
 }
 
 /**
- * A problem tried before comes back turned, mirrored and sometimes in
- * the other colour (practice/transform.js), so a review asks for the idea, not
- * the remembered picture. The placement quiz and the first showing use the
- * problem as written. The id stays, so the result is the same problem's.
+ * A problem's first showing is as written, Black or White to play as the
+ * profile's seed chooses (practice/transform.js); one tried before comes
+ * back turned, mirrored and sometimes recoloured, so a review asks for the
+ * idea, not the remembered picture. The placement quiz uses the problem as
+ * written. The id stays, so the result is the same problem's.
  */
 function shownDef(p, { placement = false } = {}) {
   if (placement) return p;
-  return transformProblem(p, reviewTransform(p, state.profile.problems?.[p.id]?.tries || 0));
+  return transformProblem(p, reviewTransform(p, state.profile.problems?.[p.id]?.tries || 0, state.profile.seed));
 }
 
 function showProblem(id, daily, placement = false) {

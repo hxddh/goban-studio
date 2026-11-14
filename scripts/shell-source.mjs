@@ -4,6 +4,7 @@
  * (`shellSource()`, main.zig first), the update install (`installSource()`)
  * and the KataGo sidecar (`engineSource()`). Each is its files concatenated
  * with Unix line endings, so a check can look for code wherever it lives.
+ * The HTTPS client's files are listed too (`NET_FILES`).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -29,6 +30,9 @@ export const INSTALL_FILES = ["src/install.zig", "src/install_verify.zig", "src/
 
 /** The KataGo sidecar: engine.zig and the modules split from it. */
 export const ENGINE_FILES = ["src/engine.zig", "src/engine_request.zig", "src/engine_worker.zig"];
+
+/** The HTTPS client: net.zig and the modules split from it. */
+export const NET_FILES = ["src/net.zig", "src/net_proxy.zig", "src/net_tunnel.zig"];
 
 /** `files` concatenated, the first one first, with Unix line endings. */
 export function zigSource(files, dir = root) {

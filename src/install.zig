@@ -58,6 +58,7 @@ const builtin = @import("builtin");
 const update = @import("update.zig");
 const json = @import("json.zig");
 const net = @import("net.zig");
+const net_tunnel = @import("net_tunnel.zig");
 const paths = @import("paths.zig");
 const install_verify = @import("install_verify.zig");
 const install_package = @import("install_package.zig");
@@ -182,7 +183,7 @@ pub const Installer = struct {
     /// SHA256SUMS must carry a valid signature by it.
     public_key: ?[install_verify.Ed25519.PublicKey.encoded_length]u8 = null,
     /// Set once before the first download (`setEnv`): where the proxy
-    /// settings are read from (net.zig). Null: always connect directly.
+    /// settings are read from (net_proxy.zig). Null: always connect directly.
     env: ?*const std.process.Environ.Map = null,
     /// Tests: called instead of starting a download thread.
     spawn_hook: ?*const fn (self: *Installer, job: *Job) void = null,
@@ -473,7 +474,7 @@ pub const Installer = struct {
         const io = self.io;
         const asset = job.platform.assetName() orelse return error.Unsupported;
         // Through the proxy the environment or the system names, if any.
-        var session: net.Session = undefined;
+        var session: net_tunnel.Session = undefined;
         session.init(std.heap.page_allocator, io, self.env, "github.com");
         defer session.deinit();
 
@@ -604,7 +605,7 @@ pub const Installer = struct {
     /// asking only for the rest.
     fn fetchFile(
         self: *Installer,
-        session: *net.Session,
+        session: *net_tunnel.Session,
         job: *const Job,
         url: []const u8,
         out_path: []const u8,

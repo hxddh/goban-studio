@@ -87,15 +87,18 @@ await test("advanced opening: the Chinese opening is Q16, Q3 and R9 — the side
     const b = stones(lesson(id).steps[i].board, "X");
     for (const p of ["15,3", "15,16", "16,10"]) assert.ok(b.includes(p), `${id}#${i}: ${p}`);
   }
-  // Against it White approaches from the bottom, one point away from the 3-4 stone — not between Black's stones.
-  assert.deepEqual(lesson("adv-open-direction").steps[2].accept, [{ x: 13, y: 16 }, { x: 13, y: 15 }]);
+  // Against it White approaches the 3-4 stone the way v16's book rates best: the one-space high
+  // approach from the right side, Q5 (the approaches from the bottom are not among KataGo's candidates).
+  assert.deepEqual(lesson("adv-open-direction").steps[2].accept, [{ x: 15, y: 14 }]);
 });
 
 await test("advanced: every opening and joseki step the book knows accepts only book-quality moves", () => {
-  // The Chinese opening's side stone: the book has the position before it, but KataGo's search there
-  // did not look at R9 or Q9 (it prefers an enclosure), so these two steps have no evaluation to hold
-  // them to. When a rebuilt book lists the move, this exception fails and must go.
-  const unsearched = new Set(["adv-open-chinese#1", "adv-open-chinese#2"]);
+  // Steps the book has the position for but no evaluation of the accepted move: KataGo's search
+  // there did not list it, so there is nothing to hold it to. v16's book evaluates the Chinese
+  // opening's side stone (once listed here); after the 3-4 point's low approach and the knight's
+  // move answer it lists only moves elsewhere, not the two-space extension the lesson teaches.
+  // When a rebuilt book lists the move, the exception fails and must go.
+  const unsearched = new Set(["adv-joseki-knight#3"]);
   let known = 0;
   for (const id of ["adv-opening", "adv-joseki", "adv-handicap"])
     for (const l of unit(id).lessons)

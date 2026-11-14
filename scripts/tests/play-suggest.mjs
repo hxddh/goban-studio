@@ -86,6 +86,8 @@ await test("classics: the moments are the famous moves, written in four language
       if (i) assert.ok(mo.index > ms[i - 1].index, `${c.id}: moments in game order`);
       for (const k of ["title", "note"]) for (const lang of ["zh", "en", "ko", "ja"]) assert.ok(mo[k]?.[lang]?.trim(), `${c.id} ${mo.index} ${k}.${lang}`);
       // Written moments only, and none calls a move a mistake or the best move unless KataGo agrees.
+      // A game the last check ran out of time on is listed as missing; its claims wait for the rerun.
+      if (!byId[c.id]) return assert.ok(data.missing?.includes(c.id), `${c.id}: neither checked nor listed as missing`);
       const mv = byId[c.id].moves[mo.index - 1];
       if (mo.claim === "mistake") assert.ok(mv.loss >= 3, `${c.id} ${mo.index}: a mistake loses ${mv.loss}`);
       if (mo.claim === "best") assert.ok(mv.move === mv.best || mv.loss <= 1, `${c.id} ${mo.index}: best move loses ${mv.loss}`);

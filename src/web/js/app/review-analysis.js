@@ -11,7 +11,7 @@ import { state, update, updateSlice } from "./store.js";
 import { persistLive } from "./ctl-core.js";
 import { buildReview, keyMovesOf as keyMistakes, reviewFits } from "../play/review-model.js";
 import { analyzeLine, storeAnalysis, visitsFor } from "../play/analysis.js";
-import { recordIdOf, startLive } from "./review-position.js";
+import { recordIdOf, reviewIndex, startLive } from "./review-position.js";
 
 /* --------------------------------------------------------- analysis */
 
@@ -97,6 +97,7 @@ export async function analyzeReview(review, { existing = null } = {}) {
     review.analyzed = existing.filter(Boolean).length;
   }
   update();
+  let onBoard = false;
   // A background job of the scheduler, owned by this review.
   const job = Engine.sched.startJob({
     kind: "review",
@@ -110,6 +111,8 @@ export async function analyzeReview(review, { existing = null } = {}) {
         onPoint: (i, p) => {
           review.points[i] = p;
           review.engine = p.source;
+          // The board shows this move's ownership: it is drawn again with the next tick.
+          if (review.ownership && state.review === review && i === reviewIndex()) onBoard = true;
         },
         onProgress: (k, n) => {
           review.analyzed = k;
@@ -117,7 +120,9 @@ export async function analyzeReview(review, { existing = null } = {}) {
           if (k % 4 === 0 || k === n) {
             review.keyMoves = keyMovesOf(review);
             if (k % 16 === 0 || k === n) refreshModel(review);
-            updateSlice("review");
+            // A tick re-renders what shows the analysis (store.js "analysis"), not the review around it.
+            updateSlice(onBoard ? ["analysis", "review"] : "analysis");
+            onBoard = false;
           }
         },
       }),

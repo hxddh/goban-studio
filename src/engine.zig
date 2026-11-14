@@ -70,15 +70,32 @@ pub const Slot = enum(u2) {
 };
 pub const slot_count = 3;
 
+/// The network the package ships for the standard slot (engine/model/README.md).
+pub const standard_network = "g170-b6c96-s175395328-d26788732";
+
 /// Which executable the slots start, shared by them (engine_build.zig):
 /// whether this machine can run the faster build, and whether it already
 /// failed to start this session (then every slot uses the plain one).
 pub const BuildState = struct {
     capable: bool = false,
+    /// The package has the faster build (set once, before the worker starts).
+    present: bool = false,
     failed: std.atomic.Value(bool) = .init(false),
+    /// Why it failed (engine_build.Fallback), stored before `failed`.
+    reason: std.atomic.Value(u8) = .init(0),
 
     pub fn detect() BuildState {
         return .{ .capable = engine_build.hostCapable() };
+    }
+
+    /// The build the slots run now, or will run when they start.
+    pub fn inUse(self: *const BuildState) engine_build.Build {
+        return engine_build.inUse(builtin.os.tag, builtin.cpu.arch, self.present, self.capable, self.failed.load(.acquire));
+    }
+
+    pub fn fallback(self: *const BuildState) engine_build.Fallback {
+        if (!self.failed.load(.acquire)) return .none;
+        return std.enums.fromInt(engine_build.Fallback, self.reason.load(.acquire)) orelse .none;
     }
 };
 
@@ -358,6 +375,12 @@ pub const Engine = struct {
         return self.paths() != null;
     }
 
+    /// The package has the faster build beside the plain one.
+    pub fn preferredPresent(self: *@This()) bool {
+        const resolved = self.paths() orelse return false;
+        return resolved.preferred != null;
+    }
+
     pub fn versionText(self: *@This(), output: []u8) []const u8 {
         const resolved = self.paths() orelse return "KataGo 19x19";
         var file = std.Io.Dir.openFileAbsolute(self.io, resolved.version, .{}) catch return "KataGo 19x19";
@@ -392,10 +415,10 @@ pub const Engine = struct {
                         self.running_preferred = true;
                         return;
                     } else |err| {
-                        try self.preferredFailed(err);
+                        try self.preferredFailed(err, .no_answer);
                     }
                 } else |err| {
-                    try self.preferredFailed(err);
+                    try self.preferredFailed(err, .start_failed);
                 }
             }
         }
@@ -407,7 +430,7 @@ pub const Engine = struct {
     /// on with the plain build, unless the watchdog killed it (the request
     /// has used up its time; it is answered Timeout, and the next one
     /// starts the plain build).
-    fn preferredFailed(self: *@This(), err: anyerror) !void {
+    fn preferredFailed(self: *@This(), err: anyerror, reason: engine_build.Fallback) !void {
         var killed = false;
         if (self.write_lock) |lock| {
             lock.lockUncancelable(self.io);
@@ -415,7 +438,11 @@ pub const Engine = struct {
             lock.unlock(self.io);
         } else killed = self.killed;
         self.deinit(self.io);
-        if (self.build) |build| build.failed.store(true, .release);
+        if (self.build) |build| {
+            const why: engine_build.Fallback = if (killed) .timed_out else reason;
+            build.reason.store(@intFromEnum(why), .release);
+            build.failed.store(true, .release);
+        }
         if (killed) return err;
     }
 
@@ -733,6 +760,11 @@ test "the faster build is tried first; when it does not start, every slot uses t
     try engine.start();
     try std.testing.expect(!engine.running_preferred);
     try std.testing.expect(build.failed.load(.acquire));
+    // The diagnostics say so: the plain build, because it did not answer.
+    build.present = engine.preferredPresent();
+    try std.testing.expect(build.present);
+    try std.testing.expectEqual(engine_build.Build.eigen, build.inUse());
+    try std.testing.expectEqual(engine_build.Fallback.no_answer, build.fallback());
     try std.testing.expectEqualStrings("KataGo", try engine.command("name"));
     engine.deinit(io);
     // Remembered: the next start (of any slot sharing `build`) goes straight
@@ -740,14 +772,28 @@ test "the faster build is tried first; when it does not start, every slot uses t
     engine.preferred_name = "katago-fast";
     try engine.start();
     try std.testing.expect(!engine.running_preferred);
+    try std.testing.expectEqual(engine_build.Fallback.no_answer, build.fallback());
     engine.deinit(io);
 
     // A faster build that starts is the one used.
-    build = .{ .capable = true };
+    build = .{ .capable = true, .present = true };
     try engine.start();
     try std.testing.expect(engine.running_preferred);
+    try std.testing.expectEqual(engine_build.Build.faster(builtin.os.tag, builtin.cpu.arch), build.inUse());
+    try std.testing.expectEqual(engine_build.Fallback.none, build.fallback());
     try std.testing.expectEqualStrings("KataGo", try engine.command("name"));
     engine.deinit(io);
+
+    // One that cannot be started at all (not executable).
+    try tmp.dir.writeFile(io, .{ .sub_path = try std.fmt.bufPrint(&path_buf, "{s}/katago-noexec", .{platform}), .data = answers });
+    engine.preferred_name = "katago-noexec";
+    build = .{ .capable = true, .present = true };
+    try engine.start();
+    try std.testing.expect(!engine.running_preferred);
+    try std.testing.expectEqual(engine_build.Fallback.start_failed, build.fallback());
+    try std.testing.expectEqual(engine_build.Build.eigen, build.inUse());
+    engine.deinit(io);
+    engine.preferred_name = "katago-fast";
 
     // A machine that cannot run it never tries.
     build = .{ .capable = false };
@@ -756,4 +802,3 @@ test "the faster build is tried first; when it does not start, every slot uses t
     try std.testing.expect(!build.failed.load(.acquire));
     engine.deinit(io);
 }
-

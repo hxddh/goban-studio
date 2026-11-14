@@ -25,9 +25,9 @@ The course has changed since, and **the audit has not been run again**:
   steps and the step numbers after a split differ from the ones in the
   generated section (`scripts/tests/course-steps.mjs` keeps a step under
   170 Chinese characters).
-- The Chinese opening lesson was corrected to Q16–Q3–R9 (high: Q9). It
-  waits for a rebuild of the opening book with KataGo and for a strong
-  player's look; the entry below names the four steps.
+- The Chinese opening lesson was corrected to Q16–Q3–R9 (high: Q9). v16's
+  book evaluates it; one step changed with it, and two wait for a strong
+  player's look (the entry below).
 
 ## Method
 
@@ -174,20 +174,31 @@ The v13 units `adv-opening` (view whole), `adv-joseki` (local;
 generated section below does not list them yet. Before KataGo sees them:
 
 - Every opening and joseki step whose position is in the opening book
-  (`content/book.json`, KataGo 1.18.1, 2000 visits) accepts only moves the
+  (`content/book.json`, KataGo 1.18.1; since v16 kata1-b18c384nbt at 1,000
+  visits, before that g170e-b15c192 at 2,000) accepts only moves the
   book rates within `JOSEKI_LOSS` (1.5 points) of its best;
   `scripts/tests/core-course-advanced.mjs` enforces this.
-- **The Chinese opening has no evaluation yet.** The lesson
+- **The Chinese opening, evaluated (v16).** The lesson
   (`adv-open-chinese`) and the book's table (`scripts/make-book.mjs`) used
   Q16–R4–R10 (high: Q10) until it was corrected to the real opening,
-  Q16–Q3–R9 (high: Q9). The shipped book was built with the old line, so it
-  has the position before the side stone but no evaluation of R9 or Q9
-  (KataGo's own choices there are the enclosures Q5, R6 and Q6), and the
-  two wrong labels were removed from it. Waiting for a book rebuild and a
-  run: `adv-open-chinese#1` and `#2` (the side stone), the approach
-  against it from the bottom (`adv-open-direction#2`: O3 or O4) and the
-  3-3 block toward it (`adv-joseki-choose#2`). A strong player should
-  look at these four steps.
+  Q16–Q3–R9 (high: Q9). v16 rebuilt the book with kata1-b18c384nbt, and it
+  now has both forms with their replies. What that changed:
+  - `adv-open-chinese#1` and `#2` (the side stone, R9 or Q9) are evaluated
+    and within `JOSEKI_LOSS`.
+  - `adv-open-direction#2`, White's approach to the 3-4 stone, taught the
+    approach from the bottom (O3 or O4) and said not to come in from the
+    right side. The book's candidates there are O17 (0.0), Q5 (0.1), F17,
+    C6, Q4, R17, F3 and C14; O3 and O4 are not among them. The step now
+    asks for Q5, the one-space high approach from the right side, and says
+    the old advice is not KataGo's choice.
+  - `adv-joseki-knight#3` (the two-space extension M17 after the low
+    approach and the knight's move answer) is in the book's position now,
+    but its candidates there are all moves elsewhere (C3, F3, C6, R6, O3,
+    F17), so the extension has no evaluation; the test lists it as
+    unsearched until a book lists the move.
+  A strong player should still look at `adv-open-direction#2`,
+  `adv-joseki-knight#3` and the 3-3 block toward the opening
+  (`adv-joseki-choose#2`).
 - Not covered by the book, so the next run is their first check: the
   urgent-point lesson (`adv-open-urgent`, whose life-and-death part the
   solver proves), the small knight's enclosure (`adv-joseki-knight#1`),

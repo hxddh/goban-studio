@@ -4,7 +4,7 @@
  * teaching warning.
  */
 import { test, assert } from "./helpers.mjs";
-import { SLACK_FROM, mistakeFrom, moveLoss, verdictOf } from "../../src/web/js/play/verdict.js";
+import { SLACK_FROM, mistakeFrom, moveLoss, tallyVerdicts, verdictOf } from "../../src/web/js/play/verdict.js";
 
 await test("play verdict: the loss is the best move's lead minus the lead after the move, for the mover", () => {
   const before = { moves: [{ scoreLead: 3 }] };
@@ -12,6 +12,14 @@ await test("play verdict: the loss is the best move's lead minus the lead after 
   assert.equal(moveLoss(before, { scoreLead: 5 }, -1), 2, "White gained Black two: White lost two");
   assert.equal(moveLoss({ moves: [] }, { scoreLead: 1 }, 1), null, "no best move, nothing to say");
   assert.equal(moveLoss(before, { scoreLead: NaN }, 1), null);
+});
+
+await test("play verdict: the game's tally counts only the moves it kept, not one taken back", () => {
+  // Moves 1 and 3 are on the main line; move "2b" was a mistake that was taken back.
+  const line = [{ id: "root" }, { id: "1" }, { id: "2" }, { id: "3" }];
+  const verdicts = { 1: 0.5, "2b": 9, 3: 2 };
+  assert.deepEqual(tallyVerdicts(line, verdicts, 15), { good: 1, slack: 1, mistake: 0 });
+  assert.deepEqual(tallyVerdicts(line, null, 15), { good: 0, slack: 0, mistake: 0 });
 });
 
 await test("play verdict: good below 1.5 points, slack from 1.5, a mistake at the teaching warning's threshold", () => {

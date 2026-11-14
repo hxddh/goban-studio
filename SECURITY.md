@@ -35,7 +35,7 @@ Only the latest release is supported. There are no older branches.
   your system (or the `HTTPS_PROXY` environment variable) names an HTTP
   proxy, these requests go through it as a CONNECT tunnel: the proxy learns
   the host name, and TLS is still verified end to end with the server
-  (`src/net.zig`). Only
+  (`src/net_tunnel.zig`). Only
   plain HTTP proxies are used; SOCKS proxies and auto-config (PAC) scripts
   are not, and when no tunnel can be set up the request goes out directly.
 - **Files you choose.** SGF files and backups are read and written where

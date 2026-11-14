@@ -435,6 +435,12 @@ export default async function ({ test, assert, root }) {
     assert.deepEqual(p.classics, { "shusaku-ear-reddening": { done: true, at: NOW } });
     assert.deepEqual(P.normalizeProfile(JSON.parse(JSON.stringify(p))), p);
     assert.deepEqual(P.normalizeProfile({ ...p, classics: { a: { done: "yes" }, b: 3 } }).classics, {}, "a classic is done or not there");
+    // The seed of the player's draws (a problem's first colour) is kept through every change, and junk is dropped.
+    const seeded = { ...p, seed: P.newSeed(() => 0.5) };
+    assert.equal(seeded.seed, "80000000");
+    assert.equal(P.recordProblem(seeded, PROBLEMS[1].id, { solved: false }, NOW).seed, "80000000");
+    assert.equal(P.normalizeProfile(JSON.parse(JSON.stringify(seeded))).seed, "80000000");
+    for (const seed of [3, "", "a b", "x".repeat(17), null]) assert.equal("seed" in P.normalizeProfile({ ...p, seed }), false, String(seed));
     // Damaged parts go, the rest stays.
     const bad = JSON.parse(JSON.stringify(p));
     bad.rating[19] = { mu: "x" };

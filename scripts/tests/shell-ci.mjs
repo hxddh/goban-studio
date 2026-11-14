@@ -316,6 +316,32 @@ await test("ci: pull requests that touch the shell compile and test it on macOS 
   }
 });
 
+await test("ci: pull requests that touch what the packages are made of build and self-test both packages", () => {
+  const checks = wf["checks.yml"];
+  const mac = checks.jobs["package-macos"];
+  const win = checks.jobs["package-windows"];
+  assert.equal(mac.uses, "./.github/workflows/build-macos.yml");
+  assert.deepEqual(mac.with, { runner: "macos-15", arch: "arm64" });
+  assert.equal(win.uses, "./.github/workflows/build-windows.yml");
+  for (const job of [mac, win]) {
+    assert.equal(job.needs, "changes");
+    assert.equal(job.if, "${{ needs.changes.outputs.package == 'true' }}");
+    assert.deepEqual(job.permissions, { contents: "read" });
+    // Unsigned: no signing secret reaches a pull request's build.
+    assert.equal(job.secrets, undefined);
+  }
+  const sh = runs(checks.jobs.changes);
+  const filters = [...sh.matchAll(/grep -E '([^']+)'/g)].map((m) => new RegExp(m[1]));
+  assert.equal(filters.length, 2);
+  const filter = filters[1];
+  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs"]) {
+    assert.ok(filter.test(hit), `${hit} triggers the packaging checks`);
+  }
+  for (const miss of ["src/web/js/host.js", "src/web/styles.css", "docs/storage.md", ".github/workflows/checks.yml", ".github/workflows/book.yml", "package.json", "scripts/tests/shell-ci.mjs", "README.md"]) {
+    assert.ok(!filter.test(miss), `${miss} does not`);
+  }
+});
+
 await test("ci: the Native SDK comes from the lockfile: one exact version, hashed, never installed globally", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   assert.equal(pkg.devDependencies["@native-sdk/cli"], "0.11.1", "one exact version, not a range");

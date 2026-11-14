@@ -38,14 +38,15 @@ The app has four places and opens on the first.
   it. Reviews are spaced by a memory model and come back turned, mirrored
   or in the other colour. Difficulty is Level 1–5.
 - **Library** (⌘4) — your games (the one in progress and unfinished ones
-  in their own group), 20 classics with their final positions, openings and joseki, and a free board. Import SGF from a
+  in their own group), 20 classics with their final positions and at least three key moments each, openings and joseki, and a free board. Import SGF from a
   file, several files, a collection or the clipboard; export SGF or an
   image.
 - **Settings** (⌘, / Ctrl+,) — seven panes: General, Board, Playing, You,
   Engines, Data, About. Language, appearance, larger text, a
   high-contrast board, coordinates (on two or all four sides), traditional board proportions, sound volume, teaching, rules, your
-  level, the optional KataGo networks, backup and restore, the data
-  folder, updates.
+  level, the optional KataGo networks, which KataGo build runs (Metal,
+  AVX2 or CPU) with Measure speed, backup and restore, the data folder,
+  updates.
 
 The board is playable with Tab, the arrow keys and Space, and with a
 screen reader. ⌘/ (Ctrl+/ on Windows) lists every shortcut.
@@ -183,7 +184,10 @@ macOS 13 is the oldest supported release: Zig 0.16, which builds the
 shell, and KataGo's Metal backend both need it. The opponent's strength comes from the
 search budget, from choosing among KataGo's candidates within a loss
 window and, for the weaker ranks, from a share of deliberate beginner's
-moves.
+moves. Settings → Engines says which build runs (Metal, AVX2 or the
+standard CPU build), why the faster one was given up if it was, and
+Measure speed times one short search per installed network in visits per
+second.
 
 The ranks are measured: `scripts/calibrate-strength.mjs` plays the
 settings against each other and against KataGo's human-imitation model,
@@ -272,8 +276,8 @@ three packages on the CPUs they ship for, and only then creates the tag
 and the GitHub release:
 
 ```bash
-gh workflow run release.yml --ref main -f tag=v15.0.0
-gh workflow run release.yml -f tag=v15.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
+gh workflow run release.yml --ref main -f tag=v16.0.0
+gh workflow run release.yml -f tag=v16.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
 ```
 
 The tag must be `v` + the version in `package.json`, its notes must exist
@@ -318,7 +322,8 @@ src/durable.zig          a written file survives a power cut
 src/instance.zig         one running copy; a second launch hands over its file
 src/engine.zig, engine_build.zig         the KataGo child process; which build starts
 src/engine_request.zig, engine_worker.zig  what a search is; the thread that runs it
-src/net.zig              one HTTPS client: proxy, redirects, resume
+src/net.zig              one HTTPS client: redirects, resume
+src/net_proxy.zig, net_tunnel.zig        which proxy; the session and the tunnel through it
 src/update.zig, install.zig, updater/    update check, download and checks, the swap helpers
 src/install_verify.zig, install_package.zig, install_apply.zig
                          signature and sums; the package; the helper and replies

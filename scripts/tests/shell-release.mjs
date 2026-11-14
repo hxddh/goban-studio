@@ -228,7 +228,7 @@ await test("this version's release notes fit the release workflow, and the READM
   const sections = [...notes.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   assert.equal(sections.at(-1), "Known limits");
   const limits = notes.slice(notes.indexOf("## Known limits"));
-  for (const said of [/Not checked by people/, /not code-signed/, /no Windows installer/i, /not been tried by hand/, /opening book/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
+  for (const said of [/Not checked by people/, /not code-signed/, /no Windows installer/i, /not been tried by hand/, /joseki step is not judged/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
 
   // The README: the app as it is, the user's half before the developer's, the real release command.
   const readme = read("README.md");

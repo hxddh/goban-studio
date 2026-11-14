@@ -1,7 +1,9 @@
 /**
  * Problems shown again are turned, mirrored and sometimes recoloured,
  * so a review asks for the idea rather than the remembered picture
- * (docs/plan.md, "Review").
+ * (docs/plan.md, "Review"). The first showing is the problem as written in
+ * the colour chosen for it on the profile (firstTransform): Black or White
+ * to play, about half each.
  *
  * A transform is { sym, swap }: one of the eight board symmetries (sym
  * 0–7, 0 the problem as written) and whether the colours are swapped
@@ -173,23 +175,62 @@ export function hash(text) {
   return h >>> 0;
 }
 
+/** Mix a 32-bit hash so every bit depends on every input bit (the low bits of FNV-1a alone are weak). */
+function mix(h) {
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
 /**
- * The transform for one showing of a problem: the problem as written the
- * first time (`tries` 0, so lessons and the catalogue match what was
- * taught), then a symmetry and, half the time, swapped colours, chosen
- * from the id and how often it was tried, so the same review looks the
- * same after a restart and different the next time it comes back.
+ * The transform of a problem's first showing: as written (no symmetry, so
+ * the shape is the one the lessons and the catalogue teach), in the colour
+ * chosen for it on this profile. About half the problems a player meets
+ * are White to play; which ones comes from the problem's id and the
+ * profile's `seed`, so a problem shows the same way on a profile each time
+ * and another player gets another half. Endgame problems stay Black.
  */
-export function reviewTransform(def, tries = 0) {
-  if (!def || !(tries > 0)) return IDENTITY;
+export function firstTransform(def, seed = "") {
+  if (!def?.id || !canSwap(def)) return IDENTITY;
+  return { sym: 0, swap: (mix(hash(`${seed}:${def.id}`)) & 1) === 1 };
+}
+
+/**
+ * A problem as its tile shows it: in the colour of its first showing, so
+ * the tile's position, its to-move stone and its goal say what the board
+ * will. The definition itself until its body has arrived (content.js).
+ * Kept per definition and seed: a grid asks for a hundred at each render.
+ */
+const firstShowings = new WeakMap();
+export function firstShown(def, seed = "") {
+  if (!Array.isArray(def?.diagram)) return def;
+  const kept = firstShowings.get(def);
+  if (kept && kept.seed === seed) return kept.out;
+  const out = transformProblem(def, firstTransform(def, seed));
+  firstShowings.set(def, { seed, out });
+  return out;
+}
+
+/**
+ * The transform for one showing of a problem: its first transform the
+ * first time (`tries` 0), then a symmetry and, half the time, swapped
+ * colours, chosen from the id and how often it was tried, so the same
+ * review looks the same after a restart and different the next time it
+ * comes back. `seed` is the profile's (firstTransform).
+ */
+export function reviewTransform(def, tries = 0, seed = "") {
+  const first = firstTransform(def, seed);
+  if (!def || !(tries > 0)) return first;
   const h = hash(`${def.id}:${tries}`);
   const syms = allowedSyms(def);
   let sym = syms[h % syms.length];
   let swap = canSwap(def) && ((h >>> 3) & 1) === 1;
-  // A review never looks just like the problem as written.
-  if (!sym && !swap) {
+  // A review never looks just like the problem's first showing.
+  if (!sym && swap === first.swap) {
     if (syms.length > 1) sym = syms[1 + ((h >>> 4) % (syms.length - 1))];
-    else swap = canSwap(def);
+    else swap = canSwap(def) && !first.swap;
   }
   return { sym, swap };
 }

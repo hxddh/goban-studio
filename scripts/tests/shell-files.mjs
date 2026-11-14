@@ -8,7 +8,7 @@ import { test, assert, fs, path, root } from "./helpers.mjs";
 import { FILE_CHUNK_BYTES, installFlushHook, openFileDialog, readFileChunks, revealDataDir, saveFileDialog, writeFileChunks } from "../../src/web/js/host.js";
 import { INSTALL_ERRORS, installFallsBack, installMessageKey, interpretInstallStatus } from "../../src/web/js/update.js";
 import * as Sign from "../signing-notes.mjs";
-import { ENGINE_FILES, INSTALL_FILES, SHELL_FILES, shellSource } from "../shell-source.mjs";
+import { ENGINE_FILES, INSTALL_FILES, NET_FILES, SHELL_FILES, shellSource } from "../shell-source.mjs";
 
 function fakeHost() {
   const files = new Map();
@@ -238,7 +238,7 @@ await test("shell files: every text that says where the data is names the folder
   assert.ok(paths.includes('"/Users/a/Library/Application Support/dev.hxddh.gobanstudio"'));
   assert.ok(paths.includes('"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\dev.hxddh.gobanstudio\\\\Data"'));
   // The id is spelled once in the shell (tests aside).
-  for (const f of [...SHELL_FILES, ...INSTALL_FILES, ...ENGINE_FILES, "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", "src/net.zig"]) {
+  for (const f of [...SHELL_FILES, ...INSTALL_FILES, ...ENGINE_FILES, "src/models.zig", "src/update.zig", "src/store.zig", "src/instance.zig", ...NET_FILES]) {
     const code = read(f).split("// ------------------------------------------------------------ tests")[0].split("// ------------------------------------------------------------------ tests")[0];
     assert.doesNotMatch(code, /"dev\.hxddh\.gobanstudio"/, `${f} takes the id from paths.zig`);
   }

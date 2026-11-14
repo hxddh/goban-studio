@@ -29,7 +29,7 @@
 //!     retried a few times by the same download, continuing where it
 //!     stopped.
 //!   * Requests go through the proxy the environment or the system names
-//!     (net.zig), and follow redirects only over HTTPS to `download_hosts`.
+//!     (net_proxy.zig), and follow redirects only over HTTPS to `download_hosts`.
 //!   * Free space is checked before the transfer starts (macOS, Windows).
 //!
 //! Threads: one short-lived thread per download. The UI thread reads the
@@ -44,6 +44,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const json = @import("json.zig");
 const net = @import("net.zig");
+const net_tunnel = @import("net_tunnel.zig");
 const durable = @import("durable.zig");
 
 pub const Kind = enum(u2) { human = 0, strong = 1 };
@@ -142,7 +143,7 @@ pub const Manager = struct {
     lock: std.Io.Mutex = .init,
     dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined,
     dir_len: usize = 0,
-    /// Where the proxy settings are read from (net.zig); set once by
+    /// Where the proxy settings are read from (net_proxy.zig); set once by
     /// `main`. Null: always connect directly.
     env: ?*const std.process.Environ.Map = null,
 
@@ -439,7 +440,7 @@ pub const Manager = struct {
 
         if (offset < s.size) {
             // Through the proxy the environment or the system names, if any.
-            var session: net.Session = undefined;
+            var session: net_tunnel.Session = undefined;
             session.init(allocator, self.io, self.env, net.httpsHost(s.url) orelse "github.com");
             defer session.deinit();
             var failures: u32 = 0;
@@ -528,7 +529,7 @@ pub const Manager = struct {
     /// follows the bytes as they are stored.
     fn transfer(
         self: *Manager,
-        session: *net.Session,
+        session: *net_tunnel.Session,
         kind: Kind,
         gen: u64,
         file: std.Io.File,
