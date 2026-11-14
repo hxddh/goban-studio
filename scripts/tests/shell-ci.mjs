@@ -317,9 +317,9 @@ await test("ci: pull requests that touch the shell compile and test it on macOS 
 
 await test("ci: the Native SDK comes from the lockfile: one exact version, hashed, never installed globally", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  assert.equal(pkg.devDependencies["@native-sdk/cli"], "0.11.0", "one exact version, not a range");
+  assert.equal(pkg.devDependencies["@native-sdk/cli"], "0.11.1", "one exact version, not a range");
   const { version, packages } = Sdk.checkLock();
-  assert.equal(version, "0.11.0");
+  assert.equal(version, "0.11.1");
   // The package and the `native` binary of every platform a release is built on.
   for (const name of ["@native-sdk/cli", "@native-sdk/cli-darwin-arm64", "@native-sdk/cli-darwin-x64", "@native-sdk/cli-win32-x64"]) {
     const p = packages.find((x) => x.name === name);
@@ -330,19 +330,19 @@ await test("ci: the Native SDK comes from the lockfile: one exact version, hashe
   const tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "goban-sdk-"));
   try {
     const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
-    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "^0.11.0" } }));
+    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "^0.11.1" } }));
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
     assert.throws(() => Sdk.checkLock(tmp), /one exact version/);
-    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "0.11.0" } }));
-    assert.equal(Sdk.checkLock(tmp).version, "0.11.0");
+    fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ devDependencies: { "@native-sdk/cli": "0.11.1" } }));
+    assert.equal(Sdk.checkLock(tmp).version, "0.11.1");
     delete lock.packages["node_modules/@native-sdk/cli-win32-x64"].integrity;
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
     assert.throws(() => Sdk.checkLock(tmp), /no integrity hash for @native-sdk\/cli-win32-x64/);
     lock.packages["node_modules/@native-sdk/cli-win32-x64"].integrity = "sha512-AAAA";
     lock.packages["node_modules/@native-sdk/cli"].version = "0.12.0";
     fs.writeFileSync(path.join(tmp, "package-lock.json"), JSON.stringify(lock));
-    assert.throws(() => Sdk.checkLock(tmp), /0\.12\.0, package\.json pins 0\.11\.0/);
-    assert.throws(() => Sdk.checkInstalled(tmp), /pins 0\.11\.0/);
+    assert.throws(() => Sdk.checkLock(tmp), /0\.12\.0, package\.json pins 0\.11\.1/);
+    assert.throws(() => Sdk.checkInstalled(tmp), /pins 0\.11\.1/);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

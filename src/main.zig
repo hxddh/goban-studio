@@ -339,6 +339,7 @@ const sync_commands = [_]SyncCommand{
     // Window chrome and menus.
     .{ .name = "studio.windowDrag", .invoke = windowDrag },
     .{ .name = "studio.windowChrome", .invoke = windowChrome },
+    .{ .name = "studio.windowTheme", .invoke = windowTheme },
     .{ .name = "studio.setMenus", .invoke = setMenus },
     // The quit gate (v13).
     .{ .name = "studio.flushHook", .invoke = flushHook },
@@ -671,6 +672,43 @@ fn windowChrome(context: *anyopaque, invocation: native_sdk.bridge.Invocation, o
         chrome.buttons.y,
         chrome.buttons.height,
     });
+}
+
+const ThemePayload = struct {
+    scheme: []const u8 = "",
+};
+
+/// "light", "dark" or "system" (the app's Appearance setting on Auto).
+fn windowColorScheme(name: []const u8) ?native_sdk.platform.WindowColorScheme {
+    if (std.mem.eql(u8, name, "light")) return .light;
+    if (std.mem.eql(u8, name, "dark")) return .dark;
+    if (std.mem.eql(u8, name, "system")) return .system;
+    return null;
+}
+
+/// `studio.windowTheme` {scheme}: the window frame (macOS title bar, traffic
+/// lights, sheets and the window's own controls) follows the app's theme
+/// rather than the system's when the user picked Light or Dark in Settings
+/// (SDK 0.11.1). Windows keeps the system title bar, whose colour the SDK
+/// takes from the OS setting; there the call does nothing.
+fn windowTheme(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
+    const self: *App = @ptrCast(@alignCast(context));
+    const parsed = std.json.parseFromSlice(ThemePayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true }) catch return error.InvalidRequest;
+    defer parsed.deinit();
+    const scheme = windowColorScheme(parsed.value.scheme) orelse return error.InvalidRequest;
+    const runtime = self.runtime orelse return std.fmt.bufPrint(output, "false", .{}) catch "false";
+    runtime.options.platform.services.setWindowColorScheme(invocation.source.window_id, scheme) catch {
+        return std.fmt.bufPrint(output, "false", .{}) catch "false";
+    };
+    return std.fmt.bufPrint(output, "true", .{}) catch "true";
+}
+
+test "window theme: the three schemes the page sends, nothing else" {
+    try std.testing.expectEqual(native_sdk.platform.WindowColorScheme.light, windowColorScheme("light").?);
+    try std.testing.expectEqual(native_sdk.platform.WindowColorScheme.dark, windowColorScheme("dark").?);
+    try std.testing.expectEqual(native_sdk.platform.WindowColorScheme.system, windowColorScheme("system").?);
+    try std.testing.expect(windowColorScheme("auto") == null);
+    try std.testing.expect(windowColorScheme("") == null);
 }
 
 /// Engine presence and version are resolved once in `main`, before the

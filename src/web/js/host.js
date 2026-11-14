@@ -47,6 +47,17 @@ function windowDrag() {
   if (hasNative()) invoke("studio.windowDrag").catch(() => {});
 }
 
+/**
+ * The window frame follows the app's Appearance setting: "light", "dark",
+ * or "auto" (the system's). macOS only; elsewhere, and on an older shell,
+ * nothing happens.
+ */
+export function setWindowTheme(appearance) {
+  if (!hasNative()) return;
+  const scheme = appearance === "light" || appearance === "dark" ? appearance : "system";
+  invoke("studio.windowTheme", { scheme }).catch(() => {});
+}
+
 /* ------------------------------------------------------- the user's files */
 //
 // The host reads and writes only files it handed out itself — what

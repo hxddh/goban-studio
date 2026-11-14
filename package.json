@@ -22,7 +22,7 @@
     "preact": "^10.29.8"
   },
   "devDependencies": {
-    "@native-sdk/cli": "0.11.0",
+    "@native-sdk/cli": "0.11.1",
     "esbuild": "0.28.2",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",

@@ -9,6 +9,7 @@ import { estimate } from "../model/level.js";
 import { hasLang, loadLang, setLang, t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { applyBoardTheme } from "../theme.js";
+import { setWindowTheme } from "../host.js";
 import { state, update } from "./store.js";
 
 /* ----------------------------------------------- The game in play */
@@ -77,6 +78,8 @@ export function applyAppearance() {
   root.dataset.text = s.largeText ? "large" : "normal"; // A11y
   // The board's colours follow the theme and the board style (theme.js).
   applyBoardTheme({ style: s.boardStyle });
+  // So does the window's own frame (macOS title bar and controls).
+  setWindowTheme(s.appearance);
 }
 
 export function setSetting(key, value) {

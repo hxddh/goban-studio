@@ -218,7 +218,7 @@ No machine can check these, and none has been done yet:
 
 ## Dependency notes
 
-- Zig stays at 0.16.0: Native SDK 0.11.0 pins that toolchain.
+- Zig stays at 0.16.0: Native SDK 0.11.1 pins that toolchain (0.16.x only).
 - Node.js 24 is the floor (the Native SDK's own); CI also runs 26.
 - KataGo 1.18.1 is the latest release with official Eigen CPU builds.
 - The b6c96 network stays deliberately: larger current networks would make

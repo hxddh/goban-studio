@@ -46,6 +46,11 @@ pub const RunOptions = struct {
             .window_title = self.window_title,
             .bundle_id = self.bundle_id,
             .icon_path = self.icon_path,
+            // SDK 0.11.1: Web Inspector on macOS's WKWebView only in Debug
+            // builds, so a release build cannot be inspected or have script
+            // run in it from Safari's Develop menu (0.11.0 made every WebView
+            // inspectable). WebView2 on Windows is not covered by this flag.
+            .webview_inspection = @import("builtin").mode == .Debug,
         };
         const windows = manifestWindowOptions(buffers);
         if (windows.len > 0) {
