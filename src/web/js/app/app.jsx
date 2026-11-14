@@ -7,15 +7,15 @@
  * finished game turns into its review; Practice its home (the path,
  * practice/path.jsx, then the catalog) or one of its pages (practice.jsx).
  */
-import { render } from "preact";
+import { options, render } from "preact";
 import { useEffect } from "preact/hooks";
 import { t } from "../i18n.js";
 import * as Host from "../host.js";
 import { hasNative, normalizePaths, onDropFiles, onOpenFiles, setupChrome, takeOpenFiles } from "../host.js";
-import { state, update, useAppState } from "./store.js";
+import { AREA_SLICES, state, subscribe, update, useAppState, useSlice } from "./store.js";
 import { CrashProbe, ErrorBoundary, TaskNotice, Toasts, crashRender, installErrorHandlers } from "./feedback.jsx";
 import { matchShortcut, menuKey } from "./shortcuts.js";
-import { expose } from "./debug.js";
+import { expose, renderCounter, testHandles } from "./debug.js";
 import { store } from "../data/store.js";
 import * as C from "./controller.js";
 import * as S from "../solver.js";
@@ -52,12 +52,35 @@ function App() {
     document.documentElement.lang = s.settings?.lang === "zh" ? "zh-CN" : s.settings?.lang || "en";
     document.title = "Goban Studio";
   });
-  useAnnouncements(); // Review moves, problems, lessons
   // No bridge in the packaged app, or the store could not be read (app/safety.jsx).
   if (s.bootError) return <BootError />;
   if (!s.ready) return null;
   if (s.storeProblem && !s.storeProblem.continued) return <StoreProblem />;
   return <Shell s={s} />;
+}
+
+/**
+ * The page of the space. It follows the area slices (store.js), so a move,
+ * an analysis tick or an answer re-renders the page and not the shell.
+ */
+function Page({ space }) {
+  useSlice(...AREA_SLICES);
+  useAnnouncements(); // Review moves, problems, lessons
+  if (space === "today") return <TodayView />;
+  if (space === "play") return <PlaySpace />;
+  if (space === "practice") return <PracticeView />;
+  if (space === "library") return <LibrarySpace />;
+  return null;
+}
+
+/** The app's live region (store.js announce). */
+function LiveRegion() {
+  const s = useSlice("announce");
+  return (
+    <div class="sr-only" aria-live="polite" aria-atomic="true">
+      {s.announce}
+    </div>
+  );
 }
 
 /** The app itself: the sidebar, the page of the space, and what lies over them. */
@@ -77,18 +100,13 @@ function Shell({ s }) {
         <ErrorBoundary resetKey={place}>
           <div class="place" key={place}>
             <CrashProbe at="page" />
-            {s.space === "today" && <TodayView />}
-            {s.space === "play" && <PlaySpace />}
-            {s.space === "practice" && <PracticeView />}
-            {s.space === "library" && <LibrarySpace />}
+            <Page space={s.space} />
           </div>
         </ErrorBoundary>
       </main>
       <Sheets />
       <Toasts />
-      <div class="sr-only" aria-live="polite" aria-atomic="true">
-        {s.announce}
-      </div>
+      <LiveRegion />
       <input
         id="file-input"
         type="file"
@@ -328,6 +346,8 @@ export async function start() {
   expose("__solver", S);
   expose("__autoAnalyse", () => C.autoAnalyse({ offline: true }));
   expose("__crashRender", crashRender);
+  // Component renders, for the render budgets (scripts/ui-tests/shell-renders.mjs).
+  if (testHandles()) expose("__renders", renderCounter(options, subscribe));
   render(
     <ErrorBoundary scope="app">
       <App />

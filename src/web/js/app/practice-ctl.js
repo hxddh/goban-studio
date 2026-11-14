@@ -13,7 +13,7 @@ import { recordLesson, recordMistake, recordProblem } from "../model/record.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
 import { COURSE, GRADES, PROBLEMS, SHAPES, THEMES, withContent } from "../content.js";
-import { state, update, toast, announce } from "./store.js";
+import { state, update, updateSlice, toast, announce } from "./store.js";
 import { changeProfile, isRestoring, playerEstimate, playerRankNow, remember, tx } from "./ctl-core.js";
 import { flow } from "../practice/flow.js";
 import { reviewTransform, transformProblem } from "../practice/transform.js";
@@ -381,7 +381,7 @@ export function practicePlay(x, y) {
   // second click on the same point plays it (as the two-click stone in Play).
   if (state.settings.confirmProblemMove && !(P.ghost && P.ghost.x === x && P.ghost.y === y)) {
     P.ghost = { x, y };
-    update();
+    updateSlice("practice");
     return;
   }
   P.ghost = null;
@@ -393,7 +393,7 @@ export function practicePlay(x, y) {
   P.busy = true;
   P.feedback = null;
   Audio.stone(false);
-  update();
+  updateSlice("practice");
   later(P, 60, () => respond(P));
 }
 
@@ -439,7 +439,7 @@ function respond(P) {
     if (st === "won") return finishProblem(P);
     if (st === "lost") return lost(P);
     P.feedback = "keep";
-    update();
+    updateSlice("practice");
   });
 }
 
@@ -456,7 +456,7 @@ function lost(P, { ko = false } = {}) {
   Audio.wrong?.();
   recordAttempt(P, false);
   announce(t("practice.wrong"));
-  update();
+  updateSlice("practice");
   const st = P.st;
   later(P, 1900, () => {
     if (P.st !== st || P.status !== "lost" || P.answer) return;
@@ -466,7 +466,7 @@ function lost(P, { ko = false } = {}) {
     P.status = "open";
     P.feedback = "retry";
     P.last = null;
-    update();
+    updateSlice("practice");
   });
 }
 

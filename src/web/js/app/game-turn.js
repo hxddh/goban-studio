@@ -7,7 +7,7 @@ import { coordLabel } from "../rules.js";
 import * as Engine from "../engine.js";
 import { t } from "../i18n.js";
 import * as Audio from "../audio.js";
-import { state, update, toast, announce } from "./store.js";
+import { state, update, updateSlice, toast, announce } from "./store.js";
 import { moveText } from "../a11y.js";
 import { confirmAction, teachingOn } from "./ctl-core.js";
 import { colorName } from "./game-view.js";
@@ -40,7 +40,7 @@ export function humanPlay(x, y) {
   // Two-click placement: the first click shows the stone, the second plays it.
   if (state.settings.confirmMove && !(g.ghost && g.ghost.x === x && g.ghost.y === y)) {
     g.ghost = { x, y };
-    update();
+    updateSlice("game");
     return;
   }
   g.ghost = null;
@@ -53,7 +53,7 @@ export function clearGhost() {
   const g = state.game;
   if (g?.ghost) {
     g.ghost = null;
-    update();
+    updateSlice("game");
   }
 }
 
@@ -89,7 +89,7 @@ function afterMove({ human = false } = {}) {
   g.proposal = false;
   if (g.game.phase === "scoring" && !g.scoring) startScoring();
   persistCurrent();
-  update();
+  updateSlice("game");
   if (human && g.opponent === "ai") maybeComputerMove({ afterHuman: true });
   else if (g.opponent === "ai") maybeComputerMove();
   else ponder();
@@ -119,7 +119,7 @@ export async function ponder() {
   g.before = { nodeId: node.id, ...a };
   g.eval = a;
   checkProposal(a);
-  update();
+  updateSlice("game");
 }
 
 /**
@@ -152,7 +152,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   const gen = ++g.gen;
   g.thinking = true;
   g.engineFailed = false;
-  update();
+  updateSlice("game");
   const started = performance.now();
   // The position the move is for, fixed now (a queued search would read the board when it runs).
   const node = g.game.current;
@@ -189,7 +189,7 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
         const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
         g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
         announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
-        update();
+        updateSlice("game");
         return;
       }
     }
@@ -221,7 +221,7 @@ function computerFailed(g) {
   g.thinking = false;
   g.engineFailed = true;
   announce(t("play.engineFailed"));
-  update();
+  updateSlice("game");
 }
 
 /** Retry after the computer could not move (the panel's Retry). */
@@ -262,7 +262,7 @@ async function reply(g, gen, result, started) {
   g.thinking = false;
   const move = result.move;
   if (!isComputerTurn()) {
-    update();
+    updateSlice("game");
     return;
   }
   // No move to play (a kept teaching pause whose search had none): never stuck on the computer's turn.
@@ -279,7 +279,7 @@ async function reply(g, gen, result, started) {
     afterMove();
   } else if (ready && !proposalWaits(g)) {
     g.proposal = true;
-    update();
+    updateSlice("game");
   }
   if (!gameOver(g) && !g.scoring) ponder();
 }

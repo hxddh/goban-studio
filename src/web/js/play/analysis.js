@@ -23,7 +23,7 @@ import * as Engine from "../engine.js";
 import { store } from "../data/store.js";
 import { loadSGF } from "../sgf.js";
 import { t } from "../i18n.js";
-import { state, update } from "../app/store.js";
+import { state, update, updateSlice } from "../app/store.js";
 import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 import { humanMoveProbabilities } from "../katago.js";
@@ -351,7 +351,7 @@ async function runBatch(me, b) {
     const id = b.ids[0];
     b.current = id;
     me.setProgress(b.done / b.total);
-    update();
+    updateSlice("batch");
     const one = queueAnalysis(id, { owner: OWNER, signal: me.signal, hidden: true });
     if (one) {
       const tick = () => me.setProgress((b.done + (one.progress || 0)) / b.total);
@@ -370,7 +370,7 @@ async function runBatch(me, b) {
     b.current = null;
     if (b.ids.length) saveBatch(b.ids);
     else clearBatch();
-    update();
+    updateSlice("batch");
   }
   if (me.signal.aborted) {
     // Quitting keeps the rest for the next launch; a cancel forgets it.
