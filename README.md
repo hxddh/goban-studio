@@ -18,7 +18,9 @@ The app has four places and opens on the first.
 - **Play** (⌘2) — the board. The opponent is one choice: a rank from
   30 kyu to 7 dan, played by the KataGo setting that measured closest to
   it. Teaching mode warns before a costly move and says why; a hint gives
-  its reason. Undo and redo, pass, count; a game that used undo or hints
+  its reason; each of your moves gets a quiet verdict (good, slack or a
+  mistake, with the points) when the game teaches or the balance is shown.
+  Undo and redo, pass, count; a game that used undo or hints
   is not rated, and says so. A beginner is offered 9×9, then 13×13, then
   19×19.
 - **The review** — when a game ends, the same board becomes its review:
@@ -35,8 +37,8 @@ The app has four places and opens on the first.
   positions with their status. A problem's name appears once you solve
   it. Reviews are spaced by a memory model and come back turned, mirrored
   or in the other colour. Difficulty is Level 1–5.
-- **Library** (⌘4) — your games (unfinished ones in their own group),
-  20 classics, openings and joseki, and a free board. Import SGF from a
+- **Library** (⌘4) — your games (the one in progress and unfinished ones
+  in their own group), 20 classics with their final positions, openings and joseki, and a free board. Import SGF from a
   file, several files, a collection or the clipboard; export SGF or an
   image.
 - **Settings** (⌘, / Ctrl+,) — seven panes: General, Board, Playing, You,
@@ -269,8 +271,8 @@ three packages on the CPUs they ship for, and only then creates the tag
 and the GitHub release:
 
 ```bash
-gh workflow run release.yml --ref main -f tag=v14.0.0
-gh workflow run release.yml -f tag=v14.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
+gh workflow run release.yml --ref main -f tag=v15.0.0
+gh workflow run release.yml -f tag=v15.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
 ```
 
 The tag must be `v` + the version in `package.json`, its notes must exist
