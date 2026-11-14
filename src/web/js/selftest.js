@@ -268,8 +268,11 @@ export async function runSelfTest({ state } = {}) {
       second.sync && second.sync.reset === false && second.sync.undo === 0 && second.sync.play === 1 &&
       third.sync && third.sync.reset === false && third.sync.undo === 1 && third.sync.play === 0 &&
       // The sync counts prove the position was extended, not replayed; the
-      // timing only guards against a pathological slowdown.
-      secondMs <= firstMs * 1.5
+      // timing only guards against a pathological slowdown (a replay of the
+      // whole game each time). A GPU backend on a virtual machine (Metal on
+      // a CI runner) varies by a second or two between searches, and the
+      // first one may reuse an earlier search's cache: 1.5× or 3 s more.
+      secondMs <= Math.max(firstMs * 1.5, firstMs + 3000)
     );
 
     // --- cancel: a long search stops promptly when asked
