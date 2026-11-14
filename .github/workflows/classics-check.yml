@@ -30,11 +30,11 @@ env:
   NPM_CONFIG_ENGINE_STRICT: "true"
   KATAGO_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-linux-x64.zip
   KATAGO_SHA256: 33e79780dbe3bf6ee859e16f64952cdfc90f7210c8f71ad978ffcba85ad20d79
-  SHARDS: 20
+  SHARDS: 3
   # To search again only some games (one that ran out of time), list their
   # ids here, comma-separated; the report keeps the others when the network
   # and visits are the same.
-  CLASSICS_ONLY: ""
+  CLASSICS_ONLY: "ear-reddening,dosaku-1674,ke-alphago-1"
 
 jobs:
   check:
@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
