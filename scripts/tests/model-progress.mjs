@@ -134,8 +134,9 @@ export default async function ({ test, assert, root }) {
   const roles = (list) => list.filter((i) => i.kind === "problem" || i.kind === "mistake").map((i) => i.role);
   const count = (list, role) => roles(list).filter((r) => r === role).length;
 
-  await test("model path: reviews come before new problems — a small backlog leaves a place for a new one, a larger one takes the day", () => {
-    assert.equal(P.RULES.SMALL_BACKLOG, 3);
+  await test("model path: reviews come before new problems, and leave a place for a new one until twice the day is due", () => {
+    assert.equal(P.RULES.SMALL_BACKLOG, undefined);
+    assert.equal(P.RULES.BACKLOG_PER_PLACE, 2);
     // Nothing due: all new.
     assert.equal(count(pathOf(withDue(0)), "review"), 0);
     // Up to three due: all of them, the rest new.
@@ -145,9 +146,14 @@ export default async function ({ test, assert, root }) {
       assert.equal(roles(list).length, 5);
       assert.ok(roles(list).length - n >= 1, "at least one new problem");
     }
-    // Four due: four reviews and one new problem; five or more: the whole day.
+    // Four due: four reviews and one new problem; up to ten (twice the day): still one new problem.
     assert.equal(count(pathOf(withDue(4)), "review"), 4);
-    assert.equal(count(pathOf(withDue(5)), "review"), 5);
+    for (const n of [5, 8, 10]) {
+      const list = pathOf(withDue(n));
+      assert.deepEqual([count(list, "review"), roles(list).length], [4, 5], `${n} due: one place of the day is a new problem`);
+    }
+    // More than that: the whole day, until the backlog is back under it.
+    assert.equal(count(pathOf(withDue(11)), "review"), 5);
     const many = pathOf(withDue(30));
     assert.deepEqual(roles(many), Array(5).fill("review"));
     // The most forgotten first.
@@ -157,13 +163,21 @@ export default async function ({ test, assert, root }) {
     const mixed = pathOf(withDue(30, { mistakes: drills }));
     assert.deepEqual(mixed.filter((i) => i.kind !== "lesson").map((i) => i.kind), ["mistake", "mistake", "problem", "problem", "problem"]);
     assert.deepEqual(roles(mixed), Array(5).fill("review"));
+    // A small backlog, but nothing new to give (every problem solved): reviews may take the day.
+    const solvedAll = {};
+    for (const [i, x] of PROBLEMS.entries()) solvedAll[x.id] = { tries: 2, solved: true, clean: true, streak: 1, s: 2 + i, d: 5, reps: 2, lapses: 0, rating: 3, last: NOW - 60 * DAY, due: i < 6 ? NOW - 30 * DAY : NOW + 30 * DAY };
+    const none = pathOf(P.normalizeProfile({ ...P.newProfile({ rank: 12 }), problems: solvedAll }));
+    assert.equal(count(none, "review"), 5, "no new problem is open: every place is a review");
   });
 
   await test("model path: the day's size is 3, 5 or 10 problem items; at most REVIEW_CAP reviews a day across its sessions", () => {
     assert.deepEqual(P.RULES.DAILY_SIZES, [3, 5, 10]);
     for (const limit of [3, 5, 10]) {
       assert.equal(roles(pathOf(P.newProfile({ rank: 12 }), NOW, { limit })).length, limit, `limit ${limit}, all new`);
-      assert.equal(count(pathOf(withDue(30), NOW, { limit }), "review"), limit, `limit ${limit}, a backlog`);
+      assert.equal(count(pathOf(withDue(30), NOW, { limit }), "review"), limit, `limit ${limit}, a large backlog`);
+      // A day of three with four to six due still has a new problem (it had none with more than three due).
+      const some = pathOf(withDue(2 * limit), NOW, { limit });
+      assert.deepEqual([count(some, "review"), roles(some).length], [limit - 1, limit], `limit ${limit}, twice the day due: one new problem`);
       const small = pathOf(withDue(2), NOW, { limit });
       assert.deepEqual([count(small, "review"), roles(small).length], [2, limit]);
     }
@@ -190,18 +204,18 @@ export default async function ({ test, assert, root }) {
     play(second, NOW + 1000);
     assert.equal(P.reviewsToday(p, NOW + 2000), P.MEMORY.REVIEW_CAP, "new problems met today are not reviews");
     assert.equal(count(pathOf(p, NOW + 2000, { limit: 10 }), "review"), 0);
-    // Tomorrow the backlog goes on.
-    assert.equal(count(pathOf(p, NOW + DAY, { limit: 10 }), "review"), 10);
+    // Tomorrow the backlog goes on (eighteen due, under twice the day: one place stays new).
+    assert.equal(count(pathOf(p, NOW + DAY, { limit: 10 }), "review"), 9);
   });
 
-  await test("model path: over 60 simulated days the review backlog stays bounded, at every size", () => {
+  await test("model path: over 240 simulated days the review backlog stays bounded, at every size", () => {
     for (const limit of [3, 5, 10]) {
       const rnd = lcg(4242);
       let p = P.setPlacement(P.newProfile(), { grade: 3 }, NOW);
       let max = 0;
       let longest = 0;
       let fresh = 0;
-      for (let d = 0; d < 60; d++) {
+      for (let d = 0; d < 240; d++) {
         const now = NOW + d * DAY;
         const dueNow = Object.values(p.problems).filter((e) => !e.retired && e.due && e.due <= now);
         max = Math.max(max, dueNow.length);
@@ -214,9 +228,10 @@ export default async function ({ test, assert, root }) {
           p = P.recordProblem(p, it.id, { solved: ok, clean: ok, quick: ok && rnd() < 0.3 }, now);
         }
       }
-      assert.ok(max <= limit + 6, `limit ${limit}: backlog reached ${max}`);
-      assert.ok(longest <= 4, `limit ${limit}: a review waited ${longest.toFixed(1)} days`);
-      assert.ok(fresh >= 8 * limit, `limit ${limit}: only ${fresh} new problems in 60 days`);
+      // A new place every day whatever the backlog reached 130 due and waits of 160 days at size 3.
+      assert.ok(max <= 2 * limit + 6, `limit ${limit}: backlog reached ${max}`);
+      assert.ok(longest <= 10, `limit ${limit}: a review waited ${longest.toFixed(1)} days`);
+      assert.ok(fresh >= 30 * limit, `limit ${limit}: only ${fresh} new problems in 240 days`);
     }
   });
 

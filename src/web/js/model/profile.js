@@ -250,7 +250,7 @@ export const RULES = {
   PRIOR_ABOVE: 0.35, // …and above it
   STRETCH: 1, // the stretch problem is this many grades above the level, never more
   MAX_FOCUS: 2,
-  SMALL_BACKLOG: 3, // up to this many reviews due: one place of the day is kept for a new problem; more: reviews may take every place
+  BACKLOG_PER_PLACE: 2, // a new problem keeps its place in the day until more than this many reviews per place are due
   MAX_DRILLS: 2, // drills from your games in one day's path
   DAILY_SIZES: [3, 5, 10], // problem items in a day's path (the player's choice)
   DAILY_SIZE: 5, // …by default
