@@ -39,6 +39,15 @@ the workflows, the SDK scripts or `package.json` / `package-lock.json`
 compiles the shell and runs its unit tests on a macOS and a Windows
 runner. It builds no KataGo, packages nothing and signs nothing.
 
+Since v16 a pull request that touches what the packages are made of
+(the shell sources, `src/web/js/selftest.js`, `engine/`, `packaging/`,
+`build-macos.yml`, `build-windows.yml`, `release.yml`, or the packaging
+scripts) also runs the release's own builds, `package-macos` (Apple
+Silicon, Metal and Eigen KataGo) and `package-windows` (AVX2 and plain),
+each ending in the packaged app's self-test. No secret is passed, so the
+packages are unsigned, and nothing is published. All four faults v15's
+release rehearsals found would have failed here.
+
 ## Static checks (`npm run lint`)
 
 ESLint with `eslint.config.js`: undefined names, unused variables and

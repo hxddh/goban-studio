@@ -87,6 +87,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       native: ${{ steps.files.outputs.native }}
+      package: ${{ steps.files.outputs.package }}
     steps:
       # The merge commit of the pull request and its two parents: the first
       # parent is the base branch.
@@ -103,6 +104,16 @@ jobs:
           else
             echo "native=false" >> "$GITHUB_OUTPUT"
             echo "no shell, build or workflow file changed: the macOS and Windows compile is skipped"
+          fi
+          # v16: what the packaged app is made of (the shell, the engine
+          # builds, the packaging scripts, the self-test, the build
+          # workflows). v15's release found four faults here that no pull
+          # request had run into.
+          if grep -E '^(src/[^/]+\.(zig|m)$|src/web/js/selftest\.js$|build\.zig(\.zon)?$|app\.zon$|engine/|packaging/|\.github/workflows/(build-macos|build-windows|release)\.yml$|scripts/(install-engine|make-zip|macos-sign|selftest-app|native-sdk|patch-sdk)\.(mjs|py|sh)$)' "$RUNNER_TEMP/files.txt"; then
+            echo "package=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=false" >> "$GITHUB_OUTPUT"
+            echo "nothing the packages are made of changed: the packaging checks are skipped"
           fi
 
   # The shell compiled and unit-tested against the real macOS and Windows
@@ -166,6 +177,28 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: native build --yes -Dnative-sdk-path="$SDK_PATH" -Dplatform="$PLATFORM" -Doptimize=ReleaseSafe
+
+  # v16: the full packaging path of a release (build-macos.yml on Apple
+  # Silicon with the Metal and Eigen KataGo builds, build-windows.yml with
+  # the AVX2 and plain builds), each ending in the packaged app's self-test,
+  # for pull requests that touch what the packages are made of. No secrets
+  # are passed, so nothing is signed; nothing is published.
+  package-macos:
+    needs: changes
+    if: ${{ needs.changes.outputs.package == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      runner: macos-15
+      arch: arm64
+
+  package-windows:
+    needs: changes
+    if: ${{ needs.changes.outputs.package == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-windows.yml
 
   ui:
     runs-on: ubuntu-latest

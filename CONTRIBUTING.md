@@ -73,7 +73,11 @@ zig build -Dnative-sdk-path="$SDK" -Doptimize=ReleaseSafe
 A pull request that touches `src/*.zig`, `src/*.m`, `src/updater/`,
 `build.zig`, `app.zon`, the workflows or the SDK pin also runs these on
 macOS and Windows (`checks.yml`, job `native-hosts`), so platform-specific
-code is compiled before it is merged.
+code is compiled before it is merged. One that touches what the packages
+are made of (the shell, `src/web/js/selftest.js`, `engine/`, `packaging/`,
+the build and release workflows, the packaging scripts) also builds both
+packages with KataGo and runs the packaged app's self-test, unsigned
+(`checks.yml`, jobs `package-macos` and `package-windows`, about an hour).
 
 `scripts/package.sh` packages, installs KataGo and signs ad hoc on macOS.
 KataGo itself is not in the repository: the workflows build it (macOS) or
