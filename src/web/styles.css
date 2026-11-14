@@ -595,6 +595,12 @@ button.group-row:hover { background: var(--fill); }
 .eval-bar { display: flex; flex-direction: column; gap: var(--s-15); }
 .eval-track { height: 6px; border-radius: var(--r-pill); background: var(--eval-white); box-shadow: var(--ring-track); overflow: hidden; }
 .eval-track i { display: block; height: 100%; background: var(--eval-black); transition: width var(--dur-3) var(--ease-out); }
+/* the verdict on the player's last move: a quiet line, a dot for a slack move or a mistake */
+.verdict { display: flex; align-items: center; gap: var(--s-15); margin: 0; font: var(--t-small); color: var(--text-2); }
+.verdict > i { width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--good); }
+.verdict.v-slack > i { background: var(--text-3); }
+.verdict.v-mistake > i { background: var(--bad); }
+.verdict.v-mistake { color: var(--text); }
 /* move list: fills the panel, newest at the bottom */
 .moves { flex: 1 1 auto !important; min-height: 120px; display: flex; flex-direction: column; }
 .move-grid {
@@ -608,6 +614,8 @@ button.group-row:hover { background: var(--fill); }
 .move-grid button:hover { background: var(--fill); color: var(--text); }
 .move-grid li.last button { color: var(--text); font-weight: 500; }
 .move-grid .mn { min-width: 22px; text-align: right; color: var(--text-3); }
+.move-grid .v-dot { width: 5px; height: 5px; margin-left: auto; border-radius: var(--r-pill); background: var(--text-3); }
+.move-grid li.v-mistake .v-dot { background: var(--bad); }
 .moves-empty { font: var(--t-small); color: var(--text-3); margin: 0; }
 .float-bar {
   position: absolute; left: 50%; bottom: var(--s-6); transform: translateX(-50%); display: flex; align-items: center; gap: var(--s-3);

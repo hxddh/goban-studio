@@ -11,6 +11,7 @@ import * as C from "./controller.js";
 import { ataris } from "./insight.js";
 import { hintText, warningText } from "./teach-why.js";
 import { formatClock } from "./clock.js";
+import { verdictOf } from "../play/verdict.js";
 import { Board, Button, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
 import { ScoreCard } from "./score-card.jsx";
 import { NarrowFold, Toolbar } from "./chrome.jsx";
@@ -268,6 +269,28 @@ function EvalBar() {
   );
 }
 
+/** The verdict on the player's last move (play/verdict.js), when the balance is shown or the game teaches. */
+function verdictShown(g) {
+  return g.opponent === "ai" && !!g.verdicts && (state.settings.showEval || C.teachingOn());
+}
+
+function LastVerdict() {
+  const g = state.game;
+  if (!verdictShown(g) || g.pending) return null;
+  const line = g.game.mainLine();
+  const node = [...line].reverse().find((n) => n.move && !n.move.pass && n.move.color === g.humanColor);
+  const loss = node ? g.verdicts[node.id] : null;
+  const v = verdictOf(loss, state.settings.playerRank);
+  if (!v) return null;
+  const pts = formatPoints(Math.round(loss * 2) / 2);
+  return (
+    <p class={`verdict v-${v}`} aria-live="polite">
+      <i aria-hidden="true" />
+      {t(`play.verdict.${v}`, [pts])}
+    </p>
+  );
+}
+
 function MoveStrip() {
   const g = state.game;
   const game = g.game;
@@ -303,12 +326,15 @@ function MoveStrip() {
           {line.map((n, k) => {
             const i = k + 1;
             const m = n.move;
+            const v = verdictShown(g) ? verdictOf(g.verdicts[n.id], state.settings.playerRank) : null;
+            const marked = v === "slack" || v === "mistake";
             return (
-              <li class={i === line.length ? "last" : ""}>
-                <button type="button" onClick={() => peek(i)} title={t("play.peek")}>
+              <li class={`${i === line.length ? "last" : ""} ${marked ? `v-${v}` : ""}`}>
+                <button type="button" onClick={() => peek(i)} title={marked ? `${t("play.peek")} · ${t(`play.verdict.${v}Short`)}` : t("play.peek")}>
                   <span class="mn">{i}</span>
                   <Stone color={m.color} size={8} />
                   <span>{m.pass ? t("common.pass") : coordLabel(m.x, m.y, game.size)}</span>
+                  {marked && <i class="v-dot" aria-label={t(`play.verdict.${v}Short`)} />}
                 </button>
               </li>
             );
@@ -358,6 +384,7 @@ function PlayPanel() {
         <PlayerRow color={WHITE} />
       </section>
       <EvalBar />
+      <LastVerdict />
       <div class="panel-state" key={g.scoring ? "scoring" : over ? "over" : g.pending ? "pending" : "play"}>
         {!g.scoring && !over && (
           <p class="status-line" aria-live="off">

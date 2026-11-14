@@ -241,8 +241,25 @@ export default async function ({ test, assert, root }) {
     assert.match(state.announce, /This move may cost about 9 points — White can capture it at once\./);
     // The card's text (play.jsx renders warningText).
     assert.equal(warningText("8.5", g.pending.reason), "This move may cost about 8.5 points — White can capture it at once.");
+    // The same comparison is the move's verdict (the panel and the move list).
+    assert.equal(g.verdicts[g.game.current.id], 8.5);
     Play.teachTakeBack();
     assert.equal(g.pending, null);
+  });
+
+  await test("play verdict: without teaching, the balance shown, a costly move is noted and the game goes on", async () => {
+    const { verdictOf } = await import("../../src/web/js/play/verdict.js");
+    for (const rec of Lib.listGames()) Lib.deleteGame(rec.id);
+    state.settings = { ...P.DEFAULT_SETTINGS, lang: "en", teaching: false, showEval: true, onboarded: true, confirmMove: false };
+    Play.newGame({ size: 9, color: BLACK, opponentRank: 30 });
+    const g = state.game;
+    for (const [x, y] of [[8, 8], [2, 0], [8, 7], [1, 1]]) assert.ok(g.game.play(x, y).ok);
+    await Play.ponder();
+    Play.humanPlay(1, 0);
+    const node = g.game.current;
+    await until(() => g.game.moveNumber === 6 && !g.thinking, 3000, "the reply");
+    assert.equal(g.pending, null, "no pause without teaching");
+    assert.equal(verdictOf(g.verdicts[node.id], state.settings.playerRank), "mistake");
   });
 
   await test("play teaching: the hint reads its reason off the board", async () => {

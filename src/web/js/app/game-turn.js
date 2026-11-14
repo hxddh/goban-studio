@@ -15,6 +15,7 @@ import { countReady, resignStep, thinkTime } from "./feel.js";
 import { moveMade } from "./clock.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 import { gameOver, gameSignal, isComputerTurn, persistCurrent, playReviewing } from "./game-session.js";
+import { moveLoss, verdictOf } from "../play/verdict.js";
 import { finishGame, startScoring, toggleDead } from "./game-end.js";
 
 /* ------------------------------------------------------------ moves */
@@ -176,23 +177,20 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
     g.rank = Engine.implLabel(result.impl);
   }
 
-  // Teaching: a big drop after the player's move pauses the reply.
-  if (afterHuman && a && teachingOn() && g.before && g.game.current.parent?.id === g.before.nodeId) {
-    const best = g.before.moves?.[0];
-    if (best && Number.isFinite(best.scoreLead) && Number.isFinite(a.scoreLead)) {
-      const loss = g.humanColor * (best.scoreLead - a.scoreLead);
-      const threshold = state.settings.playerRank != null && state.settings.playerRank <= 10 ? 6 : 4;
-      if (loss >= threshold) {
-        g.thinking = false;
-        const move = g.game.current.move;
-        // One reason, from the two searches already made (no new search).
-        const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
-        g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
-        announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
-        update();
-        return;
-      }
-    }
+  // How the player's move compares with the best one: said quietly in the
+  // panel and the move list; in a teaching game a big drop pauses the reply.
+  const loss = afterHuman && a && g.before && g.game.current.parent?.id === g.before.nodeId ? moveLoss(g.before, a, g.humanColor) : null;
+  if (loss != null) (g.verdicts ||= {})[g.game.current.id] = loss;
+  if (loss != null && teachingOn() && verdictOf(loss, state.settings.playerRank) === "mistake") {
+    const best = g.before.moves[0];
+    g.thinking = false;
+    const move = g.game.current.move;
+    // One reason, from the two searches already made (no new search).
+    const reason = warningReason({ signMapBefore: g.game.current.parent.board.signMap, move, mover: g.humanColor, loss, before: g.before, after: a });
+    g.pending = { loss: Math.round(loss * 2) / 2, move, best: best.pass ? null : { x: best.x, y: best.y }, result, reason };
+    announce(reason ? warningText(Math.round(loss), reason) : t("teach.warn", [Math.round(loss)]));
+    update();
+    return;
   }
   await reply(g, gen, result, started);
 }
