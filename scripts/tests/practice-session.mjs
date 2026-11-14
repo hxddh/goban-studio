@@ -5,7 +5,10 @@
  * first 9×9 game, to a quiet "done for today". Run in Node on the
  * controllers, with the content in memory.
  */
-import { test, assert, bundle, sleep } from "./helpers.mjs";
+import { test, assert, bundle, sleep, pinDate } from "./helpers.mjs";
+
+// The path is drawn from the day: the same day whenever the tests run.
+pinDate();
 
 const A = await bundle([
   'export * as C from "./src/web/js/app/controller.js";',

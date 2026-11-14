@@ -115,6 +115,18 @@ await test("shell structure: the controller only lists names, by area, and lists
   assert.deepEqual(unused, [], "names the controller lists that nothing reaches as X.name");
 });
 
+await test("shell structure: a test file that builds today's practice path pins the date", () => {
+  // Without a date of its own, a path is drawn from today: such a file must pin it (helpers.mjs pinDate).
+  const today = /\b(?:pathNow|practicePath|todaysSession)\(\)|\b(?:startPath|continuePath)\(/;
+  const unpinned = [];
+  for (const n of fs.readdirSync(path.join(root, "scripts/tests"))) {
+    if (!n.endsWith(".mjs") || n === "helpers.mjs") continue;
+    const src = fs.readFileSync(path.join(root, "scripts/tests", n), "utf8");
+    if (today.test(src) && !/^pinDate\(\);$/m.test(src)) unpinned.push(n);
+  }
+  assert.deepEqual(unpinned, []);
+});
+
 await test("shell structure: no module is longer than 600 lines, but for content, the rules and solver, and five that may not grow", () => {
   // What is over the line today, with the reason; each may shrink, none may grow.
   const CEILING = {

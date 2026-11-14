@@ -4,7 +4,10 @@
  * death among them; the first answer to each counts; the grade it ends on
  * is stored and shapes the path; skipping is remembered.
  */
-import { test, assert, bundle, sleep } from "./helpers.mjs";
+import { test, assert, bundle, sleep, pinDate } from "./helpers.mjs";
+
+// The path is drawn from the day: the same day whenever the tests run.
+pinDate();
 
 const A = await bundle([
   'export * as C from "./src/web/js/app/controller.js";',
