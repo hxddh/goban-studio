@@ -153,9 +153,11 @@ jobs:
             -DABSL_PROPAGATE_CXX_STD=ON -DABSL_BUILD_TESTING=OFF -DABSL_ENABLE_INSTALL=ON
           cmake --build "$RUNNER_TEMP/build/abseil" --parallel 4
           cmake --install "$RUNNER_TEMP/build/abseil"
+          # libupb stays on: protoc itself is built from upb's bootstrap headers
+          # (descriptor.upb.h), and without it protoc does not compile.
           cmake -S "$RUNNER_TEMP/src/protobuf" -B "$RUNNER_TEMP/build/protobuf" "${common[@]}" \
             -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package \
-            -Dprotobuf_INSTALL=ON -Dutf8_range_ENABLE_INSTALL=ON -Dprotobuf_BUILD_LIBUPB=OFF
+            -Dprotobuf_INSTALL=ON -Dutf8_range_ENABLE_INSTALL=ON
           cmake --build "$RUNNER_TEMP/build/protobuf" --parallel 4
           cmake --install "$RUNNER_TEMP/build/protobuf"
           # Static only: a dylib here would be linked instead and then be
