@@ -23,7 +23,7 @@
 export { DAY, MAX_DAYS_KEPT } from "./util.js";
 export { PROFILE_V, PROFILE_MIN_V, SIGMA0, SIGMA_LEVEL, MIN_RATED_MOVES, MAX_HISTORY, priorRating, sigmaAt, expectedScore, updateRating, readRating } from "./rating.js";
 export { LADDER, MEMORY, RATING, retrievabilityAfter, retrievability, intervalFor, nextMemory, migrateReview, migrateProblemRecord, ratingOf } from "./memory.js";
-export { MAX_GAMES, MAX_MISTAKES, PHASES, newProfile, setPriorRank, normalizeGame, MOVE_RANK, applyMoveRank, normalizeGames, normalizeProfile, RULES, PLACEMENT } from "./profile.js";
+export { MAX_GAMES, MAX_MISTAKES, PHASES, newProfile, setPriorRank, normalizeGame, MOVE_RANK, applyMoveRank, normalizeGames, normalizeProfile, newSeed, RULES, PLACEMENT } from "./profile.js";
 export { recordGame, recordProblem, recordLesson, recordClassic, addMistake, recordMistake, removeMistake, keepFocus } from "./record.js";
 export { dailySize, ENDGAME_THEMES, THEME_TOPIC, focusKey, FOCUS_LESSONS, focusLesson, focusTopic, themeLosses, drillLast, smoothedRate, solvingLevel, startGrade, evidence, evidenceOf, weekStart, focus } from "./focus.js";
 export { byRetrievability, due, reviewsToday, isMastered, reviewLoad, masteryByTheme } from "./review.js";
