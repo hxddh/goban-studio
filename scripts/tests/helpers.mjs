@@ -51,6 +51,33 @@ export { PHASES, gameRecord, phaseBoundaries, phaseThresholds, recordAnalysis, s
 
 export const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/**
+ * The day the checks that build a practice path run on: the path is drawn
+ * from the day (practice/session.js practicePath), so what they see must not
+ * depend on when the tests run. scripts/ui-test.mjs pins the same day.
+ */
+export const PINNED_DAY = "2026-11-11T12:00:00";
+
+/**
+ * Pin today's date for this test file (each runs in a process of its own):
+ * Date.now() and new Date() start at `iso` and time passes from there, so
+ * timers and "a second later" still work.
+ */
+export function pinDate(iso = PINNED_DAY) {
+  const Real = globalThis.Date.pinnedFrom || globalThis.Date;
+  const offset = new Real(iso).getTime() - Real.now();
+  class PinnedDate extends Real {
+    constructor(...args) {
+      super(...(args.length ? args : [Real.now() + offset]));
+    }
+    static now() {
+      return Real.now() + offset;
+    }
+  }
+  PinnedDate.pinnedFrom = Real;
+  globalThis.Date = PinnedDate;
+}
+
 let count = 0;
 let failures = 0;
 export async function test(name, fn) {

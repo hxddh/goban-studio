@@ -26,7 +26,6 @@ import { t } from "../i18n.js";
 import { state, update } from "../app/store.js";
 import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
-import { humanMoveProbabilities } from "../katago.js";
 import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
 import { recordGame } from "../model/record.js";
 import { changeProfile } from "../app/ctl-core.js";
@@ -38,7 +37,7 @@ export const visitsFor = (size) => (size === 19 ? 40 : size === 13 ? 56 : 80);
 
 /**
  * Analyse every position of the main line. Returns an array aligned with
- * game.mainLine(); null when cancelled. Falls back to the offline estimate
+ * game.mainLine(); null when cancelled (a search too). Falls back to the offline estimate
  * per position when KataGo is not there. Every search is one job of the
  * scheduler's lane (background by default), so the computer's move and
  * what the player looks at always go first; `signal` cancels the pass, and
@@ -55,13 +54,14 @@ export async function analyzeLine(game, { visits = 40, signal = null, lane = "ba
       continue;
     }
     let p = null;
+    const status = { stopped: false };
     try {
-      p = await Engine.analyzeNode(game, line[i], visits, { signal, lane });
+      p = await Engine.analyzeNode(game, line[i], visits, { signal, lane, status });
     } catch (_) {
       p = null;
     }
     // A cancelled search is not an answer: never store an estimate for it.
-    if (signal?.aborted) return null;
+    if (signal?.aborted || status.stopped) return null;
     if (!p) p = Engine.estimateNode(game, line[i]);
     points[i] = p;
     onPoint?.(i, p);
@@ -160,7 +160,7 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
 
 /**
  * After a finished game's analysis, with the human-style model installed
- * and a host that can read its policy (katago.js humanMoveProbabilities):
+ * and a host that can read its policy (engine.js humanPolicy, queued like a search):
  * how likely the player's moves were for each rank profile, read as a rank
  * with its range (model/move-rank.js). Stored with the game (`moveRank`)
  * and in the player model, where it is only a weak prior (player.js
@@ -168,7 +168,7 @@ export function storeAnalysis(recordId, game, points, { humanColor = null, refin
  */
 async function estimateMoveRank(recordId, game, humanColor, { signal = null } = {}) {
   if (!recordId || !Engine.installed().human) return null;
-  const rows = await humanMoveProbabilities(game, humanColor, PROFILES.map((p) => p.id), { signal });
+  const rows = await Engine.humanPolicy(game, humanColor, PROFILES.map((p) => p.id), { signal });
   const reading = rows && rankFromLikelihoods(rows);
   if (!reading || signal?.aborted || !Games.getGame(recordId)) return null;
   const moveRank = { rank: reading.rank, lo: reading.lo, hi: reading.hi, n: reading.n, at: Date.now() };

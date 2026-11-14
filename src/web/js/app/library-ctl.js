@@ -127,6 +127,8 @@ function showClassic(id) {
  * Delete a game from the Library: it goes at once, and a toast offers Undo
  * for a few seconds (data/games.js trashGame). The file is deleted when the
  * toast goes, when another game is deleted, and before the app quits.
+ * Anything else that writes everything out (a backup, a restore) makes the
+ * delete final too: the Undo then goes, and a toast says so.
  */
 export function deleteRecord(id) {
   if (!Games.trashGame(id)) return;
@@ -146,6 +148,10 @@ export function deleteRecord(id) {
     },
   });
 }
+
+Games.onTrashFlushed(() => {
+  if (dismissToastKey("game-deleted", "final")) toast(t("library.deletedFinal"), "info");
+});
 
 export function renameRecord(id, name) {
   Games.renameGame(id, name);

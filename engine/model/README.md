@@ -4,8 +4,10 @@
 The engine is KataGo v1.18.1, MIT licensed by David J Wu and contributors:
 <https://github.com/lightvector/KataGo>.
 
-`model.txt.gz` is the public b6c96 network (KataGo model version 8). It is
-distributed with KataGo's releases under the same MIT licence. The model is
+`model.txt.gz` is the public b6c96 network (KataGo model version 8), from
+KataGo's g170 run. The g170 networks are under CC0 (effectively public
+domain), not the MIT licence of the engine:
+<https://katagotraining.org/network_license/>. The model is
 the small CPU-friendly network, not a superhuman GPU network. The
 opponent's eight levels and their approximate ranks are measured with this
 network; see `docs/strength.md`.

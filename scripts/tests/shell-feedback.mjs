@@ -432,6 +432,16 @@ try {
     assert.deepEqual(names(), ["third"]);
     assert.equal(store.has(Games.gameKey(c.id)), true);
 
+    // Something writes everything out (a backup, a restore) while Undo is offered: the delete is
+    // final, so the Undo goes and a toast says so; an Undo that would do nothing is never shown.
+    C.deleteRecord(c.id);
+    assert.equal(state.toasts[0].message, t("library.deleted"));
+    await store.flush();
+    assert.equal(store.has(Games.gameKey(c.id)), false, "the flush deleted the file");
+    assert.deepEqual(state.toasts.map((x) => [x.message, !!x.action]), [[t("library.deletedFinal"), false]]);
+    assert.deepEqual(names(), []);
+    state.toasts = [];
+
     // A game that is not there: nothing happens.
     C.deleteRecord("missing");
     assert.equal(state.toasts.length, 0);

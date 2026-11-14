@@ -5,7 +5,10 @@
  * Practice, back and forward move between them, and a write that fails is one
  * toast. The controller runs in Node with a minimal window.
  */
-import { test, assert, bundle, fs, path, root, sleep } from "./helpers.mjs";
+import { test, assert, bundle, fs, path, root, sleep, pinDate } from "./helpers.mjs";
+
+// The path is drawn from the day: the same day whenever the tests run.
+pinDate();
 
 // What boot touches of the page: the theme on <html>, the colour-scheme
 // query, the idle callback the content loader waits for.

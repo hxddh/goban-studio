@@ -6,7 +6,10 @@
  * milestones kept and said once, the day's size, and a name that is not
  * shown before the problem is solved.
  */
-import { test, assert, bundle, PROBLEMS, S, setLang, t } from "./helpers.mjs";
+import { test, assert, bundle, PROBLEMS, S, setLang, t, pinDate } from "./helpers.mjs";
+
+// The path is drawn from the day: the same day whenever the tests run.
+pinDate();
 import * as G from "../../src/web/js/practice/progress.js";
 import * as PM from "../../src/web/js/model/player.js";
 

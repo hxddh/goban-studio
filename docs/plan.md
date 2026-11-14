@@ -113,12 +113,16 @@ The problem items come in this order:
 
 1. **Due reviews, before anything new**: up to two mistake drills from
    your own games, then due problems, the most forgotten first (see
-   "Review" below). How many places they take depends on the backlog (all
-   drills and problems whose review date has come):
-   - **up to 3 due** (`RULES.SMALL_BACKLOG`): all of them, and at least
-     one place stays for a new problem (at most size − 1 reviews);
-   - **more than 3 due**: reviews may take every place, until the backlog
-     is small again;
+   "Review" below). However large the backlog (all drills and problems
+   whose review date has come):
+   - **up to twice the day's size due** (`RULES.BACKLOG_PER_PLACE`, 6 for
+     a day of 3): all of them that fit, and one place stays for a new
+     problem (at most size − 1 reviews) while one is open (not due, not
+     solved);
+   - **more than that**: reviews may take every place, until the backlog
+     is back under it. (A new place every day, whatever the backlog, lets
+     the backlog of a three-item day grow without end: 130 reviews due
+     after 240 simulated days.)
    - never more than **12 reviews a day** (`MEMORY.REVIEW_CAP`), counting
      the reviews already done today (`reviewsToday`), so a second session
      on the same day stays within it and fills up with new problems.

@@ -258,9 +258,9 @@ await test("play edits: redo plays the moves of the last undo again, the compute
   assert.equal(g.game.turn, BLACK, "it is the player's turn, with no new reply asked for");
   assert.equal(g.thinking, false);
   assert.equal(JSON.stringify(g.clock), clock, "redo adds no time: those moves were already paid for");
-  assert.equal(g.undos, 0, "an undo redone leaves no trace");
+  assert.equal(g.undos, 2, "an undo redone still counts: the game was told it is not rated");
   assert.equal(C.canRedo(), false);
-  assert.equal(C.unratedReason(g), "");
+  assert.equal(C.unratedReason(g), t("play.unrated.undos"), "and it is not rated, as the notice said");
   // Against a person an undo is one move; a new move ends the redo.
   const h = boardWith(3);
   C.undo();

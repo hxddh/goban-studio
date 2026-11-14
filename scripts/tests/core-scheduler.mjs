@@ -75,6 +75,18 @@ export default async function ({ test, assert, root }) {
     assert.ok(!s.ownerSignal("reports").aborted);
     s.cancelOwner("reports");
     assert.ok(!s.ownerSignal("reports").aborted, "a fixed owner name is fresh again");
+    // Owners do not pile up: a hundred games replaced one after another leave one entry behind.
+    const before = s.snapshot().owners;
+    let last = null;
+    for (let i = 0; i < 100; i++) {
+      if (last) s.cancelOwner(last);
+      last = s.newOwner("game");
+      s.ownerSignal(last);
+    }
+    assert.equal(s.snapshot().owners, before + 1);
+    assert.ok(s.ownerSignal(owner).aborted && s.ownerSignal("game:50").aborted, "cancelled unique owners stay cancelled");
+    assert.ok(!s.ownerSignal(last).aborted);
+    s.cancelOwner("reports");
 
     // cancelLanes: queued and running searches of those lanes only.
     log.length = 0;

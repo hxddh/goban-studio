@@ -270,7 +270,9 @@ export function decodeSgf(input, { lang = currentLang() } = {}) {
     // Not UTF-8: the record's own charset.
   }
   const head = decodeWith("windows-1252", bytes.subarray(0, 65536), false);
-  const ca = /(?:^|[^A-Za-z])CA\s*\[([^\]]*)\]/.exec(head);
+  // CA outside property values: each value is skipped whole, so a comment that mentions CA[…] is text
+  // (escapes are not followed: a Shift_JIS trail byte is a backslash).
+  const ca = [...head.matchAll(/\[[^\]]*\]|(?<![A-Za-z])CA\s*\[([^\]]*)\]/g)].find((m) => m[1] !== undefined);
   const named = ca && sgfCharset(ca[1]);
   // A record that says UTF-8 but is not keeps what can be read of it.
   if (named) return as(named, bytes);
@@ -810,6 +812,8 @@ export function loadSGF(input, { index = null } = {}) {
     const raw = first(d, key);
     const v = moveVertex(raw, size);
     game.current = into;
+    // Two passes followed by more moves did not end the game: that node is not a count.
+    if (into.phase === "scoring") into.phase = "playing";
     let res;
     if (!v) {
       warn("sgf.warn.badMove", [depth + 1, String(raw).slice(0, 12)]);

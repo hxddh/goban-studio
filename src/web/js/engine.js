@@ -70,16 +70,59 @@ export function suggestHandicap(playerRank, opponentRank, size) {
 export { LANES } from "./scheduler.js";
 export const sched = scheduler;
 /**
- * One queued search as { analysis, cancelled }. `cancelled` is true when
- * the search was stopped (its signal, cancel(), quitting) rather than
- * answered: a null analysis then says nothing about the engine, and the
- * position it was for is no longer wanted.
+ * How often a request the host superseded (it answered "cancelled" though
+ * nothing here cancelled it: a request that reached KataGo outside the
+ * scheduler) is asked again before it is given up as cancelled.
+ */
+export const SUPERSEDED_RETRIES = 3;
+
+/**
+ * One request to KataGo through the scheduler: `ask(signal, out)` is a
+ * katago.js call that sets `out.superseded`. Resolves { value, cancelled,
+ * superseded }: `cancelled` is true when the request was stopped (its
+ * signal, cancel(), quitting) or kept being superseded (`superseded` too),
+ * rather than answered; a null value then says nothing about the engine.
+ */
+async function askKataGo(ask, { lane = "background", signal = null, yields = false } = {}) {
+  const status = { cancelled: false };
+  let superseded = false;
+  const value = await scheduler.search(
+    async (sig) => {
+      for (let k = 0; ; k++) {
+        const out = {};
+        const v = await ask(sig, out);
+        superseded = !!out.superseded && !sig.aborted;
+        if (!superseded) return v;
+        if (k >= SUPERSEDED_RETRIES) return null;
+      }
+    },
+    { lane, signal, preemptible: KataGo.canCancel(), yields, status },
+  );
+  const stopped = status.cancelled || !!signal?.aborted;
+  return { value, cancelled: stopped || superseded, superseded: superseded && !stopped };
+}
+
+/**
+ * One queued search as { analysis, cancelled, superseded } (see askKataGo):
+ * a cancelled search's position is no longer wanted, or could not be
+ * searched now; it is not a failure of the engine.
  */
 async function searchQ(game, opts = {}) {
   const { lane = "background", signal = null, ...rest } = opts;
-  const status = { cancelled: false };
-  const analysis = await scheduler.search((sig) => KataGo.analyze(game, { ...rest, signal: sig }), { lane, signal, preemptible: KataGo.canCancel(), status });
-  return { analysis, cancelled: status.cancelled || !!signal?.aborted };
+  const { value, cancelled, superseded } = await askKataGo((sig, out) => KataGo.analyze(game, { ...rest, signal: sig, status: out }), { lane, signal });
+  return { analysis: value, cancelled, superseded };
+}
+
+/**
+ * How likely each of the player's moves was for players of several ranks
+ * (katago.js humanMoveProbabilities), as a low-priority request: background
+ * lane, and it gives way to any other search, which it never interrupts.
+ * Given way to, it is asked again afterwards; null when it cannot be read
+ * or was cancelled.
+ */
+export async function humanPolicy(game, color, profiles, { signal = null } = {}) {
+  const { value } = await askKataGo((sig, out) => KataGo.humanMoveProbabilities(game, color, profiles, { signal: sig, status: out }), { lane: "background", signal, yields: true });
+  return value;
 }
 
 /**
@@ -92,7 +135,7 @@ async function analysisR(game, opts = {}) {
   const engine = analysisEngine();
   if (engine === "standard") return searchQ(game, opts);
   const first = await searchQ(game, { ...opts, engine, visits: scaledVisits(opts.visits ?? 64, engine) });
-  if (first.cancelled) return { analysis: null, cancelled: true };
+  if (first.cancelled) return first;
   if (first.analysis) {
     strongAnswered();
     return first;
@@ -102,14 +145,13 @@ async function analysisR(game, opts = {}) {
 }
 const analysisQ = (game, opts = {}) => analysisR(game, opts).then((r) => r.analysis);
 
-let cached = null;
+/**
+ * What answers: KataGo or the offline engine. "Offline" is asked again
+ * later (katago.js status); `retryAt` says when (null: not again).
+ */
 export async function info() {
-  if (cached) return cached;
   const st = await KataGo.status();
-  cached = st?.available
-    ? { kind: "katago", name: st.version || "KataGo", available: true }
-    : { kind: "offline", name: "", available: false };
-  return cached;
+  return st?.available ? { kind: "katago", name: st.version || "KataGo", available: true } : { kind: "offline", name: "", available: false, retryAt: KataGo.statusRetryAt() };
 }
 
 /* ------------------------------------------------- optional networks */
@@ -373,30 +415,32 @@ export function humanRequest(human) {
  * the move back, started another game) ends the decision there: the result
  * has no move and `cancelled: true`. Nothing else is searched and the
  * offline engine is not asked, because the position is no longer wanted.
+ * `superseded: true` with it: nothing here cancelled the search, but KataGo
+ * kept answering that a newer request had replaced it (askKataGo).
  */
 export async function decide(game, opponent, { signal, lane = "move", node = game.current } = {}) {
   const inst = installed();
   let it = resolveOpponent(opponent, inst);
   const rank = opponent && typeof opponent === "object" && Number.isFinite(Number(opponent.rank)) ? Number(opponent.rank) : Number.isFinite(Number(opponent)) ? Number(opponent) : implLabel(it.id);
   if (it.kind === "human") {
-    const { analysis, cancelled } = await searchQ(game, { ...humanRequest(it.level.human), node, signal, lane });
-    if (cancelled) return { move: null, analysis: null, mode: "human", impl: it.id, cancelled: true };
+    const { analysis, cancelled, superseded } = await searchQ(game, { ...humanRequest(it.level.human), node, signal, lane });
+    if (cancelled) return { move: null, analysis: null, mode: "human", impl: it.id, cancelled, superseded };
     const move = analysis && humanMoveFromAnalysis(game, analysis, it.level.human);
     if (move) return { move, analysis, mode: "human", impl: it.id };
     // The human process could not answer: what plays the rank without it.
     it = impl(levelFor(rank, { strong: inst.strong }).impl);
   }
   if (it.kind === "strong") {
-    const { analysis, cancelled } = await searchQ(game, { visits: it.level.strong.visits, engine: "strong", node, signal, lane });
-    if (cancelled) return { move: null, analysis: null, mode: "strong", impl: it.id, cancelled: true };
+    const { analysis, cancelled, superseded } = await searchQ(game, { visits: it.level.strong.visits, engine: "strong", node, signal, lane });
+    if (cancelled) return { move: null, analysis: null, mode: "strong", impl: it.id, cancelled, superseded };
     if (analysis) strongAnswered();
     else strongFailed();
     const move = analysis && moveFromAnalysis(game, analysis, it.level);
     if (move) return { move, analysis, mode: "strong", impl: it.id };
     it = impl(levelFor(rank, {}).impl);
   }
-  const { analysis, cancelled } = await searchQ(game, { visits: it.level.visits, node, signal, lane });
-  if (cancelled) return { move: null, analysis: null, mode: "standard", impl: it.id, cancelled: true };
+  const { analysis, cancelled, superseded } = await searchQ(game, { visits: it.level.visits, node, signal, lane });
+  if (cancelled) return { move: null, analysis: null, mode: "standard", impl: it.id, cancelled, superseded };
   if (analysis) {
     const move = moveFromAnalysis(game, analysis, it.level);
     if (move) return { move, analysis, mode: "standard", impl: it.id };
@@ -461,10 +505,13 @@ export async function hint(game, { signal, lane = "move", node = game.current } 
 
 /**
  * Review data for one position: Black-POV win rate and score lead, and the
- * best move with its line. `visits` trades accuracy for speed.
+ * best move with its line. `visits` trades accuracy for speed. Null when
+ * there is none; `status.stopped` then says the search was cancelled
+ * (no estimate stands in for it).
  */
-export async function analyzeNode(game, node, visits = 48, { signal, lane = "background" } = {}) {
-  const a = await analysisQ(game, { node, visits, signal, lane });
+export async function analyzeNode(game, node, visits = 48, { signal, lane = "background", status = null } = {}) {
+  const { analysis: a, cancelled } = await analysisR(game, { node, visits, signal, lane });
+  if (cancelled && status) status.stopped = true;
   if (a && a.moves.length) {
     const top = a.moves[0];
     return {

@@ -130,13 +130,7 @@ export async function boot() {
   preloadContent(() => update());
   // The other languages too, so choosing one in Settings shows it at once.
   setTimeout(preloadLangs, 1500);
-  Engine.info().then((info) => {
-    update({ engine: info });
-    maybeComputerMove();
-    ponder();
-    // The background analyses quitting interrupted (play/analysis.js).
-    resumeBackground();
-  });
+  checkEngine();
   // A restore snapshot nobody can undo any more is removed.
   if (!problem) expireSnapshots(store).catch(() => {});
   // Which optional networks are installed (a local status call).
@@ -145,6 +139,25 @@ export async function boot() {
   if (hasNative()) setTimeout(() => autoCheckForUpdates().catch(() => {}), 4000);
   // How the last in-app update went (no request).
   if (hasNative()) setTimeout(() => restoreUpdateState().catch(() => {}), 600);
+}
+
+/**
+ * Which engine answers. KataGo found "unavailable" (still starting, or a
+ * status call that failed) is asked again when katago.js allows, with a
+ * growing wait, a few times; once it answers, the app uses it.
+ */
+const ENGINE_CHECKS = 6;
+function checkEngine(tries = 0) {
+  Engine.info().then((info) => {
+    if (tries === 0 || info.available) {
+      update({ engine: info });
+      maybeComputerMove();
+      ponder();
+      // The background analyses quitting interrupted (play/analysis.js).
+      if (tries === 0) resumeBackground();
+    }
+    if (!info.available && info.retryAt != null && tries < ENGINE_CHECKS) setTimeout(() => checkEngine(tries + 1), Math.max(0, info.retryAt - Date.now()) + 50);
+  });
 }
 
 /* ----------------------------------------------------------- onboarding */
