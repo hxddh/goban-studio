@@ -180,6 +180,9 @@ jobs:
           set -euo pipefail
           # pkg-config sees only the libraries built above, never Homebrew's.
           export PKG_CONFIG_LIBDIR="$METAL_DEPS/lib/pkgconfig"
+          # The Swift driver links this one; it reads the deployment target
+          # from the environment as well as from CMake's setting.
+          export MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN"
           cmake -S "$RUNNER_TEMP/KataGo/cpp" -B "$RUNNER_TEMP/KataGo/cpp/build-metal" \
             -G Ninja -DUSE_BACKEND=METAL -DNO_GIT_REVISION=1 -DNO_LIBZIP=1 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_MIN" \
@@ -193,6 +196,8 @@ jobs:
           chmod +x engine/macos/katago-metal
           file engine/macos/katago-metal
           lipo -archs engine/macos/katago-metal | grep -qw arm64
+          # Printed first, so a wrong minimum shows in the log.
+          vtool -show-build engine/macos/katago-metal
           vtool -show-build engine/macos/katago-metal | grep -E "minos $MACOS_MIN( |$)"
           # Only the system's libraries and frameworks (and Swift's runtime,
           # part of macOS 13): nothing that would be missing on a player's Mac.
