@@ -4,7 +4,7 @@
  *   node scripts/check-classics-katago.mjs list
  *       one line per classic: id, moves, komi (no engine needed)
  *   node scripts/check-classics-katago.mjs run --katago PATH --model PATH --out FILE
- *       [--shard i/n] [--visits 400] [--threads 4] [--only ID,ID]
+ *       [--shard i/n] [--visits 400] [--threads 4] [--only ID,ID (shared by the shards)]
  *       search every position of this shard's games and write the results
  *   node scripts/check-classics-katago.mjs report FILE...
  *       merge shard results into docs/classics-katago.json
@@ -98,12 +98,19 @@ function writeReport(files) {
   const games = {};
   let network = null;
   let runId = null;
-  for (const f of files) {
-    const j = JSON.parse(fs.readFileSync(f, "utf8"));
+  const shards = files.map((f) => JSON.parse(fs.readFileSync(f, "utf8")));
+  for (const j of shards) {
     network ||= j.network;
     runId ||= j.runId;
-    for (const g of j.results) games[g.id] = g;
   }
+  // A rerun of some games (--only) keeps the others from the last report,
+  // when they were searched with the same network and visits.
+  const visits = shards.find((j) => j.results.length)?.results[0].visits;
+  if (fs.existsSync(OUT)) {
+    const prev = JSON.parse(fs.readFileSync(OUT, "utf8"));
+    if (prev.network === network) for (const g of prev.games) if (g.visits === visits) games[g.id] = g;
+  }
+  for (const j of shards) for (const g of j.results) games[g.id] = g;
   const order = CLASSICS.map((c) => c.id).filter((id) => games[id]);
   const missing = CLASSICS.map((c) => c.id).filter((id) => !games[id]);
   const report = { network, runId, missing, games: order.map((id) => games[id]) };
@@ -149,7 +156,8 @@ async function main() {
   const threads = Number(a.threads || os.availableParallelism?.() || 4);
   const [si, sn] = String(a.shard || "0/1").split("/").map(Number);
   const only = a.only ? new Set(String(a.only).split(",")) : null;
-  const games = CLASSICS.filter((c, i) => (only ? only.has(c.id) : i % sn === si));
+  // --only picks the games first; the shards then share those.
+  const games = CLASSICS.filter((c) => !only || only.has(c.id)).filter((c, i) => i % sn === si);
   const kg = new Analysis({ katago: a.katago || process.env.KATAGO, model: a.model || process.env.KATAGO_STRONG_MODEL, threads });
   const started = Date.now();
   const results = [];
