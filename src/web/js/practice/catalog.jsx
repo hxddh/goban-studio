@@ -27,6 +27,16 @@ export function CatalogView() {
   );
 }
 
+/** A row's progress as a short bar beside its count (the count says it for screen readers). */
+function Meter({ part, of }) {
+  const share = of > 0 ? Math.min(1, part / of) : 0;
+  return (
+    <span class={`meter ${share >= 1 ? "full" : ""}`} aria-hidden="true">
+      <i style={{ width: `${Math.round(share * 100)}%` }} />
+    </span>
+  );
+}
+
 /** The course, the problems by topic and the shapes — on Practice's page itself. */
 export function CatalogSections({ first = true } = {}) {
   const p = state.profile;
@@ -50,6 +60,7 @@ export function CatalogSections({ first = true } = {}) {
                   <span class="gr-text">
                     <strong>{t("topic." + topic)}</strong>
                   </span>
+                  <Meter part={solvedOf(list)} of={list.length} />
                   <span class="row-count">{t("practice.ofN", [solvedOf(list), list.length])}</span>
                   <Icon name="next" size={14} />
                 </button>
@@ -111,6 +122,7 @@ function CourseMap() {
                 <span class="unit-text">
                   <h3>{C.tx(unit.title)}</h3>
                 </span>
+                <Meter part={done} of={unit.lessons.length} />
                 <span class="row-count">{t("practice.ofN", [done, unit.lessons.length])}</span>
                 <Icon name={expanded ? "down" : "next"} size={14} />
               </button>
