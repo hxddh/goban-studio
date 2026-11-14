@@ -691,7 +691,7 @@ await check("a11y: problems say the goal, the reply and the verdict; lessons rea
   await hear(page, "board", goal, "T");
   const right = await page.evaluate(() => {
     const P = window.__state.practice.problem;
-    return window.__solver.solveFirstMoves(P.pz).correct[0];
+    return { ...window.__solver.solveFirstMoves(P.pz).correct[0], color: P.pz.userColor === 1 ? "Black" : "White" };
   });
   await listen(page);
   await clickPoint(page, right.x, right.y);
@@ -699,7 +699,8 @@ await check("a11y: problems say the goal, the reply and the verdict; lessons rea
   await page.waitForTimeout(150);
   const heard = await page.evaluate(() => window.__heard);
   const verdict = await page.evaluate(() => document.querySelector(".feedback")?.textContent.trim());
-  assert(/^Black [A-T]\d+/.test(heard[0] || ""), `the move was not spoken: ${heard.join(" | ")}`);
+  // The player's colour: a problem is first shown Black or White to play (practice/transform.js).
+  assert(new RegExp(`^${right.color} [A-T]\\d+`).test(heard[0] || ""), `the move was not spoken as ${right.color}'s: ${heard.join(" | ")}`);
   assert(heard.some((h) => h.includes(verdict)), `the verdict "${verdict}" was not spoken: ${heard.join(" | ")}`);
   await page.keyboard.press("Control+3");
   await page.click(".lesson-row >> nth=0");
