@@ -1,7 +1,7 @@
 //! The one JSON writer of the shell.
 //!
 //! Every reply to the page and every window event is built into a fixed
-//! buffer with these two functions (the bridge_*.zig handlers, install.zig,
+//! buffer with these two functions (the bridge_*.zig handlers, install_apply.zig,
 //! update.zig, models.zig, store.zig). They return false when the buffer is full and
 //! leave what was already written in place; the caller keeps a mark if it
 //! wants to drop a half-written value.

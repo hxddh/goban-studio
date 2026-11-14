@@ -4,8 +4,8 @@
  *   UPDATE_SIGNING_KEY=… node scripts/sign-sums.mjs [SHA256SUMS] [SHA256SUMS.sig]
  *
  * Writes the base64 of the 64-byte Ed25519 signature over the exact bytes of
- * SHA256SUMS, one line, to SHA256SUMS.sig. The app (src/install.zig
- * verifySums) checks it against the public key it was built with
+ * SHA256SUMS, one line, to SHA256SUMS.sig. The app
+ * (src/install_verify.zig verifySums) checks it against the public key it was built with
  * (-Dupdate-pubkey) before it believes any checksum in the file.
  *
  * UPDATE_SIGNING_KEY is either the PKCS#8 PEM that scripts/gen-update-key.mjs

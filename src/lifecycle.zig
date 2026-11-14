@@ -1,10 +1,10 @@
-//! One instance per data directory (instance.zig) and the v13 quit gate:
+//! One instance per data directory (instance.zig) and the quit gate:
 //! the page's flush before a quit or window close, and the wait for the
 //! update helper.
 const std = @import("std");
 const builtin = @import("builtin");
 const native_sdk = @import("native_sdk");
-const install_mod = @import("install.zig");
+const install_apply = @import("install_apply.zig");
 const win_close = @import("win_close.zig");
 const json = @import("json.zig");
 const instance_mod = @import("instance.zig");
@@ -64,7 +64,7 @@ pub fn pollInbox(self: *App) void {
 /// to the one that does. False: this launch has nothing more to do.
 pub fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const u8) bool {
     const io = init.io;
-    var note: install_mod.LaunchNote = .{};
+    var note: install_apply.LaunchNote = .{};
     var paths: instance_mod.PathList = .{};
     var it: ?std.process.Args.Iterator = std.process.Args.Iterator.initAllocator(init.minimal.args, init.gpa) catch null;
     defer if (it) |*args| args.deinit();
@@ -82,7 +82,7 @@ pub fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const 
     // itself when it is done (with one of its two arguments); any other
     // launch in between would hold files of the folder being swapped.
     const by_helper = note.just_updated or note.install_failed;
-    if (!by_helper and install_mod.ownUpdateInProgress(io)) {
+    if (!by_helper and install_apply.ownUpdateInProgress(io)) {
         std.debug.print("goban-studio: an update is being installed; this launch does nothing\n", .{});
         return false;
     }
@@ -105,7 +105,7 @@ pub fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const 
     }
     // The new version did start; the helper that launched it must not
     // take a second window for a failed update and roll back.
-    install_mod.writeAck(io, &note);
+    install_apply.writeAck(io, &note);
     std.debug.print("goban-studio: already running; this launch {s}\n", .{
         if (result.outcome == .taken) "handed over to it" else "got no answer and does nothing",
     });
@@ -114,7 +114,7 @@ pub fn claimInstance(app_state: *App, init: std.process.Init, data_dir: []const 
 
 // ------------------------------------------------------------ quit gate
 //
-// v13. Two waits that must end before the app goes away, both run by one
+// Two waits that must end before the app goes away, both run by one
 // 100 ms timer on the UI thread:
 //
 //   * the update helper's "started" marker (`studio.updateApply`): the app
@@ -151,11 +151,11 @@ pub fn runGate(self: *App) void {
 fn checkHelperStarted(self: *App, now: i64) void {
     const marker = self.apply_started_buf[0..self.apply_started_len];
     const id = self.apply_bridge_id[0..self.apply_bridge_id_len];
-    var started = install_mod.helperStarted(self.io, marker);
+    var started = install_apply.helperStarted(self.io, marker);
     if (!started and now >= self.apply_deadline_ms) {
         // Claim the marker: if the helper got there first after all, it
         // did start; otherwise a late helper finds it taken and gives up.
-        started = !install_mod.claimStarted(self.io, marker);
+        started = !install_apply.claimStarted(self.io, marker);
         if (!started) {
             self.apply_active = false;
             self.installer.markApplyFailed("HelperNotStarted");

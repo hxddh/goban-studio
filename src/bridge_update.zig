@@ -3,9 +3,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const native_sdk = @import("native_sdk");
-const engine_mod = @import("engine.zig");
+const engine_request = @import("engine_request.zig");
 const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
+const install_apply = @import("install_apply.zig");
 const runner = @import("runner");
 const bridge_katago = @import("bridge_katago.zig");
 const lifecycle = @import("lifecycle.zig");
@@ -77,8 +78,8 @@ pub fn drainUpdate(self: *App) void {
         stopUpdateTimer(self);
         return;
     }
-    const buf = engine_mod.result_allocator.alloc(u8, update_mod.max_reply_bytes) catch return;
-    defer engine_mod.result_allocator.free(buf);
+    const buf = engine_request.result_allocator.alloc(u8, update_mod.max_reply_bytes) catch return;
+    defer engine_request.result_allocator.free(buf);
     const id = self.update_bridge_id[0..self.update_bridge_id_len];
     if (self.updater.take(self.update_gen, buf)) |reply| {
         self.update_active = false;
@@ -129,24 +130,24 @@ fn spawnBrowser(io: std.Io, url: []const u8) bool {
 
 // ------------------------------------------------------------ update install
 //
-// v5: after a check found a newer release, the player may download and
+// After a check found a newer release, the player may download and
 // install it (install.zig). The download runs on its own thread; the page
 // polls `studio.updateStatus` for progress and is answered on
 // `studio.updateDownload` when the thread is done (platform wake, or the
 // fallback timer, which also runs the stall watchdog).
 
 fn stagingRoot(self: *App) ?[]const u8 {
-    return install_mod.stagingRoot(self.env_map, &self.staging_root_buf);
+    return install_apply.stagingRoot(self.env_map, &self.staging_root_buf);
 }
 
 /// Can this installation be replaced in place? Probed once a session (it
 /// writes and removes a test file next to the app), again before a download.
-fn installTarget(self: *App, refresh: bool) *const install_mod.Target {
+fn installTarget(self: *App, refresh: bool) *const install_apply.Target {
     if (!self.install_target_known or refresh) {
         var token_bytes: [6]u8 = undefined;
         self.io.random(&token_bytes);
         const token = std.fmt.bytesToHex(token_bytes, .lower);
-        self.install_target = install_mod.detectTarget(self.io, &token);
+        self.install_target = install_apply.detectTarget(self.io, &token);
         if (self.install_target.blocked == .none and stagingRoot(self) == null) self.install_target.blocked = .NoTempDir;
         self.install_target_known = true;
     }
@@ -182,15 +183,15 @@ const StatusPayload = struct {
 /// next to the app, once a session) has looked.
 pub fn updateStatus(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     const self: *App = @ptrCast(@alignCast(context));
-    install_mod.writeAck(self.io, &self.installer.note);
+    install_apply.writeAck(self.io, &self.installer.note);
     const snap = self.installer.snapshot();
     var probe = false;
     if (std.json.parseFromSlice(StatusPayload, self.allocator, invocation.request.payload, .{ .ignore_unknown_fields = true })) |parsed| {
         probe = parsed.value.probe;
         parsed.deinit();
     } else |_| {}
-    const blocked: install_mod.Blocked = if (probe or self.install_target_known) installTarget(self, false).blocked else .NotChecked;
-    return install_mod.statusReply(output, &snap, self.installer.platform, blocked, &self.installer.note);
+    const blocked: install_apply.Blocked = if (probe or self.install_target_known) installTarget(self, false).blocked else .NotChecked;
+    return install_apply.statusReply(output, &snap, self.installer.platform, blocked, &self.installer.note);
 }
 
 /// `studio.updateCancel` {}: stop a download (its files are removed), or
@@ -212,7 +213,7 @@ const DownloadPayload = struct {
     tag: []const u8 = "",
 };
 
-/// May `tag` be installed over this version? v13: only the tag this
+/// May `tag` be installed over this version? Only the tag this
 /// app's own last successful check returned, and only when it is newer
 /// than the running version (no downgrades, no tags the page made up).
 /// Returns the refusal's error name, or null.
@@ -255,13 +256,13 @@ pub fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     const probe = self.probe_tag_len > 0 and std.mem.eql(u8, tag, self.probe_tag_buf[0..self.probe_tag_len]);
     if (!probe) {
         if (installRefusal(self, tag)) |name| {
-            responder.success(rid, install_mod.errorReply(&reply_buf, name)) catch {};
+            responder.success(rid, install_apply.errorReply(&reply_buf, name)) catch {};
             return;
         }
     }
     const target = installTarget(self, true);
     if (target.blocked != .none) {
-        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        responder.success(rid, install_apply.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
         return;
     }
     const root = stagingRoot(self) orelse {
@@ -271,7 +272,7 @@ pub fn updateDownload(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     if (!bridge_katago.keepBridgeId(rid, &self.install_bridge_id, &self.install_bridge_id_len, responder)) return;
     installWakeUp(self);
     const gen = self.installer.start(root, tag, nowMs(self)) catch |err| {
-        responder.success(rid, install_mod.errorReply(&reply_buf, install_mod.errorName(err))) catch {};
+        responder.success(rid, install_apply.errorReply(&reply_buf, install_apply.errorName(err))) catch {};
         return;
     };
     self.install_responder = responder;
@@ -303,9 +304,9 @@ pub fn drainInstall(self: *App) void {
     if (!done) return;
     var buf: [256]u8 = undefined;
     const reply = if (snap.gen != self.install_gen)
-        install_mod.errorReply(&buf, if (snap.error_name.len > 0) snap.error_name else "Cancelled")
+        install_apply.errorReply(&buf, if (snap.error_name.len > 0) snap.error_name else "Cancelled")
     else
-        install_mod.downloadReply(&buf, &snap, self.installer.platform);
+        install_apply.downloadReply(&buf, &snap, self.installer.platform);
     self.install_active = false;
     self.install_responder.success(self.install_bridge_id[0..self.install_bridge_id_len], reply) catch {};
     stopInstallTimer(self);
@@ -337,12 +338,12 @@ pub fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation
     // A probe download (or anything not checked and newer) is never installed.
     const snap = self.installer.snapshot();
     if (installRefusal(self, snap.tag())) |name| {
-        responder.success(rid, install_mod.errorReply(&reply_buf, name)) catch {};
+        responder.success(rid, install_apply.errorReply(&reply_buf, name)) catch {};
         return;
     }
     const target = installTarget(self, true);
     if (target.blocked != .none) {
-        responder.success(rid, install_mod.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
+        responder.success(rid, install_apply.errorReply(&reply_buf, @tagName(target.blocked))) catch {};
         return;
     }
     const root = stagingRoot(self) orelse {
@@ -355,15 +356,15 @@ pub fn updateApply(context: *anyopaque, invocation: native_sdk.bridge.Invocation
     }
     if (!bridge_katago.keepBridgeId(rid, &self.apply_bridge_id, &self.apply_bridge_id_len, responder)) return;
     self.installer.markInstalling();
-    const started = install_mod.startHelper(self.io, self.env_map, root, target.root(), staged, &self.apply_started_buf);
+    const started = install_apply.startHelper(self.io, self.env_map, root, target.root(), staged, &self.apply_started_buf);
     if (started.err) |err_name| {
         self.installer.markApplyFailed(err_name);
-        responder.success(rid, install_mod.errorReply(&reply_buf, err_name)) catch {};
+        responder.success(rid, install_apply.errorReply(&reply_buf, err_name)) catch {};
         return;
     }
     self.apply_started_len = started.started.len;
     self.apply_responder = responder;
-    self.apply_deadline_ms = nowMs(self) + install_mod.helper_start_timeout_ms;
+    self.apply_deadline_ms = nowMs(self) + install_apply.helper_start_timeout_ms;
     self.apply_active = true;
     lifecycle.startGateTimer(self);
 }

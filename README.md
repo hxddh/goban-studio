@@ -313,10 +313,14 @@ src/commands.zig         the bridge's command table; events.zig: platform events
 src/bridge_*.zig         the commands: files, window and menus, KataGo, updates, networks
 src/lifecycle.zig        one running copy, and the save before a quit
 src/store.zig, files.zig, paths.zig      the data folder, file dialogs, paths
+src/durable.zig          a written file survives a power cut
 src/instance.zig         one running copy; a second launch hands over its file
 src/engine.zig, engine_build.zig         the KataGo child process; which build starts
+src/engine_request.zig, engine_worker.zig  what a search is; the thread that runs it
 src/net.zig              one HTTPS client: proxy, redirects, resume
 src/update.zig, install.zig, updater/    update check, download and checks, the swap helpers
+src/install_verify.zig, install_package.zig, install_apply.zig
+                         signature and sums; the package; the helper and replies
 src/models.zig           the optional network downloads
 src/macos_open.m, win_close.zig          platform pieces
 

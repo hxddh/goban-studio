@@ -1,11 +1,12 @@
 //! Bridge commands for the player's files: the two user-file commands and
-//! their dialogs (files.zig grants), the data folder, the v9 store
+//! their dialogs (files.zig grants), the data folder, the file store
 //! (store.zig), the queue of files the OS opened, and the release
 //! self-test and screenshot tour (the report files they may write).
 const std = @import("std");
 const builtin = @import("builtin");
 const native_sdk = @import("native_sdk");
-const install_mod = @import("install.zig");
+const install_apply = @import("install_apply.zig");
+const install_verify = @import("install_verify.zig");
 const store_mod = @import("store.zig");
 const files_mod = @import("files.zig");
 const json = @import("json.zig");
@@ -24,7 +25,7 @@ const FilePayload = struct {
 /// `offset` and `done` it is one write of at most `store.chunk_bytes`
 /// (written beside, then renamed over); a larger file is sent as chunks from
 /// offset 0 in order, the last with `done: true` (as `studio.storeWrite`).
-/// v13: only a path a save dialog returned (or the self-test's report
+/// Only a path a save dialog returned (or the self-test's report
 /// files) — `AccessDenied` for anything else (files.zig).
 pub fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = output;
@@ -46,7 +47,7 @@ pub fn writeTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocati
 
 /// `studio.readTextFile {path, offset?}` → `{size, b64}`: the file's size
 /// and up to `store.chunk_bytes` of it from `offset`, as base64. A larger
-/// file is read in several calls (as `studio.storeRead`). v13: only a path
+/// file is read in several calls (as `studio.storeRead`). Only a path
 /// an open dialog returned, a document the OS opened with the app, a file
 /// dropped on the window, or the tour's acknowledgement file.
 pub fn readTextFile(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
@@ -76,7 +77,7 @@ const DialogPayload = struct {
 };
 
 /// `studio.openFileDialog {title?, defaultPath?, allowMultiple?}` → the
-/// chosen paths (an array) or null when cancelled. v13: the page's way to
+/// chosen paths (an array) or null when cancelled. The page's way to
 /// let the user pick a file to import (an SGF, a backup); every path it
 /// returns may then be read through `studio.readTextFile` if it is one of
 /// the app's file types (files.zig); any other pick is returned but stays
@@ -197,7 +198,7 @@ fn spawnFolder(io: std.Io, dir: []const u8) bool {
     return true;
 }
 
-// ------------------------------------------------------- v9 file storage
+// ---------------------------------------------------------- file storage
 
 /// The payload of the four store commands (each reads the fields it needs).
 const StorePayload = struct {
@@ -272,7 +273,7 @@ pub fn storeRemove(context: *anyopaque, invocation: native_sdk.bridge.Invocation
 
 /// The page polls this once after boot (and while running) instead of relying
 /// on an event that may fire before the webview exists. The queue is consumed
-/// on read; a path never opens twice. v13: the queue is cleared whatever
+/// on read; a path never opens twice. The queue is cleared whatever
 /// happens, and a path that cannot be sent (not UTF-8, or past the reply's
 /// room) is dropped alone instead of failing every later call.
 pub fn takeOpenFiles(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
@@ -311,14 +312,14 @@ fn openPathsJson(paths: []const []const u8, output: []u8) ?[]const u8 {
 /// release job. The page writes a small report to that path after the real
 /// WebView, bridge and engine are up; the platform workflow waits for it.
 ///
-/// GOBAN_TOUR_OUT (v4) asks for the screenshot tour instead: the page walks
+/// GOBAN_TOUR_OUT asks for the screenshot tour instead: the page walks
 /// through its main screens (src/web/js/tour.js), writing its progress to
 /// that path and waiting for scripts/tour-app.mjs to capture each one.
 pub fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocation, output: []u8) anyerror![]const u8 {
     _ = invocation;
     const self: *App = @ptrCast(@alignCast(context));
     // The page is up: tell a waiting update helper (if it launched us).
-    install_mod.writeAck(self.io, &self.installer.note);
+    install_apply.writeAck(self.io, &self.installer.note);
     const path = self.env_map.get("GOBAN_SELFTEST_OUT") orelse "";
     const tour = self.env_map.get("GOBAN_TOUR_OUT") orelse "";
     var n: usize = 0;
@@ -328,7 +329,7 @@ pub fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocat
         if (!json.append(output, &n, "{\"enabled\":true,\"path\":")) return error.HandlerFailed;
         if (!json.appendString(output, &n, path)) return error.HandlerFailed;
     }
-    // v5: also exercise the optional downloads (GOBAN_MODELS_DIR should
+    // GOBAN_SELFTEST_MODELS: also exercise the optional downloads (GOBAN_MODELS_DIR should
     // point at an empty temporary folder).
     const models = self.env_map.get("GOBAN_SELFTEST_MODELS") orelse "";
     if (path.len > 0 and std.mem.eql(u8, models, "1")) {
@@ -338,16 +339,16 @@ pub fn selftestConfig(context: *anyopaque, invocation: native_sdk.bridge.Invocat
         if (!json.append(output, &n, ",\"tour\":")) return error.HandlerFailed;
         if (!json.appendString(output, &n, tour)) return error.HandlerFailed;
     }
-    // v5: GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
+    // GOBAN_UPDATE_PROBE_OUT asks the page for the updater probe
     // (selftest.js; scripts/test-updater.mjs), GOBAN_UPDATE_PROBE_TAG for a
     // real download of that release. The download address is still built
-    // and checked by install.zig; the tag is only a tag.
+    // and checked by install_verify.zig; the tag is only a tag.
     const probe = self.env_map.get("GOBAN_UPDATE_PROBE_OUT") orelse "";
     if (probe.len > 0) {
         if (!json.append(output, &n, ",\"updateProbe\":")) return error.HandlerFailed;
         if (!json.appendString(output, &n, probe)) return error.HandlerFailed;
         const probe_tag = self.env_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
-        if (install_mod.validTag(probe_tag)) {
+        if (install_verify.validTag(probe_tag)) {
             if (!json.append(output, &n, ",\"updateProbeTag\":")) return error.HandlerFailed;
             if (!json.appendString(output, &n, probe_tag)) return error.HandlerFailed;
         }

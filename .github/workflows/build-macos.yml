@@ -325,7 +325,7 @@ jobs:
           # v9: the course, problems and classics past the start-up index (src/web/js/content.js)
           for f in course problems classics; do test -s "dist/GobanStudio.app/Contents/Resources/frontend/dist/content/$f.json"; done
           # The in-app updater installs a package only if the package itself
-          # says it is the release's version (src/install.zig
+          # says it is the release's version (src/install_package.zig
           # stagedVersionMatches): both places must carry package.json's.
           version="$(node -p 'require("./package.json").version')"
           test "$(node -p 'require(process.argv[1]).app' "$PWD/dist/GobanStudio.app/Contents/Resources/frontend/dist/build-info.json")" = "$version"
@@ -353,7 +353,7 @@ jobs:
           set -euo pipefail
           # What the app downloads and unpacks itself carries no quarantine
           # flag, because the app does not opt in to LSFileQuarantineEnabled
-          # (src/install.zig's macOS test checks the unpacked bundle too), so
+          # (src/install_package.zig's macOS test checks the unpacked bundle too), so
           # Gatekeeper does not stop the ad-hoc signed new version.
           if /usr/libexec/PlistBuddy -c 'Print :LSFileQuarantineEnabled' dist/GobanStudio.app/Contents/Info.plist >/dev/null 2>&1; then
             echo "LSFileQuarantineEnabled is set: downloaded updates would be quarantined"
@@ -417,7 +417,7 @@ jobs:
           node scripts/signing-notes.mjs readme packaging/README-macOS.txt "$status" > dist/README-macOS.txt
           # The .zip is also what the in-app updater installs: it must hold
           # GobanStudio.app at its root, under exactly that name (every
-          # released app looks for it there; src/install.zig
+          # released app looks for it there; src/install_package.zig
           # stagedRootNames). The .dmg shows the same app as
           # "Goban Studio.app"; the README names both.
           ditto -c -k --sequesterRsrc --keepParent dist/GobanStudio.app "dist/GobanStudio-macOS-${ARCH}.zip"

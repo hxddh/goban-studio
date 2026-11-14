@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 /**
  * The app has two names: "Goban Studio.app" in the .dmg and
  * "GobanStudio.app" in the .zip (the name the in-app updater looks for in
- * the package; src/install.zig stagedRootNames). Any command we print has
+ * the package; src/install_package.zig stagedRootNames). Any command we print has
  * to work for the copy the reader has.
  */
 export const APP_NAMES = ["Goban Studio.app", "GobanStudio.app"];

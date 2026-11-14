@@ -1,4 +1,4 @@
-//! Optional KataGo networks (v5): downloaded only when the player asks.
+//! Optional KataGo networks: downloaded only when the player asks.
 //!
 //! The app ships the small b6c96 network and is complete without anything
 //! here. In Settings the player may fetch two more:
@@ -20,7 +20,9 @@
 //!   * A download streams into `<file>.part`, hashing as it goes; the file
 //!     becomes `<file>` (one rename in the same directory) only when its
 //!     size and SHA-256 match the pinned values. A model is never used
-//!     before that rename.
+//!     before that rename. The bytes and the rename are flushed to the disk
+//!     (durable.zig), so a power cut cannot leave a short or empty `<file>`
+//!     that looks finished.
 //!   * A stopped or failed download keeps its `.part`; the next download
 //!     resumes it with an HTTP Range request (and starts over when the
 //!     server ignores the range). A connection that breaks off mid-file is
@@ -42,6 +44,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const json = @import("json.zig");
 const net = @import("net.zig");
+const durable = @import("durable.zig");
 
 pub const Kind = enum(u2) { human = 0, strong = 1 };
 pub const kind_count = 2;
@@ -467,7 +470,7 @@ pub const Manager = struct {
             self.truncate(kind, gen, file) catch {};
             return Outcome.fail("ChecksumMismatch", 0);
         }
-        file.sync(self.io) catch {};
+        durable.syncFile(self.io, file) catch return Outcome.fail("SyncFailed", offset);
         return self.activate(kind, gen, part, final);
     }
 
@@ -476,7 +479,7 @@ pub const Manager = struct {
         self.lock.lockUncancelable(self.io);
         defer self.lock.unlock(self.io);
         if (!self.currentLocked(kind, gen)) return Outcome.fail("Cancelled", 0);
-        std.Io.Dir.renameAbsolute(part, final, self.io) catch return Outcome.fail("RenameFailed", spec(kind).size);
+        durable.renameAbsolute(self.io, part, final) catch return Outcome.fail("RenameFailed", spec(kind).size);
         return .ready;
     }
 

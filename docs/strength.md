@@ -1311,7 +1311,7 @@ a host whose `studio.katagoStatus` reports `humanPolicy: true`, through
 `studio.katagoHumanPolicy` (position fields as `katagoAnalyzeAsync`, the
 whole main line, the player's colour and the profiles), and expects
 `{ ok, moves: [{ index, p: { profile: probability } }] }`. The native side
-(`src/engine.zig` `processPolicy`, `src/bridge_katago.zig` `katagoHumanPolicy`) is
+(`src/engine_worker.zig` `processPolicy`, `src/bridge_katago.zig` `katagoHumanPolicy`) is
 one request kind on the human slot: it brings KataGo to each position
 before a move of that colour (the incremental sync) and, for each profile
 (checked by `validProfile`), sends `kata-set-param humanSLProfile

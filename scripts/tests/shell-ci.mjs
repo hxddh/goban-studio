@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import { test, assert, fs, path, root } from "./helpers.mjs";
 import * as Sdk from "../native-sdk.mjs";
+import { installSource } from "../shell-source.mjs";
 
 /* ------------------------------------------------------- YAML subset */
 const isBlank = (l) => /^\s*(#.*)?$/.test(l);
@@ -433,7 +434,7 @@ await test("ci: SHA256SUMS names its release, is signed when the key exists, and
   assert.deepEqual(rel.jobs.sign.needs, ["preflight", "assemble"]);
   const sums = steps(rel.jobs.assemble).find((s) => s.name === "checksums");
   assert.equal(sums.env.TAG, "${{ inputs.tag }}");
-  // The sixth line binds the signed bytes to the tag (src/install.zig sumsBinding).
+  // The sixth line binds the signed bytes to the tag (src/install_verify.zig sumsBinding).
   assert.match(sums.run, /^printf '%s\\n' "\$TAG" > VERSION$/m);
   assert.match(sums.run, /^sha256sum VERSION >> SHA256SUMS$/m);
   assert.match(sums.run, /test "\$\(wc -l < SHA256SUMS\)" -eq 6/);
@@ -454,11 +455,11 @@ await test("ci: SHA256SUMS names its release, is signed when the key exists, and
   const line = (tag) => `${crypto.createHash("sha256").update(tag + "\n").digest("hex")}  VERSION`;
   assert.equal(line("v14.0.0"), "03f8f8d787997ec97ed6273980f539025f918130669d7660b538ed4dbe40a0a2  VERSION");
   assert.notEqual(line("v14.0.0"), line("v14.0.1"));
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  const zig = installSource();
   assert.ok(zig.includes('"03f8f8d787997ec97ed6273980f539025f918130669d7660b538ed4dbe40a0a2  VERSION\\n"'), "the Zig test checks the same line");
   assert.match(zig, /sha\.update\(tag\);\n\s+sha\.update\("\\n"\);/);
-  assert.match(zig, /try checkBinding\(sums_text, job\.tag\(\), job\.public_key != null\);/);
-  assert.match(zig, /if \(!stagedVersionMatches\(io, job\.platform, staged_root, job\.tag\(\)\)\) return error\.VersionMismatch;/);
+  assert.match(zig, /try install_verify\.checkBinding\(sums_text, job\.tag\(\), job\.public_key != null\);/);
+  assert.match(zig, /if \(!install_package\.stagedVersionMatches\(io, job\.platform, staged_root, job\.tag\(\)\)\) return error\.VersionMismatch;/);
 });
 
 await test("ci: every package states the version the updater will ask it for", () => {
@@ -477,7 +478,7 @@ await test("ci: the disk image offers the Applications folder, and the zip keeps
   assert.ok(dmg.indexOf("ln -s /Applications") < dmg.indexOf("hdiutil create"), "before the image is made");
   assert.match(dmg, /ditto dist\/GobanStudio\.app "dist\/dmg\/Goban Studio\.app"/);
   assert.match(dmg, /grep -x 'GobanStudio\.app\/Contents\/MacOS\/goban-studio'/, "the zip's root is GobanStudio.app");
-  const zig = fs.readFileSync(path.join(root, "src/install.zig"), "utf8");
+  const zig = installSource();
   assert.match(zig, /\.macos_arm64, \.macos_x64 => &\.\{ "GobanStudio\.app", "Goban Studio\.app" \}/);
   assert.match(fs.readFileSync(path.join(root, "scripts/package.sh"), "utf8"), /ln -s \/Applications dmg\/Applications/);
 });

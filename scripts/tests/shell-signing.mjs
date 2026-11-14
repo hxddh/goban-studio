@@ -1,7 +1,7 @@
 /**
  * Shell: signed updates (docs/signing.md). scripts/sign-sums.mjs signs
  * SHA256SUMS with node:crypto; the app verifies with Zig's Ed25519
- * (src/install.zig verifySums). The fixed vector below is also checked by
+ * (src/install_verify.zig verifySums). The fixed vector below is also checked by
  * the Zig test "signed sums: a valid signature passes, anything else is
  * refused", so the two sides cannot drift apart.
  */

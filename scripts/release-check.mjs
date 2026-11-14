@@ -18,7 +18,7 @@ import { COURSE } from "../src/web/js/content/course.js";
 import { PROBLEMS, THEMES } from "../src/web/js/content/problems.js";
 import { CLASSICS } from "../src/web/js/content/classics.js";
 import { APP_VERSION } from "../src/web/js/version.js";
-import { shellSource } from "./shell-source.mjs";
+import { engineSource, shellSource } from "./shell-source.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const langs = ["zh", "en", "ko", "ja"];
@@ -86,7 +86,7 @@ const cfg = fs.readFileSync(path.join(root, "engine/model/gtp.cfg"), "utf8");
 assert.match(cfg, /rules = japanese/);
 assert.match(cfg, /reportAnalysisWinratesAs = BLACK/, "the page reads analysis from Black's point of view");
 
-const engineZig = fs.readFileSync(path.join(root, "src/engine.zig"), "utf8");
+const engineZig = engineSource(root);
 const mainZig = shellSource(root);
 assert.match(engineZig, /kata-search_analyze/);
 for (const rules of ["japanese", "chinese", "korean"]) {

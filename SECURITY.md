@@ -27,7 +27,7 @@ Only the latest release is supported. There are no older branches.
   networks, the human model comes from KataGo's GitHub releases and the
   stronger network (kata1-b18c384nbt) from `media.katagotraining.org`,
   KataGo's official network server; it is not published on GitHub. The
-  addresses are fixed in the native code (`src/install.zig`,
+  addresses are fixed in the native code (`src/install_verify.zig`,
   `src/models.zig`): the page passes a release tag or a network kind, never
   a URL. Redirects are followed only over HTTPS, and only to GitHub's own
   download hosts (updates) or to those and `media.katagotraining.org`

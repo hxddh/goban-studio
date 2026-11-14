@@ -8,16 +8,19 @@
 //!   lifecycle.zig      one instance per data directory; the quit gate
 //!   bridge_files.zig   the player's files, the store, the self-test reports
 //!   bridge_window.zig  window drag, title-bar geometry, colour scheme, menus
-//!   bridge_katago.zig  KataGo searches and human-policy statistics (engine.zig)
-//!   bridge_update.zig  the update check, download and install (update.zig, install.zig)
+//!   bridge_katago.zig  KataGo searches and human-policy statistics (engine*.zig)
+//!   bridge_update.zig  the update check, download and install (update.zig, install*.zig)
 //!   bridge_models.zig  the optional networks (models.zig)
 const std = @import("std");
 const builtin = @import("builtin");
 const runner = @import("runner");
 const native_sdk = @import("native_sdk");
 const engine_mod = @import("engine.zig");
+const engine_request = @import("engine_request.zig");
+const engine_worker = @import("engine_worker.zig");
 const update_mod = @import("update.zig");
 const install_mod = @import("install.zig");
+const install_verify = @import("install_verify.zig");
 const models_mod = @import("models.zig");
 const store_mod = @import("store.zig");
 const files_mod = @import("files.zig");
@@ -42,7 +45,7 @@ pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
 /// The update key compiled in with `-Dupdate-pubkey` (docs/signing.md), or
 /// null. A malformed key is a compile error, never a silently unsigned app.
-const update_public_key = install_mod.parsePublicKey(app_options.update_pubkey) catch
+const update_public_key = install_verify.parsePublicKey(app_options.update_pubkey) catch
     @compileError("-Dupdate-pubkey must be the base64 of a 32-byte Ed25519 public key");
 
 fn macOpenCallback(context: ?*anyopaque, path: [*:0]const u8) callconv(.c) void {
@@ -67,7 +70,7 @@ pub fn main(init: std.process.Init) !void {
     var data_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const data_dir = paths_mod.dataDir(init.environ_map, &data_dir_buf);
     if (!lifecycle.claimInstance(&app_state, init, data_dir)) return;
-    // Optional networks (v5). Not freed at exit: a download thread may
+    // Optional networks (models.zig). Not freed at exit: a download thread may
     // still be running.
     var models_dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const models = try std.heap.page_allocator.create(models_mod.Manager);
@@ -76,18 +79,18 @@ pub fn main(init: std.process.Init) !void {
     // system names (net.zig).
     models.env = init.environ_map;
     app_state.models = models;
-    // v9 file storage: the page's settings, profile and games (store.zig).
+    // File storage: the page's settings, profile and games (store.zig).
     app_state.store.init(init.io, data_dir);
     var strong_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     var human_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const strong_model = models.modelPath(.strong, &strong_buf) orelse "";
     const human_model = models.modelPath(.human, &human_buf) orelse "";
     // Not freed at exit: the detached worker thread may still be unwinding.
-    const katago = try std.heap.page_allocator.create(engine_mod.Worker);
+    const katago = try std.heap.page_allocator.create(engine_worker.Worker);
     katago.init(init.io, init.environ_map, strong_model, human_model);
     defer katago.shutdown();
     app_state.katago = katago;
-    app_state.request_scratch = try std.heap.page_allocator.create(engine_mod.Request);
+    app_state.request_scratch = try std.heap.page_allocator.create(engine_request.Request);
     app_state.request_scratch.* = .{};
     app_state.katago_available = katago.standard().available();
     app_state.katago_version = katago.standard().versionText(&app_state.katago_version_buf);
@@ -104,7 +107,7 @@ pub fn main(init: std.process.Init) !void {
     app_state.installer = installer;
     if (init.environ_map.get("GOBAN_UPDATE_PROBE_OUT") != null) {
         const probe_tag = init.environ_map.get("GOBAN_UPDATE_PROBE_TAG") orelse "";
-        if (install_mod.validTag(probe_tag)) {
+        if (install_verify.validTag(probe_tag)) {
             @memcpy(app_state.probe_tag_buf[0..probe_tag.len], probe_tag);
             app_state.probe_tag_len = probe_tag.len;
         }
@@ -128,11 +131,17 @@ pub fn main(init: std.process.Init) !void {
 
 test {
     std.testing.refAllDecls(engine_mod);
+    std.testing.refAllDecls(@import("engine_request.zig"));
+    std.testing.refAllDecls(@import("engine_worker.zig"));
     std.testing.refAllDecls(@import("engine_build.zig"));
     std.testing.refAllDecls(update_mod);
     std.testing.refAllDecls(install_mod);
+    std.testing.refAllDecls(@import("install_verify.zig"));
+    std.testing.refAllDecls(@import("install_package.zig"));
+    std.testing.refAllDecls(@import("install_apply.zig"));
     std.testing.refAllDecls(models_mod);
     std.testing.refAllDecls(store_mod);
+    std.testing.refAllDecls(@import("durable.zig"));
     std.testing.refAllDecls(files_mod);
     std.testing.refAllDecls(win_close);
     std.testing.refAllDecls(json);

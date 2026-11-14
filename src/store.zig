@@ -1,4 +1,4 @@
-//! v9 file storage (docs/v9.md, "Storage"): the page's data as JSON files
+//! File storage (docs/v9.md, "Storage"): the page's data as JSON files
 //! under `<app data>/data`, read and written through four bridge commands
 //! (`studio.storeRead`, `studio.storeWrite`, `studio.storeList`,
 //! `studio.storeRemove`; see bridge_files.zig).
@@ -11,13 +11,16 @@
 //! file moves in chunks of `chunk_bytes`: a write sends its chunks in order
 //! (`offset` 0 truncates the temporary file, later chunks must start where
 //! the previous one ended) and the last one (`done`) renames the temporary
-//! file over the target, so a reader never sees half a file. A read returns
+//! file over the target, so a reader never sees half a file. The rename is
+//! durable (durable.zig): once `done` succeeds, the file survives a power
+//! cut. A read returns
 //! the file's size with one chunk from `offset`. One file is at most
 //! `max_file_bytes`.
 
 const std = @import("std");
 const json = @import("json.zig");
 const builtin = @import("builtin");
+const durable = @import("durable.zig");
 
 /// Largest file the store keeps (a game with its full analysis is well under).
 pub const max_file_bytes: u64 = 8 * 1024 * 1024;
@@ -110,22 +113,20 @@ pub fn validPrefix(prefix: []const u8) bool {
     return validPath(p) and noDeviceSegment(p);
 }
 
-/// Rename `from` over `to` in `dir`. On Windows a rename over a file that
-/// an antivirus scanner, the search indexer or a backup tool has open for a
-/// moment fails with AccessDenied / sharing violation; a few short retries
-/// (10, 20, 40, 80, 160 ms: about 0.3 s in all) ride that out instead of
-/// failing the write. Elsewhere a rename either works or does not.
-fn renameRetrying(io: std.Io, dir: std.Io.Dir, from: []const u8, to: []const u8) Error!void {
+/// Rename `from` over `to` in `dir` (whose absolute path is `dir_path`),
+/// durably (durable.zig: the rename and the directory entry reach the disk
+/// before this returns). On Windows a rename over a file that an antivirus
+/// scanner, the search indexer or a backup tool has open for a moment fails
+/// with AccessDenied / sharing violation; a few short retries (10, 20, 40,
+/// 80, 160 ms: about 0.3 s in all) ride that out instead of failing the
+/// write. Elsewhere a rename either works or does not.
+fn renameRetrying(io: std.Io, dir: std.Io.Dir, dir_path: []const u8, from: []const u8, to: []const u8) Error!void {
     const attempts: u32 = if (builtin.os.tag == .windows) 6 else 1;
     var delay_ms: i64 = 10;
     var i: u32 = 0;
     while (true) : (i += 1) {
-        dir.rename(from, dir, to, io) catch |err| {
-            if (i + 1 >= attempts) return error.Disk;
-            switch (err) {
-                error.AccessDenied, error.PermissionDenied, error.FileBusy, error.AntivirusInterference => {},
-                else => return error.Disk,
-            }
+        durable.renameIn(io, dir, dir_path, from, to) catch |err| {
+            if (i + 1 >= attempts or err != error.Busy) return error.Disk;
             std.Io.sleep(io, .fromMilliseconds(delay_ms), .awake) catch {};
             delay_ms *= 2;
             continue;
@@ -236,9 +237,9 @@ pub const Store = struct {
                 if (len != offset) return error.OutOfOrder;
             }
             if (bytes.len > 0) file.writePositionalAll(self.io, bytes, offset) catch return error.Disk;
-            if (done) file.sync(self.io) catch return error.Disk;
+            if (done) durable.syncFile(self.io, file) catch return error.Disk;
         }
-        if (done) try renameRetrying(self.io, dir, tmp, sub);
+        if (done) try renameRetrying(self.io, dir, self.root(), tmp, sub);
     }
 
     /// Remove `key` (and any unfinished write of it). A missing key is fine.
@@ -422,9 +423,9 @@ pub fn writePath(io: std.Io, path: []const u8, bytes: []const u8, offset: u64, d
             if (len != offset) return error.OutOfOrder;
         }
         if (bytes.len > 0) file.writePositionalAll(io, bytes, offset) catch return error.Disk;
-        if (done) file.sync(io) catch return error.Disk;
+        if (done) durable.syncFile(io, file) catch return error.Disk;
     }
-    if (done) try renameRetrying(io, dir, tmp, name);
+    if (done) try renameRetrying(io, dir, std.fs.path.dirname(path).?, tmp, name);
 }
 
 test "a user file is written in chunks beside its target and read back from offsets" {

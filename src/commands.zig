@@ -1,4 +1,4 @@
-//! Every bridge command in one place (v13): the registry and the policy
+//! Every bridge command in one place: the registry and the policy
 //! (which origins may call it) are both built from these two tables.
 const std = @import("std");
 const native_sdk = @import("native_sdk");
@@ -23,7 +23,7 @@ else
 const SyncCommand = struct { name: []const u8, invoke: native_sdk.bridge.HandlerFn };
 const AsyncCommand = struct { name: []const u8, invoke: native_sdk.bridge.AsyncHandlerFn };
 
-/// Every bridge command in one place (v13): the registry and the policy
+/// Every bridge command in one place: the registry and the policy
 /// (which origins may call it) are both built from these two tables, so a
 /// command can never be registered without its policy, or the other way
 /// round, and adding one is a one-line change.
@@ -40,7 +40,7 @@ pub const sync_commands = [_]SyncCommand{
     .{ .name = "studio.windowChrome", .invoke = bridge_window.windowChrome },
     .{ .name = "studio.windowTheme", .invoke = bridge_window.windowTheme },
     .{ .name = "studio.setMenus", .invoke = bridge_window.setMenus },
-    // The quit gate (v13).
+    // The quit gate (lifecycle.zig).
     .{ .name = "studio.flushHook", .invoke = lifecycle.flushHook },
     .{ .name = "studio.flushDone", .invoke = lifecycle.flushDone },
     // KataGo (searches are async, below).
@@ -57,7 +57,7 @@ pub const sync_commands = [_]SyncCommand{
     .{ .name = "studio.modelDownload", .invoke = bridge_models.modelDownload },
     .{ .name = "studio.modelCancel", .invoke = bridge_models.modelCancel },
     .{ .name = "studio.modelRemove", .invoke = bridge_models.modelRemove },
-    // v9 file storage (store.zig).
+    // File storage (store.zig).
     .{ .name = "studio.storeRead", .invoke = bridge_files.storeRead },
     .{ .name = "studio.storeWrite", .invoke = bridge_files.storeWrite },
     .{ .name = "studio.storeList", .invoke = bridge_files.storeList },
@@ -84,7 +84,7 @@ test "every bridge command is registered once, with the same origins" {
     var has_reveal = false;
     for (names) |n| has_reveal = has_reveal or std.mem.eql(u8, n, "studio.revealDataDir");
     try std.testing.expect(has_reveal);
-    // The v2 synchronous KataGo commands are gone.
+    // No synchronous KataGo command: a search never blocks the UI thread.
     for (names) |n| {
         try std.testing.expect(!std.mem.eql(u8, n, "studio.katagoMove"));
         try std.testing.expect(!std.mem.eql(u8, n, "studio.katagoAnalyze"));
