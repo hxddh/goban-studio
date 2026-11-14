@@ -23,6 +23,33 @@ await test("all 20 classic games parse and carry four-language notes", () => {
   }
 });
 
+await test("classics: the KataGo moments are what classics-moments.mjs writes from the check, and each says what was measured", async () => {
+  const Moments = await import("../classics-moments.mjs");
+  // classics.js is what the script would write from docs/classics-katago.json.
+  execFileSync(process.execPath, [path.join(root, "scripts/classics-moments.mjs"), "--check"], { stdio: "pipe" });
+  assert.equal(Moments.region("D16"), 0);
+  assert.equal(Moments.region("K10"), 4);
+  assert.equal(Moments.region("Q4"), 8);
+  assert.equal(Moments.region("A10"), 3);
+  // A checked move's lead is the position before it (Black's view); the loss is the mover's.
+  assert.equal(Moments.leadAfter({ c: "B", lead: 3.4, loss: 20.4 }), -17);
+  assert.equal(Moments.leadAfter({ c: "W", lead: 0.4, loss: 22 }), 22.4);
+  const m = Moments.momentOf({ n: 199, c: "B", move: "F6", lead: 3.4, best: "E6", loss: 20.4 }, 19, false);
+  assert.equal(m.title.en, "The lead changes hands");
+  assert.equal(m.note.en, "KataGo would play E6 (lower left) instead; this costs Black about 20 points. The lead passes from Black (about 3 points) to White (about 17).");
+  const data = JSON.parse(fs.readFileSync(path.join(root, "docs/classics-katago.json"), "utf8"));
+  const checked = new Map(data.games.map((g) => [g.id, g]));
+  for (const classic of CLASSICS) {
+    for (const mo of (classic.moments || []).filter((x) => x.source === "katago")) {
+      const move = checked.get(classic.id).moves[mo.index - 1];
+      assert.ok(move.loss >= 1.5, `${classic.id} ${mo.index}: a swing the check measured`);
+      for (const lang of LANG_IDS) assert.ok(mo.note[lang].includes(move.best), `${classic.id} ${mo.index} ${lang}: names KataGo's move`);
+    }
+    // Every checked classic has at least three moments, hand-written or KataGo's.
+    if (checked.has(classic.id)) assert.ok((classic.moments || []).length >= 3, `${classic.id}: ${(classic.moments || []).length} moments`);
+  }
+});
+
 await test("classics: every commented moment is a move of its record, in four languages, and the famous ones are where the record has them", () => {
   const at = (id, index) => {
     const { game } = loadSGF(CLASSICS.find((c) => c.id === id).sgf);
