@@ -53,7 +53,7 @@ export function PlayView() {
     deadStones: scoring ? scoring.dead : [],
     variation: null,
     moveNumbers: moveNumbers(game),
-    showCoords: s.settings.coords,
+    showCoords: s.settings.coords, coordsAround: s.settings.coordsAround,
     view: null,
     ghost: g.ghost ? { ...g.ghost, color: game.turn } : null,
     hoverColor: scoring ? null : game.turn,
@@ -455,6 +455,27 @@ function ScoringCard() {
  * A finished game on the board without its review (rare: the review opens
  * by itself when a game ends): the result and the way into the review.
  */
+/**
+ * The game in one line under the result: its length, and how your moves
+ * went (play/verdict.js) when they were judged.
+ */
+function GameTally() {
+  const g = state.game;
+  const moves = g.game.mainLine().length - 1;
+  const counts = { good: 0, slack: 0, mistake: 0 };
+  for (const loss of Object.values(g.verdicts || {})) {
+    const v = verdictOf(loss, state.settings.playerRank);
+    if (v) counts[v]++;
+  }
+  const judged = counts.good + counts.slack + counts.mistake > 0;
+  return (
+    <div class="game-tally">
+      <span>{tn("play.moveN", moves)}</span>
+      {judged && <span>{t("play.result.verdicts", [counts.good, counts.slack, counts.mistake])}</span>}
+    </div>
+  );
+}
+
 function ResultCard() {
   const g = state.game;
   const headline = C.resultHeadline(g);
@@ -464,6 +485,7 @@ function ResultCard() {
       <strong class="result-big">{headline}</strong>
       {headline !== C.resultText(g.game.current.result) && <span class="muted">{C.resultText(g.game.current.result)}</span>}
       {C.unratedReason(g) && <span class="fine unrated-note">{C.unratedReason(g)}</span>}
+      <GameTally />
       <div class="actions center">
         <Button kind="primary" icon="chart" onClick={() => C.openPostGame(g, { inPlace: false })}>
           {t("play.reviewGame")}

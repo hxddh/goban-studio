@@ -185,6 +185,33 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.close();
   });
 
+  await check("shell board: coordinates on all four sides, from Settings → Board, reach the board", async () => {
+    const page = await fresh();
+    await onboard(page, 1);
+    await page.waitForFunction(() => window.__board?.geom?.cell > 10);
+    assert(await page.evaluate(() => !window.__board.model.coordsAround), "off by default");
+    await page.keyboard.press("Control+,");
+    await page.click(".settings-tab[data-pane=board]");
+    await page.locator(".settings-pane .switch", { hasText: "Coordinates on all four sides" }).click();
+    await page.waitForFunction(() => window.__state.settings.coordsAround === true);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => window.__board.model.coordsAround === true);
+    // Letters above the grid now: the band over the top line is no longer plain wood.
+    const ink = await page.evaluate(() => {
+      const bv = window.__board;
+      const g = bv.geom;
+      const ctx = bv.canvas.getContext("2d");
+      const y = Math.round((g.oy - g.cell * 0.475 - 12) * bv.dpr);
+      const row = ctx.getImageData(Math.round(g.ox * bv.dpr) - 20, y - 6, 40, 12).data;
+      let dark = 0;
+      for (let i = 0; i < row.length; i += 4) if (row[i] + row[i + 1] + row[i + 2] < 420) dark++;
+      return dark;
+    });
+    assert(ink > 3, `the letter A above the board (${ink} dark pixels)`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   await check("shell board: the last move is a thin ring on the stone, not a filled dot; Settings can leave it out", async () => {
     const page = await seededPage({ appearance: "light" });
     await position(page);
@@ -203,10 +230,10 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const on = await ring();
     assert(on.ring > 150, `a light ring on the black stone (${on.ring.toFixed(0)})`);
     assert(on.centre < 110, `its centre is the stone, not a dot (${on.centre.toFixed(0)})`);
-    // Off in Settings → Board (the third switch).
+    // Off in Settings → Board (the switch named for it).
     await page.keyboard.press("Control+,");
     await page.click(".settings-tab[data-pane=board]");
-    await page.click(".settings-pane .switch >> nth=2");
+    await page.locator(".settings-pane .switch", { hasText: "Mark the last move" }).click();
     await page.waitForFunction(() => window.__state.settings.lastMoveMark === false);
     await page.keyboard.press("Escape");
     const off = await ring();

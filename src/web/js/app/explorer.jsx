@@ -63,7 +63,7 @@ export function ExplorerView() {
     deadStones: [],
     variation: null,
     moveNumbers: null,
-    showCoords: state.settings.coords,
+    showCoords: state.settings.coords, coordsAround: state.settings.coordsAround,
     view: X.explorerView(e),
     hoverColor: node.turn,
     interactive: true,

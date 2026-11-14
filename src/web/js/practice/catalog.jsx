@@ -8,7 +8,7 @@ import { useState } from "preact/hooks";
 import { t } from "../i18n.js";
 import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
-import { Icon } from "../app/parts.jsx";
+import { DiagramThumb, Icon } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
@@ -25,6 +25,12 @@ export function CatalogView() {
       </div>
     </>
   );
+}
+
+/** A unit's face: the first position its lessons show (nothing until the course's part has arrived). */
+function UnitThumb({ unit }) {
+  const step = unit.lessons.flatMap((l) => l.steps || []).find((s) => Array.isArray(s.board?.diagram));
+  return step ? <DiagramThumb diagram={step.board.diagram} size={36} /> : <span class="unit-thumb-wait" aria-hidden="true" />;
 }
 
 /** A row's progress as a short bar beside its count (the count says it for screen readers). */
@@ -119,6 +125,7 @@ function CourseMap() {
             <li class={`unit ${state_} ${expanded ? "open" : ""}`}>
               <button type="button" class="unit-head" aria-expanded={expanded} onClick={() => setOpen(expanded ? -1 : ui)}>
                 <span class="unit-no">{all ? <Icon name="check" size={13} /> : ui + 1}</span>
+                <UnitThumb unit={unit} />
                 <span class="unit-text">
                   <h3>{C.tx(unit.title)}</h3>
                 </span>

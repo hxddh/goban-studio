@@ -424,6 +424,15 @@ button.group-row:hover { background: var(--fill); }
 .game-item { display: flex; align-items: center; padding-right: var(--s-2); }
 .game-item .group-row { flex: 1; }
 .row-count { flex: none; font: var(--t-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* A row's own action ("Start", "Continue", "Try it"): a quiet button inside a row that is itself the button */
+/* Lines that appear in the panel (a verdict, a hint, the tally) ease in instead of popping (@starting-style; reduced motion makes it instant) */
+.verdict, .panel .note, .game-tally, .week-goal { transition: opacity var(--dur-2) var(--ease-out), translate var(--dur-2) var(--ease-out); }
+@starting-style {
+  .verdict, .panel .note, .game-tally, .week-goal { opacity: 0; translate: 0 4px; }
+}
+.game-tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-05); font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.row-action { flex: none; display: inline-flex; align-items: center; height: 26px; padding: 0 var(--s-25); border-radius: var(--r-1); background: var(--fill); color: var(--text); font: var(--t-label); }
+.group-row:hover .row-action, .problem-card:hover .row-action { background: var(--fill-2); }
 .meter { flex: none; align-self: center; width: 56px; height: 4px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--text-2); }
 .meter.full i { background: var(--good); }
@@ -849,6 +858,9 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .catalog .units.map .unit + .unit, .catalog .units.map .units-heading + .unit { border-top: 1px solid var(--line); }
 .catalog .units.map .unit-head { border-radius: 0; min-height: 44px; padding: var(--s-2) var(--s-4); }
 .catalog .units.map .unit-text h3 { font: var(--t-label); }
+.units.map .unit-head .dthumb, .unit-thumb-wait { flex: none; width: 36px; height: 36px; border-radius: var(--r-0); }
+.unit-thumb-wait { background: var(--thumb-board); opacity: 0.5; }
+.catalog .units.map .unit-head { align-items: center; }
 .catalog .units-heading { margin: 0; padding: var(--s-3) var(--s-4) var(--s-1); border-top: 1px solid var(--line); }
 .units { display: flex; flex-direction: column; gap: var(--s-3); }
 .unit { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); padding: var(--s-4); }

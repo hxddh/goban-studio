@@ -35,7 +35,7 @@ const SHEETS_TESTED = ["confirm", "importReport", "level", "newGame", "onboardin
  */
 const SETTINGS_PANES_TESTED = {
   general: { ".lang-grid button": 4, ".segmented": 2, ".segmented.volume button": 4, ".switch": 1 },
-  board: { ".segmented.board-style button": 2, ".switch": 5 },
+  board: { ".segmented.board-style button": 2, ".switch": 6 }, // coordinates, on all four sides (shown while coordinates are on), …
   playing: { ".switch": 4, ".segmented.default-rules button": 3 },
   you: { ".level-row .level-now": 1, "[data-change-level]": 1, ".segmented.daily-size button": 3 },
   engines: { ".model-row": 2 },

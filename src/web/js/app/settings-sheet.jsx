@@ -151,6 +151,7 @@ function BoardPane() {
         </Row>
         <p class="fine">{t("settings.boardStyleHelp")}</p>
         <Switch label={t("settings.coordinates")} checked={s.coords} onChange={(v) => set("coords", v)} />
+        {s.coords && <Switch label={t("settings.coordsAround")} checked={!!s.coordsAround} onChange={(v) => set("coordsAround", v)} />}
         <Switch label={t("settings.moveNumbers")} checked={s.numbers} onChange={(v) => set("numbers", v)} />
         <Switch label={t("settings.lastMove")} checked={s.lastMoveMark !== false} onChange={(v) => set("lastMoveMark", v)} />
       </section>

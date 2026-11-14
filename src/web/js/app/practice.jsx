@@ -203,7 +203,7 @@ function MistakeView() {
     board,
     lastMove: D.status === "right" ? D.last : node.move,
     marks,
-    showCoords: state.settings.coords,
+    showCoords: state.settings.coords, coordsAround: state.settings.coordsAround,
     view: null,
     hoverColor: m.color,
     interactive: D.status !== "right" && D.status !== "revealed",

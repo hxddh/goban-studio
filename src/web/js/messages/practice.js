@@ -15,6 +15,8 @@ export const PRACTICE = {
   "today.next": m("下一项", "Next", "다음", "次"),
   "today.week": m("本周", "This week", "이번 주", "今週"),
   "today.goal": m("今天的练习：{0}", "Today's practice: {0}", "오늘의 연습: {0}", "今日の練習：{0}"),
+  "today.goalTodo": m("今天有 {0} 项练习", "{0} things to practise today", "오늘 연습할 것 {0}개", "今日の練習は {0} 項目"),
+  "today.goalTodo.one": m("今天有 {0} 项练习", "{0} thing to practise today", "오늘 연습할 것 {0}개", "今日の練習は {0} 項目"),
   "today.goalDone": m("今天的练习完成了。", "Today's practice is done.", "오늘의 연습을 마쳤습니다.", "今日の練習は終わりました。"),
   "today.daysLabel": m("最近七天，做过练习或下过棋的日子", "The last seven days: days with practice or a game", "최근 7일: 연습하거나 대국한 날", "直近7日：練習か対局をした日"),
   "today.problem.title": m("今天的一题", "A problem for today", "오늘의 문제", "今日の一問"),

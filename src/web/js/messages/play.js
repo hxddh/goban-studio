@@ -43,6 +43,7 @@ export const PLAY = {
   "play.timeUp": m("时间到了。", "Time is up.", "시간이 다 됐습니다.", "時間切れです。"),
   "play.clock": m("剩余时间", "Time left", "남은 시간", "残り時間"),
   "play.evalLabel": m("形势", "Balance", "형세", "形勢"),
+  "play.result.verdicts": m("你的着法：好棋 {0} · 缓手 {1} · 失误 {2}", "Your moves: {0} good · {1} slack · {2} mistakes", "내 수: 좋은 수 {0} · 완착 {1} · 실수 {2}", "あなたの手：好手 {0}・緩手 {1}・悪手 {2}"),
   "play.verdict.good": m("上一手：好棋", "Last move: good", "앞 수: 좋은 수", "前の手：好手"),
   "play.verdict.slack": m("上一手：缓手，约亏 {0} 目", "Last move: slack, about {0} points", "앞 수: 완착, 약 {0}집 손해", "前の手：緩手、約{0}目損"),
   "play.verdict.mistake": m("上一手：失误，约亏 {0} 目", "Last move: a mistake, about {0} points", "앞 수: 실수, 약 {0}집 손해", "前の手：悪手、約{0}目損"),

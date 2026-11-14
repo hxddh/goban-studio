@@ -438,11 +438,15 @@ export class BoardView {
       ctx.textBaseline = "middle";
       // Just past the edge stones: half a stone, then a fixed gap.
       const gap = Math.min(cell * 0.8, cell * 0.475 + 12);
+      // Letters below and numbers on the left; on all four sides when asked (a whole board only).
+      const around = m.coordsAround && !m.view;
       for (let x = win.x0; x <= win.x1; x++) {
         ctx.fillText(LETTERS[x], px(x), py(win.y1) + gap + ext(win.y1 < size - 1) * 0.6);
+        if (around) ctx.fillText(LETTERS[x], px(x), py(win.y0) - gap);
       }
       for (let y = win.y0; y <= win.y1; y++) {
         ctx.fillText(String(size - y), px(win.x0) - gap - ext(win.x0 > 0) * 0.6, py(y));
+        if (around) ctx.fillText(String(size - y), px(win.x1) + gap, py(y));
       }
     }
 

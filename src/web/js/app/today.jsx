@@ -286,15 +286,17 @@ function Week() {
           );
         })}
       </ol>
+      <p class="muted">{weekText(weekCounts())}</p>
       {path.items.length > 0 && (
         <p class="week-goal">
-          {path.finished ? t("today.goalDone") : t("today.goal", [t("practice.ofN", [done, path.items.length])])}
-          <span class="meter" aria-hidden="true">
-            <i style={{ width: `${Math.round((done / path.items.length) * 100)}%` }} />
-          </span>
+          {path.finished ? t("today.goalDone") : done === 0 ? tn("today.goalTodo", path.items.length) : t("today.goal", [t("practice.ofN", [done, path.items.length])])}
+          {done > 0 && !path.finished && (
+            <span class="meter" aria-hidden="true">
+              <i style={{ width: `${Math.round((done / path.items.length) * 100)}%` }} />
+            </span>
+          )}
         </p>
       )}
-      <p class="muted">{weekText(weekCounts())}</p>
     </section>
   );
 }
