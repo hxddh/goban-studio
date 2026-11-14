@@ -183,7 +183,10 @@ macOS 13 is the oldest supported release: Zig 0.16, which builds the
 shell, and KataGo's Metal backend both need it. The opponent's strength comes from the
 search budget, from choosing among KataGo's candidates within a loss
 window and, for the weaker ranks, from a share of deliberate beginner's
-moves.
+moves. Settings → Engines says which build runs (Metal, AVX2 or the
+standard CPU build), why the faster one was given up if it was, and
+Measure speed times one short search per installed network in visits per
+second.
 
 The ranks are measured: `scripts/calibrate-strength.mjs` plays the
 settings against each other and against KataGo's human-imitation model,

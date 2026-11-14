@@ -14,6 +14,7 @@ import * as C from "./controller.js";
 import { estimateLabel } from "./estimate-label.js";
 import { Button, Icon, Segmented, Switch } from "./parts.jsx";
 import { Modal } from "./modal.jsx";
+import { EngineRow } from "./engine-row.jsx";
 
 /* --------------------------------------------------------------- settings */
 
@@ -343,7 +344,7 @@ function EnginesPane() {
     <>
       <section class="settings-group">
         <h3>{t("settings.pane.engines")}</h3>
-        <p class="muted">{state.engine.available ? t("settings.engineOn", [state.engine.name || "KataGo"]) : t("settings.engineOff")}</p>
+        <EngineRow />
       </section>
       <section class="settings-group">
         <h3>{t("models.title")}</h3>

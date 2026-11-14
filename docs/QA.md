@@ -231,7 +231,9 @@ No machine can check these, and none has been done yet:
   built and its `version` checked there, but whether it answers a move on
   the runner's virtual GPU is informational, and neither the speed-up nor
   the fallback on a real Mac or PC has been tried. Nor has the Metal build
-  under the hardened runtime of a Developer ID build.
+  under the hardened runtime of a Developer ID build. Settings → Engines
+  shows the build in use, the fallback reason and the visits per second,
+  which is what such a check should record.
 - **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192;
   the top level and the analysis budget that use it have not been measured
   again (`docs/strength.md`, "v15").

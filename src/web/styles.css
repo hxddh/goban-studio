@@ -1076,6 +1076,11 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .settings-tab.on { background: var(--fill); color: var(--text); font-weight: 500; }
 .settings-pane { overflow-y: auto; padding: var(--s-4) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
 .update-row > span { flex: 1; }
+/* The build and its speed beside Measure speed, why it fell back under them, close together and at the pane's full width. */
+.engine-diag { display: flex; flex-direction: column; gap: var(--s-1); }
+.engine-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings-pane .engine-diag .fine { max-width: none; }
+.engine-speed { font-variant-numeric: tabular-nums; }
 .update-block { display: flex; flex-direction: column; gap: var(--s-2); }
 .update-progress { display: flex; align-items: center; gap: var(--s-3); }
 .update-progress .progress { flex: 1; }

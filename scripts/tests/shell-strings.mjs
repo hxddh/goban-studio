@@ -113,6 +113,7 @@ await test("every key in the string table is used by the interface", () => {
     "area.", // review.jsx, insight.js: "area." + areaOf(...)
     "backup.error.", // data-ctl.js restoreError
     "edit.mark.", // review.jsx: the mark kinds (rules.js MARK_KINDS)
+    "engineDiag.build.", // engine-diag.js engineLine: the build the host names (metal, avx2, eigen)
     "error.", // play-ctl.js: "error." + the rules' reason
     "explorer.name.", // explorer-ctl.js: named openings and joseki of the book
     "explorer.tag.", // explorer.jsx: "explorer.tag." + tag
