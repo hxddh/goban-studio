@@ -43,7 +43,7 @@ The app has four places and opens on the first.
   image.
 - **Settings** (⌘, / Ctrl+,) — seven panes: General, Board, Playing, You,
   Engines, Data, About. Language, appearance, larger text, a
-  high-contrast board, coordinates, sound volume, teaching, rules, your
+  high-contrast board, coordinates (on two or all four sides), traditional board proportions, sound volume, teaching, rules, your
   level, the optional KataGo networks, backup and restore, the data
   folder, updates.
 
