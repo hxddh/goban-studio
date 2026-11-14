@@ -346,13 +346,15 @@ function EnginesPane() {
         <h3>{t("settings.pane.engines")}</h3>
         <EngineRow />
       </section>
-      <section class="settings-group">
+      <section class="settings-group models-group">
         <h3>{t("models.title")}</h3>
-        <p class="fine">{t("models.intro")}</p>
+        {/* One paragraph, so the pane fits at 1200×800 with larger text. */}
+        <p class="fine">
+          {t("models.intro")} {t("models.source")}
+        </p>
         {["human", "strong"].map((kind) => (
           <ModelRow kind={kind} one={ms?.[kind]} />
         ))}
-        <p class="fine">{t("models.source")}</p>
       </section>
     </>
   );

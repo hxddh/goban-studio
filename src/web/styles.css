@@ -1079,13 +1079,16 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 /* The build and its speed beside Measure speed, why it fell back under them, close together and at the pane's full width. */
 .engine-diag { display: flex; flex-direction: column; gap: var(--s-1); }
 .engine-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.settings-pane .engine-diag .fine { max-width: none; }
+/* Engines at the pane's full width: with larger text at 1200×800 the 62ch measure would wrap it past the pane's height. */
+.settings-pane .engine-diag .fine, .settings-pane .models-group .fine { max-width: none; }
+.settings-pane .models-group { gap: var(--s-2); }
+.settings-pane .models-group > .fine { margin-top: 0; }
 .engine-speed { font-variant-numeric: tabular-nums; }
 .update-block { display: flex; flex-direction: column; gap: var(--s-2); }
 .update-progress { display: flex; align-items: center; gap: var(--s-3); }
 .update-progress .progress { flex: 1; }
 .update-progress .fine { font-variant-numeric: tabular-nums; }
-.model-row { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) 0; border-top: 1px solid var(--line); }
+.model-row { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-2) 0; border-top: 1px solid var(--line); }
 .model-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-1); }
 .model-text strong { font: var(--t-label); }
 .model-status { font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }

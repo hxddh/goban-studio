@@ -242,20 +242,20 @@ export const SHELL = {
   "models.title": m("可选下载", "Optional downloads", "선택 다운로드", "追加ダウンロード"),
   "models.intro": m(
     "不下载也能完整离线使用。下面两项只在你点“下载”后才会从网上获取。",
-    "Goban Studio works fully offline without these. Nothing is downloaded until you choose Download.",
+    "Everything works offline without these; nothing is downloaded until you choose Download.",
     "이것들 없이도 오프라인으로 모두 쓸 수 있습니다. ‘다운로드’를 누르기 전에는 아무것도 받지 않습니다.",
     "これらがなくてもオフラインですべて使えます。「ダウンロード」を押すまで何も取得しません。",
   ),
   "models.source": m(
     "文件来自 KataGo 的官方发布（GitHub、katagotraining.org），使用前会核对校验值。",
-    "Files come from KataGo's official releases (GitHub, katagotraining.org) and are verified before use.",
+    "Files come from KataGo's official releases (GitHub, katagotraining.org), checked before use.",
     "파일은 KataGo 공식 배포(GitHub, katagotraining.org)에서 받으며, 사용 전에 검사값을 확인합니다.",
     "ファイルは KataGo の公式配布（GitHub、katagotraining.org）から取得し、使う前にチェックサムを確認します。",
   ),
   "models.human.name": m("拟人对手", "Human-style opponent", "사람 같은 상대", "人間らしい相手"),
   "models.human.desc": m(
     "KataGo 的人类棋谱模型（{0} MB）。电脑对手会像同级别的人一样下棋：人的棋形，也有人的失误。",
-    "KataGo's human model ({0} MB). The computer opponent plays like a person of its level: human shapes and human mistakes.",
+    "KataGo's human model ({0} MB): the opponent plays like a person of its level, mistakes included.",
     "KataGo의 인간 기보 모델({0} MB). 컴퓨터 상대가 같은 급수의 사람처럼 둡니다. 사람의 모양, 사람의 실수까지.",
     "KataGo の人間棋譜モデル（{0} MB）。コンピュータの相手が同じ棋力の人のように打ちます。人の形も、人のミスも。",
   ),

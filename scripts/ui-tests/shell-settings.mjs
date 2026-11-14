@@ -132,13 +132,15 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
             const pane = document.querySelector(".settings-pane");
             const sheet = document.querySelector(".settings-sheet").getBoundingClientRect();
             const nav = document.querySelector(".settings-nav");
-            return { content: pane.scrollHeight, room: pane.clientHeight, wide: pane.scrollWidth > pane.clientWidth + 1, sheetFits: sheet.top >= 0 && sheet.bottom <= innerHeight, navFits: nav.scrollHeight <= nav.clientHeight + 1 };
+            // The content's own height (scrollHeight never reports less than the room), so the summary shows the margin left.
+            const natural = Math.ceil(pane.lastElementChild.getBoundingClientRect().bottom - pane.getBoundingClientRect().top + pane.scrollTop + parseFloat(getComputedStyle(pane).paddingBottom));
+            return { content: pane.scrollHeight, natural, room: pane.clientHeight, wide: pane.scrollWidth > pane.clientWidth + 1, sheetFits: sheet.top >= 0 && sheet.bottom <= innerHeight, navFits: nav.scrollHeight <= nav.clientHeight + 1 };
           });
           assert(m.sheetFits, `${locale} ${id}: the sheet does not fit the window`);
           assert(m.navFits, `${locale} ${id}: the list of panes scrolls`);
           assert(!m.wide, `${locale} ${id}: the pane scrolls sideways`);
           if (!MAY_SCROLL.includes(id)) assert(m.content <= m.room, `${locale} ${id}${large ? " (larger text)" : ""}: ${m.content} px of content in ${m.room} px`);
-          seen.push(m.content);
+          if (!MAY_SCROLL.includes(id)) seen.push({ px: m.natural, room: m.room, where: `${locale} ${id}` });
         }
         // The fullest states were really on screen.
         await openPane(page, "engines");
@@ -148,7 +150,9 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
         assert(page.errors.length === 0, `${locale}: ${page.errors.join("; ")}`);
         await page.close();
       }
-      return `tallest pane ${Math.max(...seen)} px`;
+      const top = seen.reduce((a, b) => (b.px > a.px ? b : a));
+      const engines = seen.filter((x) => x.where.endsWith(" engines")).reduce((a, b) => (b.px > a.px ? b : a));
+      return `tallest content ${top.px} px in ${top.room} px, ${top.where}; Engines ${engines.px} px, ${engines.where}`;
     });
   }
 
