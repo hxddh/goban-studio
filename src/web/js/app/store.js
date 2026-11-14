@@ -13,7 +13,10 @@
  * The slices:
  *
  *   game      the game on the board: a move, the computer thinking, an evaluation
- *   review    a review's analysis filling in
+ *   review    the review on screen: its board and its panel
+ *   analysis  a review's analysis filling in: only what shows it (the
+ *             chart, the progress line, the evaluation, the key moments)
+ *             follows it, not the page around them
  *   practice  a problem, a lesson step or a drill being answered
  *   batch     the quiet analysis pass over older games
  *   toasts, tasks, announce   the shell's own messages
