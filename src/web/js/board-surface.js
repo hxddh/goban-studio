@@ -1,7 +1,7 @@
 /**
  * The board's surface and grid, by the cell size (docs/review-v14-zh.md
  * §3.3): the grid's strokes, the star points, the last-move ring, the hover
- * preview's edge and the wood. Pure functions
+ * preview's edge, the wood, a stone's landing and its finish at small sizes. Pure functions
  * of their arguments, so board.js stays the renderer and these numbers can
  * be tested and tuned in one place.
  */
@@ -108,4 +108,59 @@ export function drawWood(g, w, h, theme) {
     }
     g.stroke();
   }
+}
+
+/**
+ * How high a stone being placed still is, from the share `t` of the landing
+ * time that has passed: 1 in the air, 0 on the board, easing out (it comes
+ * down fast and settles), never below the board.
+ */
+export function liftOf(t) {
+  const u = Math.min(1, Math.max(0, t));
+  return Math.pow(1 - u, 3);
+}
+
+/**
+ * A stone's finish for its size on screen (`device` = its diameter in
+ * device pixels). The sprites are drawn at 256 px; shrunk to a 19×19 cell
+ * the white stone's shell lines turn into noise and the black stone's broad
+ * highlight disappears. Below about 80 device pixels a soft glaze calms the
+ * white face (its rim shading stays), and black gets back a faint highlight
+ * towards the light (top left). Nothing is added at large sizes.
+ */
+export function finishStone(ctx, cx, cy, r, black, device) {
+  const k = Math.min(1, Math.max(0, (80 - device) / 40));
+  if (k <= 0) return;
+  const g = black
+    ? ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.42, 0, cx - r * 0.35, cy - r * 0.42, r * 0.7)
+    : ctx.createRadialGradient(cx - r * 0.1, cy - r * 0.12, 0, cx, cy, r * 0.86);
+  if (black) {
+    g.addColorStop(0, `rgba(150, 150, 146, ${(0.2 * k).toFixed(3)})`);
+    g.addColorStop(1, "rgba(150, 150, 146, 0)");
+  } else {
+    g.addColorStop(0, `rgba(250, 249, 245, ${(0.55 * k).toFixed(3)})`);
+    g.addColorStop(0.7, `rgba(246, 244, 238, ${(0.35 * k).toFixed(3)})`);
+    g.addColorStop(1, "rgba(246, 244, 238, 0)");
+  }
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * The board's edge, so it reads as a block of wood rather than a card: a
+ * light line where the top and left faces catch the light, a slightly
+ * darker band along the bottom and right. Only on a whole board (a problem
+ * window shows part of one and has no edge of its own).
+ */
+export function drawBoardEdge(g, w, h, theme) {
+  const light = theme.dark ? "rgba(255, 236, 200, 0.12)" : "rgba(255, 252, 240, 0.55)";
+  const shade = theme.dark ? "rgba(0, 0, 0, 0.28)" : "rgba(90, 56, 18, 0.16)";
+  g.fillStyle = light;
+  g.fillRect(0, 0, w, 1);
+  g.fillRect(0, 0, 1, h);
+  g.fillStyle = shade;
+  g.fillRect(0, h - 2, w, 2);
+  g.fillRect(w - 2, 0, 2, h);
 }

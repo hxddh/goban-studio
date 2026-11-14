@@ -21,7 +21,7 @@
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
 import { loadMaterials, stoneVariant } from "./materials.js";
 import { currentPalette, onBoardTheme } from "./theme.js";
-import { drawPreviewEdge, drawWood, gridStrokesOf, lastMarkOf, starRadiusOf } from "./board-surface.js";
+import { drawBoardEdge, drawPreviewEdge, drawWood, finishStone, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "./board-surface.js";
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
@@ -78,19 +78,13 @@ export function frameAspect(model) {
 const ON_LIGHT = { accent: "#34529A", good: "#2E7D4F", bad: "#B3402C" };
 /** The same on a black stone: the dark theme's lighter signals. */
 const ON_DARK = { accent: "#9FB6EE", good: "#7FD0A2", bad: "#F09A84" };
-const PLACE_MS = 140;
+const PLACE_MS = 170;
 const FADE_MS = 260;
 
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function easeOutBack(t) {
-  const c1 = 1.4;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
 export class BoardView {
@@ -350,7 +344,7 @@ export class BoardView {
 
   /** The board surface, cached per size. */
   grain(theme, w, h) {
-    const key = `${w}x${h}:${this.dpr}:${theme.key}`;
+    const key = `${w}x${h}:${this.dpr}:${theme.key}:${this.model.view ? "window" : "board"}`;
     if (this.grainCache?.key === key) return this.grainCache.canvas;
     const c = document.createElement("canvas");
     c.width = Math.round(w * this.dpr);
@@ -360,6 +354,7 @@ export class BoardView {
     g.fillStyle = theme.base;
     g.fillRect(0, 0, w, h);
     if (!theme.contrast) drawWood(g, w, h, theme);
+    if (!theme.contrast && !this.model.view) drawBoardEdge(g, w, h, theme);
     // A barely-there falloff from the centre, so the surface is not dead flat.
     const r = Math.hypot(w, h) / 2;
     const v = g.createRadialGradient(w / 2, h / 2, r * 0.35, w / 2, h / 2, r);
@@ -487,15 +482,12 @@ export class BoardView {
         for (let x = win.x0; x <= win.x1; x++) {
           const v = m.board[y]?.[x];
           if (!v) continue;
-          let scale = 1;
+          let lift = 0;
           let alpha = 1;
-          if (this.placing && this.placing.x === x && this.placing.y === y) {
-            const t = Math.min(1, (now - this.placing.start) / PLACE_MS);
-            scale = 0.82 + 0.18 * easeOutBack(t);
-            alpha = Math.min(1, 0.4 + t * 1.2);
-          }
+          // A new stone lands: it comes down a little and its shadow closes in under it.
+          if (this.placing && this.placing.x === x && this.placing.y === y) lift = liftOf((now - this.placing.start) / PLACE_MS);
           if (deadSet.has(y * size + x)) alpha = 0.38;
-          this.stone(ctx, x, y, v, theme, { scale, alpha });
+          this.stone(ctx, x, y, v, theme, { lift, alpha });
           const n = m.moveNumbers?.[x + "," + y];
           if (n && alpha === 1) this.label(ctx, x, y, String(n), v === BLACK ? theme.onBlack : theme.onWhite, cell * (n > 99 ? 0.34 : 0.42));
         }
@@ -601,25 +593,28 @@ export class BoardView {
     return { dx: (hash(x, y) - 0.5) * cell * 0.03, dy: (hash(y + 31, x + 17) - 0.5) * cell * 0.03 };
   }
 
-  stone(ctx, x, y, color, theme, { alpha = 1, scale = 1, shadow = true, jitter = true } = {}) {
+  stone(ctx, x, y, color, theme, { alpha = 1, scale = 1, lift = 0, shadow = true, jitter = true } = {}) {
     const g = this.geom;
     const j = jitter ? this.jitter(x, y) : { dx: 0, dy: 0 };
     const cx = g.ox + x * g.cell + j.dx;
-    const cy = g.oy + y * g.cell + j.dy;
     const r = g.cell * 0.475 * scale;
+    const cy = g.oy + y * g.cell + j.dy - lift * r * 0.08;
     ctx.save();
     ctx.globalAlpha = alpha;
     if (shadow) {
-      // A short, soft contact shadow: the stone sits on the board.
-      const sx = cx + r * 0.04;
-      const sy = cy + r * 0.09;
-      const sh = ctx.createRadialGradient(sx, sy, r * 0.82, sx, sy, r * 1.08);
+      // A short, soft contact shadow: the stone sits on the board (a lifted one casts a wider, fainter one).
+      const sx = cx + r * (0.04 + 0.1 * lift);
+      const sy = cy + r * (0.09 + 0.3 * lift);
+      const sr = r * (1.08 + 0.14 * lift);
+      ctx.globalAlpha = alpha * (1 - 0.5 * lift);
+      const sh = ctx.createRadialGradient(sx, sy, r * 0.82, sx, sy, sr);
       sh.addColorStop(0, theme.shadow);
       sh.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = sh;
       ctx.beginPath();
-      ctx.arc(sx, sy, r * 1.08, 0, Math.PI * 2);
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = alpha;
     }
     if (theme.contrast) {
       // The high-contrast board: flat discs with a clear rim, no sprites.
@@ -641,6 +636,7 @@ export class BoardView {
     if (sprite) {
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
+      finishStone(ctx, cx, cy, r, color === BLACK, r * 2 * this.dpr);
     } else {
       const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
       if (color === BLACK) {

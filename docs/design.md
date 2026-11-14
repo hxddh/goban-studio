@@ -139,7 +139,7 @@ else casts a shadow.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `--shadow-board` | 0 0 0 1px rgba(60,40,12,.08), 0 2px 4px rgba(60,40,12,.06), 0 24px 48px -24px rgba(60,40,12,.35) | 0 0 0 1px rgba(0,0,0,.4), 0 24px 48px -24px rgba(0,0,0,.7) | the board on its stage |
+| `--shadow-board` | 0 0 0 1px rgba(60,40,12,.1), 0 1px 2px rgba(60,40,12,.12), 0 12px 24px -14px rgba(60,40,12,.4) | 0 0 0 1px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.4), 0 12px 24px -14px rgba(0,0,0,.75) | the board on its stage: close to the table |
 | `--shadow-pop` | 0 0 0 1px rgba(0,0,0,.06), 0 8px 24px -6px rgba(0,0,0,.18) | 0 0 0 1px rgba(255,255,255,.08), 0 8px 24px -6px rgba(0,0,0,.6) | menus, toasts, the bar floating over the board |
 | `--shadow-sheet` | 0 0 0 1px rgba(0,0,0,.06), 0 24px 64px -16px rgba(0,0,0,.32) | 0 0 0 1px rgba(255,255,255,.08), 0 24px 64px -16px rgba(0,0,0,.7) | sheets |
 | `--shadow-raised` | 0 0 0 .5px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.08) | none | the selected segment |

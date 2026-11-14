@@ -59,7 +59,7 @@
   --knob: #fff;
 
   /* Elevation (§4): three shadows that lift, and rings that mark */
-  --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.08), 0 2px 4px rgba(60, 40, 12, 0.06), 0 24px 48px -24px rgba(60, 40, 12, 0.35);
+  --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.1), 0 1px 2px rgba(60, 40, 12, 0.12), 0 12px 24px -14px rgba(60, 40, 12, 0.4);
   --shadow-pop: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 24px -6px rgba(0, 0, 0, 0.18);
   --shadow-sheet: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px -16px rgba(0, 0, 0, 0.32);
   --shadow-raised: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.08); /* the selected segment */
@@ -150,7 +150,7 @@
   --scrim: rgba(0, 0, 0, 0.5);
   --stone-edge-black: inset 0 0 0 0.75px rgba(255, 255, 255, 0.28);
   --eval-black: #4a4843;
-  --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.7);
+  --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 24px -14px rgba(0, 0, 0, 0.75);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px -16px rgba(0, 0, 0, 0.7);
   --shadow-raised: none;
