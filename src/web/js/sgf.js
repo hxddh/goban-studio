@@ -812,6 +812,8 @@ export function loadSGF(input, { index = null } = {}) {
     const raw = first(d, key);
     const v = moveVertex(raw, size);
     game.current = into;
+    // Two passes followed by more moves did not end the game: that node is not a count.
+    if (into.phase === "scoring") into.phase = "playing";
     let res;
     if (!v) {
       warn("sgf.warn.badMove", [depth + 1, String(raw).slice(0, 12)]);
