@@ -38,14 +38,15 @@ The app has four places and opens on the first.
   it. Reviews are spaced by a memory model and come back turned, mirrored
   or in the other colour. Difficulty is Level 1–5.
 - **Library** (⌘4) — your games (the one in progress and unfinished ones
-  in their own group), 20 classics with their final positions, openings and joseki, and a free board. Import SGF from a
+  in their own group), 20 classics with their final positions and at least three key moments each, openings and joseki, and a free board. Import SGF from a
   file, several files, a collection or the clipboard; export SGF or an
   image.
 - **Settings** (⌘, / Ctrl+,) — seven panes: General, Board, Playing, You,
   Engines, Data, About. Language, appearance, larger text, a
   high-contrast board, coordinates (on two or all four sides), traditional board proportions, sound volume, teaching, rules, your
-  level, the optional KataGo networks, backup and restore, the data
-  folder, updates.
+  level, the optional KataGo networks, which KataGo build runs (Metal,
+  AVX2 or CPU) with Measure speed, backup and restore, the data folder,
+  updates.
 
 The board is playable with Tab, the arrow keys and Space, and with a
 screen reader. ⌘/ (Ctrl+/ on Windows) lists every shortcut.
@@ -275,8 +276,8 @@ three packages on the CPUs they ship for, and only then creates the tag
 and the GitHub release:
 
 ```bash
-gh workflow run release.yml --ref main -f tag=v15.0.0
-gh workflow run release.yml -f tag=v15.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
+gh workflow run release.yml --ref main -f tag=v16.0.0
+gh workflow run release.yml -f tag=v16.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
 ```
 
 The tag must be `v` + the version in `package.json`, its notes must exist
