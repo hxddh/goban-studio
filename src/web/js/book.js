@@ -317,7 +317,7 @@ export function continuations(node, map = (mv) => decodeMove(mv)) {
   }
   // Book moves first (they have their own evaluated positions), then
   // KataGo's other candidates; each group best first.
-  out.sort((a, b) => b.inBook - a.inBook || a.loss - b.loss || b.visits - a.visits);
+  out.sort((a, b) => Number(b.inBook) - Number(a.inBook) || a.loss - b.loss || b.visits - a.visits);
   return out;
 }
 

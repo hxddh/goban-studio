@@ -47,6 +47,9 @@ export function canRerate(profile, id, base = null) {
  * point leaves the history), then the game is rated as recordGame rates a
  * new one. Returns the profile unchanged when the step cannot be replaced
  * (canRerate).
+ * @param {any} profile
+ * @param {string} id
+ * @param {{ won?: boolean, result?: string, opponent?: any, base?: any }} [change]
  */
 export function rerateGame(profile, id, { won, result, opponent = undefined, base = null } = {}) {
   const p = normalizeProfile(profile);

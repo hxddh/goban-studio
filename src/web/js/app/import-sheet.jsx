@@ -30,7 +30,7 @@ export function SgfGamesSheet({ name, texts, head = [] }) {
   const total = texts.length;
   const pages = Math.ceil(total / COLLECTION_PAGE);
   // Read after a paint, so the sheet is on screen before a large page is parsed.
-  const list = useAsync(() => new Promise((resolve) => setTimeout(() => resolve(listCollection(texts, { from: page * COLLECTION_PAGE })), 0)), [page]);
+  const list = useAsync(() => new Promise((resolve) => setTimeout(() => resolve(listCollection(texts, { from: page * COLLECTION_PAGE })), 0)), [texts, page]);
   const first = page * COLLECTION_PAGE + 1;
   const last = Math.min(total, first + COLLECTION_PAGE - 1);
   return (

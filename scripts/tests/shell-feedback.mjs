@@ -1,5 +1,5 @@
 /**
- * Shell: what the app says back (app/store.js toasts and tasks,
+ * Shell: what the app says back (app/store.js slices, toasts and tasks,
  * app/feedback.jsx, app/shortcuts.js, app/debug.js) — toasts with four
  * tones, a duration that follows the text, one action and a reason for
  * closing; tasks that show only when slow and offer Retry when they fail;
@@ -60,6 +60,35 @@ try {
   await C.boot();
   A.setLang("en");
   state.sheet = null;
+
+  /* ------------------------------------------------------------ slices */
+
+  await test("store: a slice update reaches that slice's followers and the plain subscribers; update() reaches everyone", async () => {
+    await settle();
+    const seen = [];
+    const offs = [Store.follow(["game"], () => seen.push("game")), Store.follow(["review", "practice"], () => seen.push("review+practice")), Store.follow([], () => seen.push("shell")), Store.subscribe(() => seen.push("any"))];
+    try {
+      Store.updateSlice("game", (s) => (s.ui = { ...s.ui }));
+      Store.updateSlice("game");
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "game"], "one notification for the moment, to the game's followers");
+      seen.length = 0;
+      Store.updateSlice(["practice", "batch"]);
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "review+practice"]);
+      seen.length = 0;
+      Store.updateSlice("game");
+      Store.update();
+      await settle();
+      assert.deepEqual(seen.sort(), ["any", "game", "review+practice", "shell"], "an update() in the same moment notifies everyone");
+      seen.length = 0;
+      Store.updateSlice("toasts");
+      await settle();
+      assert.deepEqual(seen, ["any"]);
+    } finally {
+      for (const off of offs) off();
+    }
+  });
 
   /* ------------------------------------------------------------ toasts */
 

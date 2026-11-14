@@ -47,6 +47,10 @@ function hash(x, y) {
 }
 
 export class BoardView {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {{ onPlay?: (x: number, y: number) => void, onHover?: (v: any) => void }} [handlers]
+   */
   constructor(canvas, { onPlay, onHover } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");

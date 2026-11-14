@@ -20,7 +20,7 @@
  * book knows against the book's KataGo evaluation (JOSEKI_LOSS). Lessons
  * cannot link into the explorer yet, so the text only points to it. Steps
  * the book does not cover wait for the KataGo lesson audit
- * (docs/lesson-audit.md, "v13 units waiting for a run").
+ * (docs/lesson-audit.md, the units waiting for a run).
  *
  * Every unit here carries `level: "advanced"`.
  */

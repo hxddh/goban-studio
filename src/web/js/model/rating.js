@@ -6,9 +6,9 @@ import { gorToTheta, onBoard, rankToRating, ratingToRank, thetaToGoR } from "./l
 import { DAY, finite, round } from "./util.js";
 
 /**
- * The profile's own version. Files written by v9–v12 say 9 and are
+ * The profile's own format version. Format 9 files (`v: 9`) are
  * migrated by normalizeProfile (problem and drill records to the memory
- * model, placements capped); anything older than v9 or newer than this
+ * model, placements capped); anything older than 9 or newer than this
  * starts empty, as before (the data layer refuses to overwrite a newer file).
  */
 export const PROFILE_V = 13;

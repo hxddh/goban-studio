@@ -86,7 +86,8 @@ run.
 
 | What | Command | Notes |
 | --- | --- | --- |
-| Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code. No warnings are allowed; fix the code rather than disabling a rule |
+| Static checks | `npm run lint` | ESLint (`eslint.config.js`): undefined names, unused variables and imports, duplicate keys, unreachable code, hook dependencies. No warnings are allowed; fix the code rather than disabling a rule |
+| Types | `npm run typecheck` | TypeScript over the page's JS (`jsconfig.json`, `checkJs`): JSDoc types where inference is not enough |
 | Unit and data tests | `npm test` | Node only, about a minute. `node scripts/test.mjs play-,practice-` runs only files whose names contain those |
 | Content gate | `npm run release-check` | counts, four languages, pins and versions |
 | Interface tests | `npm run build && npm run sync && npm run ui-test` | Chromium via Playwright (`npx playwright install chromium` once). `UI_ONLY=<text>` runs matching checks |

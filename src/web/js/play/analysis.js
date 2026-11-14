@@ -23,7 +23,7 @@ import * as Engine from "../engine.js";
 import { store } from "../data/store.js";
 import { loadSGF } from "../sgf.js";
 import { t } from "../i18n.js";
-import { state, update } from "../app/store.js";
+import { state, update, updateSlice } from "../app/store.js";
 import { learnFromGame } from "../app/learn-game.js";
 import { REVIEW_VERSION, analysisFits, buildReview, lineKey, resultOf } from "./review-model.js";
 import { PROFILES, normalizeMoveRank, rankFromLikelihoods } from "../model/move-rank.js";
@@ -42,6 +42,8 @@ export const visitsFor = (size) => (size === 19 ? 40 : size === 13 ? 56 : 80);
  * scheduler's lane (background by default), so the computer's move and
  * what the player looks at always go first; `signal` cancels the pass, and
  * a search still queued then never runs. `existing` positions are kept.
+ * @param {any} game
+ * @param {{ visits?: number, signal?: AbortSignal, lane?: string, onProgress?: (done: number, total: number) => void, onPoint?: (i: number, point: any) => void, existing?: any[] }} [opts]
  */
 export async function analyzeLine(game, { visits = 40, signal = null, lane = "background", onProgress, onPoint, existing = null } = {}) {
   const line = game.mainLine();
@@ -340,6 +342,7 @@ export function analyseAll({ ids = null } = {}) {
   return batch;
 }
 
+/** @type {(signal: AbortSignal) => Promise<void>} */
 const aborted = (signal) => new Promise((resolve) => (signal.aborted ? resolve() : signal.addEventListener("abort", () => resolve(), { once: true })));
 
 async function runBatch(me, b) {
@@ -348,7 +351,7 @@ async function runBatch(me, b) {
     const id = b.ids[0];
     b.current = id;
     me.setProgress(b.done / b.total);
-    update();
+    updateSlice("batch");
     const one = queueAnalysis(id, { owner: OWNER, signal: me.signal, hidden: true });
     if (one) {
       const tick = () => me.setProgress((b.done + (one.progress || 0)) / b.total);
@@ -367,7 +370,7 @@ async function runBatch(me, b) {
     b.current = null;
     if (b.ids.length) saveBatch(b.ids);
     else clearBatch();
-    update();
+    updateSlice("batch");
   }
   if (me.signal.aborted) {
     // Quitting keeps the rest for the next launch; a cancel forgets it.

@@ -146,6 +146,7 @@ export function teachingOn() {
 
 const hist = { back: [], fwd: [] };
 let restoring = false;
+/** @type {(loc: any) => void} */
 let restorer = () => {};
 
 export function setRestorer(fn) {

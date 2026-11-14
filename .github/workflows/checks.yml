@@ -37,6 +37,8 @@ jobs:
       # Static checks first (eslint.config.js): an undefined name or an
       # unused variable fails here, before anything runs.
       - run: npm run lint
+      # Types (jsconfig.json): TypeScript reads the page's JS and its JSDoc.
+      - run: npm run typecheck
       - run: npm test
       - run: npm run release-check
       - run: npm run build

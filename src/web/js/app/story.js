@@ -158,6 +158,7 @@ export function simulate(signMap, firstColor, moves = [], { ownership = null } =
   const size = signMap.length;
   let board = boardFromSignMap(signMap);
   let color = firstColor;
+  /** @type {any[]} A move's facts; marking ladders below adds `ladder` to some. */
   const facts = [];
   for (const mv of moves) {
     if (!mv) break;
@@ -182,7 +183,8 @@ export function simulate(signMap, firstColor, moves = [], { ownership = null } =
     const captured = [];
     for (let yy = 0; yy < size; yy++) for (let xx = 0; xx < size; xx++) if (before[yy][xx] === -c && after[yy][xx] === 0) captured.push({ x: xx, y: yy });
     const mine = ca.list[ca.id[y][x]];
-    const ko = !!(next._koInfo && next._koInfo.sign === -c);
+    const koInfo = /** @type {any} */ (next)._koInfo; // @sabaki/go-board keeps the ko on the board, unexported
+    const ko = !!(koInfo && koInfo.sign === -c);
 
     // New ataris on the opponent: chains next to the move with one liberty now and more before.
     const ataris = [];

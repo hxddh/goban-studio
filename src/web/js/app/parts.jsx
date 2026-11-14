@@ -51,6 +51,7 @@ export function Icon({ name, size = 18 }) {
   );
 }
 
+/** @param {{ kind?: string, icon?: string, children?: any, onClick?: (e: MouseEvent) => any, disabled?: boolean, title?: string, size?: string, class?: string, [attr: string]: any }} props */
 export function Button({ kind = "secondary", icon, children, onClick, disabled, title, size, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`btn ${kind} ${size || ""} ${cls}`} onClick={onClick} disabled={disabled} title={title} aria-label={title || undefined} {...rest}>
@@ -60,6 +61,7 @@ export function Button({ kind = "secondary", icon, children, onClick, disabled, 
   );
 }
 
+/** @param {{ icon: string, label: string, onClick?: (e: MouseEvent) => any, disabled?: boolean, active?: boolean, size?: number, class?: string, [attr: string]: any }} props */
 export function IconButton({ icon, label, onClick, disabled, active, size = 18, class: cls = "", ...rest }) {
   return (
     <button type="button" class={`icon-btn ${active ? "on" : ""} ${cls}`} onClick={onClick} disabled={disabled} title={label} aria-label={label} aria-pressed={active === undefined ? undefined : !!active} {...rest}>
@@ -139,6 +141,7 @@ export function Loading({ label }) {
  * The one error surface: what happened in a sentence, and what to do.
  * `actions`: [{ label, onClick, primary }]. `compact`: the inline size (a
  * section that could not load), without the icon and the card's padding.
+ * @param {{ title?: any, body?: any, actions?: { label: any, onClick: () => any, primary?: boolean }[], compact?: boolean, [attr: string]: any }} props
  */
 export function ErrorCard({ title, body, actions = [], compact = false, ...rest }) {
   return (
@@ -193,6 +196,10 @@ export function useAsync(fn, deps = []) {
       live = false;
       clearTimeout(timer);
     };
+    // The caller's deps decide when fn runs again (the rule checks them at
+    // each useAsync call: eslint.config.js additionalHooks); fn itself is a
+    // new closure on every render and is read from the render that changed them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, turn]);
   return { ...s, retry: () => setTurn((n) => n + 1) };
 }
@@ -210,6 +217,7 @@ export function Async({ state: s, label, error, children }) {
  * `text`, a quiet button that says the choice in force (an order). An item
  * with `checked` (true or false) is one of a set of choices and shows a
  * check when it is the one.
+ * @param {{ id: string, items: any[], label?: string, icon?: string, text?: any }} props
  */
 export function MoreMenu({ id, items, label, icon = "more", text = null }) {
   const open = state.menu === id;
@@ -297,6 +305,7 @@ export const SHIFT = isMac ? "⇧" : "Shift+";
 /**
  * The board. `model` is a BoardView model patch; the canvas is created once
  * and updated in place.
+ * @param {{ model: any, onPlay?: (x: number, y: number) => any, onHover?: (v: any) => any, label?: string }} props
  */
 export function Board({ model, onPlay, onHover, label }) {
   const canvas = useRef(null);
@@ -425,9 +434,10 @@ export function DiagramThumb({ diagram, label = "", size = 32 }) {
   const ref = useRef(null);
   const key = Array.isArray(diagram) ? diagram.join("|") : "";
   const palette = usePaletteKey();
+  // Keyed by the rows, not the array: a caller may build a new array with the same rows on every render.
   useEffect(() => {
     if (!key) return;
-    paintThumb(ref.current, thumbFromDiagram(diagram), size);
+    paintThumb(ref.current, thumbFromDiagram(key.split("|")), size);
   }, [key, palette, size]);
   return <canvas ref={ref} class="dthumb" width={size} height={size} style={{ width: `${size}px`, height: `${size}px` }} role="img" aria-label={label} />;
 }

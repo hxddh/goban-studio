@@ -93,6 +93,7 @@ function emptyRegions(board, size, color) {
     for (const chain of lost) for (const p of chain) board.set(p, EMPTY);
   }
   const owners = territoryMap(board);
+  /** @type {any[][] & { settled?: boolean }} */
   const out = Array.from({ length: size }, () => Array(size).fill(null));
   out.settled = true;
   for (let y = 0; y < size; y++) {

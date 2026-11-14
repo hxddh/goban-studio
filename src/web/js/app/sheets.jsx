@@ -5,7 +5,7 @@
  */
 import { useState } from "preact/hooks";
 import { t } from "../i18n.js";
-import { state, toast, update } from "./store.js";
+import { AREA_SLICES, state, toast, update, useSlice } from "./store.js";
 import * as C from "./controller.js";
 import { Button } from "./parts.jsx";
 import { CrashProbe, ErrorBoundary } from "./feedback.jsx";
@@ -27,6 +27,8 @@ function sheetFailed() {
 }
 
 export function Sheets() {
+  // A sheet may show the area under it (the game, the review): it follows the same slices as the page.
+  useSlice(...AREA_SLICES);
   const sheet = state.sheet;
   if (!sheet) return null;
   const Comp = SHEETS[sheet.kind];

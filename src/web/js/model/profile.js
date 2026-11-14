@@ -3,7 +3,7 @@
  * any stored value read into a valid current profile. Pure.
  *
  *   profile = {
- *     v: 13,                                         // v9–v12 files say 9
+ *     v: 13,                                         // PROFILE_V; older files say 9
  *     rating: { [size]: { mu, sigma, games, at } },  // Glicko, measured ladder
  *     history: [{ at, size, rank, pm, r?, sd? }],    // after each rated game
  *     games: [{ id, at, size, result, won, ... }],    // own games, newest 30
@@ -122,7 +122,7 @@ export function normalizeGame(r) {
  * MOVE_RANK.MAX_GAMES rated games, and as a measurement of at least
  * MOVE_RANK.SIGMA nats (about six ranks around 15 kyu): it moves a fresh
  * estimate part of the way and narrows it a little; results against the
- * measured levels soon outweigh it (docs/strength.md, "v13: your moves").
+ * measured levels soon outweigh it (docs/strength.md, "your moves, a second channel").
  */
 export const MOVE_RANK = { SIGMA: 4, MAX_GAMES: 5 };
 
@@ -167,9 +167,9 @@ function normalizeMistake(m) {
 }
 
 /**
- * Any stored value → a valid current profile. A v9–v12 profile (v: 9) is
+ * Any stored value → a valid current profile. A format 9 profile (v: 9) is
  * migrated field by field (migrateProblemRecord, migrateReview, the
- * placement cap); anything else starts empty (v9 reads no earlier data);
+ * placement cap); anything else starts empty (no format before 9 is read);
  * bad parts are dropped. Idempotent.
  */
 export function normalizeProfile(raw) {
@@ -203,7 +203,7 @@ export function normalizeProfile(raw) {
   const w = obj(raw.week);
   let week = null;
   if (w && finite(w.start) && Array.isArray(w.focus) && w.focus.every((k) => typeof k === "string")) {
-    week = { start: w.start, focus: w.focus.slice(0, RULES.MAX_FOCUS) };
+    week = /** @type {{ start: number, focus: string[], areas?: any[] }} */ ({ start: w.start, focus: w.focus.slice(0, RULES.MAX_FOCUS) });
     // The evidence each focus was chosen on, as it was then (optional).
     const areas = Array.isArray(w.areas) ? w.areas.filter((a) => obj(a) && week.focus.includes(a.key)) : [];
     if (areas.length) week.areas = JSON.parse(JSON.stringify(areas));
@@ -211,7 +211,7 @@ export function normalizeProfile(raw) {
   const pl = obj(raw.placement);
   let placement = null;
   if (pl && pl.skipped === true) placement = { skipped: true, at: num(pl.at, 0) };
-  // A placement is never above PLACEMENT.MAX_GRADE (v10–v12 stored up to 5).
+  // A placement is never above PLACEMENT.MAX_GRADE (format 9 files hold up to 5).
   else if (pl && finite(pl.grade) && pl.grade >= 1 && pl.grade <= 5) placement = { grade: Math.min(PLACEMENT.MAX_GRADE, Math.round(pl.grade)), at: num(pl.at, 0) };
   const days = {};
   for (const [k, v] of Object.entries(obj(raw.days) || {})) if (/^\d{8}$/.test(k) && num(v, 0) > 0) days[k] = Math.floor(num(v));

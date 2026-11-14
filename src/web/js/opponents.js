@@ -16,13 +16,13 @@
  * closest implementation measured a rank away, or when an optional network
  * is missing and a standard level stands in.
  *
- * Every number comes from the calibrations (docs/strength.md, v4–v8, and
+ * Every number comes from the calibration games (docs/strength.md and
  * docs/calibration/results/). An implementation is a setting that was
  * played there, under its calibration name: `L:<id>` a standard level
  * (STRENGTHS), `HL:<id>` its human-style version, `LS:2d` the stronger
- * network, `C:<name>` / `CH:<name>` bridge candidates of the v4 and v7
- * measurements with exactly the settings they were measured with. Those
- * names are internal; games and settings store ranks.
+ * network, `C:<name>` / `CH:<name>` bridge candidates between the levels,
+ * with exactly the settings they were measured with. Those names are
+ * internal; games and settings store ranks.
  */
 
 /* ------------------------------------------------------ the θ ↔ GoR scale */
@@ -66,9 +66,10 @@ export function roundRank(r) {
  *            `profile`; `style` "raw" plays the profile's own move
  *            distribution, "search" lets `visits` of search veto losing
  *            moves; `blunder` adds beginner's moves below the model's
- *            20-kyu floor (v5–v7)
+ *            20-kyu floor
  *   strong   the version on the stronger network: `visits` of its search
- *   rank     the standard level's v4 label (kept for the calibration harness)
+ *   rank     the standard level's label from its 19×19 measurement (kept for
+ *            the calibration harness)
  */
 export const STRENGTHS = [
   { id: "30k", rank: 30, visits: 8, temp: 2.0, maxLoss: 40, slip: 0.3, blunder: 1.0, local: 1, human: { profile: "rank_20k", blunder: 0.9 } },
@@ -89,8 +90,10 @@ export function calibrated(id) {
 /**
  * Measured strength of each calibrated level, θ on 19×19, 9×9 and 13×13
  * (each board its own Bradley–Terry fit, all with the weakest standard
- * level at 0). standard: v4 (527 + 620 games); human and strong: v7
- * (docs/strength.md). 13×13, every mode: v8, one fit of 960 games.
+ * level at 0; docs/strength.md). standard: the ladder's own fit (527 + 620
+ * games, "Results"); human and strong: the human-style fit ("the
+ * human-style ladder without a gap"). 13×13, every mode: one fit of 960
+ * games ("the ladder on 13×13").
  */
 export const MEASURED = {
   standard: {
@@ -103,9 +106,9 @@ export const MEASURED = {
     "1k": { 19: 17.9, 9: 12.08, 13: 14.91 },
     "2d": { 19: 23.35, 9: 14.93, 13: 17.45 },
   },
-  // v7, 708 games on 19×19 and 824 on 9×9 (with v6's for the settings
-  // that did not change) against the standard levels held at their v4
-  // values. The top two rest on a 400-visit bridge above the ladder.
+  // 708 games on 19×19 and 824 on 9×9 (pooled with the earlier games of
+  // the settings that did not change) against the standard levels held at
+  // their own fit. The top two rest on a 400-visit bridge above the ladder.
   human: {
     "30k": { 19: 0.42, 9: 0.41, 13: 0.19 },
     "25k": { 19: 1.39, 9: 1.15, 13: 1.04 },
@@ -132,15 +135,16 @@ const level = (id) => {
  * Everything the ladder can play. `theta` holds what was measured on each
  * board (a board left out was not measured: `implTheta` derives it from
  * the same kind's measured levels); `gor` is the published 95% bootstrap
- * interval of its 19×19 strength in EGF GoR (docs/strength.md: the v4
- * table for `L:` and `C:`, which includes the anchor's sampling error;
- * v7's fit with the ladder held fixed for `HL:`, `CH:` and `LS:`, which
- * does not). `level` is what engine.js plays: a standard level's fields,
+ * interval of its 19×19 strength in EGF GoR (docs/strength.md: the
+ * ladder's own table for `L:` and `C:`, which includes the anchor's
+ * sampling error; the human-style fit with the ladder held fixed for
+ * `HL:`, `CH:` and `LS:`, which does not). `level` is what engine.js plays: a standard level's fields,
  * plus `human` or `strong` for those kinds.
  */
+/** @type {{ id: string, kind: string, level: any, theta: Record<number, number>, gor: number[] }[]} */
 export const IMPLS = [
-  // standard levels and the v4 bridges between them (`C:bNN` is the
-  // 8-visit base level with blunder 0.NN; C:b40 was measured on 13×13 in v8)
+  // standard levels and the bridges between them (`C:bNN` is the
+  // 8-visit base level with blunder 0.NN; C:b40 was also measured on 13×13)
   { id: "L:25k", kind: "standard", level: level("25k"), theta: MEASURED.standard["25k"], gor: [-1484, -520] },
   { id: "L:20k", kind: "standard", level: level("20k"), theta: MEASURED.standard["20k"], gor: [-573, 35] },
   { id: "L:15k", kind: "standard", level: level("15k"), theta: MEASURED.standard["15k"], gor: [-2, 454] },
@@ -151,8 +155,8 @@ export const IMPLS = [
   { id: "C:b0", kind: "standard", level: { ...level("5k"), blunder: 0, local: 5 }, theta: { 19: 14.98 }, gor: [1456, 1733] },
   { id: "L:1k", kind: "standard", level: level("1k"), theta: MEASURED.standard["1k"], gor: [1769, 2112] },
   { id: "L:2d", kind: "standard", level: level("2d"), theta: MEASURED.standard["2d"], gor: [2310, 2601] },
-  // human-style levels and two v6 settings v7 measured again
-  // (`CH:r20k` was v6's human `15k`, `CH:s7k24` v6's human `5k`)
+  // human-style levels and two earlier human-style settings measured
+  // again as bridges (`CH:r20k` and `CH:s7k24`, once the human `15k` and `5k`)
   { id: "HL:25k", kind: "human", level: { human: calibrated("25k").human }, theta: MEASURED.human["25k"], gor: [-1115, -712] },
   { id: "HL:20k", kind: "human", level: { human: calibrated("20k").human }, theta: MEASURED.human["20k"], gor: [-498, -173] },
   { id: "HL:15k", kind: "human", level: { human: calibrated("15k").human }, theta: MEASURED.human["15k"], gor: [91, 425] },

@@ -167,7 +167,7 @@ export async function initIndex() {
   const games = stored && isObject(stored.games) ? stored.games : null;
   const keys = store.list(GAMES_PREFIX).filter(idOfKey);
   const missing = keys.filter((k) => !store.isLoaded(k) && !validEntry(games?.[idOfKey(k)]));
-  // Side by side, a few at a time (an upgrade from v12 reads every game once).
+  // Side by side, a few at a time (a format migration reads every game once).
   let next = 0;
   const worker = async () => {
     while (next < missing.length) await store.load(missing[next++]).catch(() => {});
@@ -320,6 +320,8 @@ export async function loadGame(id) {
  * the rest of the options go to its meta. `keepPlace` keeps an edited game
  * where it is in the history instead of moving it to the top. `finishedAt`
  * is set the first time a game is saved with a result.
+ * @param {any} game
+ * @param {{ id?: string, name?: string, source?: string, keepPlace?: boolean, [meta: string]: any }} [opts]
  */
 export function saveGame(game, { id = null, name = "", source = "game", keepPlace = false, ...meta } = {}) {
   const now = Date.now();

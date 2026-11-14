@@ -42,10 +42,10 @@ const NARROW_QUERY = "(max-width: 860px)";
 
 /** Whether the window is narrow now; follows resizes. */
 function useNarrow() {
-  const mq = typeof matchMedia === "function" ? matchMedia(NARROW_QUERY) : null;
-  const [narrow, setNarrow] = useState(!!mq?.matches);
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === "function" && matchMedia(NARROW_QUERY).matches);
   useEffect(() => {
-    if (!mq) return;
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia(NARROW_QUERY);
     const on = () => setNarrow(mq.matches);
     mq.addEventListener?.("change", on);
     on();
@@ -113,6 +113,7 @@ export function Sidebar() {
  * The toolbar. `crumbs` are links back up the hierarchy; `title` is the
  * current place (list pages leave it out and show a large title instead);
  * children are the actions, right-aligned — at most one primary.
+ * @param {{ crumbs?: { label: any, onClick?: () => any }[], title?: any, titleLang?: string, sub?: any, children?: any, class?: string }} props
  */
 export function Toolbar({ crumbs = [], title, titleLang = null, sub, children, class: cls = "" }) {
   return (

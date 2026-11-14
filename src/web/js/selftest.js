@@ -120,6 +120,7 @@ async function waitModel(kind, done, ms) {
 
 /** The optional downloads, end to end against the pinned URLs. */
 async function modelChecks(checks, report, cfg = {}) {
+  /** @type {Record<string, any>} */
   const out = (report.models = {});
   // Breadcrumbs: if the app stalls, the runner prints how far it got.
   const mark = (step) => (cfg.path ? writeTextFile(cfg.path + ".progress", JSON.stringify({ step, at: Math.round(now()), models: out }, null, 2)) : null);
@@ -174,6 +175,7 @@ async function modelChecks(checks, report, cfg = {}) {
   checks.modelsRemove = !!(removedHuman.ok && removedStrong.ok && after.human.status === "absent" && after.strong.status === "absent" && refused === null && validAnalysis(fallback, 19));
 }
 
+/** @param {{ state?: any }} [opts] */
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
   const cfg = await selftestConfig();
@@ -181,7 +183,7 @@ export async function runSelfTest({ state } = {}) {
   if (!cfg?.enabled || !cfg.path) return;
   const checks = {
     webview: true,
-    bridge: typeof window.zero?.invoke === "function",
+    bridge: typeof (/** @type {any} */ (window).zero?.invoke) === "function",
     ui: !!(document.querySelector(".app") || document.getElementById("root")?.childElementCount),
   };
   const report = { version: APP_VERSION, language: state?.settings?.lang ?? null, checks, timings: {} };

@@ -44,7 +44,8 @@ function context() {
   if (!enabled) return null;
   try {
     if (!ctx) {
-      const AC = typeof AudioContext !== "undefined" ? AudioContext : typeof webkitAudioContext !== "undefined" ? webkitAudioContext : null;
+      // webkitAudioContext: Safari's older name for it.
+      const AC = typeof AudioContext !== "undefined" ? AudioContext : /** @type {any} */ (globalThis).webkitAudioContext || null;
       if (!AC) return null;
       ctx = new AC();
       master = ctx.createGain();
@@ -79,7 +80,7 @@ function load() {
     names.forEach((name, i) => {
       jobs.push(
         fetch(base + name + ".wav")
-          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
           .then((data) => decode(c, data))
           .then((buf) => {
             buffers[key][i] = buf;

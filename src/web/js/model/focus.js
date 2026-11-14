@@ -68,7 +68,10 @@ export const FOCUS_LESSONS = {
   endgame: ["endgame-sente-gote", "endgame-first-line", "endgame-reverse-sente", "endgame-double-sente", "endgame-counting", "endgame-big", "endgame-japanese-counting", "endgame-order"],
 };
 
-/** The lesson to offer for a focus: the first not done, else the first. */
+/**
+ * The lesson to offer for a focus: the first not done, else the first.
+ * @param {(id: string) => boolean} [isDone]
+ */
 export function focusLesson(key, isDone = () => false) {
   const ids = FOCUS_LESSONS[key] || [];
   return ids.find((id) => !isDone(id)) || ids[0] || null;

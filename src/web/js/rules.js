@@ -1056,6 +1056,7 @@ export class Game {
     // Iterative, so a record of any length or depth cannot overflow the
     // stack. A string on the stack is a parenthesis to write.
     const parts = [];
+    /** @type {any[]} the nodes still to write, and the parentheses between them */
     const stack = [root];
     while (stack.length) {
       const item = stack.pop();
