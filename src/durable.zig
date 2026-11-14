@@ -245,7 +245,9 @@ fn runFake(full: bool, full_result: std.posix.E, fsync_result: std.posix.E, allo
     fake_full_result = full_result;
     fake_fsync_result = fsync_result;
     const ops: PosixFlush = .{ .full = if (full) &fakeFull else null, .fsync = &fakeFsync };
-    const r = flushFd(ops, 0, allow_unsupported);
+    // The fakes never use the descriptor; on Windows a descriptor is a handle, not a number.
+    const fake_fd: std.posix.fd_t = if (@typeInfo(std.posix.fd_t) == .pointer) @ptrFromInt(8) else 0;
+    const r = flushFd(ops, fake_fd, allow_unsupported);
     return .{ fake_calls[0..fake_n], r };
 }
 
