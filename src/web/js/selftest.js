@@ -18,6 +18,10 @@
  *                         stepping back is a single `undo`
  *   cancel                a long search stops < 1 s after studio.katagoCancel (3 s on Metal)
  *                         and the engine answers normally afterwards
+ *   localFiles            every content part (lessons, problems, classics),
+ *                         the opening book and a sound are read from the
+ *                         package (on macOS the WebView answers them with
+ *                         status 0: local-file.js)
  *   languages             each language's strings are read from the package
  *                         (content/strings-<id>.json) and, chosen as in
  *                         Settings, the sidebar shows that language at once
@@ -43,7 +47,7 @@ import { APP_VERSION } from "./version.js";
 import * as Models from "./models.js";
 import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, updateCancel, updateDownload, updateStatus, writeTextFile } from "./host.js";
 
-const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages"];
+const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages", "localFiles"];
 const MAX_FRAME_GAP_MS = 250;
 const MAX_CANCEL_MS = 1000;
 // The Metal build on a CI runner's virtual GPU can take seconds to finish
@@ -180,6 +184,33 @@ async function modelChecks(checks, report, cfg = {}) {
   const fallback = await KataGo.analyze(g19, { visits: 16 });
   out.removed = { human: after.human.status, strong: after.strong.status, refused: refused === null };
   checks.modelsRemove = !!(removedHuman.ok && removedStrong.ok && after.human.status === "absent" && after.strong.status === "absent" && refused === null && validAnalysis(fallback, 19));
+}
+
+/** The app's own files read as the app reads them, with what each fetch answered. */
+async function localFileChecks(checks, report) {
+  const Content = await import("./content.js");
+  const Local = await import("./local-file.js");
+  const out = {};
+  let ok = true;
+  const one = async (name, read) => {
+    try {
+      await read();
+      out[name] = true;
+    } catch (e) {
+      out[name] = String(e?.message || e);
+      ok = false;
+    }
+  };
+  for (const part of Content.PARTS) await one(part, () => Content.ready(part));
+  await one("book", async () => {
+    const b = await Local.localJson("content/book.json");
+    if (!b?.trees?.whole) throw new Error("no whole-board tree");
+  });
+  await one("sound", () => Local.localBytes("assets/sounds/place-wood-0.wav"));
+  const raw = await fetch("content/book.json").catch(() => null);
+  out.status = raw ? raw.status : null;
+  report.localFiles = out;
+  checks.localFiles = ok;
 }
 
 /**
@@ -341,6 +372,7 @@ export async function runSelfTest({ state } = {}) {
       report.menusError = String(e?.message || e);
       checks.menus = false;
     }
+    await localFileChecks(checks, report);
     await languageChecks(checks, report);
     const build = (await nativeInvoke("studio.katagoStatus").catch(() => null))?.build ?? null;
     report.engineBuild = build;

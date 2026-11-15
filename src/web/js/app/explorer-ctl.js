@@ -19,6 +19,7 @@ import { state, update, announce } from "./store.js";
 import { remember } from "./ctl-core.js";
 import { freshGameState, parkCurrent, persistCurrent } from "./game-session.js";
 import { maybeComputerMove, ponder } from "./game-turn.js";
+import { localJson } from "../local-file.js";
 
 const EXPLORER_MODES = ["whole", "corner"];
 
@@ -34,8 +35,7 @@ let fetching = null;
 
 function fetchBook() {
   if (raw || fetching || typeof fetch !== "function") return;
-  fetching = fetch("content/book.json")
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("book " + r.status))))
+  fetching = localJson("content/book.json")
     .then((data) => {
       raw = data;
       // Whatever waited for it (the explorer, a review's book note) shows now.

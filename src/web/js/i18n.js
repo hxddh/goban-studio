@@ -15,6 +15,7 @@
  * read, its strings are the English ones.
  */
 import { LAZY_LANGS, MESSAGES } from "./messages.js";
+import { localJson } from "./local-file.js";
 
 export const LANG_IDS = ["zh", "en", "ko", "ja"];
 // English (zh before): a key missing in a language reads in the language most users can read.
@@ -52,7 +53,7 @@ export function hasLang(id) {
  * could not be read: the language then shows the English strings, and the
  * next call tries again.
  */
-export function loadLang(id, { read = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${url}: ${r.status}`)))) } = {}) {
+export function loadLang(id, { read = (url) => localJson(url) } = {}) {
   if (!pending.has(id)) return Promise.resolve(LANG_IDS.includes(id));
   loading[id] ||= Promise.resolve()
     .then(() => read(`content/strings-${id}.json`))

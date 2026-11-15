@@ -83,7 +83,8 @@ export default async function ({ test, assert, root }) {
       asked.push(url);
       const part = /^content\/(\w+)\.json$/.exec(url)?.[1];
       if (part === "classics" && fail) return { ok: false, status: 404 };
-      return { ok: !!bodies[part], status: bodies[part] ? 200 : 404, json: async () => JSON.parse(JSON.stringify(bodies[part])) };
+      // The packaged app on macOS answers its own files with status 0 and the body (local-file.js).
+      return { ok: !!bodies[part], status: bodies[part] ? 0 : 404, text: async () => JSON.stringify(bodies[part]) };
     };
     const warn = console.warn;
     console.warn = () => {};
@@ -134,7 +135,7 @@ export default async function ({ test, assert, root }) {
     const { mod: C } = await bundleLazy(root, ['export * from "./src/web/js/content.js";', "export const PRELOAD_TEST = 1;"], Split.indexModules(index));
     globalThis.fetch = async (url) => {
       const part = /^content\/(\w+)\.json$/.exec(url)?.[1];
-      return { ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(bodies[part])) };
+      return { ok: true, status: 200, text: async () => JSON.stringify(JSON.parse(JSON.stringify(bodies[part]))) };
     };
     const hadWindow = "window" in globalThis;
     if (!hadWindow) globalThis.window = { requestIdleCallback: (f) => setTimeout(f, 0) };
@@ -191,7 +192,7 @@ export default async function ({ test, assert, root }) {
     const gate = {};
     globalThis.fetch = (url) => {
       const part = /^content\/(\w+)\.json$/.exec(url)[1];
-      return new Promise((resolve) => (gate[part] = () => resolve({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(bodies[part])) })));
+      return new Promise((resolve) => (gate[part] = () => resolve({ ok: true, status: 200, text: async () => JSON.stringify(JSON.parse(JSON.stringify(bodies[part]))) })));
     };
     try {
       A.setLang("en");

@@ -631,7 +631,7 @@ await test("content: a click that needs a part not here yet waits for it; a fail
     calls.push(url);
     if (!online) throw new TypeError("Failed to fetch");
     const part = /content\/(\w+)\.json$/.exec(url)[1];
-    return { ok: true, status: 200, json: async () => split.bodies[part] };
+    return { ok: true, status: 200, text: async () => JSON.stringify(split.bodies[part]) };
   };
   await L.C.boot();
   const st = L.Store.state;
@@ -662,7 +662,7 @@ await test("content: a click that needs a part not here yet waits for it; a fail
   mock.timers.enable({ apis: ["setTimeout"] });
   try {
     let arrive;
-    globalThis.fetch = (url) => new Promise((r) => (arrive = () => r({ ok: true, status: 200, json: async () => split.bodies[/content\/(\w+)\.json$/.exec(url)[1]] })));
+    globalThis.fetch = (url) => new Promise((r) => (arrive = () => r({ ok: true, status: 200, text: async () => JSON.stringify(split.bodies[/content\/(\w+)\.json$/.exec(url)[1]]) })));
     let ran = 0;
     const waiting = L.Content.withContent("course", () => ++ran);
     mock.timers.tick(299);
@@ -679,7 +679,7 @@ await test("content: a click that needs a part not here yet waits for it; a fail
     mock.timers.reset();
   }
   // A status that is not ok is a failure too.
-  globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}) });
+  globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => JSON.stringify(({})) });
   let ran = false;
   await quiet(() => L.Content.withContent("problems", () => (ran = true)));
   assert.equal(ran, false);

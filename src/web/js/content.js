@@ -29,6 +29,7 @@ import GRADES from "./content/problem-grades.json";
 import { CLASSICS } from "./content/classics.js";
 import { LAZY } from "./content/lazy.js";
 import { PARTS, mergePart } from "./content-split.js";
+import { localJson } from "./local-file.js";
 
 export { COURSE, PROBLEMS, THEMES, SHAPES, GRADES, CLASSICS, PARTS };
 
@@ -43,8 +44,7 @@ export function ready(part) {
   if (!part) return Promise.all(PARTS.map((p) => ready(p)));
   if (have.has(part)) return Promise.resolve();
   if (!pending[part]) {
-    pending[part] = fetch(`content/${part}.json`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`content/${part}.json: ${r.status}`))))
+    pending[part] = localJson(`content/${part}.json`)
       .then((body) => {
         mergePart(part, body, { course: COURSE, problems: PROBLEMS, classics: CLASSICS });
         have.add(part);
