@@ -12,6 +12,7 @@
  * setSound(on), setVolume(v), stone(capture), capture(count), pass(),
  * correct(), wrong(), gameEnd(), win(), lose().
  */
+import { localBytes } from "./local-file.js";
 let ctx = null;
 let master = null;
 let enabled = true;
@@ -79,8 +80,7 @@ function load() {
     buffers[key] = [];
     names.forEach((name, i) => {
       jobs.push(
-        fetch(base + name + ".wav")
-          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+        localBytes(base + name + ".wav")
           .then((data) => decode(c, data))
           .then((buf) => {
             buffers[key][i] = buf;

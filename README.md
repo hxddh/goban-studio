@@ -276,8 +276,8 @@ three packages on the CPUs they ship for, and only then creates the tag
 and the GitHub release:
 
 ```bash
-gh workflow run release.yml --ref main -f tag=v16.0.0
-gh workflow run release.yml -f tag=v16.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
+gh workflow run release.yml --ref main -f tag=v16.0.1
+gh workflow run release.yml -f tag=v16.0.1 -f rehearse=true   # every gate and build, publishes nothing, any branch
 ```
 
 The tag must be `v` + the version in `package.json`, its notes must exist

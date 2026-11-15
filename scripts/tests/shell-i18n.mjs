@@ -148,3 +148,22 @@ await test("i18n: in the tests and the tools every language is in the table, and
     assert.equal(await I.loadLang(id, { read: () => assert.fail("read " + id) }), true);
   }
 });
+
+await test("local files: the app's own files are read when the answer is ok, or status 0 with a body (the macOS WebView), and not when empty or an error", async () => {
+  const Local = await import("../../src/web/js/local-file.js");
+  const answer = (status, body) => async () => ({ ok: status >= 200 && status < 300, status, text: async () => body, arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+  assert.deepEqual(await Local.localJson("content/x.json", answer(200, '{"a":1}')), { a: 1 });
+  // What the packaged app on macOS answers for zero://app files: status 0, the whole body.
+  assert.deepEqual(await Local.localJson("content/strings-zh.json", answer(0, '{"nav.today":"今天"}')), { "nav.today": "今天" });
+  assert.equal((await Local.localBytes("assets/sounds/a.wav", answer(0, "RIFF"))).byteLength, 4);
+  await assert.rejects(Local.localJson("content/x.json", answer(0, "")), /empty/);
+  await assert.rejects(Local.localJson("content/x.json", answer(404, "not found")), /404/);
+  await assert.rejects(Local.localBytes("a.wav", answer(500, "x")), /500/);
+  // Every reader of the app's own files goes through it: no r.ok test of its own is left.
+  const fs = await import("node:fs");
+  for (const f of ["i18n.js", "content.js", "audio.js", "app/explorer-ctl.js"]) {
+    const src = fs.readFileSync(path.join(root, "src/web/js", f), "utf8");
+    assert.match(src, /local(Json|Bytes)\(/, `${f} reads through local-file.js`);
+    assert.doesNotMatch(src, /r\.ok \? r\./, `${f}: no fetch of its own that refuses status 0`);
+  }
+});
