@@ -18,6 +18,9 @@
  *                         stepping back is a single `undo`
  *   cancel                a long search stops < 1 s after studio.katagoCancel (3 s on Metal)
  *                         and the engine answers normally afterwards
+ *   languages             each language's strings are read from the package
+ *                         (content/strings-<id>.json) and, chosen as in
+ *                         Settings, the sidebar shows that language at once
  *
  * When the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
  * GOBAN_MODELS_DIR pointing at an empty temporary folder):
@@ -40,7 +43,7 @@ import { APP_VERSION } from "./version.js";
 import * as Models from "./models.js";
 import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, updateCancel, updateDownload, updateStatus, writeTextFile } from "./host.js";
 
-const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
+const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages"];
 const MAX_FRAME_GAP_MS = 250;
 const MAX_CANCEL_MS = 1000;
 // The Metal build on a CI runner's virtual GPU can take seconds to finish
@@ -179,6 +182,42 @@ async function modelChecks(checks, report, cfg = {}) {
   checks.modelsRemove = !!(removedHuman.ok && removedStrong.ok && after.human.status === "absent" && after.strong.status === "absent" && refused === null && validAnalysis(fallback, 19));
 }
 
+/**
+ * The languages as the packaged app reads them: the raw file for each
+ * (status, type and its first characters, so a fallback page or an error
+ * shows in the report), the strings loaded, and a change made as Settings
+ * makes it, read back from the sidebar. The language it started in is put back.
+ */
+async function languageChecks(checks, report) {
+  const I18n = await import("./i18n.js");
+  const Ctl = await import("./app/ctl-core.js");
+  const { state } = await import("./app/store.js");
+  const start = state.settings.lang;
+  const out = {};
+  let ok = true;
+  for (const id of I18n.LANG_IDS.filter((x) => x !== I18n.FALLBACK_LANG)) {
+    const one = {};
+    try {
+      const r = await fetch(`content/strings-${id}.json`, { cache: "no-store" });
+      const text = await r.text();
+      Object.assign(one, { status: r.status, type: r.headers.get("content-type") || "", bytes: text.length, head: text.slice(0, 40) });
+    } catch (e) {
+      one.fetchError = String(e?.message || e);
+    }
+    one.loaded = await I18n.loadLang(id);
+    Ctl.setSetting("lang", id);
+    await sleep(400);
+    const want = I18n.t("nav.today");
+    one.sidebar = (document.querySelector("nav")?.textContent || "").replace(/\s+/g, " ").slice(0, 60);
+    one.shown = I18n.currentLang() === id && want !== "Today" && one.sidebar.includes(want);
+    ok = ok && one.loaded === true && one.shown;
+    out[id] = one;
+  }
+  Ctl.setSetting("lang", start);
+  report.languages = out;
+  checks.languages = ok;
+}
+
 /** @param {{ state?: any }} [opts] */
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
@@ -302,6 +341,7 @@ export async function runSelfTest({ state } = {}) {
       report.menusError = String(e?.message || e);
       checks.menus = false;
     }
+    await languageChecks(checks, report);
     const build = (await nativeInvoke("studio.katagoStatus").catch(() => null))?.build ?? null;
     report.engineBuild = build;
     const cancelLimit = build === "metal" ? MAX_CANCEL_MS_GPU : MAX_CANCEL_MS;

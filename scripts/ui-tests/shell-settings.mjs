@@ -210,6 +210,33 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
     await page.close();
   });
 
+  await check("shell settings: choosing a language in General changes the sidebar, the sheet and every place at once, and is kept after a reload", async () => {
+    const page = await seededPage();
+    await page.waitForSelector(".today");
+    const words = { zh: "今天", ja: "今日", ko: "오늘", en: "Today" };
+    await openPane(page, "general");
+    for (const id of ["zh", "ja", "ko", "en", "zh"]) {
+      await page.click(`.lang-grid button[lang=${id}]`);
+      await page.waitForFunction((w) => (document.querySelector("nav")?.textContent || "").includes(w), words[id], { timeout: 3000 });
+      assert((await page.locator(`.lang-grid button[lang=${id}]`).getAttribute("aria-checked")) === "true", `${id}: the choice is marked`);
+      assert(await page.evaluate((x) => document.documentElement.lang.startsWith(x), id), `${id}: the page's lang`);
+    }
+    // Every place, after the sheet is closed, in Chinese: no English word left on the page.
+    await page.keyboard.press("Escape");
+    for (const key of ["1", "2", "3", "4"]) {
+      await page.keyboard.press(`Control+${key}`);
+      await page.waitForTimeout(300);
+      const text = await page.locator("main").first().innerText();
+      const english = (text.match(/\b[A-Za-z]{4,}\b/g) || []).filter((w) => !/^(Goban|Studio|KataGo)$/.test(w));
+      assert(english.length === 0, `place ${key} still in English: ${english.slice(0, 8).join(" ")}`);
+    }
+    await page.reload();
+    await page.waitForFunction(() => (document.querySelector("nav")?.textContent || "").includes("今天"), null, { timeout: 5000 });
+    assert(await page.evaluate(() => window.__state.settings.lang === "zh"), "kept after a reload");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   await check("shell settings: the volume has four levels; a change is kept and heard once at the new level; Off is silent; the old sound switch migrates", async () => {
     // A settings file from before the volume: the sound switched off.
     const page = await seededPage({ sound: false });
