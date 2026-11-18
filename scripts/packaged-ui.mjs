@@ -36,7 +36,7 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { runSteps } from "./packaged-ui-steps.mjs";
@@ -148,10 +148,62 @@ const watchdog = setTimeout(() => fail(`timed out after ${totalMs / 1000} s`), t
 
 /* ------------------------------------------------ the DevTools endpoint */
 
-const endpoint = `http://127.0.0.1:${port}`;
+/**
+ * The port WebView2 wrote in its profile (DevToolsActivePort, first line),
+ * if it opened one at all: the port asked for may be refused or moved.
+ */
+function activePort() {
+  const root = path.join(temp, "webview2");
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) stack.push(full);
+      else if (e.name === "DevToolsActivePort") {
+        const n = Number(fs.readFileSync(full, "utf8").split(/\r?\n/)[0]);
+        if (n > 0) return n;
+      }
+    }
+  }
+  return null;
+}
+
+/** What the WebView2 processes were started with, and what is in their profile (on failure, for the log). */
+function diagnose() {
+  if (browserExe || process.platform !== "win32") return;
+  const ps = spawnSync("powershell", ["-NoProfile", "-Command", "Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Select-Object -First 3 -ExpandProperty CommandLine"], { encoding: "utf8" });
+  console.error("packaged-ui: WebView2 processes:\n" + (ps.stdout || ps.stderr || "(none)").slice(0, 3000));
+  const listing = [];
+  const walk = (dir, depth) => {
+    if (depth > 3) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      listing.push(path.relative(temp, path.join(dir, e.name)));
+      if (e.isDirectory()) walk(path.join(dir, e.name), depth + 1);
+    }
+  };
+  walk(path.join(temp, "webview2"), 0);
+  console.error("packaged-ui: the WebView2 profile: " + (listing.slice(0, 40).join(", ") || "(empty: the folder asked for was not used)"));
+}
+
+let endpoint = `http://127.0.0.1:${port}`;
 const startBy = Date.now() + START_MS;
 let version = null;
 while (Date.now() < startBy && !exited) {
+  const other = activePort();
+  if (other && other !== port) endpoint = `http://127.0.0.1:${other}`;
   version = await fetch(endpoint + "/json/version")
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
@@ -159,7 +211,10 @@ while (Date.now() < startBy && !exited) {
   await sleep(500);
 }
 if (exited) await fail(`the app exited before its DevTools port opened (${JSON.stringify(exited)})`);
-if (!version) await fail(`no DevTools endpoint on ${endpoint} after ${START_MS / 1000} s (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS not honoured?)`);
+if (!version) {
+  diagnose();
+  await fail(`no DevTools endpoint on ${endpoint} after ${START_MS / 1000} s (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS not honoured?)`);
+}
 console.log(`packaged-ui: DevTools endpoint up: ${version.Browser}`);
 
 try {
