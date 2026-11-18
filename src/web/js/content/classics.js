@@ -78,10 +78,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下左上的 F14；这一手让黑棋损失约 4 目。原本大致均势，此后白棋领先约 4 目。",
-          "en": "KataGo would play F14 (upper left) instead; this costs Black about 4 points. The game was about even; now White leads by about 4 points.",
-          "ko": "KataGo는 좌상의 F14에 둡니다. 이 수로 흑은 약 4집을 손해 봅니다. 비슷하던 형세에서 이제 백이 약 4집 앞섭니다.",
-          "ja": "KataGo は左上の F14 を選びます。この手で黒は約4目損をしています。ほぼ互角だった形勢が、白の約4目リードになります。"
+          "zh": "KataGo 更倾向左上的 F14：这一手黑棋亏了约 4 目。原本大致均势，此后白棋领先约 4 目。",
+          "en": "KataGo prefers F14 (upper left): this move gives up about 4 points for Black. The game was about even; now White leads by about 4 points.",
+          "ko": "KataGo는 좌상의 F14 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 4집 손해입니다. 비슷하던 형세에서 이제 백이 약 4집 앞섭니다.",
+          "ja": "KataGo は左上の F14 を推します。この手は黒にとって約4目の損です。ほぼ互角だった形勢が、白の約4目リードになります。"
         }
       }
     ],
@@ -226,10 +226,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下左下的 C3；这一手让黑棋损失约 6 目。原本大致均势，此后白棋领先约 5 目。",
-          "en": "KataGo would play C3 (lower left) instead; this costs Black about 6 points. The game was about even; now White leads by about 5 points.",
-          "ko": "KataGo는 좌하의 C3에 둡니다. 이 수로 흑은 약 6집을 손해 봅니다. 비슷하던 형세에서 이제 백이 약 5집 앞섭니다.",
-          "ja": "KataGo は左下の C3 を選びます。この手で黒は約6目損をしています。ほぼ互角だった形勢が、白の約5目リードになります。"
+          "zh": "KataGo 更倾向左下的 C3：这一手黑棋亏了约 6 目。原本大致均势，此后白棋领先约 5 目。",
+          "en": "KataGo prefers C3 (lower left): this move gives up about 6 points for Black. The game was about even; now White leads by about 5 points.",
+          "ko": "KataGo는 좌하의 C3 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 6집 손해입니다. 비슷하던 형세에서 이제 백이 약 5집 앞섭니다.",
+          "ja": "KataGo は左下の C3 を推します。この手は黒にとって約6目の損です。ほぼ互角だった形勢が、白の約5目リードになります。"
         }
       },
       {
@@ -242,10 +242,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下右边的 Q7；这一手让白棋损失约 4 目。白棋约 4 目的领先没有了，局面回到均势。",
-          "en": "KataGo would play Q7 (right side) instead; this costs White about 4 points. White's lead of about 4 points is gone: the game is about even.",
-          "ko": "KataGo는 우변의 Q7에 둡니다. 이 수로 백은 약 4집을 손해 봅니다. 백의 약 4집 우세가 사라져 형세가 비슷해집니다.",
-          "ja": "KataGo は右辺の Q7 を選びます。この手で白は約4目損をしています。白の約4目のリードが消え、ほぼ互角になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比右边的 Q7 差约 4 目。白棋约 4 目的领先没有了，局面回到均势。",
+          "en": "By KataGo's count this White move is about 4 points worse than Q7 (right side). White's lead of about 4 points is gone: the game is about even.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 우변의 Q7보다 약 4집 나쁩니다. 백의 약 4집 우세가 사라져 형세가 비슷해집니다.",
+          "ja": "KataGo の計算では、白のこの手は右辺の Q7 より約4目悪い手です。白の約4目のリードが消え、ほぼ互角になります。"
         }
       }
     ]
@@ -390,10 +390,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下右上的 Q13；这一手让白棋损失约 22 目。原本大致均势，此后黑棋领先约 22 目。",
-          "en": "KataGo would play Q13 (upper right) instead; this costs White about 22 points. The game was about even; now Black leads by about 22 points.",
-          "ko": "KataGo는 우상의 Q13에 둡니다. 이 수로 백은 약 22집을 손해 봅니다. 비슷하던 형세에서 이제 흑이 약 22집 앞섭니다.",
-          "ja": "KataGo は右上の Q13 を選びます。この手で白は約22目損をしています。ほぼ互角だった形勢が、黒の約22目リードになります。"
+          "zh": "KataGo 更倾向右上的 Q13：这一手白棋亏了约 22 目。原本大致均势，此后黑棋领先约 22 目。",
+          "en": "KataGo prefers Q13 (upper right): this move gives up about 22 points for White. The game was about even; now Black leads by about 22 points.",
+          "ko": "KataGo는 우상의 Q13 쪽을 더 좋게 봅니다. 이 수는 백에게 약 22집 손해입니다. 비슷하던 형세에서 이제 흑이 약 22집 앞섭니다.",
+          "ja": "KataGo は右上の Q13 を推します。この手は白にとって約22目の損です。ほぼ互角だった形勢が、黒の約22目リードになります。"
         }
       },
       {
@@ -406,10 +406,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下右下的 R4；这一手让白棋损失约 14 目。黑棋的领先由约 17 目变为约 31 目。",
-          "en": "KataGo would play R4 (lower right) instead; this costs White about 14 points. Black's lead goes from about 17 to about 31 points.",
-          "ko": "KataGo는 우하의 R4에 둡니다. 이 수로 백은 약 14집을 손해 봅니다. 흑의 우세가 약 17집에서 약 31집이 됩니다.",
-          "ja": "KataGo は右下の R4 を選びます。この手で白は約14目損をしています。黒のリードが約17目から約31目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比右下的 R4 差约 14 目。黑棋的领先由约 17 目变为约 31 目。",
+          "en": "By KataGo's count this White move is about 14 points worse than R4 (lower right). Black's lead goes from about 17 to about 31 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 우하의 R4보다 약 14집 나쁩니다. 흑의 우세가 약 17집에서 약 31집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は右下の R4 より約14目悪い手です。黒のリードが約17目から約31目になります。"
         }
       }
     ]
@@ -473,10 +473,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 M10；这一手让白棋损失约 3 目。黑棋的领先由约 5 目变为约 8 目。",
-          "en": "KataGo would play M10 (centre) instead; this costs White about 3 points. Black's lead goes from about 5 to about 8 points.",
-          "ko": "KataGo는 중앙의 M10에 둡니다. 이 수로 백은 약 3집을 손해 봅니다. 흑의 우세가 약 5집에서 약 8집이 됩니다.",
-          "ja": "KataGo は中央の M10 を選びます。この手で白は約3目損をしています。黒のリードが約5目から約8目になります。"
+          "zh": "KataGo 更倾向中央的 M10：这一手白棋亏了约 3 目。黑棋的领先由约 5 目变为约 8 目。",
+          "en": "KataGo prefers M10 (centre): this move gives up about 3 points for White. Black's lead goes from about 5 to about 8 points.",
+          "ko": "KataGo는 중앙의 M10 쪽을 더 좋게 봅니다. 이 수는 백에게 약 3집 손해입니다. 흑의 우세가 약 5집에서 약 8집이 됩니다.",
+          "ja": "KataGo は中央の M10 を推します。この手は白にとって約3目の損です。黒のリードが約5目から約8目になります。"
         }
       },
       {
@@ -489,10 +489,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下左下的 F3；这一手让白棋损失约 6 目。黑棋的领先由约 13 目变为约 19 目。",
-          "en": "KataGo would play F3 (lower left) instead; this costs White about 6 points. Black's lead goes from about 13 to about 19 points.",
-          "ko": "KataGo는 좌하의 F3에 둡니다. 이 수로 백은 약 6집을 손해 봅니다. 흑의 우세가 약 13집에서 약 19집이 됩니다.",
-          "ja": "KataGo は左下の F3 を選びます。この手で白は約6目損をしています。黒のリードが約13目から約19目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比左下的 F3 差约 6 目。黑棋的领先由约 13 目变为约 19 目。",
+          "en": "By KataGo's count this White move is about 6 points worse than F3 (lower left). Black's lead goes from about 13 to about 19 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 좌하의 F3보다 약 6집 나쁩니다. 흑의 우세가 약 13집에서 약 19집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は左下の F3 より約6目悪い手です。黒のリードが約13目から約19目になります。"
         }
       }
     ]
@@ -556,10 +556,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下中央的 H10；这一手让黑棋损失约 6 目。黑棋的领先由约 9 目变为约 2.9 目。",
-          "en": "KataGo would play H10 (centre) instead; this costs Black about 6 points. Black's lead goes from about 9 to about 2.9 points.",
-          "ko": "KataGo는 중앙의 H10에 둡니다. 이 수로 흑은 약 6집을 손해 봅니다. 흑의 우세가 약 9집에서 약 2.9집이 됩니다.",
-          "ja": "KataGo は中央の H10 を選びます。この手で黒は約6目損をしています。黒のリードが約9目から約2.9目になります。"
+          "zh": "KataGo 更倾向中央的 H10：这一手黑棋亏了约 6 目。黑棋的领先由约 9 目变为约 2.9 目。",
+          "en": "KataGo prefers H10 (centre): this move gives up about 6 points for Black. Black's lead goes from about 9 to about 2.9 points.",
+          "ko": "KataGo는 중앙의 H10 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 6집 손해입니다. 흑의 우세가 약 9집에서 약 2.9집이 됩니다.",
+          "ja": "KataGo は中央の H10 を推します。この手は黒にとって約6目の損です。黒のリードが約9目から約2.9目になります。"
         }
       },
       {
@@ -572,10 +572,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下上边的 H16；这一手让黑棋损失约 5 目。黑棋的领先由约 9 目变为约 4 目。",
-          "en": "KataGo would play H16 (top) instead; this costs Black about 5 points. Black's lead goes from about 9 to about 4 points.",
-          "ko": "KataGo는 상변의 H16에 둡니다. 이 수로 흑은 약 5집을 손해 봅니다. 흑의 우세가 약 9집에서 약 4집이 됩니다.",
-          "ja": "KataGo は上辺の H16 を選びます。この手で黒は約5目損をしています。黒のリードが約9目から約4目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比上边的 H16 差约 5 目。黑棋的领先由约 9 目变为约 4 目。",
+          "en": "By KataGo's count this Black move is about 5 points worse than H16 (top). Black's lead goes from about 9 to about 4 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 상변의 H16보다 약 5집 나쁩니다. 흑의 우세가 약 9집에서 약 4집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は上辺の H16 より約5目悪い手です。黒のリードが約9目から約4目になります。"
         }
       }
     ]
@@ -639,10 +639,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 H7；这一手让黑棋损失约 5 目。白棋的领先由约 4 目变为约 9 目。",
-          "en": "KataGo would play H7 (centre) instead; this costs Black about 5 points. White's lead goes from about 4 to about 9 points.",
-          "ko": "KataGo는 중앙의 H7에 둡니다. 이 수로 흑은 약 5집을 손해 봅니다. 백의 우세가 약 4집에서 약 9집이 됩니다.",
-          "ja": "KataGo は中央の H7 を選びます。この手で黒は約5目損をしています。白のリードが約4目から約9目になります。"
+          "zh": "KataGo 更倾向中央的 H7：这一手黑棋亏了约 5 目。白棋的领先由约 4 目变为约 9 目。",
+          "en": "KataGo prefers H7 (centre): this move gives up about 5 points for Black. White's lead goes from about 4 to about 9 points.",
+          "ko": "KataGo는 중앙의 H7 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 5집 손해입니다. 백의 우세가 약 4집에서 약 9집이 됩니다.",
+          "ja": "KataGo は中央の H7 を推します。この手は黒にとって約5目の損です。白のリードが約4目から約9目になります。"
         }
       },
       {
@@ -655,10 +655,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下右上的 O18；这一手让白棋损失约 5 目。原本大致均势，此后黑棋领先约 6 目。",
-          "en": "KataGo would play O18 (upper right) instead; this costs White about 5 points. The game was about even; now Black leads by about 6 points.",
-          "ko": "KataGo는 우상의 O18에 둡니다. 이 수로 백은 약 5집을 손해 봅니다. 비슷하던 형세에서 이제 흑이 약 6집 앞섭니다.",
-          "ja": "KataGo は右上の O18 を選びます。この手で白は約5目損をしています。ほぼ互角だった形勢が、黒の約6目リードになります。"
+          "zh": "按 KataGo 的计算，白棋这一手比右上的 O18 差约 5 目。原本大致均势，此后黑棋领先约 6 目。",
+          "en": "By KataGo's count this White move is about 5 points worse than O18 (upper right). The game was about even; now Black leads by about 6 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 우상의 O18보다 약 5집 나쁩니다. 비슷하던 형세에서 이제 흑이 약 6집 앞섭니다.",
+          "ja": "KataGo の計算では、白のこの手は右上の O18 より約5目悪い手です。ほぼ互角だった形勢が、黒の約6目リードになります。"
         }
       }
     ]
@@ -722,10 +722,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下中央的 H9；这一手让白棋损失约 5 目。黑棋的领先由约 9 目变为约 15 目。",
-          "en": "KataGo would play H9 (centre) instead; this costs White about 5 points. Black's lead goes from about 9 to about 15 points.",
-          "ko": "KataGo는 중앙의 H9에 둡니다. 이 수로 백은 약 5집을 손해 봅니다. 흑의 우세가 약 9집에서 약 15집이 됩니다.",
-          "ja": "KataGo は中央の H9 を選びます。この手で白は約5目損をしています。黒のリードが約9目から約15目になります。"
+          "zh": "KataGo 更倾向中央的 H9：这一手白棋亏了约 5 目。黑棋的领先由约 9 目变为约 15 目。",
+          "en": "KataGo prefers H9 (centre): this move gives up about 5 points for White. Black's lead goes from about 9 to about 15 points.",
+          "ko": "KataGo는 중앙의 H9 쪽을 더 좋게 봅니다. 이 수는 백에게 약 5집 손해입니다. 흑의 우세가 약 9집에서 약 15집이 됩니다.",
+          "ja": "KataGo は中央の H9 を推します。この手は白にとって約5目の損です。黒のリードが約9目から約15目になります。"
         }
       },
       {
@@ -738,10 +738,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 L7；这一手让白棋损失约 5 目。黑棋的领先由约 16 目变为约 21 目。",
-          "en": "KataGo would play L7 (centre) instead; this costs White about 5 points. Black's lead goes from about 16 to about 21 points.",
-          "ko": "KataGo는 중앙의 L7에 둡니다. 이 수로 백은 약 5집을 손해 봅니다. 흑의 우세가 약 16집에서 약 21집이 됩니다.",
-          "ja": "KataGo は中央の L7 を選びます。この手で白は約5目損をしています。黒のリードが約16目から約21目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比中央的 L7 差约 5 目。黑棋的领先由约 16 目变为约 21 目。",
+          "en": "By KataGo's count this White move is about 5 points worse than L7 (centre). Black's lead goes from about 16 to about 21 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 중앙의 L7보다 약 5집 나쁩니다. 흑의 우세가 약 16집에서 약 21집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は中央の L7 より約5目悪い手です。黒のリードが約16目から約21目になります。"
         }
       }
     ]
@@ -805,10 +805,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 H9；这一手让白棋损失约 6 目。白棋的领先由约 14 目变为约 8 目。",
-          "en": "KataGo would play H9 (centre) instead; this costs White about 6 points. White's lead goes from about 14 to about 8 points.",
-          "ko": "KataGo는 중앙의 H9에 둡니다. 이 수로 백은 약 6집을 손해 봅니다. 백의 우세가 약 14집에서 약 8집이 됩니다.",
-          "ja": "KataGo は中央の H9 を選びます。この手で白は約6目損をしています。白のリードが約14目から約8目になります。"
+          "zh": "KataGo 更倾向中央的 H9：这一手白棋亏了约 6 目。白棋的领先由约 14 目变为约 8 目。",
+          "en": "KataGo prefers H9 (centre): this move gives up about 6 points for White. White's lead goes from about 14 to about 8 points.",
+          "ko": "KataGo는 중앙의 H9 쪽을 더 좋게 봅니다. 이 수는 백에게 약 6집 손해입니다. 백의 우세가 약 14집에서 약 8집이 됩니다.",
+          "ja": "KataGo は中央の H9 を推します。この手は白にとって約6目の損です。白のリードが約14目から約8目になります。"
         }
       },
       {
@@ -821,10 +821,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下左下的 E6；这一手让黑棋损失约 20 目。领先一方由黑棋（约 3 目）变为白棋（约 17 目）。",
-          "en": "KataGo would play E6 (lower left) instead; this costs Black about 20 points. The lead passes from Black (about 3 points) to White (about 17).",
-          "ko": "KataGo는 좌하의 E6에 둡니다. 이 수로 흑은 약 20집을 손해 봅니다. 우세가 흑(약 3집)에서 백(약 17집)으로 넘어갑니다.",
-          "ja": "KataGo は左下の E6 を選びます。この手で黒は約20目損をしています。リードが黒（約3目）から白（約17目）に移ります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比左下的 E6 差约 20 目。领先一方由黑棋（约 3 目）变为白棋（约 17 目）。",
+          "en": "By KataGo's count this Black move is about 20 points worse than E6 (lower left). The lead passes from Black (about 3 points) to White (about 17).",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 좌하의 E6보다 약 20집 나쁩니다. 우세가 흑(약 3집)에서 백(약 17집)으로 넘어갑니다.",
+          "ja": "KataGo の計算では、黒のこの手は左下の E6 より約20目悪い手です。リードが黒（約3目）から白（約17目）に移ります。"
         }
       }
     ]
@@ -983,10 +983,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下上边的 N18；这一手让白棋损失约 1.4 目。白棋的领先由约 8 目变为约 7 目。",
-          "en": "KataGo would play N18 (top) instead; this costs White about 1.4 points. White's lead goes from about 8 to about 7 points.",
-          "ko": "KataGo는 상변의 N18에 둡니다. 이 수로 백은 약 1.4집을 손해 봅니다. 백의 우세가 약 8집에서 약 7집이 됩니다.",
-          "ja": "KataGo は上辺の N18 を選びます。この手で白は約1.4目損をしています。白のリードが約8目から約7目になります。"
+          "zh": "KataGo 更倾向上边的 N18：这一手白棋亏了约 1.4 目。白棋的领先由约 8 目变为约 7 目。",
+          "en": "KataGo prefers N18 (top): this move gives up about 1.4 points for White. White's lead goes from about 8 to about 7 points.",
+          "ko": "KataGo는 상변의 N18 쪽을 더 좋게 봅니다. 이 수는 백에게 약 1.4집 손해입니다. 백의 우세가 약 8집에서 약 7집이 됩니다.",
+          "ja": "KataGo は上辺の N18 を推します。この手は白にとって約1.4目の損です。白のリードが約8目から約7目になります。"
         }
       }
     ],
@@ -1051,10 +1051,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 K12；这一手让白棋损失约 2.9 目。白棋的领先由约 13 目变为约 10 目。",
-          "en": "KataGo would play K12 (centre) instead; this costs White about 2.9 points. White's lead goes from about 13 to about 10 points.",
-          "ko": "KataGo는 중앙의 K12에 둡니다. 이 수로 백은 약 2.9집을 손해 봅니다. 백의 우세가 약 13집에서 약 10집이 됩니다.",
-          "ja": "KataGo は中央の K12 を選びます。この手で白は約2.9目損をしています。白のリードが約13目から約10目になります。"
+          "zh": "KataGo 更倾向中央的 K12：这一手白棋亏了约 2.9 目。白棋的领先由约 13 目变为约 10 目。",
+          "en": "KataGo prefers K12 (centre): this move gives up about 2.9 points for White. White's lead goes from about 13 to about 10 points.",
+          "ko": "KataGo는 중앙의 K12 쪽을 더 좋게 봅니다. 이 수는 백에게 약 2.9집 손해입니다. 백의 우세가 약 13집에서 약 10집이 됩니다.",
+          "ja": "KataGo は中央の K12 を推します。この手は白にとって約2.9目の損です。白のリードが約13目から約10目になります。"
         }
       },
       {
@@ -1067,10 +1067,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下下边的 N6；这一手让黑棋损失约 4 目。白棋的领先由约 11 目变为约 15 目。",
-          "en": "KataGo would play N6 (bottom) instead; this costs Black about 4 points. White's lead goes from about 11 to about 15 points.",
-          "ko": "KataGo는 하변의 N6에 둡니다. 이 수로 흑은 약 4집을 손해 봅니다. 백의 우세가 약 11집에서 약 15집이 됩니다.",
-          "ja": "KataGo は下辺の N6 を選びます。この手で黒は約4目損をしています。白のリードが約11目から約15目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比下边的 N6 差约 4 目。白棋的领先由约 11 目变为约 15 目。",
+          "en": "By KataGo's count this Black move is about 4 points worse than N6 (bottom). White's lead goes from about 11 to about 15 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 하변의 N6보다 약 4집 나쁩니다. 백의 우세가 약 11집에서 약 15집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は下辺の N6 より約4目悪い手です。白のリードが約11目から約15目になります。"
         }
       }
     ]
@@ -1134,10 +1134,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下右上的 O13；这一手让白棋损失约 2.4 目。黑棋的领先由约 1.6 目变为约 4 目。",
-          "en": "KataGo would play O13 (upper right) instead; this costs White about 2.4 points. Black's lead goes from about 1.6 to about 4 points.",
-          "ko": "KataGo는 우상의 O13에 둡니다. 이 수로 백은 약 2.4집을 손해 봅니다. 흑의 우세가 약 1.6집에서 약 4집이 됩니다.",
-          "ja": "KataGo は右上の O13 を選びます。この手で白は約2.4目損をしています。黒のリードが約1.6目から約4目になります。"
+          "zh": "KataGo 更倾向右上的 O13：这一手白棋亏了约 2.4 目。黑棋的领先由约 1.6 目变为约 4 目。",
+          "en": "KataGo prefers O13 (upper right): this move gives up about 2.4 points for White. Black's lead goes from about 1.6 to about 4 points.",
+          "ko": "KataGo는 우상의 O13 쪽을 더 좋게 봅니다. 이 수는 백에게 약 2.4집 손해입니다. 흑의 우세가 약 1.6집에서 약 4집이 됩니다.",
+          "ja": "KataGo は右上の O13 を推します。この手は白にとって約2.4目の損です。黒のリードが約1.6目から約4目になります。"
         }
       },
       {
@@ -1150,10 +1150,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下上边的 M14；这一手让黑棋损失约 2.3 目。黑棋的领先由约 4 目变为约 2.0 目。",
-          "en": "KataGo would play M14 (top) instead; this costs Black about 2.3 points. Black's lead goes from about 4 to about 2.0 points.",
-          "ko": "KataGo는 상변의 M14에 둡니다. 이 수로 흑은 약 2.3집을 손해 봅니다. 흑의 우세가 약 4집에서 약 2.0집이 됩니다.",
-          "ja": "KataGo は上辺の M14 を選びます。この手で黒は約2.3目損をしています。黒のリードが約4目から約2.0目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比上边的 M14 差约 2.3 目。黑棋的领先由约 4 目变为约 2.0 目。",
+          "en": "By KataGo's count this Black move is about 2.3 points worse than M14 (top). Black's lead goes from about 4 to about 2.0 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 상변의 M14보다 약 2.3집 나쁩니다. 흑의 우세가 약 4집에서 약 2.0집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は上辺の M14 より約2.3目悪い手です。黒のリードが約4目から約2.0目になります。"
         }
       }
     ]
@@ -1217,10 +1217,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 L12；这一手让黑棋损失约 4 目。黑棋约 5 目的领先没有了，局面回到均势。",
-          "en": "KataGo would play L12 (centre) instead; this costs Black about 4 points. Black's lead of about 5 points is gone: the game is about even.",
-          "ko": "KataGo는 중앙의 L12에 둡니다. 이 수로 흑은 약 4집을 손해 봅니다. 흑의 약 5집 우세가 사라져 형세가 비슷해집니다.",
-          "ja": "KataGo は中央の L12 を選びます。この手で黒は約4目損をしています。黒の約5目のリードが消え、ほぼ互角になります。"
+          "zh": "KataGo 更倾向中央的 L12：这一手黑棋亏了约 4 目。黑棋约 5 目的领先没有了，局面回到均势。",
+          "en": "KataGo prefers L12 (centre): this move gives up about 4 points for Black. Black's lead of about 5 points is gone: the game is about even.",
+          "ko": "KataGo는 중앙의 L12 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 4집 손해입니다. 흑의 약 5집 우세가 사라져 형세가 비슷해집니다.",
+          "ja": "KataGo は中央の L12 を推します。この手は黒にとって約4目の損です。黒の約5目のリードが消え、ほぼ互角になります。"
         }
       },
       {
@@ -1233,10 +1233,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下左边的 C11；这一手让黑棋损失约 6 目。白棋的领先由约 8 目变为约 14 目。",
-          "en": "KataGo would play C11 (left side) instead; this costs Black about 6 points. White's lead goes from about 8 to about 14 points.",
-          "ko": "KataGo는 좌변의 C11에 둡니다. 이 수로 흑은 약 6집을 손해 봅니다. 백의 우세가 약 8집에서 약 14집이 됩니다.",
-          "ja": "KataGo は左辺の C11 を選びます。この手で黒は約6目損をしています。白のリードが約8目から約14目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比左边的 C11 差约 6 目。白棋的领先由约 8 目变为约 14 目。",
+          "en": "By KataGo's count this Black move is about 6 points worse than C11 (left side). White's lead goes from about 8 to about 14 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 좌변의 C11보다 약 6집 나쁩니다. 백의 우세가 약 8집에서 약 14집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は左辺の C11 より約6目悪い手です。白のリードが約8目から約14目になります。"
         }
       }
     ]
@@ -1300,10 +1300,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下右下的 O2；这一手让黑棋损失约 5 目。原本大致均势，此后白棋领先约 5 目。",
-          "en": "KataGo would play O2 (lower right) instead; this costs Black about 5 points. The game was about even; now White leads by about 5 points.",
-          "ko": "KataGo는 우하의 O2에 둡니다. 이 수로 흑은 약 5집을 손해 봅니다. 비슷하던 형세에서 이제 백이 약 5집 앞섭니다.",
-          "ja": "KataGo は右下の O2 を選びます。この手で黒は約5目損をしています。ほぼ互角だった形勢が、白の約5目リードになります。"
+          "zh": "KataGo 更倾向右下的 O2：这一手黑棋亏了约 5 目。原本大致均势，此后白棋领先约 5 目。",
+          "en": "KataGo prefers O2 (lower right): this move gives up about 5 points for Black. The game was about even; now White leads by about 5 points.",
+          "ko": "KataGo는 우하의 O2 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 5집 손해입니다. 비슷하던 형세에서 이제 백이 약 5집 앞섭니다.",
+          "ja": "KataGo は右下の O2 を推します。この手は黒にとって約5目の損です。ほぼ互角だった形勢が、白の約5目リードになります。"
         }
       },
       {
@@ -1316,10 +1316,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下右下的 R4；这一手让黑棋损失约 5 目。白棋的领先由约 6 目变为约 11 目。",
-          "en": "KataGo would play R4 (lower right) instead; this costs Black about 5 points. White's lead goes from about 6 to about 11 points.",
-          "ko": "KataGo는 우하의 R4에 둡니다. 이 수로 흑은 약 5집을 손해 봅니다. 백의 우세가 약 6집에서 약 11집이 됩니다.",
-          "ja": "KataGo は右下の R4 を選びます。この手で黒は約5目損をしています。白のリードが約6目から約11目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比右下的 R4 差约 5 目。白棋的领先由约 6 目变为约 11 目。",
+          "en": "By KataGo's count this Black move is about 5 points worse than R4 (lower right). White's lead goes from about 6 to about 11 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 우하의 R4보다 약 5집 나쁩니다. 백의 우세가 약 6집에서 약 11집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は右下の R4 より約5目悪い手です。白のリードが約6目から約11目になります。"
         }
       }
     ]
@@ -1383,10 +1383,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下上边的 L13；这一手让黑棋损失约 5 目。白棋的领先由约 6 目变为约 11 目。",
-          "en": "KataGo would play L13 (top) instead; this costs Black about 5 points. White's lead goes from about 6 to about 11 points.",
-          "ko": "KataGo는 상변의 L13에 둡니다. 이 수로 흑은 약 5집을 손해 봅니다. 백의 우세가 약 6집에서 약 11집이 됩니다.",
-          "ja": "KataGo は上辺の L13 を選びます。この手で黒は約5目損をしています。白のリードが約6目から約11目になります。"
+          "zh": "KataGo 更倾向上边的 L13：这一手黑棋亏了约 5 目。白棋的领先由约 6 目变为约 11 目。",
+          "en": "KataGo prefers L13 (top): this move gives up about 5 points for Black. White's lead goes from about 6 to about 11 points.",
+          "ko": "KataGo는 상변의 L13 쪽을 더 좋게 봅니다. 이 수는 흑에게 약 5집 손해입니다. 백의 우세가 약 6집에서 약 11집이 됩니다.",
+          "ja": "KataGo は上辺の L13 を推します。この手は黒にとって約5目の損です。白のリードが約6目から約11目になります。"
         }
       },
       {
@@ -1399,10 +1399,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下右边的 Q7；这一手让白棋损失约 5 目。白棋的领先由约 13 目变为约 8 目。",
-          "en": "KataGo would play Q7 (right side) instead; this costs White about 5 points. White's lead goes from about 13 to about 8 points.",
-          "ko": "KataGo는 우변의 Q7에 둡니다. 이 수로 백은 약 5집을 손해 봅니다. 백의 우세가 약 13집에서 약 8집이 됩니다.",
-          "ja": "KataGo は右辺の Q7 を選びます。この手で白は約5目損をしています。白のリードが約13目から約8目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比右边的 Q7 差约 5 目。白棋的领先由约 13 目变为约 8 目。",
+          "en": "By KataGo's count this White move is about 5 points worse than Q7 (right side). White's lead goes from about 13 to about 8 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 우변의 Q7보다 약 5집 나쁩니다. 백의 우세가 약 13집에서 약 8집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は右辺の Q7 より約5目悪い手です。白のリードが約13目から約8目になります。"
         }
       }
     ]
@@ -1466,10 +1466,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 N9；这一手让白棋损失约 2.1 目。黑棋的领先由约 2.6 目变为约 5 目。",
-          "en": "KataGo would play N9 (centre) instead; this costs White about 2.1 points. Black's lead goes from about 2.6 to about 5 points.",
-          "ko": "KataGo는 중앙의 N9에 둡니다. 이 수로 백은 약 2.1집을 손해 봅니다. 흑의 우세가 약 2.6집에서 약 5집이 됩니다.",
-          "ja": "KataGo は中央の N9 を選びます。この手で白は約2.1目損をしています。黒のリードが約2.6目から約5目になります。"
+          "zh": "KataGo 更倾向中央的 N9：这一手白棋亏了约 2.1 目。黑棋的领先由约 2.6 目变为约 5 目。",
+          "en": "KataGo prefers N9 (centre): this move gives up about 2.1 points for White. Black's lead goes from about 2.6 to about 5 points.",
+          "ko": "KataGo는 중앙의 N9 쪽을 더 좋게 봅니다. 이 수는 백에게 약 2.1집 손해입니다. 흑의 우세가 약 2.6집에서 약 5집이 됩니다.",
+          "ja": "KataGo は中央の N9 を推します。この手は白にとって約2.1目の損です。黒のリードが約2.6目から約5目になります。"
         }
       },
       {
@@ -1482,10 +1482,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下中央的 M9；这一手让白棋损失约 3 目。黑棋的领先由约 6 目变为约 10 目。",
-          "en": "KataGo would play M9 (centre) instead; this costs White about 3 points. Black's lead goes from about 6 to about 10 points.",
-          "ko": "KataGo는 중앙의 M9에 둡니다. 이 수로 백은 약 3집을 손해 봅니다. 흑의 우세가 약 6집에서 약 10집이 됩니다.",
-          "ja": "KataGo は中央の M9 を選びます。この手で白は約3目損をしています。黒のリードが約6目から約10目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比中央的 M9 差约 3 目。黑棋的领先由约 6 目变为约 10 目。",
+          "en": "By KataGo's count this White move is about 3 points worse than M9 (centre). Black's lead goes from about 6 to about 10 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 중앙의 M9보다 약 3집 나쁩니다. 흑의 우세가 약 6집에서 약 10집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は中央の M9 より約3目悪い手です。黒のリードが約6目から約10目になります。"
         }
       }
     ]
@@ -1549,10 +1549,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下右上的 P17；这一手让白棋损失约 2.4 目。黑棋的领先由约 9 目变为约 12 目。",
-          "en": "KataGo would play P17 (upper right) instead; this costs White about 2.4 points. Black's lead goes from about 9 to about 12 points.",
-          "ko": "KataGo는 우상의 P17에 둡니다. 이 수로 백은 약 2.4집을 손해 봅니다. 흑의 우세가 약 9집에서 약 12집이 됩니다.",
-          "ja": "KataGo は右上の P17 を選びます。この手で白は約2.4目損をしています。黒のリードが約9目から約12目になります。"
+          "zh": "KataGo 更倾向右上的 P17：这一手白棋亏了约 2.4 目。黑棋的领先由约 9 目变为约 12 目。",
+          "en": "KataGo prefers P17 (upper right): this move gives up about 2.4 points for White. Black's lead goes from about 9 to about 12 points.",
+          "ko": "KataGo는 우상의 P17 쪽을 더 좋게 봅니다. 이 수는 백에게 약 2.4집 손해입니다. 흑의 우세가 약 9집에서 약 12집이 됩니다.",
+          "ja": "KataGo は右上の P17 を推します。この手は白にとって約2.4目の損です。黒のリードが約9目から約12目になります。"
         }
       },
       {
@@ -1565,10 +1565,10 @@ export const CLASSICS = [
           "ja": "黒の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下左边的 E9；这一手让黑棋损失约 3 目。黑棋的领先由约 17 目变为约 14 目。",
-          "en": "KataGo would play E9 (left side) instead; this costs Black about 3 points. Black's lead goes from about 17 to about 14 points.",
-          "ko": "KataGo는 좌변의 E9에 둡니다. 이 수로 흑은 약 3집을 손해 봅니다. 흑의 우세가 약 17집에서 약 14집이 됩니다.",
-          "ja": "KataGo は左辺の E9 を選びます。この手で黒は約3目損をしています。黒のリードが約17目から約14目になります。"
+          "zh": "按 KataGo 的计算，黑棋这一手比左边的 E9 差约 3 目。黑棋的领先由约 17 目变为约 14 目。",
+          "en": "By KataGo's count this Black move is about 3 points worse than E9 (left side). Black's lead goes from about 17 to about 14 points.",
+          "ko": "KataGo의 계산으로는 흑의 이 수가 좌변의 E9보다 약 3집 나쁩니다. 흑의 우세가 약 17집에서 약 14집이 됩니다.",
+          "ja": "KataGo の計算では、黒のこの手は左辺の E9 より約3目悪い手です。黒のリードが約17目から約14目になります。"
         }
       }
     ]
@@ -1632,10 +1632,10 @@ export const CLASSICS = [
           "ja": "白の損が大きい一手"
         },
         "note": {
-          "zh": "KataGo 会下中央的 H11；这一手让白棋损失约 6 目。黑棋的领先由约 10 目变为约 16 目。",
-          "en": "KataGo would play H11 (centre) instead; this costs White about 6 points. Black's lead goes from about 10 to about 16 points.",
-          "ko": "KataGo는 중앙의 H11에 둡니다. 이 수로 백은 약 6집을 손해 봅니다. 흑의 우세가 약 10집에서 약 16집이 됩니다.",
-          "ja": "KataGo は中央の H11 を選びます。この手で白は約6目損をしています。黒のリードが約10目から約16目になります。"
+          "zh": "KataGo 更倾向中央的 H11：这一手白棋亏了约 6 目。黑棋的领先由约 10 目变为约 16 目。",
+          "en": "KataGo prefers H11 (centre): this move gives up about 6 points for White. Black's lead goes from about 10 to about 16 points.",
+          "ko": "KataGo는 중앙의 H11 쪽을 더 좋게 봅니다. 이 수는 백에게 약 6집 손해입니다. 흑의 우세가 약 10집에서 약 16집이 됩니다.",
+          "ja": "KataGo は中央の H11 を推します。この手は白にとって約6目の損です。黒のリードが約10目から約16目になります。"
         }
       },
       {
@@ -1648,10 +1648,10 @@ export const CLASSICS = [
           "ja": "最大の分岐点"
         },
         "note": {
-          "zh": "KataGo 会下右边的 O7；这一手让白棋损失约 29 目。黑棋的领先由约 19 目变为约 48 目。",
-          "en": "KataGo would play O7 (right side) instead; this costs White about 29 points. Black's lead goes from about 19 to about 48 points.",
-          "ko": "KataGo는 우변의 O7에 둡니다. 이 수로 백은 약 29집을 손해 봅니다. 흑의 우세가 약 19집에서 약 48집이 됩니다.",
-          "ja": "KataGo は右辺の O7 を選びます。この手で白は約29目損をしています。黒のリードが約19目から約48目になります。"
+          "zh": "按 KataGo 的计算，白棋这一手比右边的 O7 差约 29 目。黑棋的领先由约 19 目变为约 48 目。",
+          "en": "By KataGo's count this White move is about 29 points worse than O7 (right side). Black's lead goes from about 19 to about 48 points.",
+          "ko": "KataGo의 계산으로는 백의 이 수가 우변의 O7보다 약 29집 나쁩니다. 흑의 우세가 약 19집에서 약 48집이 됩니다.",
+          "ja": "KataGo の計算では、白のこの手は右辺の O7 より約29目悪い手です。黒のリードが約19目から約48目になります。"
         }
       }
     ]

@@ -45,6 +45,9 @@ await test("classics: the KataGo moments are what classics-moments.mjs writes fr
       assert.ok(move.loss >= 1, `${classic.id} ${mo.index}: a swing the check measured`);
       for (const lang of LANG_IDS) assert.ok(mo.note[lang].includes(move.best), `${classic.id} ${mo.index} ${lang}: names KataGo's move`);
     }
+    // One game's KataGo notes do not open alike (classics-moments.mjs takes its forms in turn).
+    const opens = (classic.moments || []).filter((x) => x.source === "katago").map((x) => x.note.en.slice(0, 14));
+    assert.equal(new Set(opens).size, opens.length, `${classic.id}: notes open alike: ${opens.join(" | ")}`);
     // Every checked classic has at least three moments, hand-written or KataGo's.
     if (checked.has(classic.id)) assert.ok((classic.moments || []).length >= 3, `${classic.id}: ${(classic.moments || []).length} moments`);
   }

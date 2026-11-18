@@ -93,8 +93,36 @@ function leadText(before, after) {
 /** The lead (Black's view) after a checked move: its `lead` is the position's before it. */
 export const leadAfter = (m) => (m.c === "B" ? m.lead - m.loss : m.lead + m.loss);
 
-/** One moment from a checked move; `top` when it is the game's largest swing among those chosen. */
-export function momentOf(m, size, top) {
+/**
+ * What KataGo would play and what the move cost, in three forms per
+ * language; a game's moments take them in turn, so its notes do not read
+ * alike. Each says the same measured facts.
+ */
+const SAYS = {
+  zh: [
+    (x) => `KataGo 会下${x.where}的 ${x.best}；这一手让${x.who}损失约 ${x.loss} 目。`,
+    (x) => `KataGo 更倾向${x.where}的 ${x.best}：这一手${x.who}亏了约 ${x.loss} 目。`,
+    (x) => `按 KataGo 的计算，${x.who}这一手比${x.where}的 ${x.best} 差约 ${x.loss} 目。`,
+  ],
+  en: [
+    (x) => `KataGo would play ${x.best} (${x.where}) instead; this costs ${x.who} about ${x.loss} points.`,
+    (x) => `KataGo prefers ${x.best} (${x.where}): this move gives up about ${x.loss} points for ${x.who}.`,
+    (x) => `By KataGo's count this ${x.who} move is about ${x.loss} points worse than ${x.best} (${x.where}).`,
+  ],
+  ko: [
+    (x) => `KataGo는 ${x.where}의 ${x.best}에 둡니다. 이 수로 ${x.who}은 약 ${x.loss}집을 손해 봅니다.`,
+    (x) => `KataGo는 ${x.where}의 ${x.best} 쪽을 더 좋게 봅니다. 이 수는 ${x.who}에게 약 ${x.loss}집 손해입니다.`,
+    (x) => `KataGo의 계산으로는 ${x.who}의 이 수가 ${x.where}의 ${x.best}보다 약 ${x.loss}집 나쁩니다.`,
+  ],
+  ja: [
+    (x) => `KataGo は${x.where}の ${x.best} を選びます。この手で${x.who}は約${x.loss}目損をしています。`,
+    (x) => `KataGo は${x.where}の ${x.best} を推します。この手は${x.who}にとって約${x.loss}目の損です。`,
+    (x) => `KataGo の計算では、${x.who}のこの手は${x.where}の ${x.best} より約${x.loss}目悪い手です。`,
+  ],
+};
+
+/** One moment from a checked move; `top` when it is the game's largest swing among those chosen; `form` picks the wording. */
+export function momentOf(m, size, top, form = 0) {
   const c = m.c === "B" ? 0 : 1;
   const r = region(m.best, size);
   const [before, after] = [m.lead, leadAfter(m)];
@@ -109,12 +137,7 @@ export function momentOf(m, size, top) {
     index: m.n,
     source: "katago",
     title,
-    note: {
-      zh: `KataGo 会下${REGION.zh[r]}的 ${m.best}；这一手让${COLOUR.zh[c]}损失约 ${pts(m.loss)} 目。${lead.zh}`,
-      en: `KataGo would play ${m.best} (${REGION.en[r]}) instead; this costs ${COLOUR.en[c]} about ${pts(m.loss)} points. ${lead.en}`,
-      ko: `KataGo는 ${REGION.ko[r]}의 ${m.best}에 둡니다. 이 수로 ${COLOUR.ko[c]}은 약 ${pts(m.loss)}집을 손해 봅니다. ${lead.ko}`,
-      ja: `KataGo は${REGION.ja[r]}の ${m.best} を選びます。この手で${COLOUR.ja[c]}は約${pts(m.loss)}目損をしています。${lead.ja}`,
-    },
+    note: Object.fromEntries(Object.keys(SAYS).map((lang) => [lang, SAYS[lang][form % SAYS[lang].length]({ best: m.best, where: REGION[lang][r], who: COLOUR[lang][c], loss: pts(m.loss) }) + (lang === "en" || lang === "ko" ? " " : "") + lead[lang]])),
   };
 }
 
@@ -140,7 +163,11 @@ export function pick(game, kept, min) {
     if (chosen.length >= want) break;
   }
   const most = Math.max(...chosen.map((c) => c.m.loss));
-  return chosen.map((c) => momentOf(c.m, game.size, c.m.loss === most));
+  // The forms in move order, so the notes of one game differ.
+  return chosen
+    .slice()
+    .sort((a, b) => a.m.n - b.m.n)
+    .map((c, i) => momentOf(c.m, game.size, c.m.loss === most, i));
 }
 
 export function withMoments(classics, report, min) {

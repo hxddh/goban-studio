@@ -196,6 +196,33 @@ lockfile; the platform builds run its toolchain install explicitly, and
 that is hash-checked); Node versions come from `.nvmrc` (24) plus a 24/26
 matrix on pull requests, with `engines` enforced in CI.
 
+## Platform paths and their checks
+
+The page runs in a browser for every interface test, but in the packaged
+app some calls behave differently on each platform. v16.0.0 shipped one
+such difference: macOS answers a fetch of the app's own files with
+status 0 (`local-file.js`). Every path where the platform decides
+something is listed here, with what checks it in the packaged app. A row
+marked *by hand* is in "What people have not verified" below.
+
+| Path | What differs by platform | Checked in the packaged app by |
+| --- | --- | --- |
+| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` (macOS, Windows) |
+| Changing the language | the strings are read from the package | self-test `languages` |
+| The store (`studio.storeRead/List/Write/Remove`, `studio.store`) | durable writes: `F_FULLFSYNC` on macOS, write-through on Windows | Zig tests (`durable.zig`) on both hosts; the self-test reads and writes settings; *by hand*: a power cut |
+| Quitting while the page saves (`studio.flushHook`, `studio.flushDone`) | the window close path | Zig tests; *by hand* |
+| KataGo (`studio.katago*`, `studio.katagoHumanPolicy`) | Metal or Eigen on macOS, AVX2 or plain on Windows, and the fallback | self-test (analysis, handicap move, async, stream, incremental, cancel); *by hand*: speed and fallback on real machines |
+| Optional networks (`studio.model*`) | download, resume, verify, remove | self-test with `GOBAN_SELFTEST_MODELS` |
+| Updates (`studio.updateStatus/Download/Cancel/Apply`, `studio.checkUpdate`) | swap and rollback per platform | updater tests in the release builds; update probe |
+| The native menu bar (`studio.setMenus`) | macOS only; Windows has none | self-test `menus` |
+| Window chrome, theme and drag (`studio.windowChrome/Theme/Drag`) | macOS title bar, Windows frame | screenshot tour (looked at, not asserted); *by hand*: the title bar following light and dark |
+| Open and save dialogs (`studio.openFileDialog`, `studio.saveFileDialog`), reading and writing a chosen file | system dialogs | Zig tests of the file commands; *by hand*: a dialog cannot be driven on CI |
+| Opening a `.sgf` from the system (`studio.takeOpenFiles`, single instance) | Finder and Explorer hand-over | Zig tests; *by hand* |
+| Show data folder (`studio.revealDataDir`), release page (`studio.openReleasePage`) | Finder / Explorer, the default browser | Zig tests; *by hand* |
+| Paste SGF (`navigator.clipboard.readText`) | WebView permission prompts | *by hand* |
+| Sound (`AudioContext`) | WebView autoplay rules | self-test `localFiles` reads a sound; *by hand*: hearing it |
+| Light and dark (`matchMedia`) | follows the system | screenshot tour; *by hand* |
+
 ## What people have not verified
 
 No machine can check these, and none has been done yet:
@@ -234,9 +261,10 @@ No machine can check these, and none has been done yet:
   under the hardened runtime of a Developer ID build. Settings → Engines
   shows the build in use, the fallback reason and the visits per second,
   which is what such a check should record.
-- **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192;
-  the top level and the analysis budget that use it have not been measured
-  again (`docs/strength.md`, "v15").
+- **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192.
+  v16 measured the top level again on 13×13 (`docs/strength.md`, "v16");
+  19×19, 9×9 and the analysis budget (`STRONG_VISIT_SCALE`) have not been
+  measured again, and its speed on real machines is unknown.
 
 ## Dependency notes
 
