@@ -346,6 +346,8 @@ export async function start() {
   expose("__solver", S);
   expose("__autoAnalyse", () => C.autoAnalyse({ offline: true }));
   expose("__crashRender", crashRender);
+  // The packaged self-test's user path (selftest-path.js), run in the browser by scripts/ui-tests/shell-packaged.mjs.
+  expose("__userPath", () => import("../selftest-path.js").then((m) => m.runUserPath()));
   // Component renders, for the render budgets (scripts/ui-tests/shell-renders.mjs).
   if (testHandles()) expose("__renders", renderCounter(options, subscribe));
   render(
