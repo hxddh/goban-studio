@@ -58,11 +58,49 @@ function newId() {
   return Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e6).toString(36);
 }
 
+/** A position as one character per point: b, w or '.'. */
+function pointString(signMap) {
+  return signMap.map((row) => row.map((v) => (v > 0 ? "b" : v < 0 ? "w" : ".")).join("")).join("");
+}
+
 /** Final position as one character per point: b, w or '.'. */
 export function thumbnail(game) {
   const line = game.mainLine();
-  const node = line[line.length - 1];
-  return node.board.signMap.map((row) => row.map((v) => (v > 0 ? "b" : v < 0 ? "w" : ".")).join("")).join("");
+  return pointString(line[line.length - 1].board.signMap);
+}
+
+/** Points on a side of a classic's face: 11 fill 44 px with whole 4 px cells (8 at 2×). */
+export const FACE_SPAN = 11;
+/** Stones the face must hold to read as a fight rather than an empty corner. */
+export const FACE_MIN_STONES = 12;
+
+/**
+ * A classic's face in the Library. Its final position is hundreds of stones
+ * at two pixels a point; instead, the FACE_SPAN-point square around the move
+ * of its first key moment (`moments`, content/classics.js) whose square
+ * holds FACE_MIN_STONES stones, else of its last. { thumb, size, crop:
+ * { x, y, n } } (thumb.js fromString), or the final position uncropped
+ * when no moment is a move of the game.
+ */
+export function classicFace(game, moments = []) {
+  const line = game.mainLine();
+  const size = game.size;
+  const n = Math.min(FACE_SPAN, size);
+  const faces = [];
+  for (const m of moments) {
+    const node = line[m?.index];
+    const mv = node?.move;
+    if (!mv || mv.pass || !(mv.x >= 0 && mv.y >= 0)) continue;
+    const signMap = node.board.signMap;
+    const x = Math.max(0, Math.min(size - n, mv.x - Math.floor(n / 2)));
+    const y = Math.max(0, Math.min(size - n, mv.y - Math.floor(n / 2)));
+    let stones = 0;
+    for (let j = y; j < y + n; j++) for (let i = x; i < x + n; i++) if (signMap[j][i]) stones++;
+    faces.push({ thumb: pointString(signMap), size, crop: { x, y, n }, stones });
+  }
+  const face = faces.find((f) => f.stones >= FACE_MIN_STONES) ?? faces[faces.length - 1];
+  if (!face) return { thumb: thumbnail(game), size, crop: null };
+  return { thumb: face.thumb, size, crop: face.crop };
 }
 
 /** A record's ruleset; anything missing or unknown is Japanese. */

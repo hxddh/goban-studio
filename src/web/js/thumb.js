@@ -9,8 +9,9 @@
  *   thumbCanvas(spec, cssPx, dpr)     a cached canvas, drawn once per
  *                                     (position, size, dpr, palette)
  *
- * A spec is { cols, rows, at(x, y) → "b" | "w" | null }; fromString and
- * fromDiagram make one from the two notations the app stores.
+ * A spec is { cols, rows, at(x, y) → "b" | "w" | null, open? }; fromString
+ * and fromDiagram make one from the two notations the app stores (`open`:
+ * the sides of a cropped board that cut it, see fromString).
  *
  * What is drawn follows the cell size in device pixels, not the board
  * size, so a 19×19 at 40 px stays readable:
@@ -69,9 +70,21 @@ export function thumbPlan(cols, rows, pxDev) {
   };
 }
 
-/** A spec from the history's notation: one character per point, "b", "w" or ".". */
-export function fromString(thumb, size) {
-  return { cols: size, rows: size, at: (x, y) => (thumb[y * size + x] === "b" ? "b" : thumb[y * size + x] === "w" ? "w" : null) };
+/**
+ * A spec from the history's notation: one character per point, "b", "w" or
+ * ".". With `crop` ({ x, y, n }), only the n × n points from (x, y): the
+ * sides that cut the board are `open`, and their lines run off the picture.
+ */
+export function fromString(thumb, size, crop = null) {
+  const at = (x, y) => (thumb[y * size + x] === "b" ? "b" : thumb[y * size + x] === "w" ? "w" : null);
+  if (!crop) return { cols: size, rows: size, at };
+  const { x: cx, y: cy, n } = crop;
+  return {
+    cols: n,
+    rows: n,
+    at: (x, y) => at(cx + x, cy + y),
+    open: { left: cx > 0, top: cy > 0, right: cx + n < size, bottom: cy + n < size },
+  };
 }
 
 /** A spec from a problem diagram: one string per row, X / O stones (solver.js notation). */
@@ -102,17 +115,24 @@ export function drawThumb(ctx, spec, plan, pal, pxDev) {
     const x1 = ox + (cols - 1) * cell + plan.lineOffset;
     const y0 = oy + plan.lineOffset;
     const y1 = oy + (rows - 1) * cell + plan.lineOffset;
+    // A cropped board's cut sides have no edge: their lines run off the picture.
+    const open = spec.open || {};
+    const left = open.left ? 0 : x0 - 0.5;
+    const right = open.right ? pxDev : x1 + 0.5;
+    const top = open.top ? 0 : y0 - 0.5;
+    const bottom = open.bottom ? pxDev : y1 + 0.5;
     for (let y = 0; y < rows; y++) {
-      ctx.moveTo(x0 - 0.5, y0 + y * cell);
-      ctx.lineTo(x1 + 0.5, y0 + y * cell);
+      ctx.moveTo(left, y0 + y * cell);
+      ctx.lineTo(right, y0 + y * cell);
     }
     for (let x = 0; x < cols; x++) {
-      ctx.moveTo(x0 + x * cell, y0 - 0.5);
-      ctx.lineTo(x0 + x * cell, y1 + 0.5);
+      ctx.moveTo(x0 + x * cell, top);
+      ctx.lineTo(x0 + x * cell, bottom);
     }
     ctx.stroke();
   }
-  if (plan.stars) {
+  // Star points belong to a whole board, not to a piece of one.
+  if (plan.stars && !spec.open) {
     ctx.fillStyle = pal.thumb.line;
     for (const a of STARS[cols]) {
       for (const b of STARS[cols]) {
@@ -155,7 +175,8 @@ const CACHE_MAX = 240;
 const cache = new Map();
 
 function specKey(spec) {
-  let s = `${spec.cols}x${spec.rows}:`;
+  const o = spec.open;
+  let s = `${spec.cols}x${spec.rows}${o ? `/${+o.left}${+o.top}${+o.right}${+o.bottom}` : ""}:`;
   for (let y = 0; y < spec.rows; y++) for (let x = 0; x < spec.cols; x++) s += spec.at(x, y) || ".";
   return s;
 }

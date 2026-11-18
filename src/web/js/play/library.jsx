@@ -303,7 +303,7 @@ function Classics() {
         {list.map((g) => (
           <li>
             <button type="button" class={`collection-row ${done[g.id]?.done ? "done" : ""}`} onClick={() => C.openClassic(g.id)}>
-              {C.classicThumb(g.id) ? <Thumb thumb={C.classicThumb(g.id)} size={19} /> : <span class="thumb thumb-wait" aria-hidden="true" />}
+              {C.classicThumb(g.id) ? <Thumb {...C.classicThumb(g.id)} /> : <span class="thumb thumb-wait" aria-hidden="true" />}
               <span class="collection-main">
                 <strong>{C.tx(g.title)}</strong>
                 <span class="muted">

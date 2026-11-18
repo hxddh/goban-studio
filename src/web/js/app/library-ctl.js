@@ -92,7 +92,11 @@ export function clearUnfinished() {
   });
 }
 
-/** A classic's final position (data/games.js thumbnail), once the classics are here; read once each. */
+/**
+ * A classic's face (data/games.js classicFace: the corner of a key moment,
+ * not the crowded final position) as { thumb, size, crop }, once the
+ * classics are here; read once each.
+ */
 const classicThumbs = new Map();
 export function classicThumb(id) {
   if (classicThumbs.has(id)) return classicThumbs.get(id);
@@ -100,7 +104,7 @@ export function classicThumb(id) {
   const c = CLASSICS.find((g) => g.id === id);
   let thumb = null;
   try {
-    if (c?.sgf) thumb = Games.thumbnail(loadSGF(c.sgf).game);
+    if (c?.sgf) thumb = Games.classicFace(loadSGF(c.sgf).game, c.moments);
   } catch (_) {}
   classicThumbs.set(id, thumb);
   return thumb;
