@@ -268,6 +268,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const page = await boot(profile);
     await page.keyboard.press("Control+3");
     await page.waitForSelector(".practice-path .path-row");
+    // The tiles are drawn once the problems part has arrived (content.js); the rows come first.
+    await page.waitForFunction(() => [...document.querySelectorAll('.practice-path .path-row[data-count]')].every((r) => Number(r.dataset.count) <= 1 || r.querySelectorAll(".path-tiles canvas").length >= Math.min(4, Number(r.dataset.count))), null, { timeout: 5000 }).catch(() => {});
     const rows = await page.evaluate(() => [...document.querySelectorAll(".practice-path .path-row")].map((r) => ({ kind: r.dataset.kind, role: r.dataset.role, count: Number(r.dataset.count), title: r.querySelector("strong").innerText, sub: r.querySelector(".gr-text > span").innerText, tiles: r.querySelectorAll(".path-tiles canvas").length })));
     const items = await page.evaluate(() => window.__state.settings.dailySize);
     const probs = rows.filter((r) => r.kind === "problem");
