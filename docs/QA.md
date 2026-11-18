@@ -263,8 +263,8 @@ marked *by hand* is in "What people have not verified" below.
 
 | Path | What differs by platform | Checked in the packaged app by |
 | --- | --- | --- |
-| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` (macOS, Windows) |
-| Changing the language | the strings are read from the package | self-test `languages` |
+| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` and `userPath` (macOS, Windows); Windows: the packaged interface checks |
+| Changing the language | the strings are read from the package | self-test `languages`, `userPath`; Windows: the packaged interface checks (Settings → General) |
 | The store (`studio.storeRead/List/Write/Remove`, `studio.store`) | durable writes: `F_FULLFSYNC` on macOS, write-through on Windows | Zig tests (`durable.zig`) on both hosts; the self-test reads and writes settings; *by hand*: a power cut |
 | Quitting while the page saves (`studio.flushHook`, `studio.flushDone`) | the window close path | Zig tests; *by hand* |
 | KataGo (`studio.katago*`, `studio.katagoHumanPolicy`) | Metal or Eigen on macOS, AVX2 or plain on Windows, and the fallback | self-test (analysis, handicap move, async, stream, incremental, cancel); *by hand*: speed and fallback on real machines |
