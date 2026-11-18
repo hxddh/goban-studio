@@ -255,25 +255,6 @@ jobs:
           exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
           test -n "$exe"
           node scripts/selftest-app.mjs "$exe"
-      - name: interface checks in the packaged app
-        # v17: the user path clicked in the real WebView2 (Playwright over
-        # its DevTools port; scripts/packaged-ui.mjs): the first run, a
-        # language change, a lesson, a problem, a classic, the explorer, a
-        # move and its review. Data, networks and the WebView2 profile go
-        # to a temporary folder.
-        timeout-minutes: 8
-        run: |
-          exe="$(find dist/GobanStudio -name goban-studio.exe | head -n1)"
-          test -n "$exe"
-          node scripts/packaged-ui.mjs "$exe" packaged-ui-windows
-      - name: upload packaged interface report
-        # The steps' report, and the window's page at a failure.
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: packaged-ui-windows
-          path: packaged-ui-windows
-          if-no-files-found: ignore
       - name: updater end-to-end tests (swap with a locked file, rollback, no exit, read-only fallback)
         timeout-minutes: 10
         run: node scripts/test-updater.mjs dist/GobanStudio

@@ -109,8 +109,8 @@ jobs:
           # builds, the packaging scripts, the self-test, the build
           # workflows). v15's release found four faults here that no pull
           # request had run into. v17: and the interface checks run in the
-          # packaged app (scripts/packaged-ui*.mjs, src/web/js/selftest-path.js).
-          if grep -E '^(src/[^/]+\.(zig|m)$|src/web/js/selftest(-path)?\.js$|build\.zig(\.zon)?$|app\.zon$|engine/|packaging/|\.github/workflows/(build-macos|build-windows|release)\.yml$|scripts/(install-engine|make-zip|macos-sign|selftest-app|packaged-ui|packaged-ui-steps|native-sdk|patch-sdk)\.(mjs|py|sh)$)' "$RUNNER_TEMP/files.txt"; then
+          # packaged app (src/web/js/selftest-path.js).
+          if grep -E '^(src/[^/]+\.(zig|m)$|src/web/js/selftest(-path)?\.js$|build\.zig(\.zon)?$|app\.zon$|engine/|packaging/|\.github/workflows/(build-macos|build-windows|release)\.yml$|scripts/(install-engine|make-zip|macos-sign|selftest-app|native-sdk|patch-sdk)\.(mjs|py|sh)$)' "$RUNNER_TEMP/files.txt"; then
             echo "package=true" >> "$GITHUB_OUTPUT"
           else
             echo "package=false" >> "$GITHUB_OUTPUT"

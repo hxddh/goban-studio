@@ -30,7 +30,6 @@ disagrees with the content.
 | Zig unit tests | `npm run test:native` / `native test` | Linux, SDK null platform; macOS and Windows when the shell changes | macOS (both CPUs) and Windows, real platform |
 | Zig build | `zig build` / `native build` | Linux null platform; macOS and Windows ReleaseSafe when the shell changes | `native build -Doptimize=ReleaseSafe` per platform |
 | Packaged-app self-test | `scripts/selftest-app.mjs` | `package-macos`, `package-windows` (below) | each platform, in the real WebView with KataGo |
-| Packaged-app interface checks | `scripts/packaged-ui.mjs` | `package-windows` (below) | Windows, in the real WebView2 |
 | Updater end to end | `scripts/test-updater.mjs` | — | each platform, on the real OS |
 | Native screenshot tour | `scripts/tour-app.mjs` | — | each platform |
 
@@ -45,11 +44,10 @@ Since v16 a pull request that touches what the packages are made of
 `build-macos.yml`, `build-windows.yml`, `release.yml`, or the packaging
 scripts) also runs the release's own builds, `package-macos` (Apple
 Silicon, Metal and Eigen KataGo) and `package-windows` (AVX2 and plain),
-each ending in the packaged app's self-test (and, on Windows, the
-interface checks in the packaged app). No secret is passed, so the
+each ending in the packaged app's self-test. No secret is passed, so the
 packages are unsigned, and nothing is published. All four faults v15's
 release rehearsals found would have failed here. Since v17 the list
-includes `src/web/js/selftest-path.js` and `scripts/packaged-ui*.mjs`.
+includes `src/web/js/selftest-path.js`.
 
 ## The packaged app
 
@@ -78,21 +76,20 @@ review. `report.userPath` has each step's time and what it saw, or what
 it waited for. The start (language, place, sheet, game) is put back. On
 release builds the optional network downloads are checked as well.
 
-**The interface checks in the packaged Windows app**
-(`scripts/packaged-ui.mjs`, after the self-test in `build-windows.yml`)
-launch the app with WebView2's DevTools port open
-(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`) and a
-temporary profile, connect Playwright to it (`chromium.connectOverCDP`:
-the library only, no browser is installed) and click the same path from
-outside, as a person does (`scripts/packaged-ui-steps.mjs`): onboarding;
-Settings → General through 中文, 日本語, 한국어 and English, the sidebar
-following each; a lesson and a problem from Practice; a classic from the
-Library; the openings explorer; New game, 9×9, two players, two moves
-played with the keyboard; Review so far. Each step waits at most 20 s for
-what it should show and fails with what it waited for. The steps' report,
-and the window's page at a failure, are uploaded as the
-`packaged-ui-windows` artifact. WKWebView (macOS) has no such port, which
-is why the self-test walks the path from inside the page there.
+**Driving the packaged Windows app from outside** (`scripts/packaged-ui.mjs`,
+the steps in `scripts/packaged-ui-steps.mjs`: onboarding, Settings →
+General through the four languages, a lesson, a problem, a classic, the
+explorer, a two-player 9×9 game, its review) was meant to run after the
+self-test. It does not run on CI: WebView2 156–157 on GitHub's runner
+ignores both `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` and the
+per-executable `AdditionalBrowserArguments` policy (no
+`--remote-debugging-port` on its command line, while the profile folder
+from `WEBVIEW2_USER_DATA_FOLDER` is used), and passing it through the
+environment options would mean changing the Native SDK's host. The
+self-test's `userPath` walks the same path inside the real WebView on both
+platforms instead. The script stays as a tool for a person on a Windows
+machine where the variable is honoured, and runs against a browser with
+`GOBAN_PACKAGED_UI_BROWSER`.
 
 Both paths also run in the interface gate against the browser build
 (`scripts/ui-tests/shell-packaged.mjs`): the clicked steps on a new
@@ -263,8 +260,8 @@ marked *by hand* is in "What people have not verified" below.
 
 | Path | What differs by platform | Checked in the packaged app by |
 | --- | --- | --- |
-| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` and `userPath` (macOS, Windows); Windows: the packaged interface checks |
-| Changing the language | the strings are read from the package | self-test `languages`, `userPath`; Windows: the packaged interface checks (Settings → General) |
+| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` and `userPath` (macOS, Windows) |
+| Changing the language | the strings are read from the package | self-test `languages`, `userPath` |
 | The store (`studio.storeRead/List/Write/Remove`, `studio.store`) | durable writes: `F_FULLFSYNC` on macOS, write-through on Windows | Zig tests (`durable.zig`) on both hosts; the self-test reads and writes settings; *by hand*: a power cut |
 | Quitting while the page saves (`studio.flushHook`, `studio.flushDone`) | the window close path | Zig tests; *by hand* |
 | KataGo (`studio.katago*`, `studio.katagoHumanPolicy`) | Metal or Eigen on macOS, AVX2 or plain on Windows, and the fallback | self-test (analysis, handicap move, async, stream, incremental, cancel); *by hand*: speed and fallback on real machines |
