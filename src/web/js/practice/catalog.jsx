@@ -10,6 +10,7 @@ import { state } from "../app/store.js";
 import * as C from "../app/controller.js";
 import { DiagramThumb, Icon } from "../app/parts.jsx";
 import { Toolbar } from "../app/chrome.jsx";
+import { unitFace } from "./progress.js";
 
 export const TOPICS = ["capture", "escape", "connect", "life", "kill", "race", "technique", "endgame"];
 
@@ -27,10 +28,10 @@ export function CatalogView() {
   );
 }
 
-/** A unit's face: the first position its lessons show (nothing until the course's part has arrived). */
+/** A unit's face: a position of its lessons with stones enough to read (progress.js unitFace; nothing until the course's part has arrived). */
 function UnitThumb({ unit }) {
-  const step = unit.lessons.flatMap((l) => l.steps || []).find((s) => Array.isArray(s.board?.diagram));
-  return step ? <DiagramThumb diagram={step.board.diagram} size={36} /> : <span class="unit-thumb-wait" aria-hidden="true" />;
+  const diagram = unitFace(unit);
+  return diagram ? <DiagramThumb diagram={diagram} size={36} /> : <span class="unit-thumb-wait" aria-hidden="true" />;
 }
 
 /** A row's progress as a short bar beside its count (the count says it for screen readers). */
