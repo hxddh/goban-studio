@@ -90,6 +90,8 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
+/** True when the run fell back to a preinstalled headless shell (launchInstalled): its layout measures differ from CI's browser. */
+let installedShell = false;
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}).catch((e) => launchInstalled(e));
 
 /**
@@ -106,6 +108,7 @@ async function launchInstalled(error) {
   const exe = shells.map((d) => path.join(dir, d, "chrome-headless-shell-linux64", "chrome-headless-shell")).find((f) => fs.existsSync(f));
   if (!exe) throw error;
   console.log(`# Playwright's own browser is not installed; using ${exe}`);
+  installedShell = true;
   return chromium.launch({ executablePath: exe });
 }
 
@@ -787,7 +790,7 @@ await check("a11y: radio groups take arrow keys, menus give focus back on Esc", 
 // Each area keeps its browser checks in scripts/ui-tests/*.mjs (by area: shell-*, play-*, practice-*).
 for (const f of fs.readdirSync(path.join(root, "scripts/ui-tests")).filter((n) => n.endsWith(".mjs")).sort()) {
   const mod = await import("./ui-tests/" + f);
-  await mod.default({ check, assert, fresh, onboard, firstLanding, clickPoint, pointOf, origin, browser, audit, medianOf });
+  await mod.default({ check, assert, fresh, onboard, firstLanding, clickPoint, pointOf, origin, browser, installedShell, audit, medianOf });
 }
 
 /* ------------------------------------------------------------ visuals */
