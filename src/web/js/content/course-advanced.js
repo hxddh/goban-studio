@@ -158,20 +158,21 @@ const SAN_33 = full([...SAN_B, [15, 9]], [...SAN_W, [16, 16]]);
 // Direction of play: two black star points on the right, two white ones on the left.
 const DIR_READ = full(SAN_B, SAN_W, { marks: labels([5, 2, "A"], [2, 5, "B"]) });
 
-// Urgent before big: a small black group in the lower left corner (the
-// corner five-point shape of the life-and-death unit, seen from Black's
-// side) lives or dies by one move at the 1-1 point. White holds the lower
-// right corner; Black's approach to it (B, R6) is the big point. (With the
-// lower right corner empty, KataGo rated the corner above the group.)
-const URG_GROUP_B = [[0, 16], [1, 16], [1, 17], [2, 17], [3, 17]];
-const URG_GROUP_W = [[0, 15], [1, 15], [2, 15], [2, 16], [3, 16], [4, 16], [4, 17], [4, 18]];
+// Urgent before big: a black group of eleven stones along the lower left
+// edge, walled in by White, lives or dies by one move at the 1-1 point (the
+// corner five-point eye space of the life-and-death unit). White holds the
+// lower right corner; Black's approach to it (B, R6) is the big point. (A
+// five-stone group was not enough: KataGo rated a big point above it, since
+// Black could take two big points while White killed it.)
+const URG_GROUP_B = [[0, 16], [1, 16], [2, 16], [3, 16], [4, 16], [5, 16], [1, 17], [2, 17], [3, 17], [4, 17], [5, 17]];
+const URG_GROUP_W = [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [6, 16], [6, 17], [6, 18], [5, 18], [4, 18]];
 const URG_B = [[15, 3], [13, 2], [16, 9], ...URG_GROUP_B];
 const URG_W = [[3, 3], [5, 2], [3, 9], [15, 15], ...URG_GROUP_W];
 const URGENT = full(URG_B, URG_W);
 const URGENT_READ = full(URG_B, URG_W, { marks: labels([0, 18, "A"], [16, 13, "B"]) });
 const URGENT_DONE = full([...URG_B, [0, 18]], [...URG_W, [9, 2]]);
-// The corner group alone, for the solver (lower left, 7×5).
-const URG_CORNER = flipY(swap(CORNER_FIVE));
+// The corner group alone, for the solver (lower left, 7×5; x: the stones to kill).
+const URG_CORNER = [", , , , , , ,", "O O O O O O O", "x x x x x x O", ". x x x x x O", ". . . . O O O"];
 
 /* -------------------------------------------------- Joseki boards */
 
@@ -522,7 +523,7 @@ export const ADVANCED = [
             kind: "read",
             text: L(
               "挂右下的白角（B）是大场。但左下角里的黑棋还没有活：A这一手决定它的死活。大场值的是目数，急所关系到棋子的死活或者能不能被切断。下棋之前先问一句：有没有哪块棋还不安全？如果有，先补那里。",
-              "Approaching White's lower right corner (B) is a big point. But Black's small group in the lower left corner is not alive yet: A decides whether it lives or dies. Big points are worth points; urgent points decide whether stones live, die or get cut off. Before you take a big point, ask: is anything still unsafe? If so, play there first.",
+              "Approaching White's lower right corner (B) is a big point. But Black's group in the lower left is not alive yet: A decides whether it lives or dies. Big points are worth points; urgent points decide whether stones live, die or get cut off. Before you take a big point, ask: is anything still unsafe? If so, play there first.",
               "오른쪽 아래 백 귀에 걸치는 B는 큰 곳입니다. 하지만 왼쪽 아래 귀의 흑 돌은 아직 살지 못했습니다. A가 그 사활을 결정합니다. 큰 곳은 집의 크기이고, 급한 곳은 돌의 삶과 죽음, 또는 끊기느냐 아니냐가 걸린 곳입니다. 큰 곳을 두기 전에 아직 불안한 돌이 없는지 물어보세요. 있다면 그곳부터 둡니다.",
               "右下の白の隅へのカカリ（B）は大場です。しかし左下の隅の黒はまだ生きていません。Aがその死活を決めます。大場は地の大きさ、急場は石の生き死にや切断がかかった所です。大場を打つ前に、まだ不安な石がないか考えましょう。あればそこが先です。",
             ),
