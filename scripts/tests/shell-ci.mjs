@@ -334,12 +334,35 @@ await test("ci: pull requests that touch what the packages are made of build and
   const filters = [...sh.matchAll(/grep -E '([^']+)'/g)].map((m) => new RegExp(m[1]));
   assert.equal(filters.length, 2);
   const filter = filters[1];
-  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs"]) {
+  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs", "scripts/packaged-ui.mjs", "scripts/packaged-ui-steps.mjs", "src/web/js/selftest-path.js"]) {
     assert.ok(filter.test(hit), `${hit} triggers the packaging checks`);
   }
   for (const miss of ["src/web/js/host.js", "src/web/styles.css", "docs/storage.md", ".github/workflows/checks.yml", ".github/workflows/book.yml", "package.json", "scripts/tests/shell-ci.mjs", "README.md"]) {
     assert.ok(!filter.test(miss), `${miss} does not`);
   }
+});
+
+await test("ci: the packaged Windows app is driven through its user path after its self-test, with the report kept", () => {
+  const build = steps(wf["build-windows.yml"].jobs.build);
+  const names = build.map((s) => s.name);
+  const selftest = names.indexOf("self-test the packaged app");
+  const ui = names.indexOf("interface checks in the packaged app");
+  const upload = names.indexOf("upload packaged interface report");
+  // Right after the self-test (so release builds and the pull requests' package-windows run it), before anything is zipped.
+  assert.ok(selftest >= 0 && ui === selftest + 1 && upload === ui + 1, names.join(" | "));
+  assert.ok(ui < names.indexOf("zip"));
+  const step = build[ui];
+  assert.match(step.run, /node scripts\/packaged-ui\.mjs "\$exe" packaged-ui-windows/);
+  assert.ok(Number(step["timeout-minutes"]) > 0 && Number(step["timeout-minutes"]) <= 10);
+  assert.equal(step["continue-on-error"], undefined, "a failure fails the build");
+  // Playwright's library comes from the lockfile (npm ci); no browser is installed for it.
+  assert.doesNotMatch(runs(wf["build-windows.yml"].jobs.build), /playwright install/);
+  const up = build[upload];
+  assert.equal(up.if, "always()");
+  assert.match(up.uses, /^actions\/upload-artifact@/);
+  assert.deepEqual([up.with.name, up.with.path], ["packaged-ui-windows", "packaged-ui-windows"]);
+  // macOS cannot be driven from outside: its self-test walks the path from inside (check userPath).
+  assert.doesNotMatch(raw["build-macos.yml"], /packaged-ui/);
 });
 
 await test("ci: the Native SDK comes from the lockfile: one exact version, hashed, never installed globally", () => {

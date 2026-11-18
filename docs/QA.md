@@ -13,8 +13,8 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 586 checks in 69 files |
-| Interface tests | `npm run ui-test` | 141 checks, 18 visual baselines |
+| Unit and data tests | `npm test` | 624 checks in 74 files |
+| Interface tests | `npm run ui-test` | 153 checks, 18 visual baselines |
 | Zig tests | `npm run test:native` | 79 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
 <!-- /counts -->
@@ -29,7 +29,8 @@ disagrees with the content.
 | Interface tests | `npm run ui-test` | Chromium on Linux | — (the packaged app has its own checks below) |
 | Zig unit tests | `npm run test:native` / `native test` | Linux, SDK null platform; macOS and Windows when the shell changes | macOS (both CPUs) and Windows, real platform |
 | Zig build | `zig build` / `native build` | Linux null platform; macOS and Windows ReleaseSafe when the shell changes | `native build -Doptimize=ReleaseSafe` per platform |
-| Packaged-app self-test | `scripts/selftest-app.mjs` | — | each platform, in the real WebView with KataGo |
+| Packaged-app self-test | `scripts/selftest-app.mjs` | `package-macos`, `package-windows` (below) | each platform, in the real WebView with KataGo |
+| Packaged-app interface checks | `scripts/packaged-ui.mjs` | `package-windows` (below) | Windows, in the real WebView2 |
 | Updater end to end | `scripts/test-updater.mjs` | — | each platform, on the real OS |
 | Native screenshot tour | `scripts/tour-app.mjs` | — | each platform |
 
@@ -44,9 +45,63 @@ Since v16 a pull request that touches what the packages are made of
 `build-macos.yml`, `build-windows.yml`, `release.yml`, or the packaging
 scripts) also runs the release's own builds, `package-macos` (Apple
 Silicon, Metal and Eigen KataGo) and `package-windows` (AVX2 and plain),
-each ending in the packaged app's self-test. No secret is passed, so the
+each ending in the packaged app's self-test (and, on Windows, the
+interface checks in the packaged app). No secret is passed, so the
 packages are unsigned, and nothing is published. All four faults v15's
-release rehearsals found would have failed here.
+release rehearsals found would have failed here. Since v17 the list
+includes `src/web/js/selftest-path.js` and `scripts/packaged-ui*.mjs`.
+
+## The packaged app
+
+v16.0.0 shipped a fault no check could see: in the packaged macOS app the
+WebView answered `fetch()` of the app's own files with status 0, and the
+language switch, the lessons, problems and classics read on demand, the
+opening book and the sounds all failed, while every interface test passed
+in a browser served over HTTP. Since v17 the packaged app's own interface
+is checked on both platforms.
+
+**The self-test** (`scripts/selftest-app.mjs`, the page side in
+`src/web/js/selftest.js`) launches the packaged app with
+`GOBAN_SELFTEST_OUT` and a temporary profile (`GOBAN_DATA_DIR`,
+`GOBAN_MODELS_DIR`, deleted afterwards) and requires every check of the
+report: the bridge and the shell; KataGo on 9×9 and 19×19, a handicap
+move, analysis off the UI thread (async, stream, incremental, cancel); the
+menus; `localFiles` (every content part, the opening book and a sound read
+from the package); `languages` (each language's strings read and shown in
+the sidebar); and **`userPath`** (`src/web/js/selftest-path.js`): a
+player's first minutes walked with the app's own controller, each step
+read back from the page — the language changed and changed back, the first
+lesson with its first step, the first problem with its goal, the first
+classic in review with its record, the openings explorer with book moves,
+a new two-player 9×9 game with "1 move" after a move, and that game's
+review. `report.userPath` has each step's time and what it saw, or what
+it waited for. The start (language, place, sheet, game) is put back. On
+release builds the optional network downloads are checked as well.
+
+**The interface checks in the packaged Windows app**
+(`scripts/packaged-ui.mjs`, after the self-test in `build-windows.yml`)
+launch the app with WebView2's DevTools port open
+(`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`) and a
+temporary profile, connect Playwright to it (`chromium.connectOverCDP`:
+the library only, no browser is installed) and click the same path from
+outside, as a person does (`scripts/packaged-ui-steps.mjs`): onboarding;
+Settings → General through 中文, 日本語, 한국어 and English, the sidebar
+following each; a lesson and a problem from Practice; a classic from the
+Library; the openings explorer; New game, 9×9, two players, two moves
+played with the keyboard; Review so far. Each step waits at most 20 s for
+what it should show and fails with what it waited for. The steps' report,
+and the window's page at a failure, are uploaded as the
+`packaged-ui-windows` artifact. WKWebView (macOS) has no such port, which
+is why the self-test walks the path from inside the page there.
+
+Both paths also run in the interface gate against the browser build
+(`scripts/ui-tests/shell-packaged.mjs`): the clicked steps on a new
+profile, the self-test's user path in English and Chinese with the start
+put back, and the user path failing at the lesson and explorer steps when
+`content/course.json` and `content/book.json` cannot be read (v16.0.0's
+fault). `GOBAN_PACKAGED_UI_BROWSER=<chromium> node scripts/packaged-ui.mjs`
+runs the Windows script's DevTools connection and steps against
+`frontend/dist` in that Chromium, to check the script without a package.
 
 ## Static checks (`npm run lint`)
 
@@ -171,8 +226,9 @@ macOS and Windows with the real hosts.
    checked against its SHA-256) and a KataGo smoke test, `native validate`,
    `native test`, a ReleaseSafe build, packaging, signing when the secrets
    exist, the packaged self-test in the real WebView (KataGo analysis on
-   9×9 and 19×19, a handicap move, the optional network downloads), the
-   updater tests (swap, rollback, an app that does not quit, the read-only
+   9×9 and 19×19, a handicap move, the app's own files, the languages, the
+   user path, the optional network downloads), on Windows the interface
+   checks in the packaged app, the updater tests (swap, rollback, an app that does not quit, the read-only
    fallback), the screenshot tour, and the archive checks.
 3. **Assemble** (read-only token, no secret): the five packages must
    exist; `SHA256SUMS` is written with a sixth line that names the
