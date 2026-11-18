@@ -73,7 +73,7 @@ await test("explorer: every named line is in the book and named", () => {
   // Lines corrected in make-book.mjs after book.json was last built (the build needs KataGo): the
   // book has the position before their last move, and no position of that name. Once a rebuilt book
   // has them, they are checked like every other line.
-  const awaiting = new Set(["chinese", "high-chinese"]);
+  const awaiting = new Set(); // none since v16's book, which has the Chinese opening
   for (const id of ["whole", "corner"]) {
     const tree = BOOK.trees[id];
     const block = src.slice(src.indexOf(`  ${id}: [`), src.indexOf("],", src.indexOf(`  ${id}: [`)));

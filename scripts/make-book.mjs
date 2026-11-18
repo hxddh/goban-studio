@@ -139,6 +139,8 @@ const LINES = {
     { name: "komoku-attach-draw-back", moves: "R16 P17 Q17 Q16 R17" },
     { name: "komoku-high-approach", moves: "R16 P16" },
     { name: "komoku-high-approach-attach", moves: "R16 P16 P17" },
+    // The knight's move answer and the two-space extension the course teaches (adv-joseki-knight).
+    { name: "komoku-knight-extension", moves: "R16 P17 Q14 M17" },
   ],
 };
 
@@ -170,6 +172,8 @@ const TREES = {
 
 /** Expand a candidate only when it has this share of the visits... */
 const SHARE = Number(arg("share", 0.07));
+/** Per tree (--share-whole, --share-corner); a stronger network spreads its visits over fewer moves. */
+const shareOf = (id) => Number(arg(`share-${id}`, SHARE));
 /** ...and loses at most this many points against KataGo's first choice. */
 const AUTO_LOSS = Number(arg("auto-loss", 3));
 
@@ -385,7 +389,7 @@ async function grow(engine, id, starts, store, { stopBelow = Infinity, label = i
       let taken = 0;
       for (const m of infos) {
         if (taken >= spec.branching(node.depth)) break;
-        if (m.visits < rootVisits * SHARE) continue;
+        if (m.visits < rootVisits * shareOf(id)) continue;
         if (best - s * m.scoreLead > AUTO_LOSS) continue;
         const mv = gtpToXY(m.move);
         const p = decodeMove(mv);

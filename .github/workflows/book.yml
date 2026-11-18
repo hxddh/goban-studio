@@ -36,7 +36,7 @@ env:
   # choices are expanded. Positions the committed book already holds (same
   # network and visits) are reused, not searched again.
   BOOK_ARGS: >-
-    --visits 1000 --max-whole 2200 --max-corner 3200 --share 0.03 --auto-loss 3
+    --visits 1000 --max-whole 2200 --max-corner 3200 --share 0.03 --share-corner 0.015 --auto-loss 3
     --seed-depth-whole 3 --seed-depth-corner 4 --threads 4 --search-threads 2
     --reuse src/web/js/content/book.json
   SHARDS: "16"

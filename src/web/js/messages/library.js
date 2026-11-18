@@ -227,6 +227,7 @@ export const LIBRARY = {
   "explorer.name.corner.star-33-joseki": m("点三三定式", "3-3 invasion joseki", "삼삼 침입 정석", "三々入りの定石"),
   "explorer.name.corner.komoku-attach-draw-back": m("小目·小飞挂·托退", "3-4 point, attach and draw back", "소목 붙여 물러서기", "小目・ツケヒキ"),
   "explorer.name.corner.komoku-high-approach-attach": m("小目·一间高挂·托", "3-4 point, high approach, attachment underneath", "소목 한 칸 높은 걸침·밑붙임", "小目・一間高ガカリ・下ツケ"),
+  "explorer.name.corner.komoku-knight-extension": m("小目·小飞挂·小飞应·拆二", "3-4 point, small knight's approach, knight's move answer, two-space extension", "소목 날일자 걸침·날일자 받기·두 칸 벌림", "小目・小ゲイマガカリ・ケイマ受け・二間ビラキ"),
   "explorer.even": m("形势接近", "about even", "형세가 팽팽함", "ほぼ互角"),
   "explorer.row.whole": m("从空棋盘开始，看常见的开局下法。", "Common openings, from the empty board.", "빈 바둑판에서 시작하는 흔한 포석.", "空の盤から始まる、よくある布石。"),
   "explorer.row.corner": m("星位和小目的常见定式。", "Common joseki of the star point and the 3-4 point.", "화점과 소목의 흔한 정석.", "星と小目のよくある定石。"),

@@ -293,8 +293,10 @@ No machine can check these, and none has been done yet:
   (`docs/problems-audit.md`), not a measurement on people. The corrected
   Chinese opening lesson is among the steps waiting
   (`docs/lesson-audit.md`).
-- **The KataGo audit of the lessons** (`lesson-check`) has not been run
-  since the newest units were written and steps were split.
+- **The lessons KataGo disagrees with** (`docs/lesson-audit.md`, run
+  of 2026-11-18 over the whole course): the toy 9×9 shape boards, the 3-3
+  joseki's connection and adv-open-urgent, whose position does not show
+  its idea, wait for a strong player.
 - **Signed builds.** Until the signing secrets exist, macOS builds are
   ad-hoc signed and Windows builds are unsigned; the release notes say so.
   No update signing key is configured either.
