@@ -29,15 +29,19 @@ steps):
   the stronger network: the toy 9×9 shape and connection boards
   (connect-hanging#1, game-opening#2 and #3, shape-bamboo#1 and #2) and
   joseki-33-white#3. The seventh is new: adv-open-urgent (next entry).
-- **adv-open-urgent: the position does not show its idea.** The lesson
-  says the life of the small black group in the lower left (A, the 1-1
-  point) comes before the empty lower right corner (B). KataGo disagrees
-  in both its steps: the read step's claim (A -36.5, B -31.5 for Black)
-  and the place step (A1 is 5.4 points behind Q3). Five stones in the
-  corner are worth less here than the corner taken first. The idea is
-  sound and the corner shape is proved by the solver; the board needs a
-  bigger group (or a smaller big point) so that the urgent point is also
-  the bigger one. Left for a redesign with a strong player, then a run.
+- **adv-open-urgent was redesigned after this run.** The lesson says the
+  life of the black group in the lower left (A, the 1-1 point) comes
+  before a big point (B). On the board this run checked, KataGo disagreed
+  in both its steps (A1 5.4 points behind the empty corner). A five-stone
+  group is worth less than a big point, since Black can take two while
+  White kills it; taking the corner away or filling the board did not
+  change that (4.2 and 6.1 points behind). The group is now eleven stones
+  along the edge with the same corner eye space (the solver proves: White
+  kills, Black lives only at A1), White holds the lower right corner, and
+  B is Black's approach to it. Checked again with the same network and
+  visits (locally, `--only`): the claim passes (A -58.5, B -60.4), A1 is
+  the best move on the board, and the four approaches of the last step
+  are within 0.9 points of the best.
 - The rule steps (stones-*) are reported only, as before.
 
 ## Method
