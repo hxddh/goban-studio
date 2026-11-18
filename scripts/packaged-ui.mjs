@@ -92,6 +92,21 @@ async function serveDist() {
 
 const port = await freePort();
 let served = null;
+const POLICY_KEY = "HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments";
+let policySet = false;
+/** The WebView2 arguments for this executable, as a per-user policy (Windows only). */
+function setPolicy(args) {
+  if (process.platform !== "win32") return;
+  const r = spawnSync("reg", ["add", POLICY_KEY, "/v", path.basename(exe), "/t", "REG_SZ", "/d", args, "/f"], { encoding: "utf8" });
+  policySet = r.status === 0;
+  console.log(`packaged-ui: WebView2 arguments policy ${policySet ? "set" : "not set: " + (r.stderr || r.stdout).trim()}`);
+}
+function clearPolicy() {
+  if (!policySet) return;
+  spawnSync("reg", ["delete", POLICY_KEY, "/v", path.basename(exe), "/f"], { encoding: "utf8" });
+  policySet = false;
+}
+
 let child;
 if (browserExe) {
   served = await serveDist();
@@ -106,6 +121,11 @@ if (browserExe) {
   };
   // A normal launch: no self-test, tour or updater probe.
   for (const k of ["GOBAN_SELFTEST_OUT", "GOBAN_SELFTEST_MODELS", "GOBAN_TOUR_OUT", "GOBAN_UPDATE_PROBE_OUT", "GOBAN_UPDATE_PROBE_TAG"]) delete env[k];
+  // WebView2 157 on the runner reads the profile folder from the environment
+  // but not the browser arguments (PR #24's run: no --remote-debugging-port
+  // on its command line), so they are also given the documented other way:
+  // the per-executable policy under HKCU, set for this run and removed after.
+  setPolicy(`--remote-debugging-port=${port}`);
   child = spawn(path.resolve(exe), [], { cwd: path.dirname(path.resolve(exe)), env, stdio: "inherit" });
 }
 let exited = null;
@@ -125,6 +145,7 @@ async function stopApp() {
     await sleep(800);
   }
   served?.server.close();
+  clearPolicy();
   fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
 }
 
