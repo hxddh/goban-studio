@@ -160,14 +160,15 @@ const DIR_READ = full(SAN_B, SAN_W, { marks: labels([5, 2, "A"], [2, 5, "B"]) })
 
 // Urgent before big: a small black group in the lower left corner (the
 // corner five-point shape of the life-and-death unit, seen from Black's
-// side) lives or dies by one move at the 1-1 point; the lower right corner
-// is still empty.
+// side) lives or dies by one move at the 1-1 point. White holds the lower
+// right corner; Black's approach to it (B, R6) is the big point. (With the
+// lower right corner empty, KataGo rated the corner above the group.)
 const URG_GROUP_B = [[0, 16], [1, 16], [1, 17], [2, 17], [3, 17]];
 const URG_GROUP_W = [[0, 15], [1, 15], [2, 15], [2, 16], [3, 16], [4, 16], [4, 17], [4, 18]];
 const URG_B = [[15, 3], [13, 2], [16, 9], ...URG_GROUP_B];
-const URG_W = [[3, 3], [5, 2], [3, 9], ...URG_GROUP_W];
+const URG_W = [[3, 3], [5, 2], [3, 9], [15, 15], ...URG_GROUP_W];
 const URGENT = full(URG_B, URG_W);
-const URGENT_READ = full(URG_B, URG_W, { marks: labels([0, 18, "A"], [15, 15, "B"]) });
+const URGENT_READ = full(URG_B, URG_W, { marks: labels([0, 18, "A"], [16, 13, "B"]) });
 const URGENT_DONE = full([...URG_B, [0, 18]], [...URG_W, [9, 2]]);
 // The corner group alone, for the solver (lower left, 7×5).
 const URG_CORNER = flipY(swap(CORNER_FIVE));
@@ -520,10 +521,10 @@ export const ADVANCED = [
           {
             kind: "read",
             text: L(
-              "右下的空角（B）是大场。但左下角里的黑棋还没有活：A这一手决定它的死活。大场值的是目数，急所关系到棋子的死活或者能不能被切断。下棋之前先问一句：有没有哪块棋还不安全？如果有，先补那里。",
-              "The empty lower right corner (B) is a big point. But Black's small group in the lower left corner is not alive yet: A decides whether it lives or dies. Big points are worth points; urgent points decide whether stones live, die or get cut off. Before you take a big point, ask: is anything still unsafe? If so, play there first.",
-              "오른쪽 아래의 빈 귀(B)는 큰 곳입니다. 하지만 왼쪽 아래 귀의 흑 돌은 아직 살지 못했습니다. A가 그 사활을 결정합니다. 큰 곳은 집의 크기이고, 급한 곳은 돌의 삶과 죽음, 또는 끊기느냐 아니냐가 걸린 곳입니다. 큰 곳을 두기 전에 아직 불안한 돌이 없는지 물어보세요. 있다면 그곳부터 둡니다.",
-              "右下の空き隅（B）は大場です。しかし左下の隅の黒はまだ生きていません。Aがその死活を決めます。大場は地の大きさ、急場は石の生き死にや切断がかかった所です。大場を打つ前に、まだ不安な石がないか考えましょう。あればそこが先です。",
+              "挂右下的白角（B）是大场。但左下角里的黑棋还没有活：A这一手决定它的死活。大场值的是目数，急所关系到棋子的死活或者能不能被切断。下棋之前先问一句：有没有哪块棋还不安全？如果有，先补那里。",
+              "Approaching White's lower right corner (B) is a big point. But Black's small group in the lower left corner is not alive yet: A decides whether it lives or dies. Big points are worth points; urgent points decide whether stones live, die or get cut off. Before you take a big point, ask: is anything still unsafe? If so, play there first.",
+              "오른쪽 아래 백 귀에 걸치는 B는 큰 곳입니다. 하지만 왼쪽 아래 귀의 흑 돌은 아직 살지 못했습니다. A가 그 사활을 결정합니다. 큰 곳은 집의 크기이고, 급한 곳은 돌의 삶과 죽음, 또는 끊기느냐 아니냐가 걸린 곳입니다. 큰 곳을 두기 전에 아직 불안한 돌이 없는지 물어보세요. 있다면 그곳부터 둡니다.",
+              "右下の白の隅へのカカリ（B）は大場です。しかし左下の隅の黒はまだ生きていません。Aがその死活を決めます。大場は地の大きさ、急場は石の生き死にや切断がかかった所です。大場を打つ前に、まだ不安な石がないか考えましょう。あればそこが先です。",
             ),
             board: URGENT_READ,
           },
@@ -561,34 +562,34 @@ export const ADVANCED = [
             ),
             problem: { goal: "kill", corner: "bl", diagram: URG_CORNER },
             success: L(
-              "黑棋只剩一只眼。一块棋死掉，比一个空角的损失大得多。",
-              "Black is left with one eye. A dead group costs far more than an empty corner is worth.",
-              "흑은 한 눈뿐입니다. 한 덩어리가 죽는 손해는 빈 귀 하나보다 훨씬 큽니다.",
-              "黒は一眼しかありません。石が死ぬ損は、空き隅一つよりはるかに大きいのです。",
+              "黑棋只剩一只眼。一块棋死掉，比少挂一个角的损失大得多。",
+              "Black is left with one eye. A dead group costs far more than an approach is worth.",
+              "흑은 한 눈뿐입니다. 한 덩어리가 죽는 손해는 걸침 한 수보다 훨씬 큽니다.",
+              "黒は一眼しかありません。石が死ぬ損は、カカリ一手よりはるかに大きいのです。",
             ),
           },
           {
             kind: "place",
             text: L(
-              "黑棋已经活了，白棋在上边拆了一手。现在没有不安全的棋：黑先，占大场。",
-              "Black has lived, and White has extended on the top side. Now nothing is unsafe. Black to play: take the big point.",
-              "흑은 이미 살았고, 백은 위쪽 변에 벌렸습니다. 이제 불안한 돌이 없습니다. 흑 차례, 큰 곳을 차지하세요.",
-              "黒はもう生き、白は上辺に開きました。今は不安な石がありません。黒番です。大場を占めましょう。",
+              "黑棋已经活了，白棋在上边拆了一手。现在没有不安全的棋：黑先，挂右下的白角。",
+              "Black has lived, and White has extended on the top side. Now nothing is unsafe. Black to play: approach White's lower right corner.",
+              "흑은 이미 살았고, 백은 위쪽 변에 벌렸습니다. 이제 불안한 돌이 없습니다. 흑 차례, 오른쪽 아래 백 귀에 걸치세요.",
+              "黒はもう生き、白は上辺に開きました。今は不安な石がありません。黒番です。右下の白の隅にカカりましょう。",
             ),
             board: URGENT_DONE,
             toMove: BLACK,
-            accept: pts([15, 15], [16, 15], [15, 16], [16, 16]),
+            accept: pts([16, 13], [15, 13], [13, 16], [13, 15]),
             success: L(
-              "急所补好之后，最大的就是空角。",
-              "Once the urgent point is settled, the empty corner is the biggest move.",
-              "급한 곳을 해결한 뒤에는 빈 귀가 가장 큽니다.",
-              "急場を打った後は、空き隅がいちばん大きいのです。",
+              "急所补好之后，挂角就是最大的一手。",
+              "Once the urgent point is settled, the approach is the biggest move.",
+              "급한 곳을 해결한 뒤에는 걸침이 가장 큰 수입니다.",
+              "急場を打った後は、カカリがいちばん大きい手です。",
             ),
             wrong: L(
-              "还剩一个空着的角：右下。下在星位、小目或三三。",
-              "One corner is still empty: the lower right. Play on its star point, a 3-4 point or the 3-3 point.",
-              "아직 빈 귀가 하나 있습니다. 오른쪽 아래입니다. 화점, 소목이나 삼삼에 두세요.",
-              "まだ空いている隅が一つあります。右下です。星、小目か三々に打ちましょう。",
+              "挂右下的白角：从右边或下边，小飞挂或一间高挂。",
+              "Approach White's lower right corner from the right side or the bottom: a small knight's or a one-space high approach.",
+              "오른쪽 아래 백 귀에 오른쪽이나 아래쪽에서 걸치세요. 날일자 걸침이나 한 칸 높은 걸침입니다.",
+              "右下の白の隅に、右辺か下辺からカカりましょう。小ゲイマガカリか一間高ガカリです。",
             ),
           },
         ],
