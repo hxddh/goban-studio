@@ -334,12 +334,20 @@ await test("ci: pull requests that touch what the packages are made of build and
   const filters = [...sh.matchAll(/grep -E '([^']+)'/g)].map((m) => new RegExp(m[1]));
   assert.equal(filters.length, 2);
   const filter = filters[1];
-  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs"]) {
+  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs", "src/web/js/selftest-path.js"]) {
     assert.ok(filter.test(hit), `${hit} triggers the packaging checks`);
   }
   for (const miss of ["src/web/js/host.js", "src/web/styles.css", "docs/storage.md", ".github/workflows/checks.yml", ".github/workflows/book.yml", "package.json", "scripts/tests/shell-ci.mjs", "README.md"]) {
     assert.ok(!filter.test(miss), `${miss} does not`);
   }
+});
+
+await test("ci: the packaged app's interface is checked from inside on both platforms, not driven over DevTools", () => {
+  // WebView2 on the runner ignores both WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS and the per-executable
+  // policy (PR #24: no --remote-debugging-port on its command line), so scripts/packaged-ui.mjs is a
+  // tool to run by hand; the self-test's userPath walks the same path in the real WebView on both.
+  for (const f of ["build-windows.yml", "build-macos.yml"]) assert.doesNotMatch(raw[f], /packaged-ui/, f);
+  for (const f of ["build-windows.yml", "build-macos.yml"]) assert.match(raw[f], /node scripts\/selftest-app\.mjs/, f);
 });
 
 await test("ci: the Native SDK comes from the lockfile: one exact version, hashed, never installed globally", () => {

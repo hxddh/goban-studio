@@ -46,11 +46,11 @@ export default async function ({ test, assert, root }) {
   await test("core book: deep and broad enough", () => {
     const whole = book.trees.whole;
     const corner = book.trees.corner;
-    // v16's network (kata1-b18c384nbt) keeps fewer moves within the book's
-    // limits than b15c192 did (whole 2140 → 1963, corner 1734 → 1324, every
-    // position searched): the floors are the book's size, not a target.
+    // kata1-b18c384nbt spreads its visits over fewer moves than b15c192: the
+    // corner tree keeps moves with 1.5% of them (--share-corner, v17), which
+    // brought it back from 1324 to about 1700 positions.
     assert.ok(whole.nodes.length >= 1900, `whole ${whole.nodes.length}`);
-    assert.ok(corner.nodes.length >= 1300, `corner ${corner.nodes.length}`);
+    assert.ok(corner.nodes.length >= 1600, `corner ${corner.nodes.length}`);
     const deepest = (t) => Math.max(...t.nodes.map((n) => n.depth));
     assert.ok(deepest(whole) >= 10, `whole depth ${deepest(whole)}`);
     assert.ok(deepest(corner) >= 14, `corner depth ${deepest(corner)}`);
@@ -71,16 +71,16 @@ export default async function ({ test, assert, root }) {
     assert.equal(replay(corner, j)?.node.name, "star-33-joseki");
     // After the joseki the book still offers a move (usually elsewhere).
     assert.ok(replay(corner, j).continuations.length > 0);
-    // 3-4 point: the low and the high approach each have several good answers
-    // listed (book lines or KataGo candidates within joseki loss), and at least
-    // one of them is a book line.
+    // 3-4 point: the low and the high approach each have several book answers.
     for (const line of [["R16", "P17"], ["R16", "P16"], ["Q16", "R14"]]) {
       const hit = replay(corner, line);
-      const own = hit.continuations.filter((k) => !k.image);
-      assert.ok(own.some((k) => k.inBook), `${line.join(" ")}: a book answer`);
-      const good = own.filter((k) => k.inBook || k.loss <= Book.JOSEKI_LOSS);
-      assert.ok(good.length >= 2, `${line.join(" ")}: ${good.length} good answers`);
+      const own = hit.continuations.filter((k) => k.inBook && !k.image);
+      assert.ok(own.length >= 2, `${line.join(" ")}: ${own.length} book answers`);
     }
+    // The course's knight's move joseki: the two-space extension is a book move within joseki loss.
+    const knight = replay(corner, ["R16", "P17", "Q14"]);
+    const ext = knight.continuations.find((k) => k.x === gtp("M17").x && k.y === gtp("M17").y);
+    assert.ok(ext && ext.inBook && ext.loss <= Book.JOSEKI_LOSS, `M17 after the knight's move: ${JSON.stringify(ext && { inBook: ext.inBook, loss: ext.loss })}`);
     // Pincers lead on into the 3-3 invasion.
     assert.ok(replay(corner, ["Q16", "O17", "M17", "R17"]), "pincer and 3-3");
   });

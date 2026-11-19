@@ -131,7 +131,7 @@ const CLAIMS = {
   "adv-reduce-shoulder#0": [{ type: "better", toMove: 1, what: "the two shoulder hits are about equal", a: [8, 3], b: [10, 3], tol: 1, both: true }],
   "adv-middle-attack-gain#0": [{ type: "better", toMove: 1, what: "A and B are about equal", a: [2, 7], b: [2, 11], tol: 1, both: true }],
   "adv-open-direction#0": [{ type: "better", toMove: 1, what: "the approach from the top (A) is not worse than from the left (B)", a: [5, 2], b: [2, 5], tol: 0.5 }],
-  "adv-open-urgent#0": [{ type: "better", toMove: 1, what: "living in the corner (A) comes before the empty corner (B)", a: [0, 18], b: [15, 15], tol: 0.5 }],
+  "adv-open-urgent#0": [{ type: "better", toMove: 1, what: "living in the corner (A) comes before the approach (B)", a: [0, 18], b: [16, 13], tol: 0.5 }],
   "opening-big-urgent#0": [{ type: "better", toMove: 1, what: "the urgent cutting point comes before the big empty corner", a: [8, 3], b: [15, 15], tol: 0.5 }],
 };
 

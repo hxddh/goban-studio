@@ -241,16 +241,16 @@ export const SHELL = {
 
   "models.title": m("可选下载", "Optional downloads", "선택 다운로드", "追加ダウンロード"),
   "models.intro": m(
-    "不下载也能完整离线使用。下面两项只在你点“下载”后才会从网上获取。",
-    "Everything works offline without these; nothing is downloaded until you choose Download.",
-    "이것들 없이도 오프라인으로 모두 쓸 수 있습니다. ‘다운로드’를 누르기 전에는 아무것도 받지 않습니다.",
-    "これらがなくてもオフラインですべて使えます。「ダウンロード」を押すまで何も取得しません。",
+    "不下载也能完整离线使用；只在你点“下载”后才获取。",
+    "Everything works offline without these; nothing downloads until you choose.",
+    "없어도 오프라인으로 모두 쓸 수 있고, ‘다운로드’를 누를 때만 받습니다.",
+    "なくてもオフラインですべて使えます。「ダウンロード」を押したときだけ取得します。",
   ),
   "models.source": m(
-    "文件来自 KataGo 的官方发布（GitHub、katagotraining.org），使用前会核对校验值。",
-    "Files come from KataGo's official releases (GitHub, katagotraining.org), checked before use.",
-    "파일은 KataGo 공식 배포(GitHub, katagotraining.org)에서 받으며, 사용 전에 검사값을 확인합니다.",
-    "ファイルは KataGo の公式配布（GitHub、katagotraining.org）から取得し、使う前にチェックサムを確認します。",
+    "文件来自 KataGo 官方发布（GitHub、katagotraining.org），使用前核对校验值。",
+    "Official KataGo files (GitHub, katagotraining.org), checked before use.",
+    "KataGo 공식 배포(GitHub, katagotraining.org)에서 받아 사용 전에 검사값을 확인합니다.",
+    "KataGo の公式配布（GitHub、katagotraining.org）から取得し、使う前にチェックサムを確認します。",
   ),
   "models.human.name": m("拟人对手", "Human-style opponent", "사람 같은 상대", "人間らしい相手"),
   "models.human.desc": m(
@@ -281,7 +281,7 @@ export const SHELL = {
   "models.stalled": m("下载停住了。可以停止后重试。", "The download has stalled. Stop it and try again.", "다운로드가 멈췄습니다. 중지한 뒤 다시 시도하세요.", "ダウンロードが止まっています。停止してからもう一度お試しください。"),
   "models.unavailable": m("只有桌面版应用可以下载", "Downloads are available in the desktop app only", "다운로드는 데스크톱 앱에서만 할 수 있습니다", "ダウンロードはデスクトップアプリでのみ行えます"),
   "models.error.DiskFull": m("磁盘空间不足：还需要 {0} MB", "Not enough disk space: {0} MB needed", "디스크 공간이 부족합니다. {0} MB가 필요합니다", "ディスクの空きが足りません。{0} MB 必要です"),
-  "models.error.Network": m("下载中断了。请检查网络后重试，已下载的部分会保留。", "The download was interrupted. Check your connection and try again; what was downloaded is kept.", "다운로드가 끊겼습니다. 연결을 확인하고 다시 시도하세요. 받은 부분은 남아 있습니다.", "ダウンロードが中断しました。接続を確認してもう一度お試しください。取得済みの部分は残ります。"),
+  "models.error.Network": m("网络中断了，已下载的部分会保留。", "Connection lost; what was downloaded is kept.", "연결이 끊겼습니다. 받은 부분은 남아 있습니다.", "接続が切れました。取得済みの部分は残ります。"),
   "models.error.ChecksumMismatch": m("下载的文件与校验值不符，已丢弃。请重试。", "The downloaded file did not match its checksum and was discarded. Try again.", "받은 파일이 검사값과 맞지 않아 버렸습니다. 다시 시도하세요.", "ダウンロードしたファイルがチェックサムと一致しなかったため破棄しました。もう一度お試しください。"),
   "models.error.Busy": m("上一次下载还在收尾，请稍后再试。", "An earlier download is still finishing. Try again in a moment.", "이전 다운로드가 아직 끝나는 중입니다. 잠시 후 다시 시도하세요.", "前のダウンロードがまだ終わっていません。少し待ってからお試しください。"),
   "models.error.NoDataDir": m("找不到应用数据文件夹，无法保存下载。", "The app's data folder is not available, so nothing can be saved.", "앱 데이터 폴더를 찾을 수 없어 저장할 수 없습니다.", "アプリのデータフォルダが見つからないため、保存できません。"),

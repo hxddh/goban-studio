@@ -13,8 +13,8 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 586 checks in 69 files |
-| Interface tests | `npm run ui-test` | 141 checks, 18 visual baselines |
+| Unit and data tests | `npm test` | 624 checks in 74 files |
+| Interface tests | `npm run ui-test` | 153 checks, 18 visual baselines |
 | Zig tests | `npm run test:native` | 79 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
 <!-- /counts -->
@@ -29,7 +29,7 @@ disagrees with the content.
 | Interface tests | `npm run ui-test` | Chromium on Linux | — (the packaged app has its own checks below) |
 | Zig unit tests | `npm run test:native` / `native test` | Linux, SDK null platform; macOS and Windows when the shell changes | macOS (both CPUs) and Windows, real platform |
 | Zig build | `zig build` / `native build` | Linux null platform; macOS and Windows ReleaseSafe when the shell changes | `native build -Doptimize=ReleaseSafe` per platform |
-| Packaged-app self-test | `scripts/selftest-app.mjs` | — | each platform, in the real WebView with KataGo |
+| Packaged-app self-test | `scripts/selftest-app.mjs` | `package-macos`, `package-windows` (below) | each platform, in the real WebView with KataGo |
 | Updater end to end | `scripts/test-updater.mjs` | — | each platform, on the real OS |
 | Native screenshot tour | `scripts/tour-app.mjs` | — | each platform |
 
@@ -46,7 +46,59 @@ scripts) also runs the release's own builds, `package-macos` (Apple
 Silicon, Metal and Eigen KataGo) and `package-windows` (AVX2 and plain),
 each ending in the packaged app's self-test. No secret is passed, so the
 packages are unsigned, and nothing is published. All four faults v15's
-release rehearsals found would have failed here.
+release rehearsals found would have failed here. Since v17 the list
+includes `src/web/js/selftest-path.js`.
+
+## The packaged app
+
+v16.0.0 shipped a fault no check could see: in the packaged macOS app the
+WebView answered `fetch()` of the app's own files with status 0, and the
+language switch, the lessons, problems and classics read on demand, the
+opening book and the sounds all failed, while every interface test passed
+in a browser served over HTTP. Since v17 the packaged app's own interface
+is checked on both platforms.
+
+**The self-test** (`scripts/selftest-app.mjs`, the page side in
+`src/web/js/selftest.js`) launches the packaged app with
+`GOBAN_SELFTEST_OUT` and a temporary profile (`GOBAN_DATA_DIR`,
+`GOBAN_MODELS_DIR`, deleted afterwards) and requires every check of the
+report: the bridge and the shell; KataGo on 9×9 and 19×19, a handicap
+move, analysis off the UI thread (async, stream, incremental, cancel); the
+menus; `localFiles` (every content part, the opening book and a sound read
+from the package); `languages` (each language's strings read and shown in
+the sidebar); and **`userPath`** (`src/web/js/selftest-path.js`): a
+player's first minutes walked with the app's own controller, each step
+read back from the page — the language changed and changed back, the first
+lesson with its first step, the first problem with its goal, the first
+classic in review with its record, the openings explorer with book moves,
+a new two-player 9×9 game with "1 move" after a move, and that game's
+review. `report.userPath` has each step's time and what it saw, or what
+it waited for. The start (language, place, sheet, game) is put back. On
+release builds the optional network downloads are checked as well.
+
+**Driving the packaged Windows app from outside** (`scripts/packaged-ui.mjs`,
+the steps in `scripts/packaged-ui-steps.mjs`: onboarding, Settings →
+General through the four languages, a lesson, a problem, a classic, the
+explorer, a two-player 9×9 game, its review) was meant to run after the
+self-test. It does not run on CI: WebView2 156–157 on GitHub's runner
+ignores both `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` and the
+per-executable `AdditionalBrowserArguments` policy (no
+`--remote-debugging-port` on its command line, while the profile folder
+from `WEBVIEW2_USER_DATA_FOLDER` is used), and passing it through the
+environment options would mean changing the Native SDK's host. The
+self-test's `userPath` walks the same path inside the real WebView on both
+platforms instead. The script stays as a tool for a person on a Windows
+machine where the variable is honoured, and runs against a browser with
+`GOBAN_PACKAGED_UI_BROWSER`.
+
+Both paths also run in the interface gate against the browser build
+(`scripts/ui-tests/shell-packaged.mjs`): the clicked steps on a new
+profile, the self-test's user path in English and Chinese with the start
+put back, and the user path failing at the lesson and explorer steps when
+`content/course.json` and `content/book.json` cannot be read (v16.0.0's
+fault). `GOBAN_PACKAGED_UI_BROWSER=<chromium> node scripts/packaged-ui.mjs`
+runs the Windows script's DevTools connection and steps against
+`frontend/dist` in that Chromium, to check the script without a package.
 
 ## Static checks (`npm run lint`)
 
@@ -171,8 +223,9 @@ macOS and Windows with the real hosts.
    checked against its SHA-256) and a KataGo smoke test, `native validate`,
    `native test`, a ReleaseSafe build, packaging, signing when the secrets
    exist, the packaged self-test in the real WebView (KataGo analysis on
-   9×9 and 19×19, a handicap move, the optional network downloads), the
-   updater tests (swap, rollback, an app that does not quit, the read-only
+   9×9 and 19×19, a handicap move, the app's own files, the languages, the
+   user path, the optional network downloads), on Windows the interface
+   checks in the packaged app, the updater tests (swap, rollback, an app that does not quit, the read-only
    fallback), the screenshot tour, and the archive checks.
 3. **Assemble** (read-only token, no secret): the five packages must
    exist; `SHA256SUMS` is written with a sixth line that names the
@@ -196,6 +249,33 @@ lockfile; the platform builds run its toolchain install explicitly, and
 that is hash-checked); Node versions come from `.nvmrc` (24) plus a 24/26
 matrix on pull requests, with `engines` enforced in CI.
 
+## Platform paths and their checks
+
+The page runs in a browser for every interface test, but in the packaged
+app some calls behave differently on each platform. v16.0.0 shipped one
+such difference: macOS answers a fetch of the app's own files with
+status 0 (`local-file.js`). Every path where the platform decides
+something is listed here, with what checks it in the packaged app. A row
+marked *by hand* is in "What people have not verified" below.
+
+| Path | What differs by platform | Checked in the packaged app by |
+| --- | --- | --- |
+| The app's own files (strings, lessons, problems, classics, the book, sounds) | macOS answers status 0, Windows 200 (`local-file.js`) | self-test `localFiles`, `languages` and `userPath` (macOS, Windows) |
+| Changing the language | the strings are read from the package | self-test `languages`, `userPath` |
+| The store (`studio.storeRead/List/Write/Remove`, `studio.store`) | durable writes: `F_FULLFSYNC` on macOS, write-through on Windows | Zig tests (`durable.zig`) on both hosts; the self-test reads and writes settings; *by hand*: a power cut |
+| Quitting while the page saves (`studio.flushHook`, `studio.flushDone`) | the window close path | Zig tests; *by hand* |
+| KataGo (`studio.katago*`, `studio.katagoHumanPolicy`) | Metal or Eigen on macOS, AVX2 or plain on Windows, and the fallback | self-test (analysis, handicap move, async, stream, incremental, cancel); *by hand*: speed and fallback on real machines |
+| Optional networks (`studio.model*`) | download, resume, verify, remove | self-test with `GOBAN_SELFTEST_MODELS` |
+| Updates (`studio.updateStatus/Download/Cancel/Apply`, `studio.checkUpdate`) | swap and rollback per platform | updater tests in the release builds; update probe |
+| The native menu bar (`studio.setMenus`) | macOS only; Windows has none | self-test `menus` |
+| Window chrome, theme and drag (`studio.windowChrome/Theme/Drag`) | macOS title bar, Windows frame | screenshot tour (looked at, not asserted); *by hand*: the title bar following light and dark |
+| Open and save dialogs (`studio.openFileDialog`, `studio.saveFileDialog`), reading and writing a chosen file | system dialogs | Zig tests of the file commands; *by hand*: a dialog cannot be driven on CI |
+| Opening a `.sgf` from the system (`studio.takeOpenFiles`, single instance) | Finder and Explorer hand-over | Zig tests; *by hand* |
+| Show data folder (`studio.revealDataDir`), release page (`studio.openReleasePage`) | Finder / Explorer, the default browser | Zig tests; *by hand* |
+| Paste SGF (`navigator.clipboard.readText`) | WebView permission prompts | *by hand* |
+| Sound (`AudioContext`) | WebView autoplay rules | self-test `localFiles` reads a sound; *by hand*: hearing it |
+| Light and dark (`matchMedia`) | follows the system | screenshot tour; *by hand* |
+
 ## What people have not verified
 
 No machine can check these, and none has been done yet:
@@ -213,8 +293,10 @@ No machine can check these, and none has been done yet:
   (`docs/problems-audit.md`), not a measurement on people. The corrected
   Chinese opening lesson is among the steps waiting
   (`docs/lesson-audit.md`).
-- **The KataGo audit of the lessons** (`lesson-check`) has not been run
-  since the newest units were written and steps were split.
+- **The lessons KataGo disagrees with** (`docs/lesson-audit.md`, run
+  of 2026-11-18 over the whole course): the toy 9×9 shape boards, the 3-3
+  joseki's connection and adv-open-urgent, whose position does not show
+  its idea, wait for a strong player.
 - **Signed builds.** Until the signing secrets exist, macOS builds are
   ad-hoc signed and Windows builds are unsigned; the release notes say so.
   No update signing key is configured either.
@@ -234,9 +316,10 @@ No machine can check these, and none has been done yet:
   under the hardened runtime of a Developer ID build. Settings → Engines
   shows the build in use, the fallback reason and the visits per second,
   which is what such a check should record.
-- **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192;
-  the top level and the analysis budget that use it have not been measured
-  again (`docs/strength.md`, "v15").
+- **The stronger network (v15).** kata1-b18c384nbt replaces g170e-b15c192.
+  v16 measured the top level again on 13×13 (`docs/strength.md`, "v16");
+  19×19, 9×9 and the analysis budget (`STRONG_VISIT_SCALE`) have not been
+  measured again, and its speed on real machines is unknown.
 
 ## Dependency notes
 

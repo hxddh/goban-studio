@@ -93,12 +93,10 @@ await test("advanced opening: the Chinese opening is Q16, Q3 and R9 — the side
 });
 
 await test("advanced: every opening and joseki step the book knows accepts only book-quality moves", () => {
-  // Steps the book has the position for but no evaluation of the accepted move: KataGo's search
-  // there did not list it, so there is nothing to hold it to. v16's book evaluates the Chinese
-  // opening's side stone (once listed here); after the 3-4 point's low approach and the knight's
-  // move answer it lists only moves elsewhere, not the two-space extension the lesson teaches.
-  // When a rebuilt book lists the move, the exception fails and must go.
-  const unsearched = new Set(["adv-joseki-knight#3"]);
+  // Steps the book has the position for but no evaluation of the accepted move: none since v17's
+  // book, which names the knight's move joseki (make-book.mjs) so its extension is searched. A step
+  // that fails here is listed until a rebuilt book evaluates it.
+  const unsearched = new Set();
   let known = 0;
   for (const id of ["adv-opening", "adv-joseki", "adv-handicap"])
     for (const l of unit(id).lessons)

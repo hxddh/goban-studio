@@ -382,16 +382,20 @@ function usePaletteKey() {
 
 /**
  * Mini board thumbnail from a compact "b/w/." string (one character per
- * point, data/games.js thumbnail). Drawn by the shared renderer (thumb.js)
- * at the size CSS gives the canvas, in the board's colours.
+ * point, data/games.js thumbnail), or the `crop` ({ x, y, n }) of it (a
+ * classic's face, data/games.js classicFace). Drawn by the shared renderer
+ * (thumb.js) at the size CSS gives the canvas, in the board's colours.
  */
-export function Thumb({ thumb, size }) {
+export function Thumb({ thumb, size, crop = null }) {
   const ref = useRef(null);
   const palette = usePaletteKey();
+  // Keyed by the window, not the object.
+  const cropKey = crop ? `${crop.x},${crop.y},${crop.n}` : "";
   useEffect(() => {
     if (!thumb || !size) return;
-    paintThumb(ref.current, thumbFromString(thumb, size), 76);
-  }, [thumb, size, palette]);
+    const [x, y, n] = cropKey ? cropKey.split(",").map(Number) : [];
+    paintThumb(ref.current, thumbFromString(thumb, size, cropKey ? { x, y, n } : null), 76);
+  }, [thumb, size, cropKey, palette]);
   return <canvas ref={ref} class="thumb" aria-hidden="true" />;
 }
 

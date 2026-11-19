@@ -1,6 +1,6 @@
 {
   "name": "goban-studio",
-  "version": "16.0.1",
+  "version": "17.0.0",
   "private": true,
   "type": "module",
   "description": "Goban Studio — learn, play and review Go (围棋 · 바둑 · 囲碁) on macOS and Windows.",
@@ -25,11 +25,11 @@
   "devDependencies": {
     "@native-sdk/cli": "0.11.1",
     "esbuild": "0.28.2",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
     "pixelmatch": "8.0.0",
-    "playwright": "1.65.0",
+    "playwright": "1.65.1",
     "pngjs": "^7.0.0",
     "typescript": "7.0.2"
   },

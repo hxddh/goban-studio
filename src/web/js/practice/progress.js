@@ -10,6 +10,7 @@
  *   gradeBand        the rank band a difficulty stands for (≈)
  *   comesBackIn      "back in about 3 days"
  *   weekParts        this week's line without its zero parts
+ *   unitFace         the position a course unit's row shows
  */
 import { DAY } from "../model/util.js";
 import { GRADE_RANK } from "../model/plan.js";
@@ -156,4 +157,33 @@ export function recentMilestones(list = [], max = 3) {
     .filter((m) => Number.isFinite(m.at) && m.at > 0 && (m.n == null || m.n === top[m.key]))
     .sort((a, b) => b.at - a.at)
     .slice(0, max);
+}
+
+/** The fewest stones a unit's face may hold: fewer reads as an empty board. */
+export const FACE_MIN_STONES = 4;
+
+/** Stones in a diagram (solver.js notation: X / O stones, one string per row). */
+export function diagramStones(diagram) {
+  return diagram.join("").replace(/[^XxOo]/g, "").length;
+}
+
+/**
+ * The diagram a course unit's row shows (the catalog), or null until its
+ * lessons have arrived: the first of its lessons' boards (else, for a unit
+ * of problems only, of its problems) that holds a fair share of stones —
+ * FACE_MIN_STONES, and one per 45 points, so a 19×19 needs 8 — else the
+ * fullest. A unit that opens on three stones in the corners would show an
+ * all but empty board at 36 px.
+ */
+export function unitFace(unit) {
+  const steps = (unit?.lessons || []).flatMap((l) => l.steps || []);
+  const boards = steps.map((s) => s.board?.diagram).filter(Array.isArray);
+  const list = boards.length ? boards : steps.map((s) => s.problem?.diagram).filter(Array.isArray);
+  if (!list.length) return null;
+  const points = (d) => {
+    const rows = d.map((r) => r.replace(/\s+/g, ""));
+    return rows.length * Math.max(0, ...rows.map((r) => r.length));
+  };
+  const enough = (d) => diagramStones(d) >= Math.max(FACE_MIN_STONES, Math.round(points(d) / 45));
+  return list.find(enough) ?? list.reduce((a, b) => (diagramStones(b) > diagramStones(a) ? b : a));
 }

@@ -31,6 +31,10 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), "goban-selftest-"));
 const reportPath = path.join(temp, "report.json");
 const withModels = process.env.GOBAN_SELFTEST_MODELS !== "0";
 const modelsDir = path.join(temp, "models");
+// The self-test's user path (check userPath) plays a game and opens a
+// lesson, a problem and a classic: in a profile of its own, never the
+// runner's or a person's.
+const dataDir = path.join(temp, "data");
 // Below the workflow step's 10-minute limit, so a stall is reported here.
 const timeoutMs = Number(process.env.GOBAN_SELFTEST_TIMEOUT_MS || (withModels ? 480000 : 180000));
 const child = spawn(path.resolve(exe), [], {
@@ -40,6 +44,7 @@ const child = spawn(path.resolve(exe), [], {
     GOBAN_SELFTEST_OUT: reportPath,
     GOBAN_SELFTEST_MODELS: withModels ? "1" : "0",
     GOBAN_MODELS_DIR: modelsDir,
+    GOBAN_DATA_DIR: dataDir,
   },
   stdio: "inherit",
 });
@@ -82,8 +87,9 @@ if (!exited) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
-// The downloaded networks never outlive the test.
+// The downloaded networks and the test's profile never outlive the test.
 fs.rmSync(modelsDir, { recursive: true, force: true });
+fs.rmSync(dataDir, { recursive: true, force: true });
 
 if (quitStuck) {
   console.error("selftest: the packaged app did not quit within 15 s of SIGTERM");
@@ -103,10 +109,14 @@ const failed = Object.entries(checks).filter(([, value]) => value !== true).map(
 // plays in a handicap game. async/stream/incremental/cancel: the search
 // runs off the UI thread (no frame gap ≥ 250 ms), reports partial results,
 // re-syncs a one-move change with one `play`, and stops within 1 s.
+// languages/localFiles: the app's own files read from the package;
+// userPath: a language change, a lesson, a problem, a classic, the
+// explorer, a move and its review, each read back from the page
+// (report.userPath has every step).
 // modelsResume/modelsHuman/modelsStrong/modelsRemove: the pinned
 // downloads stop, resume, verify, run on their own KataGo processes and are
 // removed again.
-const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus"];
+const required = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages", "localFiles", "userPath"];
 if (withModels) required.push("modelsResume", "modelsHuman", "modelsStrong", "modelsRemove");
 const ok = report.ok === true && report.boardSize === 19 && required.every((k) => checks[k] === true) && failed.length === 0 && report.modelsChecked === withModels;
 console.log(JSON.stringify(report, null, 2));

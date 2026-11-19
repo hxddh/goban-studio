@@ -25,6 +25,12 @@
  *   languages             each language's strings are read from the package
  *                         (content/strings-<id>.json) and, chosen as in
  *                         Settings, the sidebar shows that language at once
+ *   userPath              a player's first minutes walked with the app's own
+ *                         controller, each step read back from the page:
+ *                         a language change, a lesson, a problem, a classic,
+ *                         the openings explorer, a move in a new game and
+ *                         its review (selftest-path.js; report.userPath has
+ *                         each step's result). The start is put back after.
  *
  * When the workflow asks for it (GOBAN_SELFTEST_MODELS=1, with
  * GOBAN_MODELS_DIR pointing at an empty temporary folder):
@@ -47,7 +53,7 @@ import { APP_VERSION } from "./version.js";
 import * as Models from "./models.js";
 import { hasNative, nativeInvoke, selftestConfig, setNativeMenus, updateCancel, updateDownload, updateStatus, writeTextFile } from "./host.js";
 
-const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages", "localFiles"];
+export const REQUIRED = ["bridge", "ui", "analyze19", "analyze9", "handicapMove", "async", "stream", "incremental", "cancel", "menus", "languages", "localFiles", "userPath"];
 const MAX_FRAME_GAP_MS = 250;
 const MAX_CANCEL_MS = 1000;
 // The Metal build on a CI runner's virtual GPU can take seconds to finish
@@ -249,6 +255,23 @@ async function languageChecks(checks, report) {
   checks.languages = ok;
 }
 
+/**
+ * The user path (selftest-path.js), after the engine checks: the same
+ * steps scripts/packaged-ui.mjs clicks in the Windows app from outside,
+ * here from inside the page (WKWebView cannot be driven from outside).
+ */
+async function userPathChecks(checks, report) {
+  try {
+    const { runUserPath } = await import("./selftest-path.js");
+    const result = await runUserPath();
+    report.userPath = result.steps;
+    checks.userPath = result.ok;
+  } catch (e) {
+    report.userPath = { error: String(e?.message || e) };
+    checks.userPath = false;
+  }
+}
+
 /** @param {{ state?: any }} [opts] */
 export async function runSelfTest({ state } = {}) {
   if (!hasNative()) return;
@@ -380,6 +403,8 @@ export async function runSelfTest({ state } = {}) {
     checks.cancel = !!(reply && reply.ok === false && reply.cancelled === true && reply.id === id && cancelMs < cancelLimit && validAnalysis(after, 9));
 
     if (cfg.models) await modelChecks(checks, report, cfg);
+    // Last: its review may go on analysing in the background.
+    await userPathChecks(checks, report);
   } catch (error) {
     report.error = String(error?.message || error);
   }

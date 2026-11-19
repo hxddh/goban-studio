@@ -64,7 +64,7 @@ function fakeKataGo() {
   };
 }
 
-export default async function ({ check, assert, fresh, firstLanding, origin }) {
+export default async function ({ check, assert, fresh, firstLanding, origin, installedShell }) {
   /** Someone who has used the app (browser preview), with these settings, at Today. */
   async function seededPage(settings = {}, { locale = "en-US", viewport = { width: 1200, height: 800 }, files = {} } = {}) {
     const page = await fresh(locale, viewport);
@@ -152,6 +152,18 @@ export default async function ({ check, assert, fresh, firstLanding, origin }) {
       }
       const top = seen.reduce((a, b) => (b.px > a.px ? b : a));
       const engines = seen.filter((x) => x.where.endsWith(" engines")).reduce((a, b) => (b.px > a.px ? b : a));
+      // Engines at its fullest is the pane that grows when a status or a
+      // reason gets wordier, so with larger text it keeps 40 px of its room
+      // to spare. The same pane measures about 44 px less on the
+      // preinstalled headless shell that a machine without Playwright's own
+      // browser falls back to (ui-test.mjs launchInstalled), so the budget
+      // is set per browser: 40 px under the room on Playwright's own
+      // browser, as in CI (v17: about 509 of 563 px), and 480 px on the
+      // fallback shell (v17: 465 px), which keeps the same margin there.
+      if (large) {
+        const budget = installedShell ? 480 : engines.room - 40;
+        assert(engines.px <= budget, `Engines with larger text: ${engines.px} px of content, over its budget of ${budget} px (${engines.where}); shorten the wording or tighten the rows`);
+      }
       return `tallest content ${top.px} px in ${top.room} px, ${top.where}; Engines ${engines.px} px, ${engines.where}`;
     });
   }

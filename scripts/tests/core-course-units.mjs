@@ -4,6 +4,7 @@
  */
 import { test, COURSE, S, assert } from "./helpers.mjs";
 import { FOCUS_LESSONS } from "../../src/web/js/model/player.js";
+import { FACE_MIN_STONES, diagramStones, unitFace } from "../../src/web/js/practice/progress.js";
 
 const unit = (id) => COURSE.find((u) => u.id === id);
 const lesson = (id) => COURSE.flatMap((u) => u.lessons).find((l) => l.id === id);
@@ -190,4 +191,18 @@ await test("ko: the boards really hold a ko and the threat really threatens", ()
   // Every ko problem is proved.
   for (const id of ["ko-count", "ko-resolve"])
     for (const st of lesson(id).steps.filter((s) => s.kind === "problem")) assert.ok(S.validate(S.createPuzzle(st.problem)).ok, id);
+});
+
+await test("units: every unit's row shows a position with stones enough to read, the opening unit a real opening", () => {
+  assert.equal(COURSE.length, 23);
+  for (const u of COURSE) {
+    const face = unitFace(u);
+    assert.ok(face, `${u.id}: no position to show`);
+    assert.ok(diagramStones(face) >= FACE_MIN_STONES, `${u.id}: ${diagramStones(face)} stones`);
+  }
+  // Its first board is three stones in three corners; the face is a whole-board opening further on.
+  const opening = unitFace(unit("opening"));
+  assert.equal(opening.length, 19);
+  assert.ok(diagramStones(opening) >= 8, `opening: ${diagramStones(opening)} stones`);
+  assert.equal(unitFace({ lessons: [] }), null, "nothing before the lessons arrive");
 });

@@ -3,7 +3,8 @@
  * decisions (thumb.js) — the parts that need no canvas. What they look
  * like on screen is checked in scripts/ui-tests/shell-board.mjs.
  */
-import { test, assert, fs, path, root } from "./helpers.mjs";
+import { test, assert, fs, path, root, CLASSICS, loadSGF } from "./helpers.mjs";
+import { FACE_MIN_STONES, FACE_SPAN, classicFace } from "../../src/web/js/data/games.js";
 import { BOARD_PALETTES, BOARD_STYLES, boardPalette, contrast, luminance } from "../../src/web/js/theme.js";
 import { GRID_MIN, RIM_MIN, STAR_MIN, drawThumb, fromDiagram, fromString, thumbPlan } from "../../src/web/js/thumb.js";
 import { TALL_RATIO, frameAspect, gridRatioOf, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "../../src/web/js/board-surface.js";
@@ -226,4 +227,65 @@ await test("thumbnails: both notations give the same picture, rims are drawn und
   // No grid is stroked when the cells are too small for one.
   assert.ok(!draw(fromString(".".repeat(361), 19), 40, boardPalette()).some((c) => c[0] === "stroke"));
   assert.ok(draw(fromString(".".repeat(361), 19), 80, boardPalette()).some((c) => c[0] === "stroke" && c[2] === 1), "one device pixel");
+});
+
+await test("thumbnails: a crop shows its window of the board, its cut sides run off the picture, and it has no star points", () => {
+  // 19×19 with a black stone at (10, 12) and a white one at (18, 18).
+  const full = ".".repeat(361).split("");
+  full[12 * 19 + 10] = "b";
+  full[18 * 19 + 18] = "w";
+  const spec = fromString(full.join(""), 19, { x: 8, y: 8, n: 11 });
+  assert.deepEqual([spec.cols, spec.rows], [11, 11]);
+  assert.equal(spec.at(2, 4), "b");
+  assert.equal(spec.at(10, 10), "w");
+  assert.deepEqual(spec.open, { left: true, top: true, right: false, bottom: false });
+  assert.equal(fromString(full.join(""), 19).open, undefined, "a whole board is closed");
+  // Record where the grid lines start and end.
+  const lines = (sp, px) => {
+    const pts = [];
+    const ctx = { fillRect: () => {}, beginPath: () => {}, stroke: () => {}, fill: () => {}, arc: () => pts.push(["arc"]), moveTo: (x, y) => pts.push(["from", x, y]), lineTo: (x, y) => pts.push(["to", x, y]) };
+    drawThumb(ctx, sp, thumbPlan(sp.cols, sp.rows, px), boardPalette(), px);
+    return pts;
+  };
+  const px = 88;
+  const pts = lines(spec, px);
+  const plan = thumbPlan(11, 11, px);
+  const edge = plan.ox + plan.lineOffset;
+  // Open left and top: the first row's line starts at the picture's edge; closed right and bottom: they stop at the last line.
+  assert.deepEqual(pts[0], ["from", 0, edge]);
+  assert.deepEqual(pts[1], ["to", edge + 10 * plan.cell + 0.5, edge]);
+  // A 9×9 window at a size with star points would draw a 9×9 board's; a crop draws none.
+  const nine = fromString(full.join(""), 19, { x: 4, y: 4, n: 9 });
+  const big = thumbPlan(9, 9, 200);
+  assert.ok(big.stars);
+  assert.equal(lines(nine, 200).filter((p) => p[0] === "arc").length, 1, "the one black stone, no star points");
+});
+
+await test("thumbnails: a classic's face is a window around a key moment with stones enough to read, not its crowded final position", () => {
+  assert.ok(CLASSICS.length >= 20);
+  for (const c of CLASSICS) {
+    const { game } = loadSGF(c.sgf);
+    const face = classicFace(game, c.moments);
+    assert.equal(face.size, 19, c.id);
+    assert.ok(face.crop, `${c.id}: cropped`);
+    assert.equal(face.crop.n, FACE_SPAN);
+    const spec = fromString(face.thumb, face.size, face.crop);
+    let stones = 0;
+    for (let y = 0; y < spec.rows; y++) for (let x = 0; x < spec.cols; x++) if (spec.at(x, y)) stones++;
+    assert.ok(stones >= FACE_MIN_STONES, `${c.id}: ${stones} stones`);
+    // The position of one of its moments, inside the board.
+    const line = game.mainLine();
+    assert.ok(
+      c.moments.some((m) => line[m.index]?.board && fromString(face.thumb, 19).at(line[m.index].move.x, line[m.index].move.y)),
+      `${c.id}: a key moment's move is on it`,
+    );
+    assert.ok(face.crop.x >= 0 && face.crop.y >= 0 && face.crop.x + FACE_SPAN <= 19 && face.crop.y + FACE_SPAN <= 19, c.id);
+  }
+  // A record without moments keeps its final position, whole.
+  const { game } = loadSGF("(;SZ[9];B[cc];W[gg])");
+  const whole = classicFace(game, []);
+  assert.equal(whole.crop, null);
+  assert.equal(whole.size, 9);
+  assert.equal(whole.thumb.length, 81);
+  assert.deepEqual([whole.thumb[2 * 9 + 2], whole.thumb[6 * 9 + 6]], ["b", "w"]);
 });
