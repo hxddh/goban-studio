@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Goban Studio for Windows: the per-user installer (WiX Toolset v5).
+
+  Built by scripts/make-msi.mjs from the packaged folder (dist/GobanStudio,
+  the same files as GobanStudio-Windows-x64.zip), in build-windows.yml:
+
+    wix build packaging/windows/GobanStudio.wxs -arch x64
+      -d Version=<package.json version> -bindpath App=dist/GobanStudio
+      -ext WixToolset.Util.wixext.dll -o GobanStudio-Windows-x64.msi
+
+  What it does, for the current user only (no administrator prompt):
+    - copies the package into %LOCALAPPDATA%\Programs\Goban Studio
+      (the layout the in-app updater swaps: <root>\bin\goban-studio.exe and
+      <root>\resources\..., src/install_apply.zig installRootFromExe);
+    - adds a Start menu shortcut;
+    - opens .sgf files with Goban Studio (the ProgId the zip's
+      install\register-file-types.ps1 uses, so both agree);
+    - shows Goban Studio, with its version and icon, in Apps & Features.
+
+  Uninstalling removes all of it, and the whole install folder, including
+  files the in-app updater or WebView2 put there (RemoveFolderEx). The
+  player's games and settings are not in it: they are under
+  %LOCALAPPDATA%\dev.hxddh.gobanstudio (docs/storage.md) and stay.
+
+  The UpgradeCode never changes: a newer installer replaces the installed
+  version (MajorUpgrade). scripts/tests/shell-installer.mjs checks this
+  file.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="Goban Studio" Manufacturer="Goban Studio" Version="$(var.Version)" UpgradeCode="049F0542-01C3-4E23-B802-35EF798E2AFC" Scope="perUser" Language="1033" Compressed="yes">
+    <SummaryInformation Description="Goban Studio: learn, play and review Go" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Goban Studio is already installed." AllowSameVersionUpgrades="yes" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Apps & Features -->
+    <Icon Id="GobanStudio.ico" SourceFile="!(bindpath.App)\app-icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="GobanStudio.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/hxddh/goban-studio" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/hxddh/goban-studio/issues" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" />
+
+    <!-- Where the previous install put its folder, for RemoveFolderEx on uninstall. -->
+    <Property Id="GOBAN_INSTALLFOLDER">
+      <RegistrySearch Id="GobanInstallFolder" Root="HKCU" Key="Software\Goban Studio" Name="InstallFolder" Type="raw" />
+    </Property>
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="UserProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Goban Studio" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- The package as it is in the zip, every file. -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="!(bindpath.App)\**" />
+    </ComponentGroup>
+
+    <!-- The install folder is remembered, and removed whole on uninstall. -->
+    <Component Id="InstallFolderCleanup" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKCU" Key="Software\Goban Studio" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      <RemoveFolder Id="RemoveUserProgramsFolder" Directory="UserProgramsFolder" On="uninstall" />
+      <util:RemoveFolderEx On="uninstall" Property="GOBAN_INSTALLFOLDER" />
+    </Component>
+
+    <!-- Start menu -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="GobanStudioShortcut" Name="Goban Studio" Description="Learn, play and review Go" Target="[INSTALLFOLDER]bin\goban-studio.exe" WorkingDirectory="INSTALLFOLDER" Icon="GobanStudio.ico" />
+        <RegistryValue Root="HKCU" Key="Software\Goban Studio" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- .sgf opens with Goban Studio: "<exe>" "%1", an absolute path the app
+         hands to the copy already running (src/instance.zig). -->
+    <Component Id="SgfAssociation" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKCU" Key="Software\Classes\.sgf" Type="string" Value="dev.hxddh.gobanstudio.GogamerecordSGF" />
+      <RegistryValue Root="HKCU" Key="Software\Classes\.sgf" Name="Content Type" Type="string" Value="application/x-go-sgf" />
+      <!-- In "Open with" even when the person chose another app for .sgf;
+           Windows reads only the name (WiX refuses an empty Value). -->
+      <RegistryValue Root="HKCU" Key="Software\Classes\.sgf\OpenWithProgids" Name="dev.hxddh.gobanstudio.GogamerecordSGF" Type="string" Value="Goban Studio" />
+      <RegistryKey Root="HKCU" Key="Software\Classes\dev.hxddh.gobanstudio.GogamerecordSGF" ForceDeleteOnUninstall="yes">
+        <RegistryValue Type="string" Value="Go game record (SGF)" KeyPath="yes" />
+        <RegistryValue Name="FriendlyTypeName" Type="string" Value="Go game record (SGF)" />
+        <RegistryValue Key="DefaultIcon" Type="string" Value="[INSTALLFOLDER]app-icon.ico" />
+        <RegistryValue Key="shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]bin\goban-studio.exe&quot; &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <Feature Id="Main" Title="Goban Studio" AllowAbsent="no">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="InstallFolderCleanup" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="SgfAssociation" />
+    </Feature>
+  </Package>
+</Wix>

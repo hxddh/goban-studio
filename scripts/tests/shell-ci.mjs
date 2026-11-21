@@ -237,7 +237,7 @@ await test("ci: signing secrets reach only the steps that sign", () => {
   }
   const holders = (f) => allSteps(wf[f]).filter((s) => JSON.stringify(s.env || {}).includes("secrets.")).map((s) => s.name);
   assert.deepEqual(holders("build-macos.yml"), ["signing mode", "import Developer ID certificate", "notarize and staple the app", "notarize and staple the dmg"]);
-  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and the KataGo builds"]);
+  assert.deepEqual(holders("build-windows.yml"), ["signing mode", "Authenticode-sign goban-studio.exe and the KataGo builds", "Authenticode-sign the installer"]);
   assert.deepEqual(holders("release.yml"), ["sign SHA256SUMS"]);
 });
 
@@ -334,7 +334,7 @@ await test("ci: pull requests that touch what the packages are made of build and
   const filters = [...sh.matchAll(/grep -E '([^']+)'/g)].map((m) => new RegExp(m[1]));
   assert.equal(filters.length, 2);
   const filter = filters[1];
-  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/macos-sign.sh", "scripts/selftest-app.mjs", "src/web/js/selftest-path.js"]) {
+  for (const hit of ["src/net.zig", "src/engine_build.zig", "src/macos_open.m", "src/web/js/selftest.js", "build.zig", "build.zig.zon", "app.zon", "engine/README.md", "packaging/README-macOS.txt", ".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml", ".github/workflows/release.yml", "scripts/install-engine.mjs", "scripts/make-zip.py", "scripts/make-msi.mjs", "scripts/test-msi.mjs", "packaging/windows/GobanStudio.wxs", "scripts/macos-sign.sh", "scripts/selftest-app.mjs", "src/web/js/selftest-path.js"]) {
     assert.ok(filter.test(hit), `${hit} triggers the packaging checks`);
   }
   for (const miss of ["src/web/js/host.js", "src/web/styles.css", "docs/storage.md", ".github/workflows/checks.yml", ".github/workflows/book.yml", "package.json", "scripts/tests/shell-ci.mjs", "README.md"]) {
@@ -473,11 +473,12 @@ await test("ci: SHA256SUMS names its release, is signed when the key exists, and
   assert.deepEqual(rel.jobs.sign.needs, ["preflight", "assemble"]);
   const sums = steps(rel.jobs.assemble).find((s) => s.name === "checksums");
   assert.equal(sums.env.TAG, "${{ inputs.tag }}");
-  // The sixth line binds the signed bytes to the tag (src/install_verify.zig sumsBinding).
+  // The last line (the seventh: four macOS packages, the Windows zip and
+  // installer, VERSION) binds the signed bytes to the tag (src/install_verify.zig sumsBinding).
   assert.match(sums.run, /^printf '%s\\n' "\$TAG" > VERSION$/m);
   assert.match(sums.run, /^sha256sum VERSION >> SHA256SUMS$/m);
-  assert.match(sums.run, /test "\$\(wc -l < SHA256SUMS\)" -eq 6/);
-  assert.ok(sums.run.indexOf("sha256sum VERSION >> SHA256SUMS") > sums.run.indexOf("GobanStudio-Windows-x64.zip"), "after the packages");
+  assert.match(sums.run, /test "\$\(wc -l < SHA256SUMS\)" -eq 7/);
+  assert.ok(sums.run.indexOf("sha256sum VERSION >> SHA256SUMS") > sums.run.indexOf("GobanStudio-Windows-x64.msi"), "after the packages");
   const sign = steps(rel.jobs.sign).find((s) => s.name === "sign SHA256SUMS");
   assert.equal(sign.env.UPDATE_SIGNING_KEY, "${{ secrets.UPDATE_SIGNING_KEY }}");
   assert.match(sign.run, /^\s*node scripts\/sign-sums\.mjs$/m);
@@ -536,6 +537,17 @@ await test("ci: downloaded and built third-party code is pinned", () => {
   // The AVX2 build sits beside the plain one, with the same DLLs (src/engine_build.zig).
   assert.match(dl, /cmp "\$dll" "engine\/windows\/\$\(basename "\$dll"\)"/);
   assert.match(dl, /cp "\$RUNNER_TEMP\/katago-avx2\/katago\.exe" engine\/windows\/katago-avx2\.exe/);
+  // The WiX Toolset: two NuGet packages at one exact version, checked
+  // before they are unpacked, run from there; nothing comes from a feed.
+  assert.equal(win.env.WIX_URL, "https://api.nuget.org/v3-flatcontainer/wix/5.0.2/wix.5.0.2.nupkg");
+  assert.equal(win.env.WIX_SHA256, "f30ef0c74e2a986126539c5780be93ac24e8136eaf723b1937b26272703ae173");
+  assert.equal(win.env.WIX_UTIL_URL, "https://api.nuget.org/v3-flatcontainer/wixtoolset.util.wixext/5.0.2/wixtoolset.util.wixext.5.0.2.nupkg");
+  assert.equal(win.env.WIX_UTIL_SHA256, "dda1cc1b4d3b2305b1246f167c6af6fcded5000be84b3bbff3dda4f442bf4740");
+  const wix = steps(win.jobs.build).find((s) => s.name === "download the WiX Toolset").run;
+  assert.ok(wix.indexOf('"$WIX_SHA256  wix.nupkg" | sha256sum -c') > 0, "wix checked");
+  assert.ok(wix.indexOf('"$WIX_UTIL_SHA256  wix-util.nupkg" | sha256sum -c') > 0, "Util extension checked");
+  assert.ok(wix.lastIndexOf("sha256sum -c") < wix.indexOf("python -m zipfile -e"), "checked before it is unpacked");
+  for (const f of files) assert.doesNotMatch(raw[f], /dotnet tool install|wix extension add|choco install|winget install/, `${f}: no tool from a feed`);
   const mac = wf["build-macos.yml"];
   assert.equal(mac.env.KATAGO_COMMIT, "92ee95c0a4b25fec214da00951ab69e97e207729");
   const kg = steps(mac.jobs.build).find((s) => s.name === "build KataGo Eigen sidecar").run;
@@ -562,6 +574,65 @@ await test("ci: downloaded and built third-party code is pinned", () => {
     assert.match(wf[f].env.KATAGO_SHA256, /^[0-9a-f]{64}$/, f);
     assert.match(raw[f], /echo "\$KATAGO_SHA256  katago\.zip" \| sha256sum -c -/, f);
   }
+});
+
+await test("ci: the Windows build makes an installer from the packaged folder and installs, updates and uninstalls it", () => {
+  const job = wf["build-windows.yml"].jobs.build;
+  const names = steps(job).map((s) => s.name || `${s.uses.split("@")[0]} ${s.with?.name || ""}`.trim());
+  const at = (n) => {
+    const k = names.indexOf(n);
+    assert.ok(k >= 0, `step ${n}`);
+    return k;
+  };
+  const order = ["self-test the packaged app", "updater end-to-end tests (swap with a locked file, rollback, no exit, read-only fallback)", "remove WebView2 test profile", "zip", "download the WiX Toolset", "installer (MSI)", "Authenticode-sign the installer", "installer end to end (install, self-test, .sgf, in-app update, upgrade, uninstall)", "actions/upload-artifact GobanStudio-Windows-x64", "actions/upload-artifact GobanStudio-Windows-x64-msi"];
+  order.forEach((n, k) => k && assert.ok(at(order[k - 1]) < at(n), `${order[k - 1]} before ${n}`));
+  const byName = (n) => steps(job)[at(n)];
+  // From the same folder as the zip, at package.json's version (scripts/make-msi.mjs); a second one a patch higher for the upgrade test.
+  const make = byName("installer (MSI)").run;
+  assert.match(make, /^node scripts\/make-msi\.mjs dist\/GobanStudio dist\/GobanStudio-Windows-x64\.msi$/m);
+  assert.match(make, /node scripts\/make-msi\.mjs dist\/GobanStudio "\$RUNNER_TEMP\/msi-upgrade\/GobanStudio-upgrade-test\.msi" --version "\$next"/);
+  assert.match(byName("download the WiX Toolset").run, /echo "WIX_DLL=\$RUNNER_TEMP\/wix\/tools\/net6\.0\/any\/wix\.dll" >> "\$GITHUB_ENV"/);
+  // Signed exactly when the app is, before it is tested.
+  const sign = byName("Authenticode-sign the installer");
+  assert.equal(sign.if, "${{ steps.mode.outputs.mode == 'authenticode' }}");
+  assert.match(sign.run, /signtool\.FullName verify \/pa \/v \$msi/);
+  assert.match(sign.run, /Remove-Item -Force \$pfx/);
+  // Installed, used and removed on the runner.
+  const e2e = byName("installer end to end (install, self-test, .sgf, in-app update, upgrade, uninstall)");
+  assert.equal(e2e.run, 'node scripts/test-msi.mjs dist/GobanStudio-Windows-x64.msi dist/GobanStudio "$RUNNER_TEMP/msi-upgrade/GobanStudio-upgrade-test.msi"');
+  assert.ok(Number(e2e["timeout-minutes"]) <= 20);
+  const t = fs.readFileSync(path.join(root, "scripts/test-msi.mjs"), "utf8");
+  for (const said of ['msiexec(["/i", msi]', 'msiexec(["/x", current]', '"/qn"', 'runNode("selftest-app.mjs", [exe]', 'runNode("test-updater.mjs", [pkg, "--installed", installDir])', '"cmd.exe", ["/d", "/c", "start"', 'msiexec(["/i", upgrade]']) assert.ok(t.includes(said), `test-msi.mjs: ${said}`);
+  assert.match(t, /assert\.equal\(fs\.existsSync\(installDir\), false, `\$\{installDir\} is removed whole`\)/);
+  assert.match(t, /assert\.equal\(regKeyExists\(`HKCU\\\\Software\\\\Classes\\\\\$\{PROG_ID\}`\), false/);
+  assert.match(t, /assert\.equal\(arp\[0\]\.context, 2, "a per-user install \(no administrator\)"\)/);
+  // The updater's --installed mode runs the probe and the swap on that folder itself.
+  const u = fs.readFileSync(path.join(root, "scripts/test-updater.mjs"), "utf8");
+  assert.match(u, /await swapTest\(installed, path\.dirname\(installed\), tempDir\("swap-installed"\)\);/);
+  assert.match(u, /await swapTest\(install\(apps\), apps, dir\);/, "the zip's swap test is the same test");
+  // Uploaded next to the zip; the release downloads both into dist-windows.
+  const up = steps(job).filter((s) => s.uses?.startsWith("actions/upload-artifact@") && /^GobanStudio-Windows-x64/.test(s.with.name));
+  assert.deepEqual(
+    up.map((s) => [s.with.name, s.with.path]),
+    [
+      ["GobanStudio-Windows-x64", "dist/GobanStudio-Windows-x64.zip"],
+      ["GobanStudio-Windows-x64-msi", "dist/GobanStudio-Windows-x64.msi"],
+    ],
+  );
+  const rel = wf["release.yml"];
+  for (const n of ["assemble", "publish"]) {
+    const dl = steps(rel.jobs[n]).filter((s) => s.uses?.startsWith("actions/download-artifact@") && /^GobanStudio-Windows/.test(s.with.name || ""));
+    assert.deepEqual(
+      dl.map((s) => [s.with.name, s.with.path]),
+      [
+        ["GobanStudio-Windows-x64", "dist-windows"],
+        ["GobanStudio-Windows-x64-msi", "dist-windows"],
+      ],
+      n,
+    );
+  }
+  assert.match(runs(rel.jobs.assemble), /^test -s dist-windows\/GobanStudio-Windows-x64\.msi$/m);
+  assert.match(steps(rel.jobs.publish).find((s) => s.name === "publish").run, /^\s+dist-windows\/GobanStudio-Windows-x64\.msi$/m);
 });
 
 await test("ci: bot commits carry no stale session trailer", () => {

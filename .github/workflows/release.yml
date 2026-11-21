@@ -1,7 +1,7 @@
 name: release
 
 # One complete release: all content, every desktop package (macOS Apple
-# Silicon, macOS Intel, Windows x64) and the 19x19 KataGo sidecar must be
+# Silicon, macOS Intel, Windows x64 zip and installer) and the 19x19 KataGo sidecar must be
 # green before a tag or release exists.
 on:
   workflow_dispatch:
@@ -121,6 +121,10 @@ jobs:
           path: dist-windows
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: GobanStudio-Windows-x64-msi
+          path: dist-windows
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
           name: signing-status-macos
           path: signing
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -170,6 +174,7 @@ jobs:
           test -s dist-macos/GobanStudio-macOS-x64.zip
           test -s dist-macos/GobanStudio-macOS-x64.dmg
           test -s dist-windows/GobanStudio-Windows-x64.zip
+          test -s dist-windows/GobanStudio-Windows-x64.msi
           ls -lh dist-macos dist-windows
       - name: checksums
         env:
@@ -177,9 +182,10 @@ jobs:
         run: |
           set -euo pipefail
           # The in-app updater checks the .zip it downloads against this
-          # file's line for that exact name.
+          # file's line for that exact name; the installer (.msi) is listed
+          # for people checking their download.
           (cd dist-macos && sha256sum GobanStudio-macOS-arm64.zip GobanStudio-macOS-arm64.dmg GobanStudio-macOS-x64.zip GobanStudio-macOS-x64.dmg) > SHA256SUMS
-          (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip) >> SHA256SUMS
+          (cd dist-windows && sha256sum GobanStudio-Windows-x64.zip GobanStudio-Windows-x64.msi) >> SHA256SUMS
           # The sums name the release they are for: VERSION holds the tag
           # and a newline, and its line here is covered by the signature.
           # An app refuses sums whose VERSION is not the tag it asked for
@@ -188,7 +194,7 @@ jobs:
           printf '%s\n' "$TAG" > VERSION
           sha256sum VERSION >> SHA256SUMS
           cat SHA256SUMS
-          test "$(wc -l < SHA256SUMS)" -eq 6
+          test "$(wc -l < SHA256SUMS)" -eq 7
           sha256sum -c --ignore-missing SHA256SUMS
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -279,6 +285,10 @@ jobs:
           path: dist-windows
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: GobanStudio-Windows-x64-msi
+          path: dist-windows
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
           name: checksums
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -314,6 +324,7 @@ jobs:
             dist-macos/GobanStudio-macOS-x64.zip
             dist-macos/GobanStudio-macOS-x64.dmg
             dist-windows/GobanStudio-Windows-x64.zip
+            dist-windows/GobanStudio-Windows-x64.msi
             SHA256SUMS
             VERSION
           )

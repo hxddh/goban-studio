@@ -32,6 +32,15 @@ env:
   KATAGO_SHA256: 074485cf150c38aa3bb14ac9f54f2952ffefbceb44673709bbb8a83650bf95d6
   KATAGO_AVX2_URL: https://github.com/lightvector/KataGo/releases/download/v1.18.1/katago-v1.18.1-eigenavx2-windows-x64.zip
   KATAGO_AVX2_SHA256: 0d62ffa41ee04dd89dd1b80fe45e306c837231cb1e2dccb4f5780d0ca7c313db
+  # The WiX Toolset that builds the installer (scripts/make-msi.mjs): the
+  # NuGet packages of the `wix` command-line tool and its Util extension,
+  # pinned by their SHA-256 (the bytes NuGet's catalog lists for 5.0.2),
+  # checked before they are unpacked and run with `dotnet` from there:
+  # nothing is installed from a feed.
+  WIX_URL: https://api.nuget.org/v3-flatcontainer/wix/5.0.2/wix.5.0.2.nupkg
+  WIX_SHA256: f30ef0c74e2a986126539c5780be93ac24e8136eaf723b1937b26272703ae173
+  WIX_UTIL_URL: https://api.nuget.org/v3-flatcontainer/wixtoolset.util.wixext/5.0.2/wixtoolset.util.wixext.5.0.2.nupkg
+  WIX_UTIL_SHA256: dda1cc1b4d3b2305b1246f167c6af6fcded5000be84b3bbff3dda4f442bf4740
 
 jobs:
   build:
@@ -336,10 +345,75 @@ jobs:
           print(f"zip entries: {len(names)}; forward slashes; Unix modes present")
           PY
           ls -lh dist
+      - name: download the WiX Toolset
+        run: |
+          set -euo pipefail
+          curl -L --fail -sS --retry 5 --retry-all-errors -o "$RUNNER_TEMP/wix.nupkg" "$WIX_URL"
+          curl -L --fail -sS --retry 5 --retry-all-errors -o "$RUNNER_TEMP/wix-util.nupkg" "$WIX_UTIL_URL"
+          (cd "$RUNNER_TEMP" && echo "$WIX_SHA256  wix.nupkg" | sha256sum -c -)
+          (cd "$RUNNER_TEMP" && echo "$WIX_UTIL_SHA256  wix-util.nupkg" | sha256sum -c -)
+          python -m zipfile -e "$RUNNER_TEMP/wix.nupkg" "$RUNNER_TEMP/wix"
+          python -m zipfile -e "$RUNNER_TEMP/wix-util.nupkg" "$RUNNER_TEMP/wix-util"
+          echo "WIX_DLL=$RUNNER_TEMP/wix/tools/net6.0/any/wix.dll" >> "$GITHUB_ENV"
+          echo "WIX_UTIL_EXT=$RUNNER_TEMP/wix-util/wixext5/WixToolset.Util.wixext.dll" >> "$GITHUB_ENV"
+          test -f "$RUNNER_TEMP/wix/tools/net6.0/any/wix.dll"
+          test -f "$RUNNER_TEMP/wix-util/wixext5/WixToolset.Util.wixext.dll"
+          dotnet "$RUNNER_TEMP/wix/tools/net6.0/any/wix.dll" --version
+      - name: installer (MSI)
+        # From the same packaged folder as the zip (packaging/windows/GobanStudio.wxs).
+        # The second installer, one patch version higher, exists only for
+        # the upgrade test below and is not uploaded.
+        run: |
+          set -euo pipefail
+          node scripts/make-msi.mjs dist/GobanStudio dist/GobanStudio-Windows-x64.msi
+          next="$(node -p 'const [a, b, c] = require("./package.json").version.split(".").map(Number); `${a}.${b}.${c + 1}`')"
+          node scripts/make-msi.mjs dist/GobanStudio "$RUNNER_TEMP/msi-upgrade/GobanStudio-upgrade-test.msi" --version "$next"
+          ls -lh dist/GobanStudio-Windows-x64.msi
+      - name: Authenticode-sign the installer
+        if: ${{ steps.mode.outputs.mode == 'authenticode' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $pfx = Join-Path $env:RUNNER_TEMP "goban-cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+          try {
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+              Where-Object { $_.FullName -match "\\x64\\" } | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signtool) { throw "signtool.exe not found in the Windows SDK" }
+            $msi = (Resolve-Path dist/GobanStudio-Windows-x64.msi).Path
+            & $signtool.FullName sign /fd sha256 /f $pfx /p $env:WINDOWS_CERT_PASSWORD `
+              /tr http://timestamp.digicert.com /td sha256 /d "Goban Studio" $msi
+            if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
+            & $signtool.FullName verify /pa /v $msi
+            if ($LASTEXITCODE -ne 0) { throw "signtool verify failed for $msi" }
+            $sig = Get-AuthenticodeSignature $msi
+            Write-Host "$msi : $($sig.Status) — $($sig.SignerCertificate.Subject) — timestamp: $($sig.TimeStamperCertificate.Subject)"
+            if ($sig.Status -ne "Valid") { throw "signature on $msi is $($sig.Status)" }
+            if (-not $sig.TimeStamperCertificate) { throw "signature on $msi has no timestamp" }
+          } finally {
+            Remove-Item -Force $pfx -ErrorAction SilentlyContinue
+          }
+      - name: installer end to end (install, self-test, .sgf, in-app update, upgrade, uninstall)
+        # Per-user and silent: msiexec /i … /qn, the installed app's
+        # self-test, an .sgf opened through the shell, the update helper
+        # swapping the installed folder, the newer installer replacing this
+        # one, then msiexec /x … /qn leaving no file, shortcut or registry
+        # entry behind (scripts/test-msi.mjs).
+        timeout-minutes: 15
+        env:
+          WEBVIEW2_USER_DATA_FOLDER: ${{ runner.temp }}\goban-webview2-msi
+        run: node scripts/test-msi.mjs dist/GobanStudio-Windows-x64.msi dist/GobanStudio "$RUNNER_TEMP/msi-upgrade/GobanStudio-upgrade-test.msi"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: GobanStudio-Windows-x64
           path: dist/GobanStudio-Windows-x64.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: GobanStudio-Windows-x64-msi
+          path: dist/GobanStudio-Windows-x64.msi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signing-status-windows
