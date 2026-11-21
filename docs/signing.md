@@ -66,7 +66,11 @@ on `bin\goban-studio.exe`, `…\engine\windows\katago.exe` and
 `Valid`, with a timestamp). The `.pfx` is written to `$RUNNER_TEMP` and
 deleted in a `finally` block. `WebView2Loader.dll` and the MSVC runtime
 DLLs are already signed by Microsoft; `libcrypto-3-x64.dll` from the KataGo
-release is left as shipped.
+release is left as shipped. The installer, `GobanStudio-Windows-x64.msi`,
+is built afterwards from those signed files and signed the same way in a
+step of its own (*Authenticode-sign the installer*), before it is
+installed and tested; without the secrets it is unsigned, like the app,
+and the notes' two Windows rows say so.
 
 ## macOS: what to obtain
 
@@ -196,6 +200,7 @@ expected and is what its release notes describe.
 ```powershell
 Get-AuthenticodeSignature .\GobanStudio\bin\goban-studio.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
 Get-AuthenticodeSignature (Get-ChildItem -Recurse -Filter katago*.exe .\GobanStudio).FullName | Format-List Path, Status
+Get-AuthenticodeSignature .\GobanStudio-Windows-x64.msi | Format-List Status, SignerCertificate, TimeStamperCertificate
 # Status : Valid, with a TimeStamperCertificate
 ```
 
@@ -212,7 +217,7 @@ read them: *signing mode* (which checks that all five exist), *import
 Developer ID certificate*, and the two notarization steps (the Apple ID
 trio). Signing with the imported identity needs no secret. In
 `build-windows.yml` the two Windows secrets reach only *signing mode* and
-the Authenticode step. The build workflows run with a read-only
+the two Authenticode steps (the app, then the installer). The build workflows run with a read-only
 `GITHUB_TOKEN` and have no job that writes to a release: a package reaches
 a release only through `release.yml`, which checksums and signs all of them
 together. (Earlier versions had an `upload` job that could replace one

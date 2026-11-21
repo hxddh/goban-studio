@@ -1,11 +1,21 @@
 Goban Studio for Windows
 =======================
 
-Unzip the download anywhere you can write to (for example your user
-folder) and run bin\goban-studio.exe. There is no installer. The app
-needs the Microsoft Edge WebView2 runtime, which is preinstalled on
-Windows 10 and 11. The bundled KataGo engine starts the first time it is
-needed.
+There are two downloads with the same app inside:
+
+  GobanStudio-Windows-x64.msi  the installer (recommended). It installs
+      for your Windows user only, without an administrator prompt, into
+      %LOCALAPPDATA%\Programs\Goban Studio, adds Goban Studio to the
+      Start menu, opens .sgf files with it, and lists it in Settings >
+      Apps (Apps & Features), where you can uninstall it.
+
+  GobanStudio-Windows-x64.zip  the portable copy. Unzip it anywhere you
+      can write to (for example your user folder) and run
+      bin\goban-studio.exe. Nothing is registered with Windows.
+
+The app needs the Microsoft Edge WebView2 runtime, which is preinstalled
+on Windows 10 and 11. The bundled KataGo engine starts the first time it
+is needed.
 
 This build is not Authenticode-signed. Windows SmartScreen may show
 "Windows protected your PC"; choose "More info" and then "Run anyway".
@@ -36,8 +46,9 @@ The optional KataGo networks you download are beside them, in
 Explorer address bar to open the folder.
 
 None of this is inside the app folder, so updating keeps it, whether the
-app updates itself or you replace the app folder with a newer one by hand.
-There is nothing to copy. To move your data to another computer, use
+app updates itself, you run a newer installer, or you replace the app
+folder with a newer one by hand. Uninstalling keeps it too. There is
+nothing to copy. To move your data to another computer, use
 Export backup and Restore from backup in Settings.
 
 The folder bin\goban-studio.exe.WebView2 that appears inside the app
@@ -54,15 +65,25 @@ does not start. A download that is interrupted continues where it stopped.
 Keep the folder somewhere you can write to (for example under your user
 folder, not C:\Program Files); otherwise the app offers the download page.
 
+This works the same way for the installed app: it replaces its folder in
+%LOCALAPPDATA%\Programs\Goban Studio. Settings > Apps keeps showing the
+version that was installed with the installer until you run a newer
+installer, which you can do at any time: it replaces the installed copy,
+whichever version it is now. Uninstalling removes it either way.
+
 Uninstalling
 ------------
-Delete the app folder. Your data and any downloaded networks stay where
-they are (see "Your data"); to remove them as well, delete
+Installed with the installer: uninstall Goban Studio in Settings > Apps.
+This removes the app folder, the Start menu entry and the .sgf
+registration. The portable copy: delete the app folder.
+
+Your data and any downloaded networks stay where they are (see "Your
+data"); to remove them as well, delete
 
   %LOCALAPPDATA%\dev.hxddh.gobanstudio
 
-If you registered .sgf files (below), also remove the two registry keys
-named there.
+If you registered .sgf files for the portable copy (below), also remove
+the two registry keys named there.
 
 Windows on ARM: this x64 build runs under Windows 11's x64 emulation,
 KataGo included. There is no native ARM64 build (KataGo publishes no ARM64
@@ -70,7 +91,12 @@ Windows binary).
 
 SGF files
 ---------
-To open .sgf files by double-click, run this once from the app folder:
+The installer registers .sgf files. If Windows asks which app to use, or
+another app opens them, choose Goban Studio under "Open with" (Windows
+keeps the choice you made there).
+
+For the portable copy, to open .sgf files by double-click, run this once
+from the app folder:
 
   powershell -ExecutionPolicy Bypass -File install\register-file-types.ps1
 

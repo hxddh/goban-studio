@@ -31,6 +31,7 @@ disagrees with the content.
 | Zig build | `zig build` / `native build` | Linux null platform; macOS and Windows ReleaseSafe when the shell changes | `native build -Doptimize=ReleaseSafe` per platform |
 | Packaged-app self-test | `scripts/selftest-app.mjs` | `package-macos`, `package-windows` (below) | each platform, in the real WebView with KataGo |
 | Updater end to end | `scripts/test-updater.mjs` | — | each platform, on the real OS |
+| Windows installer end to end | `scripts/test-msi.mjs` (built by `scripts/make-msi.mjs`) | `package-windows` | Windows: install per user, self-test the installed app, open an `.sgf` through the shell, in-app update of the installed folder, upgrade by a newer installer, uninstall leaving nothing |
 | Native screenshot tour | `scripts/tour-app.mjs` | — | each platform |
 
 "When the shell changes" is the `native-hosts` job: a pull request that

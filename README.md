@@ -59,15 +59,17 @@ Downloads are on the [releases page](https://github.com/hxddh/goban-studio/relea
 | --- | --- | --- |
 | macOS 13 or later (Apple Silicon) | `GobanStudio-macOS-arm64.dmg` or `.zip` | Drag the app to Applications and open it from there. macOS says it cannot verify the app: close the message, then on macOS 15 or later go to System Settings → Privacy & Security → **Open Anyway**; on macOS 14 or earlier right-click the app → Open. |
 | macOS 13 or later (Intel) | `GobanStudio-macOS-x64.dmg` or `.zip` | As for Apple Silicon. |
-| Windows (x64) | `GobanStudio-Windows-x64.zip` | Unzip it and run `bin\goban-studio.exe`. If SmartScreen appears: More info → Run anyway. WebView2 is preinstalled on Windows 10 and 11. |
+| Windows (x64) | `GobanStudio-Windows-x64.msi` (installer, recommended) | Double-click to install for your Windows user, no administrator needed: Start menu entry, `.sgf` files open in Goban Studio, uninstall from Settings → Apps. If SmartScreen appears: More info → Run anyway. WebView2 is preinstalled on Windows 10 and 11. |
+| Windows (x64), portable | `GobanStudio-Windows-x64.zip` | Unzip it anywhere you can write to and run `bin\goban-studio.exe`. Nothing is registered with Windows; opening `.sgf` files by double-click needs one command from the package README. |
 
 **The builds are not code-signed.** macOS builds are ad-hoc signed and not
 notarized, and Windows builds are not Authenticode-signed, until the
 certificates described in [`docs/signing.md`](docs/signing.md) exist.
 Each release's notes, and the README inside each download, are written
 from what that build's signing steps actually did, so they are the place
-to look. There is no Windows installer: the download is a zip, and opening
-`.sgf` files by double-click needs one command from the package README.
+to look. Both Windows downloads hold the same app and update themselves
+in place; the installer puts it in `%LOCALAPPDATA%\Programs\Goban Studio`
+(details in [`packaging/README-Windows.txt`](packaging/README-Windows.txt)).
 `SHA256SUMS` is attached to every release.
 
 **Windows on ARM:** use the x64 package. Windows 11 on ARM runs it, KataGo
@@ -283,7 +285,10 @@ gh workflow run release.yml -f tag=v17.0.0 -f rehearse=true   # every gate and b
 The tag must be `v` + the version in `package.json`, its notes must exist
 as `.github/release-notes/<tag>.md`, and it must not be published
 already. Each build runs the packaged app's self-test in the real WebView
-with KataGo, the updater tests on the real OS and a screenshot tour.
+with KataGo, the updater tests on the real OS and a screenshot tour; the
+Windows build also builds the installer (WiX, `packaging/windows/`) and
+installs, self-tests, updates, upgrades and uninstalls it
+(`scripts/test-msi.mjs`).
 
 Signing `SHA256SUMS` happens in a job of its own in the protected
 environment `release-signing`, which the repository owner creates once
