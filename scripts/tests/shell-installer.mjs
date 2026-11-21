@@ -173,10 +173,8 @@ await test("installer: the version is package.json's, and fits an MSI ProductVer
   assert.equal(args[args.indexOf("-bindpath") + 1], "App=dist/GobanStudio");
   assert.equal(args[args.indexOf("-ext") + 1], "util.dll");
   assert.equal(args.at(-1), "out.msi");
-  assert.deepEqual(
-    args.filter((a, k) => args[k - 1] === "-sice"),
-    Msi.SUPPRESSED_ICES,
-  );
+  // WiX v5's build takes no -sice (and runs no ICE validation): the first run on Windows refused it.
+  assert.ok(!args.includes("-sice"), "no -sice for wix build");
   for (const ok of ["1.0.0", "255.255.65535", "17.0.0"]) assert.equal(Msi.msiVersion(ok), ok);
   for (const bad of ["256.0.0", "1.256.0", "1.0.65536", "1.0", "v1.0.0", "1.0.0-rc.1", "1.0.0.1"]) assert.throws(() => Msi.msiVersion(bad), /version|ProductVersion/i, bad);
   // The CLI defaults to package.json's version and refuses a package that says otherwise.

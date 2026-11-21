@@ -24,15 +24,14 @@ export const MSI_NAME = "GobanStudio-Windows-x64.msi";
 export const INSTALL_SUBDIR = ["Programs", "Goban Studio"];
 /** The ProgId the zip's install\register-file-types.ps1 registers too. */
 export const PROG_ID = "dev.hxddh.gobanstudio.GogamerecordSGF";
-/**
- * ICE checks that do not fit a per-user package harvested with <Files>:
- * every file is its own component with the file as its key path (ICE38,
- * ICE64, ICE91 expect a per-user registry key path and a RemoveFile row
- * per folder; the folder is removed whole by RemoveFolderEx instead), and
- * ICE61 warns about AllowSameVersionUpgrades (reinstalling a version
- * replaces it, wanted).
+/*
+ * WiX v5's `wix build` runs no ICE validation (that is `wix msi validate`, a
+ * separate command we do not run), and takes no -sice: nothing to suppress.
+ * The checks that would not fit this package (ICE38, ICE64, ICE91 for a
+ * per-user package harvested with <Files> whose folder RemoveFolderEx
+ * removes whole; ICE61 for AllowSameVersionUpgrades) are therefore not run;
+ * scripts/test-msi.mjs installs, upgrades and uninstalls the package instead.
  */
-export const SUPPRESSED_ICES = ["ICE38", "ICE61", "ICE64", "ICE91"];
 
 /** Files the installer needs from the package (and the shortcut, icon and association point at). */
 export const REQUIRED_FILES = ["bin/goban-studio.exe", "app-icon.ico", "resources/frontend/dist/index.html", "resources/frontend/dist/build-info.json"];
@@ -66,7 +65,6 @@ export function wixArgs({ pkgDir, out, version, utilExt, wxs = path.join(root, W
     `App=${pkgDir}`,
     "-ext",
     utilExt,
-    ...SUPPRESSED_ICES.flatMap((ice) => ["-sice", ice]),
     "-o",
     out,
   ];
