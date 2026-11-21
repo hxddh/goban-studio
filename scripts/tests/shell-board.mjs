@@ -9,32 +9,52 @@ import { BOARD_PALETTES, BOARD_STYLES, boardPalette, contrast, luminance } from 
 import { GRID_MIN, RIM_MIN, STAR_MIN, drawThumb, fromDiagram, fromString, thumbPlan } from "../../src/web/js/thumb.js";
 import { TALL_RATIO, frameAspect, gridRatioOf, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "../../src/web/js/board-surface.js";
 
-await test("board palettes: the dark board is the same wood under a lamp — dimmer, as warm — and stones part from it in every palette", () => {
+/** An rgba() colour laid over an opaque "#RRGGBB" one, as "#RRGGBB" (what a line or a coordinate looks like on the wood). */
+function over(rgba, base) {
+  const m = String(rgba).match(/rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+  if (!m) return rgba;
+  const a = Number(m[4]);
+  const b = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16));
+  return "#" + [1, 2, 3].map((k, i) => Math.round(Number(m[k]) * a + b[i] * (1 - a)).toString(16).padStart(2, "0")).join("");
+}
+
+await test("board palettes: pale kaya, and in the dark theme the same light wood a little dimmer, so stones, lines and coordinates read as well as by day", () => {
   assert.deepEqual(BOARD_STYLES, ["standard", "contrast"]);
   const light = boardPalette({ dark: false });
   const dark = boardPalette({ dark: true });
   assert.equal(boardPalette(), light, "the default is the light standard board");
   assert.equal(boardPalette({ style: "ink" }), light, "an unknown style is the standard board");
-  // Dimmer: under half the light board's luminance, and well under the page's light surfaces.
-  assert.ok(luminance(light.base) > 0.55, `light ${luminance(light.base)}`);
-  assert.ok(luminance(dark.base) < 0.3 && luminance(dark.base) > 0.12, `dark ${luminance(dark.base)}`);
-  // The same wood: a warm brown (red over green over blue) that keeps its saturation, so it does not turn grey.
+  assert.equal(light.base, "#E6C487", "pale kaya (the owner's choice for v18)");
+  // A warm wood with colour in it, not a sand grey: red over green over blue and some saturation.
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const sat = (hex) => {
     const [r, g, b] = rgb(hex);
     return (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b);
   };
-  const [r, g, b] = rgb(dark.base);
-  assert.ok(r > g && g > b, "warm");
-  assert.ok(sat(dark.base) >= sat(light.base), "at least as saturated as the light board");
-  // Sprites are kept (not another material); white is barely toned down; black parts by contrast alone.
+  for (const p of [light, dark]) {
+    const [r, g, b] = rgb(p.base);
+    assert.ok(r > g && g > b, `${p.key}: warm`);
+    assert.ok(sat(p.base) >= 0.38, `${p.key}: saturation ${sat(p.base).toFixed(2)}`);
+  }
+  // The dark board is light wood, only dimmer: 60–90 % of the light board's luminance (0.69 is about 13 % less
+  // lightness to the eye); the room around it is dark.
+  const ratio = luminance(dark.base) / luminance(light.base);
+  assert.ok(ratio >= 0.6 && ratio <= 0.9, `dark/light luminance ${ratio.toFixed(2)}`);
+  // Stones, lines and coordinates: black stands at 7:1 or more on both boards (WCAG's highest level; the muddy dark
+  // board of v15–v17 is what this keeps out).
+  const blackOn = (p) => contrast(p.stone.black.fill, p.base);
+  assert.ok(blackOn(light) >= 7 && blackOn(dark) >= 7, `black ${blackOn(light).toFixed(1)} / ${blackOn(dark).toFixed(1)}`);
+  for (const p of [light, dark]) {
+    assert.ok(contrast(over(p.line, p.base), p.base) >= 4.5, `${p.key}: lines ${contrast(over(p.line, p.base), p.base).toFixed(1)}:1`);
+    assert.ok(contrast(over(p.text, p.base), p.base) >= 4.5, `${p.key}: coordinates ${contrast(over(p.text, p.base), p.base).toFixed(1)}:1`);
+    // The edges barely darken: no muddy vignette.
+    assert.ok(Number(p.vignette.match(/([\d.]+)\)$/)[1]) <= 0.06, `${p.key}: vignette`);
+    for (const tone of Object.values(p.tones)) assert.ok(contrast(tone, p.base) >= 3, `${p.key}: signal ${tone}`);
+  }
+  // Sprites are kept; white is barely toned down at night; black parts by contrast alone.
   assert.equal(dark.sprites, true);
-  assert.ok(dark.whiteDim > 0 && dark.whiteDim <= 0.08, `whiteDim ${dark.whiteDim}`);
+  assert.ok(dark.whiteDim > 0 && dark.whiteDim <= 0.05, `whiteDim ${dark.whiteDim}`);
   assert.equal(dark.blackRim, null);
-  assert.ok(contrast(dark.stone.black.fill, dark.base) >= 4.5, "black reads on the dark board without a rim");
-  // The light falls off towards the edges more than on the light board.
-  const alpha = (rgba) => Number(rgba.match(/[\d.]+\)$/)[0].slice(0, -1));
-  assert.ok(alpha(dark.vignette) > alpha(light.vignette));
   assert.equal(light.whiteDim, 0);
   for (const style of BOARD_STYLES) {
     for (const mode of ["light", "dark"]) {
@@ -44,7 +64,7 @@ await test("board palettes: the dark board is the same wood under a lamp — dim
       for (const side of ["black", "white"]) {
         const st = p.stone[side];
         const body = contrast(st.fill, p.base);
-        assert.ok(body >= 2.2 || !!st.rim, `${p.key} ${side}: ${body.toFixed(2)} and no rim`);
+        assert.ok(body >= 1.25 || !!st.rim, `${p.key} ${side}: ${body.toFixed(2)} and no rim`);
       }
       assert.ok(contrast(p.stone.black.fill, p.stone.white.fill) >= 10, `${p.key}: black against white`);
       // Marks on stones read on the stone.

@@ -18,23 +18,38 @@ export function lastMarkOf(cell) {
 }
 
 /**
- * The edge of a hover preview (a stone at its point, drawn light): a clear
- * rim in the stone's own colour, and for white a fine outer line so the
- * light disc still parts from the wood. A preview, not a stain.
+ * A hover preview: the stone to be played, as a clean flat disc in its own
+ * colour (no wood showing through a shaded sprite, which turned it brown),
+ * with a clear rim; white also gets a fine outer line so the light disc
+ * parts from the wood. A preview, not a stain.
  */
-export function drawPreviewEdge(ctx, cx, cy, cell, black) {
+export function drawPreview(ctx, cx, cy, cell, black, base = null) {
   const r = cell * 0.475;
-  ctx.strokeStyle = black ? "rgba(20, 18, 14, 0.7)" : "rgba(255, 253, 247, 0.95)";
+  ctx.save();
+  // The wood first, so the grid does not cut through the preview.
+  if (base) {
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = black ? "rgba(26, 25, 23, 0.62)" : "rgba(255, 254, 250, 0.8)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = black ? "rgba(20, 18, 14, 0.75)" : "rgba(255, 253, 247, 0.95)";
   ctx.lineWidth = Math.max(1, cell * 0.03);
   ctx.beginPath();
   ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2);
   ctx.stroke();
-  if (black) return;
-  ctx.strokeStyle = "rgba(40, 27, 12, 0.35)";
-  ctx.lineWidth = Math.max(0.75, cell * 0.012);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
+  if (!black) {
+    ctx.strokeStyle = "rgba(40, 27, 12, 0.35)";
+    ctx.lineWidth = Math.max(0.75, cell * 0.012);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /**
@@ -124,45 +139,29 @@ function seeded(seed) {
 }
 
 /**
- * Straight-grained wood (masame), drawn once per size into the cached
- * surface: broad bands of slightly darker and lighter wood, then fine
- * grain lines that run top to bottom and drift a little sideways. All of
- * it within a few per cent of the base colour, so the grid and the
- * stones stay what the eye reads first. Seeded: the same board every time.
+ * The wood, drawn once per size into the cached surface: broad, soft bands
+ * of slightly darker and lighter wood across the board, a few per cent of
+ * the base colour. No fine grain lines: running alongside the grid they
+ * read as extra lines, and the grid and the stones are what a player reads.
+ * Seeded: the same board every time.
  */
 export function drawWood(g, w, h, theme) {
   const rnd = seeded(0x60ba);
-  const ink = theme.dark ? "28, 16, 4" : "112, 70, 24";
-  const light = theme.dark ? "255, 236, 200" : "255, 246, 226";
-  // A quiet grain: felt more than seen. The lamp-lit dark board carries a
-  // little more of it, so the wood still reads at its lower luminance.
-  const k = theme.dark ? 0.5 : 0.55;
-  // Broad bands, a few board-widths of variation.
+  const ink = theme.dark ? "40, 24, 6" : "112, 70, 24";
+  const light = "255, 246, 226";
+  // Broad bands, a few board-widths of variation, their edges blurred.
   for (let x = 0; x < w; ) {
-    const bw = 18 + rnd() * 70;
+    const bw = 30 + rnd() * 90;
     const dark = rnd() < 0.5;
-    g.fillStyle = `rgba(${dark ? ink : light}, ${((0.015 + rnd() * 0.035) * k * (dark ? 1 : 0.7)).toFixed(3)})`;
+    const a = (0.012 + rnd() * 0.026) * (dark ? 1 : 0.7);
+    const grad = g.createLinearGradient(x, 0, x + bw, 0);
+    const c = `rgba(${dark ? ink : light}, `;
+    grad.addColorStop(0, c + "0)");
+    grad.addColorStop(0.5, c + a.toFixed(3) + ")");
+    grad.addColorStop(1, c + "0)");
+    g.fillStyle = grad;
     g.fillRect(x, 0, bw, h);
-    x += bw;
-  }
-  // Fine grain: thin wavering lines, denser in places, as in quarter-sawn wood.
-  const step = 4;
-  for (let x = rnd() * 3; x < w; x += 1.2 + rnd() * rnd() * 9) {
-    const a = (0.025 + rnd() * rnd() * 0.11) * k;
-    const lw = 0.4 + rnd() * rnd() * 1.4;
-    const amp = 0.6 + rnd() * 2.2;
-    const freq = (0.6 + rnd() * 1.8) / h;
-    const phase = rnd() * Math.PI * 2;
-    const drift = (rnd() - 0.5) * 6;
-    g.strokeStyle = `rgba(${ink}, ${a.toFixed(3)})`;
-    g.lineWidth = lw;
-    g.beginPath();
-    for (let y = -step; y <= h + step; y += step) {
-      const xx = x + drift * (y / h) + amp * Math.sin(phase + y * freq * Math.PI * 2);
-      if (y === -step) g.moveTo(xx, y);
-      else g.lineTo(xx, y);
-    }
-    g.stroke();
+    x += bw * 0.6;
   }
 }
 
@@ -211,8 +210,10 @@ export function finishStone(ctx, cx, cy, r, black, device) {
  * window shows part of one and has no edge of its own).
  */
 export function drawBoardEdge(g, w, h, theme) {
-  const light = theme.dark ? "rgba(255, 236, 200, 0.12)" : "rgba(255, 252, 240, 0.55)";
-  const shade = theme.dark ? "rgba(0, 0, 0, 0.28)" : "rgba(90, 56, 18, 0.16)";
+  // Quiet: a hairline of light and of shade, so the board reads as wood
+  // and not as a lit plastic panel.
+  const light = "rgba(255, 250, 236, 0.3)";
+  const shade = theme.dark ? "rgba(30, 16, 2, 0.18)" : "rgba(90, 56, 18, 0.1)";
   g.fillStyle = light;
   g.fillRect(0, 0, w, 1);
   g.fillRect(0, 0, 1, h);

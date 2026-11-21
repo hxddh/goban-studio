@@ -6,11 +6,10 @@
  *
  * There is one board in two styles, each in a light and a dark version:
  *
- *   standard   the honey board; in the dark theme the same wood under a
- *              lamp in a dark room: lower luminance but its warmth and
- *              saturation kept, the light falling off towards the edges,
- *              white stones barely toned down, black stones parting from
- *              the wood by contrast alone (no rim)
+ *   standard   pale kaya: a warm, light wood the stones stand out on. In
+ *              the dark theme the board stays light wood, a little dimmer,
+ *              and only the room around it is dark: black stones keep
+ *              their contrast with the board, which is what play needs
  *   contrast   a plain, very legible board: near-white (light) or
  *              near-black (dark), strong lines, flat stones with clear
  *              rims. Chosen in Settings → Board, and used by itself when
@@ -34,12 +33,12 @@ const STANDARD_LIGHT = {
   key: "standard-light",
   dark: false,
   contrast: false,
-  base: "#E4CB9A",
-  vignette: "rgba(70, 44, 12, 0.07)",
-  line: "rgba(40, 27, 12, 0.72)",
-  edge: "rgba(40, 27, 12, 0.85)",
-  star: "rgba(40, 27, 12, 0.85)",
-  text: "rgba(74, 52, 26, 0.6)",
+  base: "#E6C487",
+  vignette: "rgba(80, 48, 10, 0.04)",
+  line: "rgba(34, 24, 10, 0.75)",
+  edge: "rgba(34, 24, 10, 0.88)",
+  star: "rgba(34, 24, 10, 0.88)",
+  text: "rgba(62, 40, 14, 0.78)",
   shadow: "rgba(46, 28, 8, 0.3)",
   lineScale: 1,
   sprites: true,
@@ -59,14 +58,14 @@ const STANDARD_DARK = {
   ...STANDARD_LIGHT,
   key: "standard-dark",
   dark: true,
-  base: "#9E7E4E",
-  vignette: "rgba(12, 7, 0, 0.2)",
-  line: "rgba(24, 15, 4, 0.76)",
-  edge: "rgba(24, 15, 4, 0.88)",
-  star: "rgba(24, 15, 4, 0.88)",
-  text: "rgba(24, 15, 4, 0.7)",
-  shadow: "rgba(10, 6, 0, 0.45)",
-  whiteDim: 0.06,
+  base: "#C7A46C",
+  vignette: "rgba(20, 10, 0, 0.05)",
+  line: "rgba(26, 17, 6, 0.8)",
+  edge: "rgba(26, 17, 6, 0.9)",
+  star: "rgba(26, 17, 6, 0.9)",
+  text: "rgba(36, 22, 6, 0.82)",
+  shadow: "rgba(30, 18, 4, 0.38)",
+  whiteDim: 0.03,
   blackRim: null,
   stone: {
     // The thumbnails keep a faint rim on black: at two pixels a stone the contrast alone is not enough.
@@ -75,8 +74,8 @@ const STANDARD_DARK = {
   },
   onBlack: "#E9E3D6",
   onWhite: "#241F18",
-  // On the dim board the signals are light tints: dark ones sink into it.
-  tones: { accent: "#D3DEFF", good: "#BDEBCF", bad: "#FFC2B2" },
+  // The board stays light wood, a little dimmer: the light board's signals, a shade deeper (≥ 3:1 on it).
+  tones: { accent: "#2A4A8C", good: "#185432", bad: "#8E2E1F" },
   thumb: { line: "rgba(22, 15, 6, 0.5)" },
 };
 

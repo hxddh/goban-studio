@@ -100,7 +100,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".sheet", { state: "detached" });
   };
 
-  await check("shell board: in the dark theme the board is the same wood under a lamp — surface, lines and stones keep their contrast; it follows System live", async () => {
+  await check("shell board: in the dark theme the board stays light wood, a little dimmer — stones keep their contrast on it; it follows System live", async () => {
     const page = await seededPage({ appearance: "light" });
     await position(page);
     const light = await sample(page);
@@ -112,8 +112,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const dark = await sample(page);
     assert(dark.theme === "dark", dark.theme);
     const L = lum(dark.surface);
-    assert(L < 0.3, `dark surface luminance ${L.toFixed(3)} (the light board is ${lum(light.surface).toFixed(3)})`);
-    assert(L > 0.1, `the dark board is still a board, not a black square: ${L.toFixed(3)}`);
+    // Dimmer, but still light wood (60–90 % of the light board's luminance), not the muddy board of v15–v17.
+    const ratio = L / lum(light.surface);
+    assert(ratio >= 0.6 && ratio <= 0.9, `dark surface luminance ${L.toFixed(3)} is ${ratio.toFixed(2)} of the light board's`);
     assert(hex(dark.surface).toLowerCase() !== hex(light.surface).toLowerCase(), "the surface did not change");
     // The same board: warm (red ≥ green ≥ blue), close to the palette.
     assert(dark.surface[0] > dark.surface[1] && dark.surface[1] > dark.surface[2], `not the warm board: ${dark.surface}`);
@@ -121,8 +122,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     // Stones against the dimmer board, and against each other.
     const kB = contrast(hex(dark.black), hex(dark.surface));
     const kW = contrast(hex(dark.white), hex(dark.surface));
-    assert(kB >= 3, `black stone on the dark board ${kB.toFixed(2)}:1`);
-    assert(kW >= 2, `white stone on the dark board ${kW.toFixed(2)}:1`);
+    assert(kB >= 6, `black stone on the dark board ${kB.toFixed(2)}:1`);
+    assert(kW >= 1.8, `white stone on the dark board ${kW.toFixed(2)}:1`);
     assert(contrast(hex(dark.black), hex(dark.white)) >= 8, "black against white");
     // White is barely toned down: a touch dimmer than in the light theme, unmistakably white.
     assert(lum(dark.white) < lum(light.white) && lum(dark.white) > lum(light.white) - 0.12 && lum(dark.white) > 0.5, `white stone ${lum(dark.white).toFixed(3)} (light theme ${lum(light.white).toFixed(3)})`);
@@ -140,7 +141,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.emulateMedia({ colorScheme: "dark" });
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     const auto = await sample(page);
-    assert(lum(auto.surface) < 0.3, `the board did not follow the system to dark: ${hex(auto.surface)}`);
+    assert(contrast(hex(auto.surface), boardPalette({ dark: true }).base) < 1.15, `the board did not follow the system to dark: ${hex(auto.surface)}`);
     await page.emulateMedia({ colorScheme: "light" });
     await page.waitForFunction(() => document.documentElement.dataset.theme === "light");
     assert(lum((await sample(page)).surface) > 0.5, "…and back to light");
@@ -172,7 +173,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     // Back to the standard board.
     await setBoardStyle(page, 0);
     const std = await sample(page);
-    assert(std.board === "standard" && lum(std.surface) > 0.1 && lum(std.surface) < 0.3, `standard dark again: ${hex(std.surface)}`);
+    assert(std.board === "standard" && contrast(hex(std.surface), boardPalette({ dark: true }).base) < 1.15, `standard dark again: ${hex(std.surface)}`);
     // Forced colours (Windows high contrast): the plain board without asking.
     await page.emulateMedia({ forcedColors: "active", colorScheme: "dark" });
     await page.waitForTimeout(100);
