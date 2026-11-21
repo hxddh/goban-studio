@@ -105,6 +105,10 @@ await test("board palettes: the stylesheet's defaults are the light standard pal
   const darkBlock = css.slice(css.indexOf(':root[data-theme="dark"] {'), css.indexOf("}", css.indexOf(':root[data-theme="dark"] {')));
   assert.ok(!/--board|--thumb-board/.test(darkBlock));
   assert.ok(!css.toLowerCase().includes(boardPalette({ dark: true }).base.toLowerCase()));
+  // The exported review image draws its small boards in the same wood.
+  const image = fs.readFileSync(path.join(root, "src/web/js/play/review-image.js"), "utf8");
+  assert.match(image, /board: boardPalette\(\)\.base,/);
+  assert.match(image, /boardLine: boardPalette\(\)\.thumb\.line,/);
 });
 
 await test("last move: a light ring 0.44 of a cell across, never thinner than a hairline or smaller than it can show", () => {

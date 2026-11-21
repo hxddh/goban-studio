@@ -799,9 +799,12 @@ for (const vp of [
   { width: 1200, height: 860, tag: "1200" },
   { width: 1440, height: 900, tag: "1440" },
   { width: 1920, height: 1080, tag: "1920" },
+  // The dark theme once, at the common size: the board stays light wood in a dark room.
+  { width: 1440, height: 900, tag: "1440-dark", scheme: "dark" },
 ]) {
   await check(`visual: places at ${vp.tag}`, async () => {
     const page = await fresh("en-US", { width: vp.width, height: vp.height }, { pinFont: true });
+    if (vp.scheme) await page.emulateMedia({ colorScheme: vp.scheme });
     // One fixed day: Practice's path is drawn from the date, and its rows
     // (masked below, but not their height) would move the course under them.
     // Only the date is fixed; timers run as usual.
