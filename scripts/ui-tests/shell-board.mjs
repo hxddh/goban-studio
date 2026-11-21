@@ -411,6 +411,40 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     });
   }
 
+  await check("shell board: at 1280×800 a 19×19 game's board keeps cells of 33 px or more; in the dark theme the move list's black stones are dark discs, its white ones bright", async () => {
+    const page = await seededPage({}, { viewport: { width: 1280, height: 800 }, scheme: "dark" });
+    await page.keyboard.press("Control+2");
+    await page.click(".hero-actions .btn.primary");
+    await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 0 && window.__state.game?.game.size === 19);
+    const cell = await page.evaluate(() => window.__board.geom.cell);
+    assert(cell >= 33, `a 19×19 cell is ${cell.toFixed(1)} px`);
+    for (let i = 0; i < 2; i++) {
+      await clickPoint(page, 3 + i * 12, 3);
+      await page.waitForFunction((n) => window.__state.game.game.moveNumber >= n && !window.__state.game.thinking, 2 * (i + 1), { timeout: 15000 });
+    }
+    await page.waitForSelector(".move-grid .stone.w");
+    const c = await page.evaluate(() => {
+      // A disc's colour: its fill, or the darkest (last) stop of its gradient.
+      const fill = (sel) => {
+        const st = getComputedStyle(document.querySelector(sel));
+        const stops = st.backgroundImage === "none" ? [st.backgroundColor] : st.backgroundImage.match(/rgba?\([^)]*\)/g) || [];
+        return (stops[stops.length - 1].match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      };
+      // The panel's ground: the first element up from the list with a colour of its own.
+      let el = document.querySelector(".move-grid");
+      while (el && /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(el).backgroundColor)) el = el.parentElement;
+      const ground = el ? getComputedStyle(el).backgroundColor : "rgb(0, 0, 0)";
+      return { b: fill(".move-grid .stone.b"), w: fill(".move-grid .stone.w"), panel: (ground.match(/[\d.]+/g) || []).slice(0, 3).map(Number) };
+    });
+    const [lb, lw, lp] = [lum(c.b), lum(c.w), lum(c.panel)];
+    // A flat black disc: not lit (a lit one reads grey), lighter than the panel so it is not a hole, far from the white.
+    assert(lb > lp && (lb + 0.05) / (lp + 0.05) < 2, `black ${hex(c.b)} on the panel ${hex(c.panel)}`);
+    assert((lw + 0.05) / (lb + 0.05) >= 7, `white ${hex(c.w)} against black ${hex(c.b)}`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+    return `cell ${cell.toFixed(1)} px`;
+  });
+
   await check("shell board: at 720×720 a lesson keeps its text and its button in view, and a problem its goal and its buttons", async () => {
     const page = await fresh("en-US", { width: 720, height: 720 });
     await onboard(page, 0);

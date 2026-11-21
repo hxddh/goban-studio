@@ -164,9 +164,10 @@ force; the table gives the light standard palette.
 | `--stone-black` | #1D1D1B | #1D1D1B | a black stone in an SVG mark (set by the script) |
 | `--stone-white` | #F7F4EC | #F7F4EC | a white stone in an SVG mark (set by the script) |
 | `--stone-rim` | rgba(40,27,12,.5) | rgba(40,27,12,.5) | its rim (set by the script) |
-| `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #7A7873, #2E2D2B 70%) | the inline stone beside a name |
+| `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #5A5854, #161615 62%) | the inline stone beside a name |
 | `--stone-fill-white` | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | the inline stone beside a name |
-| `--stone-edge-black` | none | inset 0 0 0 .75px rgba(255,255,255,.22) | so a black stone shows on a dark ground |
+| `--stone-edge-black` | none | inset 0 0 0 1px rgba(255,255,255,.3) | so a black stone shows on a dark ground |
+| `--stone-dot-black` | var(--stone-fill-black) | #4A4844 | the 8 px stone in the move list: flat, so on the dark panel it reads as black, not grey or a ring |
 | `--stone-edge-white` | inset 0 0 0 .75px rgba(0,0,0,.22) | inset 0 0 0 .75px rgba(0,0,0,.22) | so a white stone shows on a light ground |
 | `--tile-black` | #1B1A17 | #1B1A17 | stones on a problem's tile |
 | `--tile-white` | #FBF8F1 | #FBF8F1 | stones on a problem's tile |
