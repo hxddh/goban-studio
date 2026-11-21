@@ -371,11 +371,13 @@ force; the table gives the light standard palette.
   whole group is: a new player sees no empty chart. Then this week in one
   line — a part that is zero is not said — and the last three games. A
   milestone reached is said once, in one success toast.
-  On the first day too: after onboarding every new player lands on Today,
-  never straight on a board or in a lesson, and the hero is what the
-  onboarding answer asked for, one click away: lesson one for someone who
-  never played (*Start here*), the gentlest 9×9 game for someone who knows
-  the rules, an even 19×19 game for a player. After three finished 9×9
+  On the first day too: after onboarding a beginner lands on Today, never
+  straight on a board or in a lesson, and the hero is what the onboarding
+  answer asked for, one click away: lesson one for someone who never
+  played (*Start here*), the gentlest 9×9 game for someone who knows the
+  rules. A player has already answered one more question (their rank), so
+  that step's button (*Play*) starts the even 19×19 game itself: every
+  answer reaches a board in three clicks. After three finished 9×9
   games a beginner's suggested game is 13×13, and two games there come
   before 19×19; the quieter second offer beside the hero is the next board
   up (a quick 9×9 beside the full board).

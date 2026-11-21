@@ -364,7 +364,7 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
       assert(foot.includes(name), `${locale}: the last step says which rules new games use: "${foot}"`);
       assert((await page.locator(".ob-foot").count()) === 1 && foot.length < 80, `${locale}: one quiet line (${foot.length} characters)`);
       await page.click(".choice >> nth=1");
-      await firstLanding(page, 1);
+      await firstLanding(page);
       await page.click(".today .hero .btn.primary");
       await page.waitForFunction(() => !!window.__state.game);
       const g = await page.evaluate(() => ({ rules: window.__state.game.game.rules, komi: window.__state.game.game.komi, chosen: window.__state.settings.defaultRules, lang: window.__state.settings.lang, html: document.documentElement.lang }));
@@ -396,12 +396,12 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
     await page.close();
   });
 
-  await check("shell first run: every answer lands on Today with nothing started; its hero starts lesson one, the gentle 9×9 or the 19×19 in one click", async () => {
+  await check("shell first run: a beginner lands on Today with nothing started, whose hero starts lesson one or the gentle 9×9 in one click; a player's rank step starts the 19×19", async () => {
     const out = [];
     const WANT = [
       { choice: 0, hero: /Start here[\s\S]*Start lesson one/, after: () => window.__state.space === "practice" && window.__state.practice.view === "lesson" && window.__state.practice.lesson?.index === 0 },
       { choice: 1, hero: /Suggested game[\s\S]*9×9/, after: () => window.__state.space === "play" && window.__state.game?.game.size === 9 && window.__state.settings.opponentRank === 30 && window.__state.game.game.handicap === 0 },
-      { choice: 2, hero: /Suggested game[\s\S]*19×19/, after: () => window.__state.space === "play" && window.__state.game?.game.size === 19 && window.__state.game.game.handicap === 0 },
+      { choice: 2, hero: null, after: () => window.__state.space === "play" && window.__state.game?.game.size === 19 && window.__state.game.game.handicap === 0 },
     ];
     for (const w of WANT) {
       const page = await fresh("en-US", { width: 1200, height: 800 });
@@ -409,7 +409,18 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
       await page.waitForSelector(".ob-card");
       await page.click(".ob-card .btn.primary");
       await page.click(`.choice >> nth=${w.choice}`);
-      await firstLanding(page, w.choice);
+      if (w.choice === 2) {
+        // Someone who plays: the rank step's button starts the suggested game.
+        await page.waitForSelector(".ob-card .slider-field");
+        await page.click(".ob-card .btn.primary");
+        await page.waitForFunction(w.after, null, { timeout: 5000 });
+        await page.waitForFunction(() => JSON.parse(localStorage.getItem("goban9:settings.json") || "{}").onboarded === true, null, { timeout: 3000 });
+        assert(page.errors.length === 0, `answer ${w.choice}: ${page.errors.join("; ")}`);
+        await page.close();
+        out.push("19×19 from the rank step");
+        continue;
+      }
+      await firstLanding(page);
       // Today, as every day: the date and greeting, one hero, one primary; nothing was started.
       const st = await page.evaluate(() => ({
         space: window.__state.space,

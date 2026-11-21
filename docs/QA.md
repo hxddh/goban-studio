@@ -157,7 +157,8 @@ Fails the build unless:
 Real Chromium against the built page (`frontend/dist`); `scripts/ui-test.mjs`
 is the harness, `scripts/ui-tests/*.mjs` hold each area's checks.
 
-- **Flows**: first run landing on Today and on to lesson one or a game, a
+- **Flows**: first run landing on Today and on to lesson one or a game
+  (every answer reaches a board in three clicks), a
   two-player game played by keyboard to the count, undo and redo, passing,
   counting again, a trial line kept and discarded, review edits undone, a
   wrong answer and its reset, history back and forward, the explorer,

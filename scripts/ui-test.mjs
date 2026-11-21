@@ -196,7 +196,7 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.waitForSelector(".ob-card");
   await page.click(".ob-card .btn.primary");
   await page.click(`.choice >> nth=${choice}`);
-  await firstLanding(page, choice);
+  await firstLanding(page);
   await page.click(".today .hero .btn.primary");
   await page.waitForFunction(() => window.__state.space !== "today");
   await page.waitForSelector("canvas.board, .page");
@@ -216,13 +216,9 @@ async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.waitForFunction(() => !!window.zero || JSON.parse(localStorage.getItem("goban9:settings.json") || "{}").onboarded === true, null, { timeout: 3000 });
 }
 
-/** After the last onboarding answer: Today, with the hero for that answer and nothing started. */
-async function firstLanding(page, choice) {
-  // Someone who plays is asked for a level first.
-  if (choice === 2) {
-    await page.waitForSelector(".ob-card .slider-field");
-    await page.click(".ob-card .btn.primary");
-  }
+/** After a beginner's onboarding answer: Today, with the hero for that answer and nothing started. */
+async function firstLanding(page) {
+  // (Someone who plays is asked for a level, whose button starts their game: no landing on Today.)
   await page.waitForSelector(".page.today .hero .btn.primary");
   await page.waitForSelector(".ob-card", { state: "detached" });
 }
@@ -591,7 +587,7 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await audit(page, "onboarding");
     await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
-    await firstLanding(page, 1);
+    await firstLanding(page);
     await audit(page, "Today on the first run");
     await page.click(".today .hero .btn.primary");
     await page.waitForSelector("canvas.board");
