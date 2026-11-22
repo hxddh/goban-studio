@@ -11,6 +11,7 @@ import { BLACK, coordLabel, formatPoints, rulesetById } from "../rules.js";
 import { t, tn } from "../i18n.js";
 import { resultText } from "../app/ctl-core.js";
 import { storyText } from "../app/story.js";
+import { boardPalette } from "../theme.js";
 
 /* ------------------------------------------------------------ words */
 
@@ -59,8 +60,9 @@ const LIGHT = {
   text3: "#8a8780",
   good: "#2e7d4f",
   bad: "#b3402c",
-  board: "#e4cb9a",
-  boardLine: "rgba(60,40,20,0.42)",
+  // The board's own wood and the thumbnails' line (theme.js), not colours of its own.
+  board: boardPalette().base,
+  boardLine: boardPalette().thumb.line,
 };
 
 /**

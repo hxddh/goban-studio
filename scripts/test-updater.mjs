@@ -3,7 +3,7 @@
  * on the real OS, with the real packaged app. Run by build-macos.yml and
  * build-windows.yml after packaging:
  *
- *   node scripts/test-updater.mjs <dist/GobanStudio.app | dist/GobanStudio> [--live <tag>]
+ *   node scripts/test-updater.mjs <dist/GobanStudio.app | dist/GobanStudio> [--live <tag> | --installed <folder>]
  *
  * What is tested, and how (nothing here changes what the app trusts: the
  * download address is fixed to GitHub in src/install_verify.zig and is not
@@ -35,6 +35,11 @@
  *              (GOBAN_UPDATE_PROBE_OUT), must report canInstall:false,
  *              blocked:"ReadOnlyLocation"; launched from a writable copy,
  *              canInstall:true.
+ *   --installed  Windows: the folder the installer (.msi) put the app in,
+ *              %LOCALAPPDATA%\Programs\Goban Studio. Only the probe and
+ *              "swap" run, on that folder itself: the in-app update of an
+ *              MSI install is the same folder swap as of an unzipped one
+ *              (scripts/test-msi.mjs runs this between install and uninstall).
  *   --live     Optional: the real app downloads <tag> from GitHub, checks it
  *              against that release's SHA256SUMS, unpacks and checks it
  *              (codesign on macOS), reports "ready", and discards it. Needs
@@ -64,8 +69,11 @@ if (!isMac && !isWin) {
 const args = process.argv.slice(2);
 const pkg = args[0] && path.resolve(args[0]);
 const liveTag = args.includes("--live") ? args[args.indexOf("--live") + 1] : "";
-if (!pkg || !fs.existsSync(pkg)) {
-  console.error("usage: node scripts/test-updater.mjs <dist/GobanStudio.app | dist/GobanStudio> [--live <tag>]");
+// --installed <folder>: an installation made by the Windows installer
+// (scripts/test-msi.mjs), updated in place instead of a temp copy.
+const installed = args.includes("--installed") ? path.resolve(args[args.indexOf("--installed") + 1] || "") : "";
+if (!pkg || !fs.existsSync(pkg) || (installed && (!isWin || !fs.existsSync(installed)))) {
+  console.error("usage: node scripts/test-updater.mjs <dist/GobanStudio.app | dist/GobanStudio> [--live <tag> | --installed <folder> (Windows)]");
   process.exit(2);
 }
 
@@ -298,61 +306,82 @@ async function probe(target, { tag = "", timeoutMs = 120000 } = {}) {
   return report;
 }
 
+/**
+ * The swap test on `target`, an installation in `apps` (leftovers are
+ * looked for there), with the staged copy under `dir`.
+ */
+async function swapTest(target, apps, dir) {
+  const staged = stage(dir);
+  const cleanup = path.join(dir, "GobanStudio-update");
+  const ack = path.join(cleanup, "goban-update-ack-0123abcd.txt");
+  const log = path.join(dir, "update.log");
+  // Windows: something holds a file in the install folder for a while after
+  // the app exits (WebView2, antivirus); the swap has to wait it out. The
+  // lock is in place before the app starts, and outlasts it.
+  const locker = isWin ? await lockFile(path.join(target, "README-Windows.txt")) : null;
+  const app = fakeApp(3000);
+  try {
+    // The lock is let go only once the swap has run into it (its first
+    // failed attempt is in the log), so the retry is always exercised,
+    // however slow the runner.
+    let released = false;
+    const watch = locker
+      ? setInterval(() => {
+          if (released) return;
+          let text = "";
+          try {
+            text = fs.readFileSync(log, "utf8");
+          } catch {}
+          if (/failed \(attempt 1\)/.test(text)) {
+            released = true;
+            setTimeout(() => locker.release(), 1500);
+          }
+        }, 200)
+      : null;
+    const code = await runHelper({ pid: app.pid, target, staged, ack, log, cleanup });
+    if (watch) clearInterval(watch);
+    if (code !== 0) showLog(log);
+    assert.equal(code, 0, "helper exit code");
+    assert.ok(fs.existsSync(path.join(target, markerRel)), "the new version is in place under the installed name");
+    assert.deepEqual(leftovers(apps), [], "no backup or temporary copy is left");
+    assert.equal(fs.existsSync(cleanup), false, "the staging directory is removed");
+    const text = fs.readFileSync(log, "utf8");
+    assert.match(text, /the new app started/);
+    assert.match(text, /update complete/);
+    if (isWin) {
+      assert.ok(fs.existsSync(path.join(target, profileRel)), "the player's WebView2 profile moved to the new version");
+      assert.match(text, /succeeded on attempt/, "the locked folder was retried");
+    }
+  } finally {
+    locker?.kill();
+    app.kill();
+    await stopProcessesIn(target);
+  }
+}
+
 // ------------------------------------------------------------------- tests
 
+if (installed) {
+  await test("installed: the installer's folder can be updated in place (probe)", async () => {
+    const report = await probe(installed);
+    assert.equal(report.status?.ok, true, JSON.stringify(report));
+    assert.equal(report.status.canInstall, true, JSON.stringify(report.status));
+  });
+  await test("installed: swap on the installer's folder, as the app does it", async () => {
+    // The player's WebView2 profile, where the app keeps it by default.
+    fs.mkdirSync(path.dirname(path.join(installed, profileRel)), { recursive: true });
+    fs.writeFileSync(path.join(installed, profileRel), "the player's games\n");
+    await swapTest(installed, path.dirname(installed), tempDir("swap-installed"));
+  });
+}
+
 // --live runs only the network test (a separate, non-blocking CI step).
-if (!liveTag) {
+if (!liveTag && !installed) {
   await test("swap: waits for the app, replaces it, starts the new version, removes the backup", async () => {
     const dir = tempDir("swap");
     const apps = path.join(dir, "Applications");
     fs.mkdirSync(apps);
-    const target = install(apps);
-    const staged = stage(dir);
-    const cleanup = path.join(dir, "GobanStudio-update");
-    const ack = path.join(cleanup, "goban-update-ack-0123abcd.txt");
-    const log = path.join(dir, "update.log");
-    // Windows: something holds a file in the install folder for a while after
-    // the app exits (WebView2, antivirus); the swap has to wait it out. The
-    // lock is in place before the app starts, and outlasts it.
-    const locker = isWin ? await lockFile(path.join(target, "README-Windows.txt")) : null;
-    const app = fakeApp(3000);
-    try {
-      // The lock is let go only once the swap has run into it (its first
-      // failed attempt is in the log), so the retry is always exercised,
-      // however slow the runner.
-      let released = false;
-      const watch = locker
-        ? setInterval(() => {
-            if (released) return;
-            let text = "";
-            try {
-              text = fs.readFileSync(log, "utf8");
-            } catch {}
-            if (/failed \(attempt 1\)/.test(text)) {
-              released = true;
-              setTimeout(() => locker.release(), 1500);
-            }
-          }, 200)
-        : null;
-      const code = await runHelper({ pid: app.pid, target, staged, ack, log, cleanup });
-      if (watch) clearInterval(watch);
-      if (code !== 0) showLog(log);
-      assert.equal(code, 0, "helper exit code");
-      assert.ok(fs.existsSync(path.join(target, markerRel)), "the new version is in place under the installed name");
-      assert.deepEqual(leftovers(apps), [], "no backup or temporary copy is left");
-      assert.equal(fs.existsSync(cleanup), false, "the staging directory is removed");
-      const text = fs.readFileSync(log, "utf8");
-      assert.match(text, /the new app started/);
-      assert.match(text, /update complete/);
-      if (isWin) {
-        assert.ok(fs.existsSync(path.join(target, profileRel)), "the player's WebView2 profile moved to the new version");
-        assert.match(text, /succeeded on attempt/, "the locked folder was retried");
-      }
-    } finally {
-      locker?.kill();
-      app.kill();
-      await stopProcessesIn(target);
-    }
+    await swapTest(install(apps), apps, dir);
   });
 
   await test("rollback: a new version that does not start is replaced by the old one, which is started again", async () => {

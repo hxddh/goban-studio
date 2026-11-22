@@ -15,7 +15,8 @@ keeps one primary action. The rules live in `src/web/js/model/player.js`
 (`bridgeAfter`), the page in `app/beginner.jsx` (`LessonDone`); in v9 the
 bridges are also items of Learn's path (`learn/session.js`).
 
-After onboarding everyone lands on Today. For *I know the rules* its one
+After onboarding a beginner lands on Today (a player, who also gave a
+rank, starts a 19×19 game from that step). For *I know the rules* its one
 button starts a 9×9 game against a gentle level; for someone who has
 never played it starts lesson one. A beginner's suggested game is 9×9
 until three games are finished there, then 13×13; someone who came up

@@ -78,8 +78,10 @@ export function whiteStone(size, seed, { angle, spacing, curve }) {
   const dist = curve;
   const cx = -Math.cos(angle) * dist;
   const cy = -Math.sin(angle) * dist;
-  const albedo = [0.9, 0.885, 0.84];
-  const band = [0.76, 0.785, 0.8];
+  // A bright, slightly warm shell; its growth bands a little darker and
+  // just as warm (cool grey bands made the stone read as grey plastic).
+  const albedo = [0.965, 0.955, 0.925];
+  const band = [0.885, 0.875, 0.85];
   const phase = r() * 10;
   const spec = [0.93, 0.97, 1.0];
   return render(size, (x, y) => {
@@ -92,7 +94,7 @@ export function whiteStone(size, seed, { angle, spacing, curve }) {
     const broad = 0.5 + 0.5 * N.fbm(q / 40 + 3, 1.7, 2);
     let stripe = Math.pow(s1, 2) * 0.8 + Math.pow(s2, 3) * 0.2;
     stripe *= 0.55 + 0.9 * broad;
-    const k = clamp(stripe * 0.62);
+    const k = clamp(stripe * 0.5);
     const base = [mix(albedo[0], band[0], k), mix(albedo[1], band[1], k), mix(albedo[2], band[2], k)];
     // Shell is translucent: wrapped diffuse and a little ambient fill.
     const ndl = dot(n, LIGHT);
@@ -102,7 +104,9 @@ export function whiteStone(size, seed, { angle, spacing, curve }) {
     const gloss = 0.45 * Math.pow(ndh, 110) + 0.06 * Math.pow(ndh, 14);
     const rim = Math.pow(1 - n[2], 2.2);
     const ao = 1 - 0.18 * rim;
-    return [0, 1, 2].map((c) => (base[c] * (wrap * 0.8 + sky * 0.46) * ao + gloss * spec[c] + 0.02 * rim * spec[c]));
+    // The side away from the light stays light: a shell scatters light
+    // through itself, so the stone shades towards its rim, not to grey.
+    return [0, 1, 2].map((c) => base[c] * (0.42 + wrap * 0.48 + sky * 0.32) * ao + gloss * spec[c] + 0.02 * rim * spec[c]);
   });
 }
 

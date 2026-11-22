@@ -16,7 +16,10 @@
  *   node scripts/signing-notes.mjs readme <README-*.txt> <signing-*.json> > out.txt
  *
  * With the Intel Mac status (the fourth file) the table has a
- * "macOS (Intel)" row for GobanStudio-macOS-x64.*.
+ * "macOS (Intel)" row for GobanStudio-macOS-x64.*. Windows has two rows,
+ * the installer (GobanStudio-Windows-x64.msi, recommended) and the
+ * portable zip, both from the one Windows status: the build signs the
+ * installer whenever it signs the app (build-windows.yml).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -64,13 +67,21 @@ export function firstLaunchText(status) {
   return "**Not Authenticode-signed.** If SmartScreen appears, choose More info → Run anyway. WebView2 is preinstalled on Windows 10/11.";
 }
 
+/** The "First launch" cell for the Windows installer (.msi). */
+export function installerFirstLaunchText(status) {
+  const what = "Installs for your Windows user, no administrator needed: Start menu, `.sgf` files, Apps & Features; the app updates itself.";
+  if (status.mode === "authenticode") return `**Authenticode-signed.** ${what} SmartScreen may still ask while the certificate builds reputation: More info → Run anyway.`;
+  return `**Not Authenticode-signed.** ${what} If SmartScreen appears, choose More info → Run anyway.`;
+}
+
 export function firstLaunchTable(macos, windows, macosIntel = null) {
   return [
     "| Platform | File | First launch |",
     "| --- | --- | --- |",
     `| macOS (Apple Silicon) | \`GobanStudio-macOS-arm64.dmg\` or \`.zip\` | ${firstLaunchText(macos)} |`,
     ...(macosIntel ? [`| macOS (Intel) | \`GobanStudio-macOS-x64.dmg\` or \`.zip\` | ${firstLaunchText(macosIntel)} |`] : []),
-    `| Windows (x64) | \`GobanStudio-Windows-x64.zip\` | ${firstLaunchText(windows)} |`,
+    `| Windows (x64) | \`GobanStudio-Windows-x64.msi\` (installer, recommended) | ${installerFirstLaunchText(windows)} |`,
+    `| Windows (x64), portable | \`GobanStudio-Windows-x64.zip\` | ${firstLaunchText(windows)} Unzip it anywhere you can write to and run \`bin\\goban-studio.exe\`. |`,
   ].join("\n");
 }
 

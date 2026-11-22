@@ -220,7 +220,8 @@ await test("this version's release notes fit the release workflow, and the READM
   const adhoc = Sign.normalizeStatus("macos", { mode: "adhoc" });
   const out = Sign.applyToNotes(notes, adhoc, Sign.normalizeStatus("windows", {}), adhoc);
   assert.match(out, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg` or `\.zip` \| Ad-hoc signed, \*\*not notarized\*\*/);
-  assert.match(out, /\| Windows \(x64\) \| `GobanStudio-Windows-x64\.zip` \| \*\*Not Authenticode-signed\.\*\*/);
+  assert.match(out, /\| Windows \(x64\) \| `GobanStudio-Windows-x64\.msi` \(installer, recommended\) \| \*\*Not Authenticode-signed\.\*\*/);
+  assert.match(out, /\| Windows \(x64\), portable \| `GobanStudio-Windows-x64\.zip` \| \*\*Not Authenticode-signed\.\*\*/);
   assert.doesNotMatch(out, /See the package README/, "the placeholder cells are replaced");
   const outside = (text) => text.replace(/<!-- first-launch -->[\s\S]*?<!-- \/first-launch -->/, "");
   assert.equal(outside(out), outside(notes), "the rest of the notes is published as written");
@@ -228,7 +229,7 @@ await test("this version's release notes fit the release workflow, and the READM
   const sections = [...notes.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   assert.equal(sections.at(-1), "Known limits");
   const limits = notes.slice(notes.indexOf("## Known limits"));
-  for (const said of [/Not checked by people/, /not code-signed/, /no Windows installer/i, /not been tried by hand/, /Lessons KataGo disagrees with/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
+  for (const said of [/Not checked by people/, /not code-signed/, /installer/, /not been tried by hand/, /Lessons KataGo disagrees with/, /No Traditional Chinese/, /classics/]) assert.match(limits, said);
 
   // The README: the app as it is, the user's half before the developer's, the real release command.
   const readme = read("README.md");
@@ -492,7 +493,20 @@ await test("both platform builds test the update helpers, and an Intel Mac build
   const status = { macos: Sign.normalizeStatus("macos", { mode: "adhoc" }), win: Sign.normalizeStatus("windows", {}) };
   const table = Sign.firstLaunchTable(status.macos, status.win, status.macos);
   assert.match(table, /\| macOS \(Intel\) \| `GobanStudio-macOS-x64\.dmg`/);
-  assert.equal(Sign.firstLaunchTable(status.macos, status.win).split("\n").length, 4, "without an Intel status the table keeps its v4 rows");
+  assert.equal(Sign.firstLaunchTable(status.macos, status.win).split("\n").length, 5, "without an Intel status: header, rule, Apple Silicon and the two Windows rows");
+  // Windows: the installer first (recommended), then the portable zip, both from the one Windows status.
+  const rows = table.split("\n");
+  const msiRow = rows.findIndex((l) => l.startsWith("| Windows (x64) | `GobanStudio-Windows-x64.msi` (installer, recommended) |"));
+  const zipRow = rows.findIndex((l) => l.startsWith("| Windows (x64), portable | `GobanStudio-Windows-x64.zip` |"));
+  assert.ok(msiRow > 0 && zipRow === msiRow + 1, table);
+  assert.match(rows[msiRow], /\*\*Not Authenticode-signed\.\*\* Installs for your Windows user, no administrator needed/);
+  const signedRows = Sign.firstLaunchTable(status.macos, Sign.normalizeStatus("windows", { mode: "authenticode", timestamped: true })).split("\n");
+  assert.ok(signedRows.filter((l) => l.startsWith("| Windows")).every((l) => l.includes("**Authenticode-signed.**")), "both Windows rows follow the Windows status");
+  // The release publishes the installer and lists it in SHA256SUMS; the updater does not install it (it swaps the zip's folder).
+  assert.match(release, /sha256sum GobanStudio-Windows-x64\.zip GobanStudio-Windows-x64\.msi\) >> SHA256SUMS/);
+  assert.doesNotMatch(installSource(), /\.msi"/);
+  assert.match(readme, /`GobanStudio-Windows-x64\.msi` \(installer, recommended\)/);
+  assert.match(readme, /Windows \(x64\), portable \| `GobanStudio-Windows-x64\.zip`/);
 });
 
 await test("model status replies normalize; the browser preview is unavailable", async () => {

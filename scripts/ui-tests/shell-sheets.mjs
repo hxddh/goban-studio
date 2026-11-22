@@ -445,12 +445,48 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".ob-card .slider-field");
     assert((await sheetInfo(page)).name.length > 0, "the rank step has a name");
     await page.click(".ob-card .btn.primary");
-    // It ends on Today (nothing started), whose hero is the 19×19 game.
-    await page.waitForFunction(() => window.__state.sheet === null && window.__state.space === "today" && window.__state.game === null);
-    await page.click(".today .hero .btn.primary");
-    await page.waitForFunction(() => window.__state.space === "play" && window.__state.game?.game.size === 19);
+    // Its button starts the suggested game: the 19×19 board, the player to move.
+    await page.waitForFunction(() => window.__state.sheet === null && window.__state.space === "play" && window.__state.game?.game.size === 19);
     noErrors(page, "onboarding");
     await page.close();
+  });
+
+  await check("first launch: from opening the app to a board waiting for the first stone in 3 clicks, whatever the answer", async () => {
+    // The clicks for each answer: the welcome, the answer, then the one button that starts.
+    const paths = [
+      { answer: 0, then: ".today .hero .btn.primary" },
+      { answer: 1, then: ".today .hero .btn.primary" },
+      { answer: 2, then: ".ob-card .btn.primary" },
+    ];
+    const out = [];
+    for (const { answer, then } of paths) {
+      const page = await fresh();
+      await page.goto(origin + "/");
+      let clicks = 0;
+      const click = async (sel) => {
+        await page.click(sel);
+        clicks++;
+      };
+      await click(".ob-card .btn.primary");
+      await click(`.choice >> nth=${answer}`);
+      await click(then);
+      // A lesson's board or a game's, with the player to move.
+      await page.waitForFunction(
+        () => {
+          const s = window.__state;
+          if (!window.__board?.geom?.cell) return false;
+          if (s.space === "practice") return s.practice.view === "lesson";
+          return s.space === "play" && !!s.game && s.game.game.turn === s.game.humanColor && !s.game.thinking;
+        },
+        null,
+        { timeout: 10000 },
+      );
+      assert(clicks <= 3, `answer ${answer}: ${clicks} clicks`);
+      out.push(await page.evaluate(() => (window.__state.space === "play" ? `game ${window.__state.game.game.size}×${window.__state.game.game.size}` : "lesson")));
+      noErrors(page, `first launch, answer ${answer}`);
+      await page.close();
+    }
+    return out.join(", ");
   });
 
   /* -------------------------------------------------------- the menus */

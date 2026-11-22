@@ -21,7 +21,7 @@
 import { BLACK, WHITE, LETTERS, starPoints } from "./rules.js";
 import { loadMaterials, stoneVariant } from "./materials.js";
 import { currentPalette, onBoardTheme } from "./theme.js";
-import { drawBoardEdge, gridRatioOf, windowOf, drawPreviewEdge, drawWood, finishStone, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "./board-surface.js";
+import { drawBoardEdge, gridRatioOf, windowOf, drawPreview, drawWood, finishStone, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "./board-surface.js";
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 
@@ -528,9 +528,7 @@ export class BoardView {
     if (m.interactive && hv && inWin(hv.x, hv.y) && !m.board?.[hv.y]?.[hv.x] && m.hoverColor) {
       if (m.hoverValid) {
         // A preview, not a stain: a light stone with a clear edge.
-        const black = m.hoverColor === BLACK;
-        this.stone(ctx, hv.x, hv.y, m.hoverColor, theme, { alpha: black ? 0.38 : 0.6, shadow: false, jitter: false });
-        drawPreviewEdge(ctx, px(hv.x), py(hv.y), cell, black);
+        drawPreview(ctx, px(hv.x), py(hv.y), cell, m.hoverColor === BLACK, theme.base);
       }
       else {
         ctx.strokeStyle = theme.tones.bad;

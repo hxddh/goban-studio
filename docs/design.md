@@ -158,15 +158,16 @@ force; the table gives the light standard palette.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `--board` | #E4CB9A | #E4CB9A | the board's wood (set by the script) |
-| `--thumb-board` | #E4CB9A | #E4CB9A | thumbnails and tiles (set by the script) |
+| `--board` | #E6C487 | #E6C487 | the board's wood (set by the script) |
+| `--thumb-board` | #E6C487 | #E6C487 | thumbnails and tiles (set by the script) |
 | `--thumb-line` | rgba(60,40,20,.42) | rgba(60,40,20,.42) | their lines (set by the script) |
 | `--stone-black` | #1D1D1B | #1D1D1B | a black stone in an SVG mark (set by the script) |
 | `--stone-white` | #F7F4EC | #F7F4EC | a white stone in an SVG mark (set by the script) |
 | `--stone-rim` | rgba(40,27,12,.5) | rgba(40,27,12,.5) | its rim (set by the script) |
-| `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | the inline stone beside a name |
+| `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #5A5854, #161615 62%) | the inline stone beside a name |
 | `--stone-fill-white` | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | the inline stone beside a name |
-| `--stone-edge-black` | none | inset 0 0 0 .75px rgba(255,255,255,.28) | so a black stone shows on a dark ground |
+| `--stone-edge-black` | none | inset 0 0 0 1px rgba(255,255,255,.3) | so a black stone shows on a dark ground |
+| `--stone-dot-black` | var(--stone-fill-black) | #4A4844 | the 8 px stone in the move list: flat, so on the dark panel it reads as black, not grey or a ring |
 | `--stone-edge-white` | inset 0 0 0 .75px rgba(0,0,0,.22) | inset 0 0 0 .75px rgba(0,0,0,.22) | so a white stone shows on a light ground |
 | `--tile-black` | #1B1A17 | #1B1A17 | stones on a problem's tile |
 | `--tile-white` | #FBF8F1 | #FBF8F1 | stones on a problem's tile |
@@ -177,16 +178,18 @@ force; the table gives the light standard palette.
 
 ## 5. The board
 
-* **Surface.** One board: a warm honey (#E4CB9A) in straight-grained
-  wood (fine grain and broad bands within a few per cent of the base,
-  drawn once per size by `src/web/js/board-surface.js`) with a faint
-  centre-to-edge falloff. No alternative materials. In the dark theme it is
-  the same wood under a lamp in a dark room: lower luminance but its warmth
-  and saturation kept (#9E7E4E), the light falling off towards the edges,
-  white stones toned down only about 6 %, black stones parting from the
-  wood by contrast alone (no rim on the board; thumbnails keep one),
-  signals on the board as light tints. Black stones stand at ≥ 3:1 and
-  white at ≥ 2:1 against it. The grid, star points, last-move ring and
+* **Surface.** One board: pale kaya (#E6C487, chosen by the owner for
+  v18 from two palettes rendered side by side) with broad, soft bands a
+  few per cent from the base and no fine grain lines (running alongside
+  the grid they read as extra lines), drawn once per size by
+  `src/web/js/board-surface.js`, and a barely visible falloff to the
+  edges. No alternative materials. In the dark theme the board stays light
+  wood, a little dimmer (#C7A46C), and only the room around it is dark:
+  black stones stand at ≥ 7:1 on it as by day, lines and coordinates at ≥ 4.5:1 on both, white stones
+  toned down 3 %. Stones: a bright, warm shell for white (warm bands,
+  shading to its rim, not to grey) and a matte slate for black. The hover
+  preview is a flat disc of the stone's colour over the wood, which hides
+  the grid under it. The grid, star points, last-move ring and
   hover preview take their sizes from the cell (`board-surface.js`).
   All board colours live in one place, `src/web/js/theme.js`; the board,
   thumbnails, the New game size cards, a hero's empty board and the app's
@@ -368,11 +371,13 @@ force; the table gives the light standard palette.
   whole group is: a new player sees no empty chart. Then this week in one
   line — a part that is zero is not said — and the last three games. A
   milestone reached is said once, in one success toast.
-  On the first day too: after onboarding every new player lands on Today,
-  never straight on a board or in a lesson, and the hero is what the
-  onboarding answer asked for, one click away: lesson one for someone who
-  never played (*Start here*), the gentlest 9×9 game for someone who knows
-  the rules, an even 19×19 game for a player. After three finished 9×9
+  On the first day too: after onboarding a beginner lands on Today, never
+  straight on a board or in a lesson, and the hero is what the onboarding
+  answer asked for, one click away: lesson one for someone who never
+  played (*Start here*), the gentlest 9×9 game for someone who knows the
+  rules. A player has already answered one more question (their rank), so
+  that step's button (*Play*) starts the even 19×19 game itself: every
+  answer reaches a board in three clicks. After three finished 9×9
   games a beginner's suggested game is 13×13, and two games there come
   before 19×19; the quieter second offer beside the hero is the next board
   up (a quick 9×9 beside the full board).

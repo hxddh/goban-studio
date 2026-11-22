@@ -100,7 +100,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.waitForSelector(".sheet", { state: "detached" });
   };
 
-  await check("shell board: in the dark theme the board is the same wood under a lamp — surface, lines and stones keep their contrast; it follows System live", async () => {
+  await check("shell board: in the dark theme the board stays light wood, a little dimmer — stones keep their contrast on it; it follows System live", async () => {
     const page = await seededPage({ appearance: "light" });
     await position(page);
     const light = await sample(page);
@@ -112,8 +112,9 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     const dark = await sample(page);
     assert(dark.theme === "dark", dark.theme);
     const L = lum(dark.surface);
-    assert(L < 0.3, `dark surface luminance ${L.toFixed(3)} (the light board is ${lum(light.surface).toFixed(3)})`);
-    assert(L > 0.1, `the dark board is still a board, not a black square: ${L.toFixed(3)}`);
+    // Dimmer, but still light wood (60–90 % of the light board's luminance), not the muddy board of v15–v17.
+    const ratio = L / lum(light.surface);
+    assert(ratio >= 0.6 && ratio <= 0.9, `dark surface luminance ${L.toFixed(3)} is ${ratio.toFixed(2)} of the light board's`);
     assert(hex(dark.surface).toLowerCase() !== hex(light.surface).toLowerCase(), "the surface did not change");
     // The same board: warm (red ≥ green ≥ blue), close to the palette.
     assert(dark.surface[0] > dark.surface[1] && dark.surface[1] > dark.surface[2], `not the warm board: ${dark.surface}`);
@@ -121,8 +122,8 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     // Stones against the dimmer board, and against each other.
     const kB = contrast(hex(dark.black), hex(dark.surface));
     const kW = contrast(hex(dark.white), hex(dark.surface));
-    assert(kB >= 3, `black stone on the dark board ${kB.toFixed(2)}:1`);
-    assert(kW >= 2, `white stone on the dark board ${kW.toFixed(2)}:1`);
+    assert(kB >= 6, `black stone on the dark board ${kB.toFixed(2)}:1`);
+    assert(kW >= 1.8, `white stone on the dark board ${kW.toFixed(2)}:1`);
     assert(contrast(hex(dark.black), hex(dark.white)) >= 8, "black against white");
     // White is barely toned down: a touch dimmer than in the light theme, unmistakably white.
     assert(lum(dark.white) < lum(light.white) && lum(dark.white) > lum(light.white) - 0.12 && lum(dark.white) > 0.5, `white stone ${lum(dark.white).toFixed(3)} (light theme ${lum(light.white).toFixed(3)})`);
@@ -140,7 +141,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await page.emulateMedia({ colorScheme: "dark" });
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     const auto = await sample(page);
-    assert(lum(auto.surface) < 0.3, `the board did not follow the system to dark: ${hex(auto.surface)}`);
+    assert(contrast(hex(auto.surface), boardPalette({ dark: true }).base) < 1.15, `the board did not follow the system to dark: ${hex(auto.surface)}`);
     await page.emulateMedia({ colorScheme: "light" });
     await page.waitForFunction(() => document.documentElement.dataset.theme === "light");
     assert(lum((await sample(page)).surface) > 0.5, "…and back to light");
@@ -172,7 +173,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     // Back to the standard board.
     await setBoardStyle(page, 0);
     const std = await sample(page);
-    assert(std.board === "standard" && lum(std.surface) > 0.1 && lum(std.surface) < 0.3, `standard dark again: ${hex(std.surface)}`);
+    assert(std.board === "standard" && contrast(hex(std.surface), boardPalette({ dark: true }).base) < 1.15, `standard dark again: ${hex(std.surface)}`);
     // Forced colours (Windows high contrast): the plain board without asking.
     await page.emulateMedia({ forcedColors: "active", colorScheme: "dark" });
     await page.waitForTimeout(100);
@@ -409,6 +410,40 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
       return `board ${Math.round(board)} px`;
     });
   }
+
+  await check("shell board: at 1280×800 a 19×19 game's board keeps cells of 33 px or more; in the dark theme the move list's black stones are dark discs, its white ones bright", async () => {
+    const page = await seededPage({}, { viewport: { width: 1280, height: 800 }, scheme: "dark" });
+    await page.keyboard.press("Control+2");
+    await page.click(".hero-actions .btn.primary");
+    await page.waitForFunction(() => window.__state.space === "play" && window.__board?.geom?.cell > 0 && window.__state.game?.game.size === 19);
+    const cell = await page.evaluate(() => window.__board.geom.cell);
+    assert(cell >= 33, `a 19×19 cell is ${cell.toFixed(1)} px`);
+    for (let i = 0; i < 2; i++) {
+      await clickPoint(page, 3 + i * 12, 3);
+      await page.waitForFunction((n) => window.__state.game.game.moveNumber >= n && !window.__state.game.thinking, 2 * (i + 1), { timeout: 15000 });
+    }
+    await page.waitForSelector(".move-grid .stone.w");
+    const c = await page.evaluate(() => {
+      // A disc's colour: its fill, or the darkest (last) stop of its gradient.
+      const fill = (sel) => {
+        const st = getComputedStyle(document.querySelector(sel));
+        const stops = st.backgroundImage === "none" ? [st.backgroundColor] : st.backgroundImage.match(/rgba?\([^)]*\)/g) || [];
+        return (stops[stops.length - 1].match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      };
+      // The panel's ground: the first element up from the list with a colour of its own.
+      let el = document.querySelector(".move-grid");
+      while (el && /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(el).backgroundColor)) el = el.parentElement;
+      const ground = el ? getComputedStyle(el).backgroundColor : "rgb(0, 0, 0)";
+      return { b: fill(".move-grid .stone.b"), w: fill(".move-grid .stone.w"), panel: (ground.match(/[\d.]+/g) || []).slice(0, 3).map(Number) };
+    });
+    const [lb, lw, lp] = [lum(c.b), lum(c.w), lum(c.panel)];
+    // A flat black disc: not lit (a lit one reads grey), lighter than the panel so it is not a hole, far from the white.
+    assert(lb > lp && (lb + 0.05) / (lp + 0.05) < 2, `black ${hex(c.b)} on the panel ${hex(c.panel)}`);
+    assert((lw + 0.05) / (lb + 0.05) >= 7, `white ${hex(c.w)} against black ${hex(c.b)}`);
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+    return `cell ${cell.toFixed(1)} px`;
+  });
 
   await check("shell board: at 720×720 a lesson keeps its text and its button in view, and a problem its goal and its buttons", async () => {
     const page = await fresh("en-US", { width: 720, height: 720 });

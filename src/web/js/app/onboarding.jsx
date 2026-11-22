@@ -71,8 +71,16 @@ export function Onboarding({ step = 0 }) {
               <Button kind="ghost" onClick={() => go(1)}>
                 {t("common.back")}
               </Button>
-              <Button kind="primary" data-autofocus onClick={() => C.finishOnboarding("player", rank)}>
-                {t("common.continue")}
+              {/* Someone who plays has said enough: the suggested game starts here, not one more click away on Today. */}
+              <Button
+                kind="primary"
+                data-autofocus
+                onClick={() => {
+                  C.finishOnboarding("player", rank);
+                  C.startFirstRun();
+                }}
+              >
+                {t("play.suggest.play")}
               </Button>
             </div>
           </>
