@@ -51,6 +51,7 @@
   --stone-fill-white: radial-gradient(circle at 35% 30%, #fff, #e9e6de 75%);
   --stone-edge-black: none;
   --stone-dot-black: var(--stone-fill-black);
+  --stone-edge-dot-black: none;
   --stone-edge-white: inset 0 0 0 0.75px rgba(0, 0, 0, 0.22);
   --tile-black: #1b1a17;
   --tile-white: #fbf8f1;
@@ -60,6 +61,7 @@
   --knob: #fff;
 
   /* Elevation (§4): three shadows that lift, and rings that mark */
+  --stage-glow: none;
   --shadow-board: 0 0 0 1px rgba(60, 40, 12, 0.1), 0 1px 2px rgba(60, 40, 12, 0.12), 0 12px 24px -14px rgba(60, 40, 12, 0.4);
   --shadow-pop: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 24px -6px rgba(0, 0, 0, 0.18);
   --shadow-sheet: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 24px 64px -16px rgba(0, 0, 0, 0.32);
@@ -153,9 +155,15 @@
   /* On the dark panel a black stone stays black, lit a little at the top left; a light edge keeps it from sinking into the ground. A lighter grey disc read as a third colour at the move list's size. */
   --stone-fill-black: radial-gradient(circle at 35% 30%, #5a5854, #161615 62%);
   --stone-edge-black: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  --stone-dot-black: #4a4844;
+  /* The move list's black dot: black, with a light hairline so it reads on the dark panel (the old grey #4a4844 was 1.5:1 on it). */
+  --stone-dot-black: #050505;
+  --stone-edge-dot-black: 0 0 0 1px rgba(237, 235, 230, 0.42);
   --eval-black: #4a4843;
-  --shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 24px -14px rgba(0, 0, 0, 0.75);
+  /* The light board on the dark page: a hairline of darker wood, then a narrow warm-dark band that steps down to the
+   * page, and a soft shadow under it — a board set on a table, not a light card pasted on black. */
+  /* A faint warm light under the board, so the page around it is not flat black. */
+  --stage-glow: radial-gradient(ellipse 62% 58% at 50% 50%, rgba(214, 178, 122, 0.05), transparent 72%);
+  --shadow-board: 0 0 0 1px #6e5536, 0 0 0 4px #26221c, 0 0 0 5px rgba(255, 255, 255, 0.05), 0 22px 44px -18px rgba(0, 0, 0, 0.85);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px -16px rgba(0, 0, 0, 0.7);
   --shadow-raised: none;
@@ -436,7 +444,7 @@ button.group-row:hover { background: var(--fill); }
 }
 .game-tally { display: flex; flex-direction: column; align-items: center; gap: var(--s-05); font: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .row-action { flex: none; display: inline-flex; align-items: center; height: 26px; padding: 0 var(--s-25); border-radius: var(--r-1); background: var(--fill); color: var(--text); font: var(--t-label); }
-.group-row:hover .row-action, .today-problem-card:hover .row-action { background: var(--fill-2); }
+.group-row:hover .row-action { background: var(--fill-2); }
 .meter { flex: none; align-self: center; width: 56px; height: 4px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--text-2); }
 .meter.full i { background: var(--good); }
@@ -565,6 +573,7 @@ button.group-row:hover { background: var(--fill); }
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--panel); }
 .workspace.focus { grid-template-columns: minmax(0, 1fr); }
 .stage { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: var(--s-3); padding: var(--s-5); }
+.stage { background: var(--stage-glow); }
 .board-area { flex: 1; width: 100%; min-height: 0; container-type: size; display: grid; place-items: center; }
 .board-frame {
   position: relative; width: min(100cqw, calc(100cqh * var(--aspect, 1))); max-width: 1120px; aspect-ratio: var(--aspect, 1); border-radius: var(--r-0);
@@ -642,7 +651,7 @@ button.group-row:hover { background: var(--fill); }
 .move-grid li.last button { color: var(--text); font-weight: 500; }
 .move-grid .mn { min-width: 22px; text-align: right; color: var(--text-3); }
 /* At this size a lit disc reads as a grey third colour and a black one with an edge as a ring: on the dark panel the black stone is a flat dark disc, the white a bright one. */
-.move-grid .stone.b { background: var(--stone-dot-black); box-shadow: none; }
+.move-grid .stone.b { background: var(--stone-dot-black); box-shadow: var(--stone-edge-dot-black); }
 .move-grid .v-dot { width: 5px; height: 5px; margin-left: auto; border-radius: var(--r-pill); background: var(--text-3); }
 .move-grid li.v-mistake .v-dot { background: var(--bad); }
 .moves-empty { font: var(--t-small); color: var(--text-3); margin: 0; }
@@ -662,6 +671,10 @@ button.group-row:hover { background: var(--fill); }
 .score-pair span { font: var(--t-small); color: var(--text-3); }
 .score-result { font: var(--t-head); }
 .result-card { align-items: stretch; text-align: left; }
+/* The one quiet line that offers the human-style model (app/human-hint.jsx). */
+.human-hint { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-1) var(--s-2); margin: 0; padding: var(--s-2) var(--s-1) var(--s-2) var(--s-3); border-radius: var(--r-1); background: var(--fill); color: var(--text-2); text-align: left; }
+.human-hint > span { flex: 1 1 180px; }
+.human-hint .hint-close { width: 24px; height: 24px; margin-left: auto; }
 .result-big { font: var(--t-title); }
 .score-detail { display: flex; flex-direction: column; gap: 1px; }
 .score-detail i { font-style: normal; white-space: nowrap; }
@@ -827,9 +840,7 @@ button.progress-row:hover { background: var(--fill); }
 .week-days li.today i { outline: 1px solid var(--text-3); outline-offset: 2px; }
 .week-goal { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); font: var(--t-body); }
 .week-goal .meter { width: 96px; }
-.today-problem-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); cursor: pointer; }
-.today-problem-card:hover { background: var(--fill); }
-.today-problem-card .dthumb { border-radius: var(--r-0); }
+.today-row.has-diagram .dthumb { flex: none; border-radius: var(--r-0); }
 /* The charts end where the mastery row's bar ends, left of its chevron. */
 li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .progress-row.milestones { padding-top: var(--s-3); padding-bottom: var(--s-3); }
@@ -1051,16 +1062,12 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .settings-group { display: flex; flex-direction: column; gap: var(--s-3); }
 .settings-group + .settings-group { padding-top: var(--s-4); border-top: 1px solid var(--line); }
 .settings-group h3 { font: var(--t-caption); color: var(--text-3); letter-spacing: 0.02em; }
-.lang-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
-.lang-grid button { height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--surface); cursor: pointer; font-weight: 500; }
-.lang-grid button.on { border-color: var(--text); box-shadow: var(--ring-selected); }
-.lang-grid.big button { height: 44px; font-size: 14px; }
 /* In Settings the language is one choice among the others: the same segmented control as Appearance and Sound */
-.lang-grid:not(.big) { gap: var(--s-05); padding: var(--s-05); border-radius: var(--r-2); background: var(--fill); }
-.lang-grid:not(.big) button { height: 30px; border: 0; border-radius: var(--r-1); background: transparent; color: var(--text-2); }
-.lang-grid:not(.big) button:hover { color: var(--text); }
-.lang-grid:not(.big) button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-raised); }
-:root[data-theme="dark"] .lang-grid:not(.big) button.on { background: var(--fill-2); }
+.lang-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-05); padding: var(--s-05); border-radius: var(--r-2); background: var(--fill); }
+.lang-grid button { height: 30px; border: 0; border-radius: var(--r-1); background: transparent; color: var(--text-2); cursor: pointer; font-weight: 500; }
+.lang-grid button:hover { color: var(--text); }
+.lang-grid button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-raised); }
+:root[data-theme="dark"] .lang-grid button.on { background: var(--fill-2); }
 .about { display: flex; flex-direction: column; gap: var(--s-1); }
 .shortcuts { display: grid; grid-template-columns: 10em 1fr; gap: var(--s-2) var(--s-4); margin: 0; align-items: center; }
 .shortcuts dd { margin: 0; color: var(--text-2); }
@@ -1123,6 +1130,15 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
 .choice strong { font: 500 14px/20px var(--font); }
 .choice span { font: var(--t-small); color: var(--text-3); }
 .ob-foot { margin-top: var(--s-4); }
+.ob-welcome { margin: 0; font: var(--t-small); color: var(--text-2); }
+.ob-welcome span { color: var(--text-3); }
+/* The language, in the corner: the system's is already chosen. */
+.ob-lang { position: absolute; top: calc(var(--tb) + var(--s-2)); right: var(--s-5); display: flex; gap: var(--s-05); }
+.ob-lang button { height: 28px; padding: 0 var(--s-2); border: 0; border-radius: var(--r-1); background: transparent; color: var(--text-3); font: var(--t-small); cursor: pointer; }
+.ob-lang button:hover { color: var(--text); background: var(--fill); }
+.ob-lang button.on { color: var(--text); background: var(--fill); }
+.rank-anchor strong { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); width: 100%; }
+.anchor-rank { font: var(--t-small); font-style: normal; color: var(--text-3); white-space: nowrap; }
 /* Safe state (app/safety.jsx): no bridge, or the store could not be read */
 .safe-screen { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--s-5); background: var(--bg); overflow: auto; }
 .safe-card { max-width: 520px; width: 100%; padding: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
@@ -1213,10 +1229,10 @@ li.progress-row { padding-right: calc(var(--s-4) * 2 + 14px); }
   .spark polyline { stroke: CanvasText; }
   .spark circle { fill: CanvasText; }
   :focus-visible, .board:focus-visible, .comment-box:focus { outline: 2px solid Highlight; outline-offset: 2px; }
-  .btn, .icon-btn, .chip, .segmented button, .preset, .lang-grid button, .mark-btn, .seg-mini button, .settings-tab { border: 1px solid ButtonText; }
+  .btn, .icon-btn, .chip, .segmented button, .preset, .lang-grid button, .ob-lang button, .mark-btn, .seg-mini button, .settings-tab { border: 1px solid ButtonText; }
   .btn.primary { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
   .btn:disabled, .icon-btn:disabled { border-color: GrayText; color: GrayText; }
-  .chip.on, .segmented button.on, .preset.on, .lang-grid button.on, .mark-btn.on, .seg-mini button.on, .settings-tab.on, .sb-item.on, .icon-btn.on, .story button.on, .key-move.on {
+  .chip.on, .segmented button.on, .preset.on, .lang-grid button.on, .ob-lang button.on, .mark-btn.on, .seg-mini button.on, .settings-tab.on, .sb-item.on, .icon-btn.on, .story button.on, .key-move.on {
     outline: 2px solid Highlight; outline-offset: -2px; color: HighlightText; background: Highlight; forced-color-adjust: none;
   }
   .menu, .sheet, .card, .toast, .error-card, .task-notice { border: 1px solid CanvasText; }

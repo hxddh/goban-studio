@@ -37,7 +37,7 @@ export const LIBRARY = {
   "library.yesterday": m("昨天", "Yesterday", "어제", "昨日"),
   "library.daysAgo": m("{0} 天前", "{0} days ago", "{0}일 전", "{0}日前"),
   "library.swing": m("第 {0} 手起伏最大（约 {1} 目）", "biggest swing at move {0} (about {1} points)", "{0}수째에서 가장 크게 흔들림(약 {1}집)", "{0}手目が最大の変動（約{1}目）"),
-  "library.look": m("只看不下", "Look at it", "두지 않고 보기", "打たずに見る"),
+  "library.look": m("只看棋谱", "Look at it", "두지 않고 보기", "打たずに見る"),
   "library.clearUnfinished": m("清理未下完的对局…", "Clear unfinished games…", "미완료 대국 정리…", "未完の対局を整理…"),
   "library.clearUnfinishedTitle": m("删除 {0} 盘未下完的对局？", "Delete {0} unfinished games?", "미완료 대국 {0}판을 삭제할까요?", "未完の対局 {0} 局を削除しますか？"),
   "library.clearUnfinishedTitle.one": m("删除 {0} 盘未下完的对局？", "Delete {0} unfinished game?", "미완료 대국 {0}판을 삭제할까요?", "未完の対局 {0} 局を削除しますか？"),

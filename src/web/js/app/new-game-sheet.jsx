@@ -10,6 +10,7 @@ import * as C from "./controller.js";
 import { rankLabel } from "./play.jsx";
 import { Button, Icon, Segmented, Stepper } from "./parts.jsx";
 import { Modal } from "./modal.jsx";
+import { HumanHint } from "./human-hint.jsx";
 
 /* --------------------------------------------------------------- new game */
 
@@ -137,6 +138,8 @@ export function NewGameSheet({ prefill }) {
           />
         </div>
         {!state.engine.available && opponent === "ai" && <p class="fine">{t("newGame.offline")}</p>}
+        {/* A kyu opponent is where the human-style model shows most: offer it here, once, quietly. */}
+        {opponent === "ai" && choice.rank > 0 && <HumanHint />}
         {suggested > 0 && handicap == null && color === BLACK && <p class="note">{t("newGame.suggested", [suggested])}</p>}
 
         <button type="button" class="disclosure" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>

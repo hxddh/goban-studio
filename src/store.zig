@@ -24,6 +24,13 @@ const durable = @import("durable.zig");
 
 /// Largest file the store keeps (a game with its full analysis is well under).
 pub const max_file_bytes: u64 = 8 * 1024 * 1024;
+
+/// Whether `len` bytes written at `offset` stay within `limit`, without the
+/// `offset + len` that a hostile offset (from the page) would overflow.
+fn fits(offset: u64, len: usize, limit: u64) bool {
+    if (len > limit) return false;
+    return offset <= limit - len;
+}
 /// Raw bytes per bridge call; as base64 (512 KB) it fits one bridge message.
 pub const chunk_bytes: usize = 384 * 1024;
 pub const max_key_bytes: usize = 200;
@@ -215,7 +222,7 @@ pub const Store = struct {
     /// the temporary file replaces the target in one rename.
     pub fn write(self: *Store, key: []const u8, bytes: []const u8, offset: u64, done: bool) Error!void {
         if (!validKey(key)) return error.InvalidKey;
-        if (offset + bytes.len > max_file_bytes) return error.TooLarge;
+        if (!fits(offset, bytes.len, max_file_bytes)) return error.TooLarge;
         const dir = (try self.openRoot(true, false)).?;
         defer dir.close(self.io);
         var sub_buf: [max_key_bytes + 16]u8 = undefined;
@@ -363,6 +370,15 @@ test "store keys are validated strictly" {
     for ([_][]const u8{ "console.json", "com.json", "com0.json", "com10.json", "lpt.json", "nul-1.json", "auxiliary.json" }) |k| try testing.expect(validKey(k));
 }
 
+test "chunk bounds never overflow on a hostile offset" {
+    try testing.expect(fits(0, 0, 10));
+    try testing.expect(fits(4, 6, 10));
+    try testing.expect(!fits(5, 6, 10));
+    try testing.expect(!fits(0, 11, 10));
+    try testing.expect(!fits(std.math.maxInt(u64), 1, 10));
+    try testing.expect(!fits(std.math.maxInt(u64) - 2, 8, max_file_bytes));
+}
+
 test "Windows device names are recognised in any case, with or without an extension" {
     const devices = [_][]const u8{ "con", "CON", "Con", "prn", "aux", "nul", "NUL.txt", "com1", "COM9", "lpt1", "LPT9.json", "con.tar.gz", "con ", "aux .json" };
     for (devices) |n| try testing.expect(isDeviceName(n));
@@ -402,7 +418,7 @@ pub fn readPath(io: std.Io, path: []const u8, offset: u64, buf: []u8) Error!Chun
 /// `done` renames it over the target.
 pub fn writePath(io: std.Io, path: []const u8, bytes: []const u8, offset: u64, done: bool) Error!void {
     if (!std.fs.path.isAbsolute(path)) return error.InvalidKey;
-    if (offset + bytes.len > max_user_file_bytes) return error.TooLarge;
+    if (!fits(offset, bytes.len, max_user_file_bytes)) return error.TooLarge;
     const name = std.fs.path.basename(path);
     if (name.len == 0 or name.len + part_suffix.len > 255) return error.InvalidKey;
     var tmp_buf: [256]u8 = undefined;
@@ -454,6 +470,7 @@ test "a user file is written in chunks beside its target and read back from offs
     try writePath(io, path, "{}", 0, true);
     try testing.expectEqualStrings("{}", (try readPath(io, path, 0, &buf)).bytes);
     try testing.expectError(error.InvalidKey, writePath(io, "backup.json", "x", 0, true));
+    try testing.expectError(error.TooLarge, writePath(io, path, "xx", std.math.maxInt(u64) - 1, false));
 }
 
 test "store writes atomically, reads in chunks, lists and removes in a temp dir" {
@@ -535,6 +552,8 @@ test "store writes atomically, reads in chunks, lists and removes in a temp dir"
     try testing.expectError(error.FileNotFound, tmp.dir.access(io, "escape.json", .{}));
     // The size limit.
     try testing.expectError(error.TooLarge, store.write("big.json", "x", max_file_bytes, true));
+    // A hostile offset is refused, not an overflow panic.
+    try testing.expectError(error.TooLarge, store.write("big.json", "xx", std.math.maxInt(u64), false));
 
     // No data directory: every command says so.
     var none: Store = .{ .io = io };

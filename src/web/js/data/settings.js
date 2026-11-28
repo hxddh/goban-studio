@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS = {
   captureWins: 0, // capture Go games won (the beginner bridge, Practice)
   dailySize: 5, // problem items in a day of Practice: 3 | 5 | 10 (model/player.js RULES.DAILY_SIZES)
   firstCountSeen: false, // the one-time note on the first count was shown
+  humanHintDismissed: false, // the one line that offers the human-style model was closed (app/human-hint.jsx)
 };
 
 /**
@@ -98,7 +99,7 @@ export function normalizeSettings(raw) {
   // (older still) played Japanese rules. Only a new profile has none.
   if (s.defaultRules === undefined && s.onboarded === true) out.defaultRules = "japanese";
   for (const [k, allowed] of Object.entries(ONE_OF)) if (!allowed.includes(out[k])) out[k] = DEFAULT_SETTINGS[k];
-  for (const k of ["coords", "coordsAround", "tallBoard", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen"]) {
+  for (const k of ["coords", "coordsAround", "tallBoard", "numbers", "lastMoveMark", "onboarded", "focus", "largeText", "confirmMove", "confirmProblemMove", "showEval", "liveAnalysis", "autoStrength", "autoUpdateCheck", "firstCountSeen", "humanHintDismissed"]) {
     if (typeof out[k] !== "boolean") out[k] = DEFAULT_SETTINGS[k];
   }
   if (out.teaching !== true && out.teaching !== false) out.teaching = null;

@@ -13,9 +13,10 @@ disagrees with the content.
 | Gate | Command | Count |
 | --- | --- | --- |
 | Static checks | `npm run lint` | 0 warnings allowed |
-| Unit and data tests | `npm test` | 624 checks in 74 files |
-| Interface tests | `npm run ui-test` | 153 checks, 18 visual baselines |
-| Zig tests | `npm run test:native` | 79 pass on Linux, 3 more are skipped there |
+| Type checking | `npm run typecheck` | 0 errors allowed |
+| Unit and data tests | `npm test` | 641 checks in 75 files |
+| Interface tests | `npm run ui-test` | 157 checks, 24 visual baselines |
+| Zig tests | `npm run test:native` | 90 pass on Linux, 3 more are skipped there |
 | Content | `npm run release-check` | 23 units · 104 lessons · 377 steps · 543 problems in 30 themes · 20 classics |
 <!-- /counts -->
 
@@ -24,6 +25,7 @@ disagrees with the content.
 | Gate | Command | Pull request (`checks.yml`) | Release (`release.yml`) |
 | --- | --- | --- | --- |
 | Static checks | `npm run lint` | Node 24 and 26 | — |
+| Type checking | `npm run typecheck` | Node 24 and 26 | — |
 | Unit and data tests | `npm test` | Node 24 and 26 | macOS arm64, macOS x64, Windows |
 | Content gate | `npm run release-check` | Node 24 and 26 | every platform build, twice (before and after the frontend build) |
 | Interface tests | `npm run ui-test` | Chromium on Linux | — (the packaged app has its own checks below) |
@@ -105,8 +107,13 @@ runs the Windows script's DevTools connection and steps against
 
 ESLint with `eslint.config.js`: undefined names, unused variables and
 imports, duplicate keys, unreachable code, the hooks rules. No warning is
-allowed, and it runs before the tests on every pull request. There is no
-type checking.
+allowed, and it runs before the tests on every pull request.
+
+## Type checking (`npm run typecheck`)
+
+`tsc --noEmit -p jsconfig.json` checks the page's JavaScript against its
+JSDoc types (no TypeScript sources, nothing is emitted). It is part of
+`npm run verify`, between the lint and the tests.
 
 ## Unit and data tests (`npm test`)
 
@@ -158,7 +165,7 @@ Real Chromium against the built page (`frontend/dist`); `scripts/ui-test.mjs`
 is the harness, `scripts/ui-tests/*.mjs` hold each area's checks.
 
 - **Flows**: first run landing on Today and on to lesson one or a game
-  (every answer reaches a board in three clicks), a
+  (every answer reaches a board in two clicks), a
   two-player game played by keyboard to the count, undo and redo, passing,
   counting again, a trial line kept and discarded, review edits undone, a
   wrong answer and its reset, history back and forward, the explorer,

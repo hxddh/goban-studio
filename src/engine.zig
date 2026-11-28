@@ -292,7 +292,10 @@ pub const Engine = struct {
     /// root (binary + model + config), so a half-copied release cannot be
     /// mistaken for a working one.
     pub fn paths(self: *@This()) ?Paths {
+        // Every buffer a candidate root may point into lives for the whole
+        // function: `candidates` holds slices of them until the loop below.
         var root_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        var root2_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var bin_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var preferred_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         var model_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
@@ -318,7 +321,6 @@ pub const Engine = struct {
                     candidates[count] = p;
                     count += 1;
                 }
-                var root2_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
                 if (join(&root2_buf, &.{ up, "resources", "frontend", "dist", "engine" })) |p| {
                     candidates[count] = p;
                     count += 1;

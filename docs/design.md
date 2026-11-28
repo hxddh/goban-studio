@@ -142,7 +142,8 @@ else casts a shadow.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `--shadow-board` | 0 0 0 1px rgba(60,40,12,.1), 0 1px 2px rgba(60,40,12,.12), 0 12px 24px -14px rgba(60,40,12,.4) | 0 0 0 1px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.4), 0 12px 24px -14px rgba(0,0,0,.75) | the board on its stage: close to the table |
+| `--stage-glow` | none | radial-gradient(ellipse 62% 58% at 50% 50%, rgba(214,178,122,.05), transparent 72%) | a faint warm light under the board on the dark page |
+| `--shadow-board` | 0 0 0 1px rgba(60,40,12,.1), 0 1px 2px rgba(60,40,12,.12), 0 12px 24px -14px rgba(60,40,12,.4) | 0 0 0 1px #6E5536, 0 0 0 4px #26221C, 0 0 0 5px rgba(255,255,255,.05), 0 22px 44px -18px rgba(0,0,0,.85) | the board on its stage: close to the table; in dark, a hairline of darker wood and a narrow warm band step down to the page |
 | `--shadow-pop` | 0 0 0 1px rgba(0,0,0,.06), 0 8px 24px -6px rgba(0,0,0,.18) | 0 0 0 1px rgba(255,255,255,.08), 0 8px 24px -6px rgba(0,0,0,.6) | menus, toasts, the bar floating over the board |
 | `--shadow-sheet` | 0 0 0 1px rgba(0,0,0,.06), 0 24px 64px -16px rgba(0,0,0,.32) | 0 0 0 1px rgba(255,255,255,.08), 0 24px 64px -16px rgba(0,0,0,.7) | sheets |
 | `--shadow-raised` | 0 0 0 .5px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.08) | none | the selected segment |
@@ -167,7 +168,8 @@ force; the table gives the light standard palette.
 | `--stone-fill-black` | radial-gradient(circle at 35% 30%, #55534F, #121211 70%) | radial-gradient(circle at 35% 30%, #5A5854, #161615 62%) | the inline stone beside a name |
 | `--stone-fill-white` | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | radial-gradient(circle at 35% 30%, #FFF, #E9E6DE 75%) | the inline stone beside a name |
 | `--stone-edge-black` | none | inset 0 0 0 1px rgba(255,255,255,.3) | so a black stone shows on a dark ground |
-| `--stone-dot-black` | var(--stone-fill-black) | #4A4844 | the 8 px stone in the move list: flat, so on the dark panel it reads as black, not grey or a ring |
+| `--stone-dot-black` | var(--stone-fill-black) | #050505 | the 8 px stone in the move list: flat black, not a grey that reads as a third colour |
+| `--stone-edge-dot-black` | none | 0 0 0 1px rgba(237,235,230,.42) | its hairline on the dark panel, so it does not sink into it |
 | `--stone-edge-white` | inset 0 0 0 .75px rgba(0,0,0,.22) | inset 0 0 0 .75px rgba(0,0,0,.22) | so a white stone shows on a light ground |
 | `--tile-black` | #1B1A17 | #1B1A17 | stones on a problem's tile |
 | `--tile-white` | #FBF8F1 | #FBF8F1 | stones on a problem's tile |
@@ -226,7 +228,9 @@ force; the table gives the light standard palette.
   4 px a cell and star points from 8 px; stones are flat discs that fill
   their cell (crisp squares under 4 px), and a white stone always has a
   hairline rim drawn around it, so a 19×19 at 44 px still reads at 1× and
-  2×.
+  2×. A classic's row shows not its crowded final position but a 7×7
+  window around one of its key moves, as the board stood then, with that
+  move marked by a small dot (`data/games.js` `classicFace`).
 
 ## 6. Components
 
@@ -309,14 +313,21 @@ force; the table gives the light standard palette.
   result, the game's facts, the change of the estimate or why the game
   was not rated), then the balance chart (the hero) and the analysis line;
   below them three tabs (segmented control): *Analysis* (up to three key
-  moments, each expandable into its explained line, and variations; an
+  moments, each expandable into its explained line — opening one puts
+  the recommended line on the board at once, its first five moves as
+  numbered see-through stones, so the better way is seen, not read as
+  coordinates — and variations; an
   offline estimate shows its turning points only, without a loss or a
   better move), *Summary* (the game in three phases — only when KataGo
   analysed the game) and *Notes* (comment, marks, variation tree, and two
   small Undo / Redo buttons for the edits). A key moment of a
   KataGo-analysed game of your own has *Try again*: the board goes to the
   position before it and the panel shows one card with KataGo's verdict
-  (no primary in it). The one primary action is *New game* after a game
+  (no primary in it). Under the result of a game against the computer,
+  and in New game when the opponent is a kyu level, the desktop app
+  offers the human-style model in one quiet line (Download, and a close
+  button that hides it for good) until it is installed. The one primary
+  action is *New game* after a game
   you just played, *Back to the game* in "Review so far", *Continue* for
   an unfinished game looked at from the Library, *Play from here*
   otherwise. A record opens on its final position and moves to the first
@@ -357,8 +368,9 @@ force; the table gives the light standard palette.
 * **Today.** The app opens here. A date and a greeting; one hero — the
   game in progress or the suggested game — with the page's one primary
   button; one row for today's practice (the next row of the path, done of
-  total, *Start* / *Continue*; the placement quiz in its place before the
-  first path). Then *Your progress*, one group of rows, each a line of
+  total, *Start* / *Continue*; when the next item is a problem the row
+  leads with its board, and one click opens it; the placement quiz in its
+  place before the first path). No separate problem card beside it. Then *Your progress*, one group of rows, each a line of
   words on the left and a small picture on the right, the pictures ending
   on one edge: the level (the estimate with its ±, and from three rated
   games its line over the newest forty with the change in words, "up
@@ -375,17 +387,22 @@ force; the table gives the light standard palette.
   straight on a board or in a lesson, and the hero is what the onboarding
   answer asked for, one click away: lesson one for someone who never
   played (*Start here*), the gentlest 9×9 game for someone who knows the
-  rules. A player has already answered one more question (their rank), so
-  that step's button (*Play*) starts the even 19×19 game itself: every
-  answer reaches a board in three clicks. After three finished 9×9
+  rules. A player has already answered one more question (their level), so
+  picking it starts the even 19×19 game itself: every answer reaches a
+  board in two clicks. After three finished 9×9
   games a beginner's suggested game is 13×13, and two games there come
   before 19×19; the quieter second offer beside the hero is the next board
   up (a quick 9×9 beside the full board).
-* **Onboarding.** Three short steps on a plain page: the language; *Have
-  you played Go before?* (three answers); for a player, a level. One quiet
-  line at the foot: offline on the first step, then which rules new games
-  use (those of the language: Chinese rules in Chinese, Korean in Korean,
-  Japanese otherwise) and that Settings changes it.
+* **Onboarding.** At most two short steps on a plain page, in the
+  system's language (four quiet language names in the corner change it):
+  *Have you played Go before?* (three answers, under a welcome that says
+  the app is offline); for a player, *How do you usually play?* — five
+  levels in words (now and then ≈ 20 kyu, regularly ≈ 12 kyu, a club
+  player ≈ 5 kyu, around 1 dan, strong dan ≈ 4 dan), no slider; a pick
+  starts the game, and the rating finds the level from the games. One
+  quiet line at the foot: which rules new games use (those of the
+  language: Chinese rules in Chinese, Korean in Korean, Japanese
+  otherwise) and that Settings changes it.
 * **Narrow windows (720–860 px).** A board place keeps the board on top
   and turns its panel into a compact bar under it, so nothing needed is
   below the fold and nothing scrolls: in a game the two players side by

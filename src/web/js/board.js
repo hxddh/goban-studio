@@ -486,7 +486,8 @@ export class BoardView {
     if (m.variation) {
       for (const s of m.variation) {
         if (!inWin(s.x, s.y)) continue;
-        this.stone(ctx, s.x, s.y, s.c, theme, { alpha: 0.82, shadow: false });
+        // See-through enough that the position under the line still reads, clear enough that the numbers do.
+        this.stone(ctx, s.x, s.y, s.c, theme, { alpha: 0.74, shadow: false });
         if (s.n) this.label(ctx, s.x, s.y, String(s.n), s.c === BLACK ? theme.onBlack : theme.onWhite, cell * 0.42);
       }
     }

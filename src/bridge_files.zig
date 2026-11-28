@@ -100,17 +100,21 @@ pub fn openFileDialog(context: *anyopaque, invocation: native_sdk.bridge.Invocat
     if (!json.append(output, &n, "[")) return error.HandlerFailed;
     var count: usize = 0;
     var it = std.mem.splitScalar(u8, result.paths, '\n');
+    // At most one batch (files_mod.max_open_batch): every path returned is
+    // granted, and the grant set has room for all of them at once, so the
+    // first files of a large multi-select stay readable.
     while (it.next()) |path| {
+        if (count >= files_mod.max_open_batch) break;
         if (path.len == 0 or !std.unicode.utf8ValidateSlice(path)) continue;
-        // A file the app does not read (a .txt, say) is still returned, so
-        // the page can say it could not import it; it is just not granted.
-        _ = self.grants.grant(path, .read, false);
         const mark = n;
         if (count > 0 and !json.append(output, &n, ",")) break;
         if (!json.appendString(output, &n, path)) {
             n = mark;
             break;
         }
+        // A file the app does not read (a .txt, say) is still returned, so
+        // the page can say it could not import it; it is just not granted.
+        _ = self.grants.grant(path, .read, false);
         count += 1;
     }
     if (count == 0) return "null";

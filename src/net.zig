@@ -3,8 +3,9 @@
 //! downloads (models.zig).
 //!
 //!   * Proxy. Many players reach GitHub only through a proxy. Each request
-//!     uses, in this order: the environment (`HTTPS_PROXY`, `https_proxy`,
-//!     `ALL_PROXY`, `all_proxy`, unless `NO_PROXY` names the host), then
+//!     (and each redirect hop, by its own host) uses, in this order: the
+//!     environment (`HTTPS_PROXY`, `https_proxy`, `ALL_PROXY`,
+//!     `all_proxy`, unless `NO_PROXY` names the host), then
 //!     the system's manual HTTPS proxy (macOS: `scutil --proxy`; Windows:
 //!     the Internet Settings registry values, read with `reg.exe`). Only
 //!     plain HTTP proxies are used (`http://host:port`): the app asks the
@@ -233,9 +234,11 @@ const Exchange = struct {
     fn open(self: *Exchange, session: *net_tunnel.Session, url: []const u8, user_agent: []const u8, headers: []const std.http.Header) !void {
         const uri = std.Uri.parse(url) catch return error.BadRedirect;
         if (!std.ascii.eqlIgnoreCase(uri.scheme, "https")) return error.BadRedirect;
+        var host_buf: [std.Io.net.HostName.max_len]u8 = undefined;
+        const host = uri.getHost(&host_buf) catch return error.BadRedirect;
+        // Every hop is judged by its own host (NO_PROXY, the system proxy).
+        session.useHost(host.bytes);
         if (session.proxy) |*proxy| {
-            var host_buf: [std.Io.net.HostName.max_len]u8 = undefined;
-            const host = uri.getHost(&host_buf) catch return error.BadRedirect;
             if (net_tunnel.Tunnel.create(session, proxy, host.bytes, uri.port orelse 443, user_agent)) |tunnel| {
                 self.tunnel = tunnel;
                 errdefer {
@@ -250,7 +253,7 @@ const Exchange = struct {
                 // handshake through it failed): a proxy setting must never
                 // be worse than none, which is what the app had before it
                 // read any. This session asks directly from now on.
-                session.proxy = null;
+                session.dropProxy();
             }
         }
         self.request = session.client.request(.GET, uri, .{

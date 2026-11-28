@@ -439,24 +439,25 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
       await page.keyboard.press("Escape");
       await page.waitForTimeout(50);
       assert((await page.locator(".ob-card").count()) === 1, "Esc closed the onboarding");
-      if (step === 0) await page.click(".ob-card .btn.primary");
+      if (step === 0) {
+        await page.click(".choice >> nth=2");
+        await page.waitForSelector(".ob-card .rank-anchors");
+      }
     }
-    await page.click(".choice >> nth=2");
-    await page.waitForSelector(".ob-card .slider-field");
     assert((await sheetInfo(page)).name.length > 0, "the rank step has a name");
-    await page.click(".ob-card .btn.primary");
-    // Its button starts the suggested game: the 19×19 board, the player to move.
+    await page.click(".rank-anchor >> nth=2");
+    // A level picked starts the suggested game: the 19×19 board, the player to move.
     await page.waitForFunction(() => window.__state.sheet === null && window.__state.space === "play" && window.__state.game?.game.size === 19);
     noErrors(page, "onboarding");
     await page.close();
   });
 
-  await check("first launch: from opening the app to a board waiting for the first stone in 3 clicks, whatever the answer", async () => {
-    // The clicks for each answer: the welcome, the answer, then the one button that starts.
+  await check("first launch: from opening the app to a board waiting for the first stone in 2 clicks, whatever the answer", async () => {
+    // The clicks for each answer: the answer (the language is the system's), then the one button or level that starts.
     const paths = [
       { answer: 0, then: ".today .hero .btn.primary" },
       { answer: 1, then: ".today .hero .btn.primary" },
-      { answer: 2, then: ".ob-card .btn.primary" },
+      { answer: 2, then: ".rank-anchor >> nth=2" },
     ];
     const out = [];
     for (const { answer, then } of paths) {
@@ -467,7 +468,6 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
         await page.click(sel);
         clicks++;
       };
-      await click(".ob-card .btn.primary");
       await click(`.choice >> nth=${answer}`);
       await click(then);
       // A lesson's board or a game's, with the player to move.
@@ -481,7 +481,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
         null,
         { timeout: 10000 },
       );
-      assert(clicks <= 3, `answer ${answer}: ${clicks} clicks`);
+      assert(clicks <= 2, `answer ${answer}: ${clicks} clicks`);
       out.push(await page.evaluate(() => (window.__state.space === "play" ? `game ${window.__state.game.game.size}×${window.__state.game.game.size}` : "lesson")));
       noErrors(page, `first launch, answer ${answer}`);
       await page.close();
@@ -939,7 +939,6 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     await plain.waitForSelector(".ob-card");
     const handles = await plain.evaluate(() => ["__state", "__board", "__solver", "__autoAnalyse", "__crashRender"].filter((k) => k in window));
     assert(handles.length === 0, `left on window: ${handles}`);
-    await plain.click(".ob-card .btn.primary");
     await plain.click(".choice >> nth=1");
     await plain.click(".today .hero .btn.primary");
     await plain.waitForSelector("canvas.board");

@@ -78,7 +78,6 @@ export const STEPS = [
       // A new profile opens on onboarding; one already set up on Today or where it was left.
       await page.waitForSelector(".ob-card, nav .sb-list", { timeout: STEP_TIMEOUT_MS });
       if (await page.locator(".ob-card").count()) {
-        await page.locator(".ob-card .btn.primary").click();
         // "I know the rules": Today with a gentle 9×9 game offered, nothing started.
         await page.locator(".choice").nth(1).click();
         await see(page, ".page.today .hero .btn.primary", "Today after onboarding");

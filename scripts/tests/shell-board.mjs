@@ -4,7 +4,7 @@
  * like on screen is checked in scripts/ui-tests/shell-board.mjs.
  */
 import { test, assert, fs, path, root, CLASSICS, loadSGF } from "./helpers.mjs";
-import { FACE_MIN_STONES, FACE_SPAN, classicFace } from "../../src/web/js/data/games.js";
+import { FACE_MAX_STONES, FACE_MIN_STONES, FACE_SPAN, classicFace } from "../../src/web/js/data/games.js";
 import { BOARD_PALETTES, BOARD_STYLES, boardPalette, contrast, luminance } from "../../src/web/js/theme.js";
 import { GRID_MIN, RIM_MIN, STAR_MIN, drawThumb, fromDiagram, fromString, thumbPlan } from "../../src/web/js/thumb.js";
 import { TALL_RATIO, frameAspect, gridRatioOf, gridStrokesOf, lastMarkOf, liftOf, starRadiusOf } from "../../src/web/js/board-surface.js";
@@ -285,7 +285,7 @@ await test("thumbnails: a crop shows its window of the board, its cut sides run 
   assert.equal(lines(nine, 200).filter((p) => p[0] === "arc").length, 1, "the one black stone, no star points");
 });
 
-await test("thumbnails: a classic's face is a window around a key moment with stones enough to read, not its crowded final position", () => {
+await test("thumbnails: a classic's face is a small window around a key moment, its move marked, with stones enough to read and not so many it is noise", () => {
   assert.ok(CLASSICS.length >= 20);
   for (const c of CLASSICS) {
     const { game } = loadSGF(c.sgf);
@@ -296,7 +296,9 @@ await test("thumbnails: a classic's face is a window around a key moment with st
     const spec = fromString(face.thumb, face.size, face.crop);
     let stones = 0;
     for (let y = 0; y < spec.rows; y++) for (let x = 0; x < spec.cols; x++) if (spec.at(x, y)) stones++;
-    assert.ok(stones >= FACE_MIN_STONES, `${c.id}: ${stones} stones`);
+    assert.ok(stones >= FACE_MIN_STONES && stones <= FACE_MAX_STONES, `${c.id}: ${stones} stones`);
+    // The key move is marked, on a stone inside the window.
+    assert.ok(spec.mark && spec.at(spec.mark.x, spec.mark.y), `${c.id}: the key move is marked`);
     // The position of one of its moments, inside the board.
     const line = game.mainLine();
     assert.ok(

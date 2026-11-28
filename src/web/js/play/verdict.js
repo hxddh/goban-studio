@@ -1,9 +1,10 @@
 /**
  * How a move compares with the best one, in points (the score lead the
  * engine expected before the move, against the one it sees after it), and
- * the word for it: good, slack or a mistake. The same comparison pauses a
- * teaching game on a costly move; here it is said quietly after every move
- * of the player when the balance is shown.
+ * the word for it: good, slack or a mistake, said quietly after every move
+ * of the player when the balance is shown. A teaching game pauses only on
+ * a move that changes the game (`teachingPause`); slack moves and smaller
+ * mistakes are left to the review after the game, so the play flows.
  */
 
 /** Below this many points a move is as good as the best one. */
@@ -51,4 +52,26 @@ export function verdictOf(loss, playerRank) {
   if (loss >= mistakeFrom(playerRank)) return "mistake";
   if (loss >= SLACK_FROM) return "slack";
   return "good";
+}
+
+/**
+ * From this many points a mistake is a blunder: twice the mistake's
+ * threshold (8 for newer players, 12 from 10 kyu up).
+ */
+export function blunderFrom(playerRank) {
+  return 2 * mistakeFrom(playerRank);
+}
+
+/**
+ * Should a teaching game stop before the reply to say this move was
+ * costly? Only for a move that really changes the game: a blunder
+ * (`blunderFrom` points or more), or a mistake that turns a game the
+ * player was winning into one they are losing (`leadBefore`: the player's
+ * expected lead with the best move, in points). Everything smaller is
+ * marked in the move list and waits for the review.
+ */
+export function teachingPause(loss, playerRank, leadBefore = null) {
+  if (verdictOf(loss, playerRank) !== "mistake") return false;
+  if (loss >= blunderFrom(playerRank)) return true;
+  return Number.isFinite(leadBefore) && leadBefore > 0 && leadBefore - loss < 0;
 }

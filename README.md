@@ -17,7 +17,9 @@ The app has four places and opens on the first.
   (no streaks), recent milestones and your last three games.
 - **Play** (⌘2) — the board. The opponent is one choice: a rank from
   30 kyu to 7 dan, played by the KataGo setting that measured closest to
-  it. Teaching mode warns before a costly move and says why; a hint gives
+  it. Teaching mode stops only for a move that changes the game (a
+  blunder, or a mistake that turns a won game into a lost one) and says
+  why; smaller slips wait for the review. A hint gives
   its reason; each of your moves gets a quiet verdict (good, slack or a
   mistake, with the points) when the game teaches or the balance is shown.
   Undo and redo, pass, count; a game that used undo or hints
@@ -243,8 +245,8 @@ npm run ui-update      # rewrite tests/visual baselines after an intended change
 node scripts/export-strings.mjs   # refresh docs/l10n/strings.csv
 ```
 
-Tests are organised by area (`scripts/tests/{core,data,model,play,learn,shell}-*.mjs`,
-`scripts/ui-tests/*.mjs`). `node scripts/test.mjs play-,learn-` runs some
+Tests are organised by area (`scripts/tests/{core,data,model,play,practice,shell}-*.mjs`,
+`scripts/ui-tests/*.mjs`). `node scripts/test.mjs play-,practice-` runs some
 files; `UI_ONLY=<text> npm run ui-test` one browser check.
 [`docs/QA.md`](docs/QA.md) says what each gate covers, with current
 counts, and what no machine checks.
@@ -278,8 +280,8 @@ three packages on the CPUs they ship for, and only then creates the tag
 and the GitHub release:
 
 ```bash
-gh workflow run release.yml --ref main -f tag=v18.0.0
-gh workflow run release.yml -f tag=v18.0.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
+gh workflow run release.yml --ref main -f tag=v18.1.0
+gh workflow run release.yml -f tag=v18.1.0 -f rehearse=true   # every gate and build, publishes nothing, any branch
 ```
 
 The tag must be `v` + the version in `package.json`, its notes must exist

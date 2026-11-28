@@ -1,44 +1,58 @@
 /**
- * Onboarding: the language, then what the player already knows.
+ * Onboarding: what the player already knows, in the system's language
+ * (boot.js detectLang; a quiet switch in the corner changes it). Someone
+ * who plays picks one of a few levels described in words, and their game
+ * starts from that pick; the rating (Glicko-1) then finds the level from
+ * the games.
  */
-import { useState } from "preact/hooks";
 import { rulesetById } from "../rules.js";
 import { LANG_IDS, LANG_NAMES, t } from "../i18n.js";
 import { state, update } from "./store.js";
 import * as C from "./controller.js";
-import { Button } from "./parts.jsx";
 
-/* ------------------------------------------------------------- onboarding */
+/**
+ * The levels a player can say they are at, weakest first: a rank (kyu > 0,
+ * dan = 1 − rank, as settings.playerRank) and the words that describe it.
+ * Five, so the choice is about how one plays, not a number on a slider.
+ */
+export const RANK_ANCHORS = [
+  { id: "casual", rank: 20 },
+  { id: "regular", rank: 12 },
+  { id: "club", rank: 5 },
+  { id: "dan", rank: 0 },
+  { id: "strong", rank: -3 },
+];
+
+const rankLabel = (rank) => (rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank]));
+
+/** The language, changed in place: a row of four quiet names in the corner. */
+function LangSwitch() {
+  const lang = state.settings.lang;
+  return (
+    <div class="ob-lang" role="radiogroup" aria-label={t("settings.language")}>
+      {LANG_IDS.map((id) => (
+        <button type="button" role="radio" lang={id} aria-checked={lang === id} class={lang === id ? "on" : ""} onClick={() => C.setSetting("lang", id)}>
+          {LANG_NAMES[id]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Onboarding({ step = 0 }) {
-  const s = state.settings;
-  const [rank, setRank] = useState(15);
   const go = (n) => update((st) => (st.sheet = { kind: "onboarding", step: n }));
   return (
     <div class="onboarding" role="dialog" aria-modal="true" aria-labelledby="ob-title">
       <div class="drag" data-drag />
+      <LangSwitch />
       <div class="ob-card">
         <img class="ob-mark" src="icon.png" width="72" height="72" alt="" />
         {step === 0 && (
           <>
-            <h1 id="ob-title">{t("onboarding.welcome")}</h1>
-            <p class="muted">{t("onboarding.lead")}</p>
-            <div class="lang-grid big" role="radiogroup" aria-label={t("settings.language")}>
-              {LANG_IDS.map((id) => (
-                <button type="button" role="radio" lang={id} aria-checked={s.lang === id} class={s.lang === id ? "on" : ""} onClick={() => C.setSetting("lang", id)}>
-                  {LANG_NAMES[id]}
-                </button>
-              ))}
-            </div>
-            <div class="actions center">
-              <Button kind="primary" data-autofocus onClick={() => go(1)}>
-                {t("common.continue")}
-              </Button>
-            </div>
-          </>
-        )}
-        {step === 1 && (
-          <>
+            <p class="ob-welcome">
+              {t("onboarding.welcome")}
+              <span> · {t("onboarding.offline")}</span>
+            </p>
             <h1 id="ob-title">{t("onboarding.question")}</h1>
             <div class="choice-list">
               <button type="button" class="choice" data-autofocus onClick={() => C.finishOnboarding("new")}>
@@ -49,45 +63,46 @@ export function Onboarding({ step = 0 }) {
                 <strong>{t("onboarding.rules")}</strong>
                 <span>{t("onboarding.rulesHelp")}</span>
               </button>
-              <button type="button" class="choice" onClick={() => go(2)}>
+              <button type="button" class="choice" onClick={() => go(1)}>
                 <strong>{t("onboarding.player")}</strong>
                 <span>{t("onboarding.playerHelp")}</span>
               </button>
             </div>
+          </>
+        )}
+        {step === 1 && (
+          <>
+            <h1 id="ob-title">{t("onboarding.howYouPlay")}</h1>
+            {/* A pick starts the suggested game at once: someone who plays has said enough. */}
+            <div class="choice-list rank-anchors">
+              {RANK_ANCHORS.map((a, i) => (
+                <button
+                  type="button"
+                  class="choice rank-anchor"
+                  data-rank={a.rank}
+                  data-autofocus={i === 1 ? true : undefined}
+                  onClick={() => {
+                    C.finishOnboarding("player", a.rank);
+                    C.startFirstRun();
+                  }}
+                >
+                  <strong>
+                    {t(`onboarding.anchor.${a.id}`)}
+                    <em class="anchor-rank">{rankLabel(a.rank)}</em>
+                  </strong>
+                  <span>{t(`onboarding.anchor.${a.id}Help`)}</span>
+                </button>
+              ))}
+            </div>
+            <p class="fine">{t("onboarding.rankHelp")}</p>
             <button type="button" class="link" onClick={() => go(0)}>
               ← {t("common.back")}
             </button>
           </>
         )}
-        {step === 2 && (
-          <>
-            <h1 id="ob-title">{t("onboarding.rankQuestion")}</h1>
-            <div class="slider-field big">
-              <input type="range" min="0" max="33" step="1" value={30 - rank} onInput={(e) => setRank(30 - Number(e.currentTarget.value))} aria-label={t("settings.you")} aria-valuetext={rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank])} />
-              <output>{rank > 0 ? t("rank.kyu", [rank]) : t("rank.dan", [1 - rank])}</output>
-            </div>
-            <p class="fine">{t("onboarding.rankHelp")}</p>
-            <div class="actions center">
-              <Button kind="ghost" onClick={() => go(1)}>
-                {t("common.back")}
-              </Button>
-              {/* Someone who plays has said enough: the suggested game starts here, not one more click away on Today. */}
-              <Button
-                kind="primary"
-                data-autofocus
-                onClick={() => {
-                  C.finishOnboarding("player", rank);
-                  C.startFirstRun();
-                }}
-              >
-                {t("play.suggest.play")}
-              </Button>
-            </div>
-          </>
-        )}
-        {/* One quiet line: offline on the first step; then which rules new games use (by language) and where to change it. */}
-        <p class="fine ob-foot" data-ob-foot={step === 0 ? "offline" : "rules"}>
-          {step === 0 ? t("onboarding.offline") : t("onboarding.rulesLine", [t(rulesetById(C.defaultRules()).labelKey)])}
+        {/* One quiet line: which rules new games use (by language) and where to change it. */}
+        <p class="fine ob-foot" data-ob-foot="rules">
+          {t("onboarding.rulesLine", [t(rulesetById(C.defaultRules()).labelKey)])}
         </p>
       </div>
     </div>

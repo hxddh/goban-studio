@@ -411,7 +411,7 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
     });
   }
 
-  await check("shell board: at 1280×800 a 19×19 game's board keeps cells of 33 px or more; in the dark theme the move list's black stones are dark discs, its white ones bright", async () => {
+  await check("shell board: at 1280×800 a 19×19 game's board keeps cells of 33 px or more; in the dark theme the move list's black stones are black discs with a light hairline, its white ones bright", async () => {
     const page = await seededPage({}, { viewport: { width: 1280, height: 800 }, scheme: "dark" });
     await page.keyboard.press("Control+2");
     await page.click(".hero-actions .btn.primary");
@@ -434,11 +434,17 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, orig
       let el = document.querySelector(".move-grid");
       while (el && /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(el).backgroundColor)) el = el.parentElement;
       const ground = el ? getComputedStyle(el).backgroundColor : "rgb(0, 0, 0)";
-      return { b: fill(".move-grid .stone.b"), w: fill(".move-grid .stone.w"), panel: (ground.match(/[\d.]+/g) || []).slice(0, 3).map(Number) };
+      // The black disc's hairline: the colour of its box-shadow, blended over the panel by its alpha.
+      const rim = (getComputedStyle(document.querySelector(".move-grid .stone.b")).boxShadow.match(/rgba?\([^)]*\)/) || ["rgb(0, 0, 0)"])[0].match(/[\d.]+/g).map(Number);
+      return { b: fill(".move-grid .stone.b"), w: fill(".move-grid .stone.w"), rim, panel: (ground.match(/[\d.]+/g) || []).slice(0, 3).map(Number) };
     });
     const [lb, lw, lp] = [lum(c.b), lum(c.w), lum(c.panel)];
-    // A flat black disc: not lit (a lit one reads grey), lighter than the panel so it is not a hole, far from the white.
-    assert(lb > lp && (lb + 0.05) / (lp + 0.05) < 2, `black ${hex(c.b)} on the panel ${hex(c.panel)}`);
+    const a = c.rim[3] ?? 1;
+    const lr = lum(c.rim.slice(0, 3).map((v, i) => Math.round(v * a + c.panel[i] * (1 - a))));
+    // A flat black disc (not lit: a lit one reads grey), at least as dark as the panel, held off it by a light
+    // hairline that stands out from the panel (3:1, a graphic's contrast), and far from the white.
+    assert(lb <= lp, `black ${hex(c.b)} on the panel ${hex(c.panel)}`);
+    assert((lr + 0.05) / (lp + 0.05) >= 3, `the black disc's hairline on the panel ${hex(c.panel)}: ${((lr + 0.05) / (lp + 0.05)).toFixed(2)}:1`);
     assert((lw + 0.05) / (lb + 0.05) >= 7, `white ${hex(c.w)} against black ${hex(c.b)}`);
     assert(page.errors.length === 0, page.errors.join("; "));
     await page.close();

@@ -34,7 +34,6 @@ export default async function ({ check, assert, fresh, origin }) {
       await page.goto(origin + "/");
       // A player with a game on the board, on Today (the self-test runs wherever the app opened).
       await page.waitForSelector(".ob-card");
-      await page.click(".ob-card .btn.primary");
       await page.click(".choice >> nth=1");
       await page.waitForSelector(".page.today .hero .btn.primary");
       await page.click(".today .hero .btn.primary");
