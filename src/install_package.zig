@@ -107,6 +107,16 @@ pub fn safeEntryName(name: []const u8, root: []const u8) bool {
 /// Prefix of the AppleDouble copies `ditto -c -k --sequesterRsrc` adds.
 const sequestered_prefix = "__MACOSX/";
 
+/// Top-level files a package may carry beside its root, by exact name: the
+/// macOS release .zip gets its README added at the top level
+/// (`zip -g -j`, build-macos.yml and scripts/package.sh).
+pub fn packageExtras(p: install_mod.Platform) []const []const u8 {
+    return switch (p) {
+        .macos_arm64, .macos_x64 => &.{"README-macOS.txt"},
+        else => &.{},
+    };
+}
+
 /// The package root an entry name sits under (one of `roots`), or null.
 /// With `sequestered`, `__MACOSX/<root>/…` (ditto's resource forks) counts
 /// as that root too.
@@ -122,8 +132,10 @@ fn entryRoot(name: []const u8, roots: []const []const u8, sequestered: bool) ?[]
 /// at most `max_zip_entries`, at most `max_unpacked_bytes` declared (summed
 /// with saturation, so a hostile size cannot wrap), and every name safe and
 /// under one and the same package root from `roots`. Both platforms run
-/// this before unpacking (std.zip on Windows, ditto on macOS).
-pub fn checkZip(io: std.Io, zip_path: []const u8, roots: []const []const u8, sequestered: bool) !void {
+/// this before unpacking (std.zip on Windows, ditto on macOS). A plain
+/// top-level file named exactly as one of `extras` is allowed too; it is
+/// unpacked beside the root and never staged.
+pub fn checkZip(io: std.Io, zip_path: []const u8, roots: []const []const u8, extras: []const []const u8, sequestered: bool) !void {
     var file = std.Io.Dir.openFileAbsolute(io, zip_path, .{}) catch return error.Unpack;
     defer file.close(io);
     var read_buf: [16 * 1024]u8 = undefined;
@@ -141,17 +153,25 @@ pub fn checkZip(io: std.Io, zip_path: []const u8, roots: []const []const u8, seq
         const name = name_buf[0..entry.filename_len];
         reader.seekTo(entry.header_zip_offset + @sizeOf(std.zip.CentralDirectoryFileHeader)) catch return error.Unpack;
         reader.interface.readSliceAll(name) catch return error.Unpack;
+        if (isExtra(name, extras)) continue;
         const root = entryRoot(name, roots, sequestered) orelse return error.Unpack;
         if (package_root) |r| {
             if (!std.mem.eql(u8, r, root)) return error.Unpack;
         } else package_root = root;
     }
-    if (count == 0) return error.Unpack;
+    if (package_root == null) return error.Unpack;
+}
+
+fn isExtra(name: []const u8, extras: []const []const u8) bool {
+    for (extras) |e| {
+        if (std.mem.eql(u8, name, e)) return true;
+    }
+    return false;
 }
 
 /// Check every entry, then extract with std.zip (Windows packages).
 pub fn extractZip(io: std.Io, zip_path: []const u8, dest_path: []const u8, root: []const u8) !void {
-    try checkZip(io, zip_path, &.{root}, false);
+    try checkZip(io, zip_path, &.{root}, &.{}, false);
     var file = std.Io.Dir.openFileAbsolute(io, zip_path, .{}) catch return error.Unpack;
     defer file.close(io);
     var read_buf: [16 * 1024]u8 = undefined;
@@ -255,7 +275,7 @@ pub fn unpack(io: std.Io, platform: install_mod.Platform, zip_path: []const u8, 
             // The same entry checks as on Windows before ditto writes
             // anything: names under the .app root (or ditto's own
             // __MACOSX/ copies of it), entry count and declared size.
-            try checkZip(io, zip_path, stagedRootNames(platform), true);
+            try checkZip(io, zip_path, stagedRootNames(platform), packageExtras(platform), true);
             std.Io.Dir.cwd().createDirPath(io, dest) catch return error.Disk;
             if (!runTool(io, &.{ "/usr/bin/ditto", "-x", "-k", zip_path, dest })) return error.Unpack;
         },
@@ -423,11 +443,18 @@ test "macOS packages get the same entry checks before ditto runs" {
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const zip_path = try std.fmt.bufPrint(&path_buf, "{s}{c}mac.zip", .{ dir, std.fs.path.sep });
     const roots = stagedRootNames(.macos_arm64);
+    const extras = packageExtras(.macos_arm64);
 
     const Case = struct { entries: []const [2][]const u8, ok: bool };
     const cases = [_]Case{
         .{ .ok = true, .entries = &.{ .{ "GobanStudio.app/", "" }, .{ "GobanStudio.app/Contents/MacOS/goban-studio", "x" }, .{ "__MACOSX/GobanStudio.app/._Contents", "r" } } },
         .{ .ok = true, .entries = &.{.{ "Goban Studio.app/Contents/Info.plist", "x" }} },
+        // The release layout: ditto's archive, then the README added at the top (zip -g -j).
+        .{ .ok = true, .entries = &.{ .{ "GobanStudio.app/Contents/MacOS/goban-studio", "x" }, .{ "__MACOSX/GobanStudio.app/._Contents", "r" }, .{ "README-macOS.txt", "read me" } } },
+        // Only that name, only at the top, and never alone.
+        .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "README.txt", "x" } } },
+        .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "sub/README-macOS.txt", "x" } } },
+        .{ .ok = false, .entries = &.{.{ "README-macOS.txt", "x" }} },
         // Two different roots, an unknown root, an escape, a stray resource fork.
         .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "Goban Studio.app/b", "x" } } },
         .{ .ok = false, .entries = &.{.{ "Evil.app/Contents/MacOS/x", "x" }} },
@@ -438,20 +465,20 @@ test "macOS packages get the same entry checks before ditto runs" {
         const zip = try testZip(testing.allocator, c.entries);
         defer testing.allocator.free(zip);
         try writeTestFile(io, zip_path, zip);
-        if (c.ok) try checkZip(io, zip_path, roots, true) else try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, true));
+        if (c.ok) try checkZip(io, zip_path, roots, extras, true) else try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, extras, true));
     }
     // Without ditto's sequestered copies allowed (Windows), __MACOSX/ is refused.
     const fork = try testZip(testing.allocator, &.{ .{ "GobanStudio/a", "x" }, .{ "__MACOSX/GobanStudio/._a", "r" } });
     defer testing.allocator.free(fork);
     try writeTestFile(io, zip_path, fork);
-    try testing.expectError(error.Unpack, checkZip(io, zip_path, &.{"GobanStudio"}, false));
+    try testing.expectError(error.Unpack, checkZip(io, zip_path, &.{"GobanStudio"}, packageExtras(.windows_x64), false));
 
     // Declared sizes past the limit are refused; the sum saturates.
     const big = try testZip(testing.allocator, &.{ .{ "GobanStudio.app/a", "x" }, .{ "GobanStudio.app/b", "y" } });
     defer testing.allocator.free(big);
     setDeclaredSizes(big, 0xF000_0000);
     try writeTestFile(io, zip_path, big);
-    try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, true));
+    try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, extras, true));
     var sum: u64 = std.math.maxInt(u64) - 1;
     sum +|= 5;
     try testing.expectEqual(@as(u64, std.math.maxInt(u64)), sum);
@@ -568,6 +595,11 @@ test "macOS: ditto unpacks a signed bundle that codesign and the checks accept" 
     var zip_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const zip_path = try std.fmt.bufPrint(&zip_buf, "{s}/pkg.zip", .{dir});
     try testing.expect(runTool(io, &.{ "/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app_path, zip_path }));
+    // As the release does: the README added at the archive's top level.
+    var readme_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const readme = try std.fmt.bufPrint(&readme_buf, "{s}/README-macOS.txt", .{dir});
+    try writeTestFile(io, readme, "read me");
+    try testing.expect(runTool(io, &.{ "/usr/bin/zip", "-q", "-g", "-j", zip_path, readme }));
 
     var out_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const out = try std.fmt.bufPrint(&out_buf, "{s}/unpacked", .{dir});
