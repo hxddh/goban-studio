@@ -1,7 +1,8 @@
 /**
  * Today: the one screen to start from. One hero — the game in progress, or
  * the suggested game — carries the only primary button; below it one row
- * for today's practice (or the placement quiz first); then your progress,
+ * for today's practice (or the placement quiz first), showing the next
+ * problem's board when that is what comes next; then your progress,
  * kept calm: the level with its line over the last games, what is
  * mastered, the last four weeks as dots (days, never a streak) and the
  * newest milestones; then this week in one line and your last games.
@@ -67,7 +68,6 @@ export function TodayView() {
             <TodayList />
           </div>
           <div class="col-side">
-            {!Games.listGames().length && activeDays(practiceDays(state.profile, Date.now(), 28)) === 0 && <TodayProblem />}
             <Progress />
             <Week />
             <Recent />
@@ -101,11 +101,18 @@ function TodayList() {
     const done = now.items.filter((it) => now.done.has(it.key)).length;
     // The row the next item is in: a problem is named by its theme there, never by its own name.
     const nextRow = rows.find((r) => r.items.some((it) => !now.done.has(it.key)));
+    // When the next item is a problem, the row shows it: one click and its board is open, waiting for the first stone.
+    const next = now.items.find((it) => !now.done.has(it.key));
+    const diagram = !now.finished && next?.kind === "problem" ? rows.flatMap((r) => r.diagrams || []).find((d) => d.key === next.key) : null;
     row = (
-      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""}`} data-row="path" onClick={now.finished ? C.practiceHome : C.startPath}>
-        <span class="gr-icon">
-          <Icon name="practice" size={18} />
-        </span>
+      <button type="button" class={`group-row today-row ${now.finished ? "done" : ""} ${diagram ? "has-diagram" : ""}`} data-row="path" onClick={now.finished ? C.practiceHome : C.startPath}>
+        {diagram ? (
+          <DiagramThumb diagram={diagram.diagram} size={56} label={t("today.practice")} />
+        ) : (
+          <span class="gr-icon">
+            <Icon name="practice" size={18} />
+          </span>
+        )}
         <span class="gr-text">
           <strong>{t("today.practice")}</strong>
           <span>{now.finished ? t("practice.path.doneLine") : nextRow ? t("common.labelValue", [t("today.next"), nextRow.title]) : ""}</span>
@@ -297,26 +304,6 @@ function Week() {
           )}
         </p>
       )}
-    </section>
-  );
-}
-
-/**
- * A problem for today, while there is no progress or game to show beside
- * the hero: the first problem of today's path, as a position, one click away.
- */
-function TodayProblem() {
-  const now = C.pathNow();
-  const rows = pathRows(now.items);
-  const d = rows.flatMap((r) => r.diagrams || []).find((x) => !now.done.has(x.key));
-  if (!d) return null;
-  return (
-    <section class="section today-problem">
-      <h2 class="section-title">{t("today.problem.title")}</h2>
-      <button type="button" class="today-problem-card" onClick={() => C.openPathItem(d.key)}>
-        <DiagramThumb diagram={d.diagram} size={120} label={t("today.problem.title")} />
-        <span class="row-action">{t("today.problem.try")}</span>
-      </button>
     </section>
   );
 }

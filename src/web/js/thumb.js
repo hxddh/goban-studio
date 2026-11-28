@@ -79,11 +79,13 @@ export function fromString(thumb, size, crop = null) {
   const at = (x, y) => (thumb[y * size + x] === "b" ? "b" : thumb[y * size + x] === "w" ? "w" : null);
   if (!crop) return { cols: size, rows: size, at };
   const { x: cx, y: cy, n } = crop;
+  const mark = crop.mark && crop.mark.x >= 0 && crop.mark.y >= 0 && crop.mark.x < n && crop.mark.y < n ? { x: crop.mark.x, y: crop.mark.y } : null;
   return {
     cols: n,
     rows: n,
     at: (x, y) => at(cx + x, cy + y),
     open: { left: cx > 0, top: cy > 0, right: cx + n < size, bottom: cy + n < size },
+    ...(mark ? { mark } : {}),
   };
 }
 
@@ -167,6 +169,15 @@ export function drawThumb(ctx, spec, plan, pal, pxDev) {
     ctx.fillStyle = (s.c === "b" ? pal.stone.black : pal.stone.white).fill;
     shape(s, plan.stoneR);
   }
+  // The marked stone (a classic's key move): a dot of the other colour, once there is room for one.
+  const m = spec.mark;
+  const c = m && !plan.square ? spec.at(m.x, m.y) : null;
+  if (c) {
+    ctx.fillStyle = (c === "b" ? pal.stone.white : pal.stone.black).fill;
+    ctx.beginPath();
+    ctx.arc(ox + m.x * cell + cell / 2, oy + m.y * cell + cell / 2, Math.max(1, plan.stoneR * 0.36), 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 /* ------------------------------------------------------------- the cache */
@@ -176,7 +187,7 @@ const cache = new Map();
 
 function specKey(spec) {
   const o = spec.open;
-  let s = `${spec.cols}x${spec.rows}${o ? `/${+o.left}${+o.top}${+o.right}${+o.bottom}` : ""}:`;
+  let s = `${spec.cols}x${spec.rows}${o ? `/${+o.left}${+o.top}${+o.right}${+o.bottom}` : ""}${spec.mark ? `@${spec.mark.x},${spec.mark.y}` : ""}:`;
   for (let y = 0; y < spec.rows; y++) for (let x = 0; x < spec.cols; x++) s += spec.at(x, y) || ".";
   return s;
 }

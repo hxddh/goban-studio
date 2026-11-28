@@ -124,6 +124,7 @@ await test("every key in the string table is used by the interface", () => {
     "library.sort.", // play/library.jsx: the sort choices
     "lossKind.", // insight.js loss kinds
     "models.error.", // models-ctl.js modelErrorText
+    "onboarding.anchor.", // onboarding.jsx RANK_ANCHORS: `onboarding.anchor.${id}` and its "Help" line
     "models.human.", // settings-sheet.jsx ModelRow: `models.${kind}.name` / `.desc`
     "models.strong.",
     "newGame.", // new-game-sheet.jsx PRESETS: "newGame." + quick | medium | full

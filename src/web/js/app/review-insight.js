@@ -7,6 +7,9 @@ import { leaveModes, startLive } from "./review-position.js";
 
 /* ------------------------------------------------------ key mistakes */
 
+/** Moves of the recommended line shown on the board when a key moment opens. */
+export const PV_SHOWN = 5;
+
 /** Show a line on the board: what was played, or the engine's better line. */
 export function showVariation(km, kind) {
   const r = state.review;
@@ -21,8 +24,9 @@ export function showVariation(km, kind) {
     moves = line.filter((n) => n.move && !n.move.pass).map((n, i) => ({ x: n.move.x, y: n.move.y, c: n.move.color, n: i + 1 }));
   } else {
     let c = color;
+    // The recommended line, its first PV_SHOWN moves: enough to see why it is better, not so many it hides the board.
     moves = (km.pv || [])
-      .slice(0, 6)
+      .slice(0, PV_SHOWN)
       .map((v, i) => {
         const m = v.pass ? null : { x: v.x, y: v.y, c, n: i + 1 };
         c = -c;
@@ -69,11 +73,18 @@ export function storyStep(delta) {
   if (km) showStory(km, v.kind, v.step + delta);
 }
 
+/**
+ * Open a key moment: the board shows the recommended line at once, as
+ * numbered see-through stones (1 … PV_SHOWN), so the better way can be
+ * seen rather than read as coordinates. Without one (no analysis line,
+ * or the best move was a pass) it shows what was played next.
+ */
 export function focusMistake(km) {
   const r = state.review;
   if (!r) return;
   r.focus = km.index;
-  if (km.story?.played?.length) showStory(km, "played", 0);
+  if (km.best && !km.best.pass && km.pv?.some((v) => !v.pass)) showVariation(km, "better");
+  else if (km.story?.played?.length) showStory(km, "played", 0);
   else showVariation(km, "played");
 }
 

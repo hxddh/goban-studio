@@ -260,7 +260,6 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const page = await fresh();
     await page.goto(ORIGIN + "/");
     await page.waitForSelector(".ob-card");
-    await page.click(".ob-card .btn.primary");
     assert((await page.textContent(".choice >> nth=1")).includes("9×9"), "the help text names 9×9");
     await page.click(".choice >> nth=1");
     // Today first; its hero is that game, one click away.
@@ -327,7 +326,6 @@ export default async function ({ check, assert, fresh, onboard, clickPoint, audi
     const page = await fresh();
     await page.goto(ORIGIN + "/");
     await page.waitForSelector(".ob-card");
-    await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
     await page.click(".today .hero .btn.primary");
     await page.waitForFunction(() => window.__state.game && window.__board?.model.size === 9 && window.__board.geom?.cell > 20 && !window.__state.game.thinking);

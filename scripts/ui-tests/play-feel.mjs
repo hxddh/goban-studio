@@ -111,7 +111,6 @@ export default async function ({ check, assert, fresh, onboard, origin }) {
     // Onboarding, a first game and Play's home come up with every part held back.
     await page.goto(origin + "/");
     await page.waitForSelector(".ob-card");
-    await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
     await page.click(".today .hero .btn.primary");
     await page.waitForSelector("canvas.board");

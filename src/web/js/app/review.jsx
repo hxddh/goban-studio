@@ -14,6 +14,7 @@ import * as C from "./controller.js";
 import { storyText } from "./story.js";
 import { Board, Button, Icon, IconButton, MoreMenu, Segmented, Stone, MOD, SHIFT } from "./parts.jsx";
 import { ScoreCard } from "./score-card.jsx";
+import { HumanHint } from "./human-hint.jsx";
 import { BLUNDER, MISTAKE } from "./summary.js";
 import { accuracyText, lossText, momentWords, ratingChangeText, reviewFacts, reviewHeadline } from "../play/review-image.js";
 import { Toolbar } from "./chrome.jsx";
@@ -224,7 +225,7 @@ function KeyMove({ km }) {
           </div>
           <div class="seg-mini" role="group" aria-label={t("story.title")}>
             {canBetter ? (
-              <button type="button" class={line === "better" ? "on" : ""} onClick={() => C.showStory(km, "better", 0)}>
+              <button type="button" class={line === "better" || v?.kind === "better" ? "on" : ""} onClick={() => C.showStory(km, "better", 0)}>
                 {t("story.better")}
               </button>
             ) : (
@@ -236,7 +237,7 @@ function KeyMove({ km }) {
               )
             )}
             {canPlayed ? (
-              <button type="button" class={line === "played" ? "on" : ""} onClick={() => C.showStory(km, "played", 0)}>
+              <button type="button" class={line === "played" || v?.kind === "played" ? "on" : ""} onClick={() => C.showStory(km, "played", 0)}>
                 {t("story.played")}
               </button>
             ) : (
@@ -402,6 +403,7 @@ function ReviewFoot() {
   if (mine && line[line.length - 1].result) {
     return (
       <div class="actions">
+        {state.game.opponent === "ai" && <HumanHint />}
         <Button kind="primary" icon="plus" class="block" onClick={() => C.openNewGame()}>
           {t("common.newGame")}
         </Button>

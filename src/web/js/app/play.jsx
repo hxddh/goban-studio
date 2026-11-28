@@ -14,6 +14,7 @@ import { formatClock } from "./clock.js";
 import { tallyVerdicts, verdictOf } from "../play/verdict.js";
 import { Board, Button, Icon, IconButton, MoreMenu, Stone, MOD, SHIFT } from "./parts.jsx";
 import { ScoreCard } from "./score-card.jsx";
+import { HumanHint } from "./human-hint.jsx";
 import { NarrowFold, Toolbar } from "./chrome.jsx";
 import { ReviewView } from "./review.jsx";
 import { classicYear, colorName, moveNumbers, rankLabel } from "./game-view.js";
@@ -483,6 +484,7 @@ function ResultCard() {
       {headline !== C.resultText(g.game.current.result) && <span class="muted">{C.resultText(g.game.current.result)}</span>}
       {C.unratedReason(g) && <span class="fine unrated-note">{C.unratedReason(g)}</span>}
       <GameTally />
+      {g.opponent === "ai" && <HumanHint />}
       <div class="actions center">
         <Button kind="primary" icon="chart" onClick={() => C.openPostGame(g, { inPlace: false })}>
           {t("play.reviewGame")}

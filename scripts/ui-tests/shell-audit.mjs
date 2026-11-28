@@ -37,7 +37,6 @@ export default async function ({ check, assert, fresh, onboard, audit, origin })
       // A new player: Today opens; Play has no game, so it shows its home with the suggested game.
       await page.goto(origin + "/");
       await page.waitForSelector(".ob-card");
-      await page.click(".ob-card .btn.primary");
       await page.click(".choice >> nth=0");
       await page.waitForSelector('.page.today [data-hero="first-lesson"]');
       await page.keyboard.press("Control+2");

@@ -69,18 +69,22 @@ export function thumbnail(game) {
   return pointString(line[line.length - 1].board.signMap);
 }
 
-/** Points on a side of a classic's face: 11 fill 44 px with whole 4 px cells (8 at 2×). */
-export const FACE_SPAN = 11;
-/** Stones the face must hold to read as a fight rather than an empty corner. */
-export const FACE_MIN_STONES = 12;
+/** Points on a side of a classic's face: 7 fill 44 px with 6 px cells, so the grid and round stones show. */
+export const FACE_SPAN = 7;
+/** Stones the face must hold to read as a fight rather than an empty corner… */
+export const FACE_MIN_STONES = 8;
+/** …and at most, so it does not read as noise (of FACE_SPAN² = 49 points). */
+export const FACE_MAX_STONES = 30;
 
 /**
  * A classic's face in the Library. Its final position is hundreds of stones
  * at two pixels a point; instead, the FACE_SPAN-point square around the move
  * of its first key moment (`moments`, content/classics.js) whose square
- * holds FACE_MIN_STONES stones, else of its last. { thumb, size, crop:
- * { x, y, n } } (thumb.js fromString), or the final position uncropped
- * when no moment is a move of the game.
+ * holds between FACE_MIN_STONES and FACE_MAX_STONES stones (else the one
+ * closest to that range), as the board stood when it was played, with that
+ * move marked. { thumb, size, crop: { x, y, n, mark: { x, y } } } (thumb.js
+ * fromString; `mark` is inside the window), or the final position
+ * uncropped when no moment is a move of the game.
  */
 export function classicFace(game, moments = []) {
   const line = game.mainLine();
@@ -96,9 +100,10 @@ export function classicFace(game, moments = []) {
     const y = Math.max(0, Math.min(size - n, mv.y - Math.floor(n / 2)));
     let stones = 0;
     for (let j = y; j < y + n; j++) for (let i = x; i < x + n; i++) if (signMap[j][i]) stones++;
-    faces.push({ thumb: pointString(signMap), size, crop: { x, y, n }, stones });
+    faces.push({ thumb: pointString(signMap), size, crop: { x, y, n, mark: { x: mv.x - x, y: mv.y - y } }, stones });
   }
-  const face = faces.find((f) => f.stones >= FACE_MIN_STONES) ?? faces[faces.length - 1];
+  const off = (f) => Math.max(0, FACE_MIN_STONES - f.stones, f.stones - FACE_MAX_STONES);
+  const face = faces.find((f) => off(f) === 0) ?? faces.reduce((best, f) => (!best || off(f) < off(best) ? f : best), null);
   if (!face) return { thumb: thumbnail(game), size, crop: null };
   return { thumb: face.thumb, size, crop: face.crop };
 }

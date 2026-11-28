@@ -104,28 +104,58 @@ pub fn safeEntryName(name: []const u8, root: []const u8) bool {
     return true;
 }
 
-/// Check every entry, then extract with std.zip (Windows packages).
-pub fn extractZip(io: std.Io, zip_path: []const u8, dest_path: []const u8, root: []const u8) !void {
+/// Prefix of the AppleDouble copies `ditto -c -k --sequesterRsrc` adds.
+const sequestered_prefix = "__MACOSX/";
+
+/// The package root an entry name sits under (one of `roots`), or null.
+/// With `sequestered`, `__MACOSX/<root>/…` (ditto's resource forks) counts
+/// as that root too.
+fn entryRoot(name: []const u8, roots: []const []const u8, sequestered: bool) ?[]const u8 {
+    const rest = if (sequestered and std.mem.startsWith(u8, name, sequestered_prefix)) name[sequestered_prefix.len..] else name;
+    for (roots) |root| {
+        if (safeEntryName(rest, root)) return root;
+    }
+    return null;
+}
+
+/// Read every entry of the zip at `zip_path` before anything is written:
+/// at most `max_zip_entries`, at most `max_unpacked_bytes` declared (summed
+/// with saturation, so a hostile size cannot wrap), and every name safe and
+/// under one and the same package root from `roots`. Both platforms run
+/// this before unpacking (std.zip on Windows, ditto on macOS).
+pub fn checkZip(io: std.Io, zip_path: []const u8, roots: []const []const u8, sequestered: bool) !void {
     var file = std.Io.Dir.openFileAbsolute(io, zip_path, .{}) catch return error.Unpack;
     defer file.close(io);
     var read_buf: [16 * 1024]u8 = undefined;
     var reader = file.reader(io, &read_buf);
-    {
-        var iter = std.zip.Iterator.init(&reader) catch return error.Unpack;
-        var name_buf: [1024]u8 = undefined;
-        var count: usize = 0;
-        var total: u64 = 0;
-        while (iter.next() catch return error.Unpack) |entry| {
-            count += 1;
-            total += entry.uncompressed_size;
-            if (count > max_zip_entries or total > max_unpacked_bytes) return error.Unpack;
-            if (entry.filename_len > name_buf.len) return error.Unpack;
-            const name = name_buf[0..entry.filename_len];
-            reader.seekTo(entry.header_zip_offset + @sizeOf(std.zip.CentralDirectoryFileHeader)) catch return error.Unpack;
-            reader.interface.readSliceAll(name) catch return error.Unpack;
-            if (!safeEntryName(name, root)) return error.Unpack;
-        }
+    var iter = std.zip.Iterator.init(&reader) catch return error.Unpack;
+    var name_buf: [1024]u8 = undefined;
+    var count: usize = 0;
+    var total: u64 = 0;
+    var package_root: ?[]const u8 = null;
+    while (iter.next() catch return error.Unpack) |entry| {
+        count += 1;
+        total +|= entry.uncompressed_size;
+        if (count > max_zip_entries or total > max_unpacked_bytes) return error.Unpack;
+        if (entry.filename_len > name_buf.len) return error.Unpack;
+        const name = name_buf[0..entry.filename_len];
+        reader.seekTo(entry.header_zip_offset + @sizeOf(std.zip.CentralDirectoryFileHeader)) catch return error.Unpack;
+        reader.interface.readSliceAll(name) catch return error.Unpack;
+        const root = entryRoot(name, roots, sequestered) orelse return error.Unpack;
+        if (package_root) |r| {
+            if (!std.mem.eql(u8, r, root)) return error.Unpack;
+        } else package_root = root;
     }
+    if (count == 0) return error.Unpack;
+}
+
+/// Check every entry, then extract with std.zip (Windows packages).
+pub fn extractZip(io: std.Io, zip_path: []const u8, dest_path: []const u8, root: []const u8) !void {
+    try checkZip(io, zip_path, &.{root}, false);
+    var file = std.Io.Dir.openFileAbsolute(io, zip_path, .{}) catch return error.Unpack;
+    defer file.close(io);
+    var read_buf: [16 * 1024]u8 = undefined;
+    var reader = file.reader(io, &read_buf);
     std.Io.Dir.cwd().createDirPath(io, dest_path) catch return error.Disk;
     var dest = std.Io.Dir.cwd().openDir(io, dest_path, .{}) catch return error.Disk;
     defer dest.close(io);
@@ -222,6 +252,10 @@ pub fn unpack(io: std.Io, platform: install_mod.Platform, zip_path: []const u8, 
         // resources exactly; it adds no quarantine flag to what it writes.
         .macos_arm64, .macos_x64 => {
             if (builtin.os.tag != .macos) return error.Unsupported;
+            // The same entry checks as on Windows before ditto writes
+            // anything: names under the .app root (or ditto's own
+            // __MACOSX/ copies of it), entry count and declared size.
+            try checkZip(io, zip_path, stagedRootNames(platform), true);
             std.Io.Dir.cwd().createDirPath(io, dest) catch return error.Disk;
             if (!runTool(io, &.{ "/usr/bin/ditto", "-x", "-k", zip_path, dest })) return error.Unpack;
         },
@@ -370,6 +404,57 @@ fn testZip(allocator: std.mem.Allocator, entries: []const [2][]const u8) ![]u8 {
     std.mem.writeInt(u32, end[16..20], cd_offset, .little);
     try out.appendSlice(allocator, &end);
     return out.toOwnedSlice(allocator);
+}
+
+/// Set every central-directory entry's declared uncompressed size.
+fn setDeclaredSizes(zip: []u8, size: u32) void {
+    var i: usize = 0;
+    while (std.mem.indexOfPos(u8, zip, i, "PK\x01\x02")) |at| : (i = at + 4) {
+        std.mem.writeInt(u32, zip[at + 24 ..][0..4], size, .little);
+    }
+}
+
+test "macOS packages get the same entry checks before ditto runs" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var dir_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir = try testTempDir(io, &tmp, &dir_buf);
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const zip_path = try std.fmt.bufPrint(&path_buf, "{s}{c}mac.zip", .{ dir, std.fs.path.sep });
+    const roots = stagedRootNames(.macos_arm64);
+
+    const Case = struct { entries: []const [2][]const u8, ok: bool };
+    const cases = [_]Case{
+        .{ .ok = true, .entries = &.{ .{ "GobanStudio.app/", "" }, .{ "GobanStudio.app/Contents/MacOS/goban-studio", "x" }, .{ "__MACOSX/GobanStudio.app/._Contents", "r" } } },
+        .{ .ok = true, .entries = &.{.{ "Goban Studio.app/Contents/Info.plist", "x" }} },
+        // Two different roots, an unknown root, an escape, a stray resource fork.
+        .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "Goban Studio.app/b", "x" } } },
+        .{ .ok = false, .entries = &.{.{ "Evil.app/Contents/MacOS/x", "x" }} },
+        .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "GobanStudio.app/../../x", "x" } } },
+        .{ .ok = false, .entries = &.{ .{ "GobanStudio.app/a", "x" }, .{ "__MACOSX/Other/._x", "x" } } },
+    };
+    for (cases) |c| {
+        const zip = try testZip(testing.allocator, c.entries);
+        defer testing.allocator.free(zip);
+        try writeTestFile(io, zip_path, zip);
+        if (c.ok) try checkZip(io, zip_path, roots, true) else try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, true));
+    }
+    // Without ditto's sequestered copies allowed (Windows), __MACOSX/ is refused.
+    const fork = try testZip(testing.allocator, &.{ .{ "GobanStudio/a", "x" }, .{ "__MACOSX/GobanStudio/._a", "r" } });
+    defer testing.allocator.free(fork);
+    try writeTestFile(io, zip_path, fork);
+    try testing.expectError(error.Unpack, checkZip(io, zip_path, &.{"GobanStudio"}, false));
+
+    // Declared sizes past the limit are refused; the sum saturates.
+    const big = try testZip(testing.allocator, &.{ .{ "GobanStudio.app/a", "x" }, .{ "GobanStudio.app/b", "y" } });
+    defer testing.allocator.free(big);
+    setDeclaredSizes(big, 0xF000_0000);
+    try writeTestFile(io, zip_path, big);
+    try testing.expectError(error.Unpack, checkZip(io, zip_path, roots, true));
+    var sum: u64 = std.math.maxInt(u64) - 1;
+    sum +|= 5;
+    try testing.expectEqual(@as(u64, std.math.maxInt(u64)), sum);
 }
 
 pub fn testTempDir(io: std.Io, tmp: *testing.TmpDir, buf: []u8) ![]const u8 {

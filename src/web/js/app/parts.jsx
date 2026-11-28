@@ -390,11 +390,12 @@ export function Thumb({ thumb, size, crop = null }) {
   const ref = useRef(null);
   const palette = usePaletteKey();
   // Keyed by the window, not the object.
-  const cropKey = crop ? `${crop.x},${crop.y},${crop.n}` : "";
+  const cropKey = crop ? `${crop.x},${crop.y},${crop.n}${crop.mark ? `,${crop.mark.x},${crop.mark.y}` : ""}` : "";
   useEffect(() => {
     if (!thumb || !size) return;
-    const [x, y, n] = cropKey ? cropKey.split(",").map(Number) : [];
-    paintThumb(ref.current, thumbFromString(thumb, size, cropKey ? { x, y, n } : null), 76);
+    const [x, y, n, mx, my] = cropKey ? cropKey.split(",").map(Number) : [];
+    const win = cropKey ? { x, y, n, ...(Number.isFinite(mx) ? { mark: { x: mx, y: my } } : {}) } : null;
+    paintThumb(ref.current, thumbFromString(thumb, size, win), 76);
   }, [thumb, size, cropKey, palette]);
   return <canvas ref={ref} class="thumb" aria-hidden="true" />;
 }

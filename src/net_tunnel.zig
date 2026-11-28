@@ -13,13 +13,72 @@ pub const Session = struct {
     io: std.Io,
     /// Direct requests, and the certificate bundle of every request.
     client: std.http.Client,
+    /// The proxy for `currentHost()`, the host the last request went to.
     proxy: ?net_proxy.Proxy = null,
+    env: ?*const std.process.Environ.Map = null,
+    host_buf: [std.Io.net.HostName.max_len]u8 = undefined,
+    host_len: usize = 0,
+    /// The system's proxy, looked up once per session (it names no hosts).
+    system_proxy: ?net_proxy.Proxy = null,
+    system_known: bool = false,
+    /// A tunnel failed: every later request of this session goes direct.
+    direct_only: bool = false,
 
-    /// `host` is the first host that will be asked (for NO_PROXY).
+    /// `host` is the first host that will be asked (for NO_PROXY). A
+    /// redirect to another host chooses again (`useHost`).
     pub fn init(self: *Session, allocator: std.mem.Allocator, io: std.Io, env: ?*const std.process.Environ.Map, host: []const u8) void {
-        self.* = .{ .allocator = allocator, .io = io, .client = .{ .allocator = allocator, .io = io } };
+        self.* = .{ .allocator = allocator, .io = io, .client = .{ .allocator = allocator, .io = io }, .env = env };
+        self.choose(host);
+    }
+
+    /// The host the current proxy choice is for.
+    pub fn currentHost(self: *const Session) []const u8 {
+        return self.host_buf[0..self.host_len];
+    }
+
+    /// Choose the proxy for a request to `next`: the environment (with its
+    /// NO_PROXY) is asked for every new host, so a redirect from github.com
+    /// to a host NO_PROXY names goes direct, and the other way round.
+    pub fn useHost(self: *Session, next: []const u8) void {
+        if (self.direct_only) {
+            self.proxy = null;
+            return;
+        }
+        if (std.ascii.eqlIgnoreCase(next, self.currentHost())) return;
+        // No environment: nothing to choose by; keep what the session has.
+        if (self.env == null) return;
+        self.choose(next);
+    }
+
+    fn choose(self: *Session, next: []const u8) void {
+        const n = @min(next.len, self.host_buf.len);
+        @memcpy(self.host_buf[0..n], next[0..n]);
+        self.host_len = n;
+        self.proxy = null;
+        const map = self.env orelse return;
         var proxy: net_proxy.Proxy = .{};
-        if (net_proxy.chooseProxy(io, allocator, env, host, &proxy)) self.proxy = proxy;
+        switch (net_proxy.envProxy(map, next)) {
+            .direct => {},
+            .proxy => |value| {
+                if (net_proxy.parseProxy(value, &proxy)) self.proxy = proxy;
+            },
+            .unset => {
+                if (!self.system_known) {
+                    self.system_known = true;
+                    var system_buf: [600]u8 = undefined;
+                    if (net_proxy.systemProxy(self.io, self.allocator, map, &system_buf)) |value| {
+                        if (net_proxy.parseProxy(value, &proxy)) self.system_proxy = proxy;
+                    }
+                }
+                self.proxy = self.system_proxy;
+            },
+        }
+    }
+
+    /// The proxy did not answer: this session asks directly from now on.
+    pub fn dropProxy(self: *Session) void {
+        self.proxy = null;
+        self.direct_only = true;
     }
 
     pub fn deinit(self: *Session) void {
@@ -206,4 +265,31 @@ test "the tunnel request, and what counts as the proxy's yes" {
     try testing.expect(!connectAccepted("HTTP/1.1 2000 OK\r\n\r\n"));
     try testing.expect(!connectAccepted("SSH-2.0-OpenSSH\r\n"));
     try testing.expect(!connectAccepted(""));
+}
+
+test "a redirect to another host chooses its proxy again (NO_PROXY per host)" {
+    var env = std.process.Environ.Map.init(std.testing.allocator);
+    defer env.deinit();
+    try env.put("HTTPS_PROXY", "http://127.0.0.1:7890");
+    try env.put("NO_PROXY", "objects.githubusercontent.com");
+    var session: Session = undefined;
+    session.init(std.testing.allocator, std.testing.io, &env, "github.com");
+    defer session.deinit();
+    try std.testing.expect(session.proxy != null);
+    session.useHost("objects.githubusercontent.com");
+    try std.testing.expect(session.proxy == null);
+    session.useHost("release-assets.githubusercontent.com");
+    try std.testing.expect(session.proxy != null);
+    try std.testing.expectEqualStrings("127.0.0.1", session.proxy.?.host());
+    // A first host NO_PROXY names: direct, then proxied after a redirect.
+    var other: Session = undefined;
+    other.init(std.testing.allocator, std.testing.io, &env, "objects.githubusercontent.com");
+    defer other.deinit();
+    try std.testing.expect(other.proxy == null);
+    other.useHost("github.com");
+    try std.testing.expect(other.proxy != null);
+    // A tunnel that failed: direct for the rest of the session, any host.
+    other.dropProxy();
+    other.useHost("api.github.com");
+    try std.testing.expect(other.proxy == null);
 }

@@ -168,6 +168,46 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
     });
   }
 
+  await check("human-style model: New game with a kyu opponent offers it in one quiet line; Download starts it; closed, it stays closed", async () => {
+    const page = await fresh("en-US", { width: 1200, height: 800 });
+    await page.addInitScript(fakeHost, { "settings.json": JSON.stringify({ v: 13, lang: "en", onboarded: true, experience: "player", playerRank: 20 }) });
+    await page.addInitScript(() => {
+      window.__downloads = [];
+      const invoke = window.zero.invoke;
+      window.zero.invoke = async (command, p) => {
+        const now = () => ({ available: true, human: window.__downloads.length ? { status: "downloading", bytes: 9_906_623, total: 99_066_230, name: "h" } : { status: "absent", bytes: 0, total: 99_066_230, name: "h" }, strong: { status: "absent", bytes: 0, total: 97_898_094, name: "s" } });
+        if (command === "studio.modelStatus") return now();
+        if (command === "studio.modelDownload") {
+          window.__downloads.push(p.kind);
+          return { ok: true, models: now() };
+        }
+        return invoke(command, p);
+      };
+    });
+    await page.goto(origin + "/");
+    await page.waitForSelector(".today");
+    await page.keyboard.press("Control+n");
+    await page.waitForSelector(".sheet .human-hint");
+    assert((await page.locator(".human-hint").count()) === 1, "one line");
+    assert((await page.locator(".sheet .btn.primary").count()) === 1, "still one primary in the sheet");
+    // Two players: no computer, no line.
+    await page.click(".sheet .segmented button >> nth=1");
+    assert((await page.locator(".human-hint").count()) === 0, "offered for a two-player game");
+    await page.click(".sheet .segmented button >> nth=0");
+    await page.click(".human-hint .link");
+    await page.waitForFunction(() => window.__downloads.length === 1 && window.__downloads[0] === "human");
+    await page.waitForFunction(() => /\d+%/.test(document.querySelector(".human-hint")?.textContent || ""));
+    // Closed: gone now, and on the next game too.
+    await page.click(".human-hint .hint-close");
+    await page.waitForFunction(() => !document.querySelector(".human-hint") && window.__state.settings.humanHintDismissed === true);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+n");
+    await page.waitForSelector(".sheet .preset");
+    assert((await page.locator(".human-hint").count()) === 0, "the line came back after it was closed");
+    assert(page.errors.length === 0, page.errors.join("; "));
+    await page.close();
+  });
+
   await check("shell settings: Engines names the KataGo build in plain words and why it fell back; Measure speed times each network in the background; Stop stops it", async () => {
     const page = await fresh("en-US", { width: 1200, height: 800 });
     await page.addInitScript(fakeHost, { "settings.json": JSON.stringify({ v: 13, lang: "en", onboarded: true, experience: "player", playerRank: 12 }) });
@@ -356,10 +396,10 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
       const page = await fresh(locale);
       await page.goto(origin + "/");
       await page.waitForSelector(".ob-card");
-      // The first step is about the language; the line about rules comes once it is chosen.
-      assert((await page.getAttribute(".ob-foot", "data-ob-foot")) === "offline", "the first step says the app is offline");
-      await page.click(".ob-card .btn.primary");
+      // The system's language is already chosen: the first step asks what the player knows, says the app is offline and which rules new games use.
       await page.waitForSelector(".choice");
+      assert((await page.textContent(".ob-welcome")).length > 0 && (await page.getAttribute(".ob-foot", "data-ob-foot")) === "rules", "the first step says the app is offline, then the rules");
+      assert((await page.locator(".ob-lang [aria-checked=true]").count()) === 1, `${locale}: one language is chosen in the corner`);
       const foot = (await page.textContent(".ob-foot")).trim();
       assert(foot.includes(name), `${locale}: the last step says which rules new games use: "${foot}"`);
       assert((await page.locator(".ob-foot").count()) === 1 && foot.length < 80, `${locale}: one quiet line (${foot.length} characters)`);
@@ -407,12 +447,12 @@ export default async function ({ check, assert, fresh, firstLanding, origin, ins
       const page = await fresh("en-US", { width: 1200, height: 800 });
       await page.goto(origin + "/");
       await page.waitForSelector(".ob-card");
-      await page.click(".ob-card .btn.primary");
       await page.click(`.choice >> nth=${w.choice}`);
       if (w.choice === 2) {
-        // Someone who plays: the rank step's button starts the suggested game.
-        await page.waitForSelector(".ob-card .slider-field");
-        await page.click(".ob-card .btn.primary");
+        // Someone who plays: a level in words, and picking one starts the suggested game.
+        await page.waitForSelector(".ob-card .rank-anchors");
+        assert((await page.locator(".rank-anchor").count()) === 5, "five levels to pick from");
+        await page.click(".rank-anchor >> nth=2");
         await page.waitForFunction(w.after, null, { timeout: 5000 });
         await page.waitForFunction(() => JSON.parse(localStorage.getItem("goban9:settings.json") || "{}").onboarded === true, null, { timeout: 3000 });
         assert(page.errors.length === 0, `answer ${w.choice}: ${page.errors.join("; ")}`);

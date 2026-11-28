@@ -89,6 +89,17 @@ export const isBusy = (one) => one?.status === "downloading" || one?.status === 
 export const needsPolling = (models) => KINDS.some((k) => isBusy(models?.[k]));
 
 /**
+ * Whether to offer the human-style model in one quiet line (app/human-hint.jsx):
+ * only where downloads are possible, until it is installed or the line was
+ * closed (`dismissed`); while it downloads, the line shows the progress.
+ */
+export function offerHuman(models, dismissed = false) {
+  if (dismissed || !models?.available) return false;
+  const one = models.human;
+  return !!one && (one.status === "absent" || one.status === "partial" || one.status === "failed" || isBusy(one));
+}
+
+/**
  * What changed between two `state.models` for the toasts: [{ kind, event }]
  * with event "ready" or "failed" (a download that just finished).
  */

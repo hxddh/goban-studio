@@ -29,8 +29,13 @@ const store = @import("store.zig");
 
 /// What the app imports and exports: game records, backups, review images.
 pub const allowed_extensions = [_][]const u8{ ".sgf", ".json", ".png" };
-/// Grants kept at once (dialogs, drops and opened documents of a session).
-pub const max_grants: usize = 32;
+/// Paths one open dialog (multi-select) or drop hands out at most: every
+/// path the page gets back from a dialog is granted, none is dropped early.
+pub const max_open_batch: usize = 256;
+/// Grants kept at once (dialogs, drops and opened documents of a session):
+/// room for a whole batch on top of the session's other grants, so a large
+/// multi-select never evicts its own first paths before the page reads them.
+pub const max_grants: usize = 2 * max_open_batch;
 pub const max_path_bytes: usize = 4096;
 
 pub const Access = enum { read, write };
@@ -286,6 +291,23 @@ test "launcher-named report files are trusted and never evicted" {
     try testing.expect(!g.allows("/tmp/g0.sgf", .read));
     const last = try std.fmt.bufPrint(&buf, "/tmp/g{d}.sgf", .{max_grants + 4});
     try testing.expect(g.allows(last, .read));
+}
+
+test "a whole multi-select batch stays readable" {
+    var g = Grants.init(testing.allocator);
+    defer g.deinit();
+    // Some earlier grants of the session, then one full dialog batch.
+    try testing.expect(g.grant("/tmp/saved.sgf", .write, false));
+    var buf: [64]u8 = undefined;
+    var i: usize = 0;
+    while (i < max_open_batch) : (i += 1) {
+        try testing.expect(g.grant(try std.fmt.bufPrint(&buf, "/tmp/batch{d}.sgf", .{i}), .read, false));
+    }
+    i = 0;
+    while (i < max_open_batch) : (i += 1) {
+        try testing.expect(g.allows(try std.fmt.bufPrint(&buf, "/tmp/batch{d}.sgf", .{i}), .read));
+    }
+    try testing.expect(g.allows("/tmp/saved.sgf", .write));
 }
 
 test "a save path without the app's extension gets the suggested one" {

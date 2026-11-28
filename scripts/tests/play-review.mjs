@@ -110,3 +110,25 @@ await test("play review: the controller edits comments, marks and variations and
   saved = loadSGF(Lib.getGame(rec.id).sgf).game;
   assert.equal(saved.mainLine()[30].children.length, 1, "leaving the review saved the last edits");
 });
+
+await test("play review: opening a key moment shows its recommended line on the board, numbered 1 to 5, not just its coordinates", async () => {
+  const { R, state, P, PM } = await loadControllers();
+  state.settings = { ...P.DEFAULT_SETTINGS, liveAnalysis: false };
+  state.profile = PM.newProfile();
+  const base = v5Review({ losses: { 25: 8 } });
+  R.openReview(base.game, { source: "record", humanColor: BLACK, points: base.points, startAt: 10 });
+  const r = state.review;
+  const pv = [{ x: 3, y: 3 }, { x: 15, y: 15 }, { x: 3, y: 15 }, { x: 15, y: 3 }, { x: 9, y: 9 }, { x: 2, y: 2 }, { x: 16, y: 16 }];
+  const km = { index: 25, move: { x: 10, y: 10, color: BLACK }, loss: 8, best: pv[0], pv };
+  R.focusMistake(km);
+  assert.equal(r.variation.kind, "better", "the recommended line first");
+  assert.deepEqual(r.variation.moves.map((m) => m.n), [1, 2, 3, 4, 5], "its first five moves, numbered");
+  assert.deepEqual(r.variation.moves.map((m) => m.c), [BLACK, -BLACK, BLACK, -BLACK, BLACK], "the mover's colour first, then in turn");
+  assert.equal(r.focus, 25);
+  // Without a line (or when the best move was a pass) it shows what was played next.
+  R.focusMistake({ ...km, pv: [], best: null });
+  assert.equal(r.variation.kind, "played");
+  R.focusMistake({ ...km, best: { pass: true }, pv: [{ pass: true }] });
+  assert.equal(r.variation.kind, "played");
+  R.dropReview?.();
+});

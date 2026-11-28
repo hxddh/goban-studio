@@ -4,7 +4,7 @@
  * teaching warning.
  */
 import { test, assert } from "./helpers.mjs";
-import { SLACK_FROM, mistakeFrom, moveLoss, tallyVerdicts, verdictOf } from "../../src/web/js/play/verdict.js";
+import { SLACK_FROM, blunderFrom, mistakeFrom, moveLoss, tallyVerdicts, teachingPause, verdictOf } from "../../src/web/js/play/verdict.js";
 
 await test("play verdict: the loss is the best move's lead minus the lead after the move, for the mover", () => {
   const before = { moves: [{ scoreLead: 3 }] };
@@ -34,4 +34,20 @@ await test("play verdict: good below 1.5 points, slack from 1.5, a mistake at th
   assert.equal(mistakeFrom(-2), 6, "3 dan");
   assert.equal(verdictOf(5, 8), "slack", "wider for the rank the warning is wider for");
   assert.equal(verdictOf(null, 15), null);
+});
+
+await test("play verdict: a teaching game pauses only on a move that changes the game; smaller mistakes wait for the review", () => {
+  assert.equal(blunderFrom(15), 8);
+  assert.equal(blunderFrom(5), 12);
+  // A slack move or a plain mistake while the game stays as it was: no pause.
+  assert.equal(teachingPause(2, 15, 3), false, "slack");
+  assert.equal(teachingPause(5, 15, 12), false, "a mistake, still well ahead");
+  assert.equal(teachingPause(5, 15, -10), false, "a mistake, already behind");
+  // A blunder always pauses.
+  assert.equal(teachingPause(8, 15, 20), true);
+  assert.equal(teachingPause(11, 5, 30), false, "below a stronger player's blunder");
+  assert.equal(teachingPause(12, 5, 30), true);
+  // A mistake that turns a winning game into a losing one pauses.
+  assert.equal(teachingPause(5, 15, 3), true, "ahead by 3, behind by 2 after it");
+  assert.equal(teachingPause(5, 15, null), false, "no lead known");
 });

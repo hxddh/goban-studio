@@ -341,8 +341,9 @@ export async function analyze(game, { node = game.current, visits = 64, onInfo =
  * How likely each of one player's moves was for players of several
  * ranks, from the human SL model (model/move-rank.js reads a rank from it).
  *
- * This needs a host that offers `studio.katagoHumanPolicy`, announced by
- * `humanPolicy: true` in `studio.katagoStatus`; no released host does yet.
+ * The host offers `studio.katagoHumanPolicy` when the human SL model is
+ * installed, announced by `humanPolicy: true` in `studio.katagoStatus`
+ * (bridge_katago.zig); without it this resolves to null.
  * The search requests cannot stand in for it: their report lists only the
  * moves the search visited, with the main network's prior, so the move
  * played is often missing. The host call, on the human slot, brings

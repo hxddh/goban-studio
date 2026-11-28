@@ -15,7 +15,7 @@ import { countReady, resignStep, thinkTime } from "./feel.js";
 import { moveMade } from "./clock.js";
 import { hintReason, hintText, warningReason, warningText } from "./teach-why.js";
 import { gameOver, gameSignal, isComputerTurn, persistCurrent, playReviewing } from "./game-session.js";
-import { moveLoss, verdictOf } from "../play/verdict.js";
+import { moveLoss, teachingPause } from "../play/verdict.js";
 import { finishGame, startScoring, toggleDead } from "./game-end.js";
 
 /* ------------------------------------------------------------ moves */
@@ -181,11 +181,13 @@ export async function maybeComputerMove({ afterHuman = false } = {}) {
   }
 
   // How the player's move compares with the best one: said quietly in the
-  // panel and the move list; in a teaching game a big drop pauses the reply.
+  // panel and the move list; in a teaching game only a move that changes
+  // the game pauses the reply (verdict.js teachingPause) — the rest waits
+  // for the review, so the game keeps its flow.
   const loss = afterHuman && a && g.before && g.game.current.parent?.id === g.before.nodeId ? moveLoss(g.before, a, g.humanColor) : null;
   if (loss != null) (g.verdicts ||= {})[g.game.current.id] = loss;
-  if (loss != null && teachingOn() && verdictOf(loss, state.settings.playerRank) === "mistake") {
-    const best = g.before.moves[0];
+  const best = g.before?.moves?.[0];
+  if (loss != null && teachingOn() && teachingPause(loss, state.settings.playerRank, best ? g.humanColor * best.scoreLead : null)) {
     g.thinking = false;
     const move = g.game.current.move;
     // One reason, from the two searches already made (no new search).

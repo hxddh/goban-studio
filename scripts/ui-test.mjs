@@ -194,7 +194,6 @@ async function clickPoint(page, x, y) {
 async function onboard(page, choice = 1, { placement = false } = {}) {
   await page.goto(origin + "/");
   await page.waitForSelector(".ob-card");
-  await page.click(".ob-card .btn.primary");
   await page.click(`.choice >> nth=${choice}`);
   await firstLanding(page);
   await page.click(".today .hero .btn.primary");
@@ -270,7 +269,6 @@ await check("first run → Today, then lesson one in one click for a new player,
     await page.waitForSelector(".ob-card");
     return Date.now() - t0;
   });
-  await page.click(".ob-card .btn.primary");
   await page.click(".choice >> nth=0");
   // Nobody is dropped into a lesson: the app's home first, its hero offering lesson one.
   await page.waitForSelector('.page.today [data-hero="first-lesson"]');
@@ -585,7 +583,6 @@ for (const [locale, scheme] of [["en-US", "light"], ["ja-JP", "dark"]]) {
     await page.goto(origin + "/");
     await page.waitForSelector(".ob-card");
     await audit(page, "onboarding");
-    await page.click(".ob-card .btn.primary");
     await page.click(".choice >> nth=1");
     await firstLanding(page);
     await audit(page, "Today on the first run");
